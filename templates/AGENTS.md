@@ -26,6 +26,16 @@ Durable conventions that hold regardless of the specific task — verify the spe
 - **Thread long logic and guard it with `endon`.** Un-threaded long `wait` loops freeze the game / drop connections; persistent threads need `self endon("death")` or `level endon("end_game")`. Mind `self` vs `level` scope.
 - **Errors: turn on real output first.** In Launcher → dvars set `dev 2` and `logfile 1`, reproduce, then read the exact message before theorizing. Separate compile vs linker (`scriptparsetree` / unresolved external = something not in the `.zone` or missing `#using`) vs runtime.
 
+## Code style (GSC/CSC) — match exactly, don't copy the file you're editing
+
+The stock scripts and usermap templates predate these conventions (tabs, `( padded )` calls) — **do not mirror them.** The full craft (hooks vs override, threading/scope, clientfields, init/main, entry files) is in the **bo3-scripting** skill: **load it before writing or editing any GSC/CSC** (and its siblings for mapping, HUD/Lua, assets, zombies AI, debugging). When skills aren't available, these five are the floor and still apply:
+
+- **4 spaces, never tabs.**
+- **No padding inside brackets** — `func(arg)`, `arr[i]`, `if (x)`; never `func( arg )` or `arr[ i ]`.
+- **Always braces**, body on its own line — never `if (x) doThing();`.
+- **Naming** — `snake_case` functions/vars, `UPPER_SNAKE` for `#define`, `_`-prefix + `private` keyword for file-local helpers.
+- **Tunables in a `#insert`ed `.gsh`** — not magic numbers, not config dvars.
+
 ## Verify shipped tokens against ground truth
 
 The corpus is a starting point, not the final authority. For anything Treyarch **shipped** — exact function names, entity KVPs, asset fields, error strings, file paths — confirm against the **raw mod-tools install** (the game's own files under your BO3 root) before stating it as fact. Decompiled and community sources can be paraphrased or subtly wrong; the shipped files are ground truth. Drop any claim you can't ground in either the corpus or the raw install.

@@ -60,6 +60,8 @@ When there is **no** hook and you must change stock behavior, you **can and some
 
 `zm_usermap.gsc` (`#namespace zm_usermap`) is the **shared usermap framework** — opt-in, fx init, character/loadout/perk/sound setup. Your map file `zm_<map>.gsc` (e.g. `zm_test.gsc`) is **your** entry point: its `main()` calls `zm_usermap::main()` **first**, then wires your own map-specific systems and logic. Put custom content in the map file; don't fork the usermap scaffold.
 
+Wiring from the map file's own `main()` is fine — a usermap's `zm_<map>.gsc`/`.csc` `main()` runs early enough to register callbacks, clientfields, and spawn hooks, so you do **not** need a system for small map-local additions. When a feature outgrows a few functions, give it **its own file** instead: `_<feature>.gsc` / `_<feature>.csc` (own `#namespace`, added to the `.zone`). Self-register it with `REGISTER_SYSTEM("<feature>", &__init__, undefined)` so its `__init__` runs automatically at the system-init phase — the map file only needs to `#using` it, no explicit `init()` call. That's the clean home for anything with real init logic and it keeps the map file thin. Server and client halves are separate files sharing a `_<feature>.gsh` of constants.
+
 ## Threading & scope discipline
 
 - **Thread long-running logic.** A long `wait` loop on the main thread blocks the game and drops connections (`Connection Interrupted`) — `thread` it.
@@ -78,6 +80,8 @@ GSC is the **server** (gameplay, AI, spawning, score); CSC is the **client** (HU
 **GSC-FX gotcha:** if FX must run from GSC, spawn the model, wait a frame (`WAIT_SERVER_FRAME`), then `PlayFXOnTag` — FX spawned on the same frame as the model often won't play.
 
 ## Code style & conventions
+
+Match these exactly — and when **editing an existing file, don't infer style from it**: the stock scripts and usermap templates use tabs and `( padded )` calls, and mirroring them is the single most common way these rules get ignored. The first two are the most-violated.
 
 - **4 spaces, never tabs.**
 - **Always braces.** Never `if (x) doThing();` — write `if (x) { doThing(); }` with the body on its own line(s). Same for loops.
