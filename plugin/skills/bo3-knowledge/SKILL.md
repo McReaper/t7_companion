@@ -1,6 +1,6 @@
 ---
 name: bo3-knowledge
-description: How to search the t7kb knowledge base for Black Ops 3 / BO3 / Treyarch mod-tools questions, and the querying/reliability/grounding method every other bo3-* skill builds on. Use as the general entry point for topics without a dedicated craft skill (perks, wonder weapons, easter eggs, community packs, general lore/mechanics). For GSC/CSC, debugging, Radiant mapping, assets/porting, zombies AI, HUD/Lua, or atmosphere specifically, prefer bo3-scripting, bo3-debugging, bo3-mapping, bo3-assets, bo3-zombies-ai, bo3-hud-lui, or bo3-atmosphere instead.
+description: How to search the t7kb knowledge base for Black Ops 3 / BO3 / Treyarch mod-tools questions, and the querying/reliability/grounding method every other bo3-* skill builds on. Use as the general entry point for topics without a dedicated craft skill (perks, wonder weapons, easter eggs, community packs, general lore/mechanics). For GSC/CSC, debugging, Radiant mapping, building/compiling, assets/porting, zombies AI, HUD/Lua, or atmosphere specifically, prefer bo3-scripting, bo3-debugging, bo3-mapping, bo3-compiling, bo3-assets, bo3-zombies-ai, bo3-hud-lui, or bo3-atmosphere instead.
 ---
 
 # Answering BO3 modding questions with t7kb

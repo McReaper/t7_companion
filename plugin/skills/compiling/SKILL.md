@@ -1,0 +1,106 @@
+---
+name: bo3-compiling
+description: How to actually build a Black Ops 3 map or mod — the Mod Tools Launcher pipeline (Compile the map, Light/LEDs, Link the Fast Files, Run), what each mod-tools binary does, the TA_* environment, converting GDT/assets before linking, usermap-vs-mod builds, fast iteration (which stage to re-run), and the exact console command lines to run the whole build headlessly so an agent can compile for the user without the GUI. Use when building/compiling/linking/lighting a map or mod, driving the Launcher or its binaries from the command line, or deciding what to rebuild — as distinct from diagnosing the resulting errors (bo3-debugging) or the geometry that causes compile failures (bo3-mapping).
+---
+
+# Building & compiling BO3 maps and mods
+
+Shipping a map/mod is a **pipeline of separate stages**, each a different tool with its own inputs — the craft is knowing which stage owns which output so you rebuild only what changed and read failures at the right stage. This skill is the workflow and its gotchas; look exact zone syntax, dvars, and binary flags up in **t7kb** (`search` then `get`) and confirm shipped tokens against the raw mod-tools install. For *reading* a build error see **bo3-debugging** (compile vs linker vs unresolved-external vs runtime); for geometry that fails the map compile (leaks, triangle budget) see **bo3-mapping**.
+
+## The Launcher and its environment
+
+Everything runs through the **Mod Tools Launcher** (`bin/modlauncher.exe`, opened from Steam as *Call of Duty: Black Ops III — Mod Tools*). It orchestrates the per-tool binaries in `bin/` and needs three environment variables pointing at the install (set once by `modtools_setenv.bat` / on first launch): **`TA_TOOLS_PATH`** and **`TA_GAME_PATH`** (both the BO3 root) and **`TA_LOCAL_ASSET_CACHE`** (`share/assetconvert/`). If tools misbehave in odd ways, a missing/stale `TA_*` var is a common root cause — check them before anything else.
+
+New maps: **Add Map** from the toolbar, and always prefix the name with **`mp_`** (e.g. `mp_testmap`) — the un-prefixed form causes build/run errors later. Add Map scaffolds the map's zone/GDT/script files so it's buildable.
+
+## The four build stages (the Build Options panel)
+
+The right-hand Build Options are four independent checkboxes run by the **Build** button — tick only the ones whose input changed:
+
+- **Compile** (quality dropdown) — compiles the Radiant `.map` geometry into the level BSP via `cod2map64.exe`: portals/visibility, collision, umbra occlusion. The full pass runs `-navmesh -navvolume`; the fast option is the entity-only `-onlyents` pass (see *Iterate fast*). This is where BSP **leaks** and **`MAX_MAP_TRIANGLES`** surface — see **bo3-mapping** for the geometry side.
+- **Light** (dropdown **Low / Medium / High**) — bakes lighting and writes the **LEDs** (Lighting Export Data) through Radiant. Lighting work is invisible in-game until this runs, and the LEDs must be exported or the map loads unlit. In the GUI this opens Radiant; **it also bakes headlessly** via `radiant_modtools.exe -ledSilent` (see *Headless build* below) — Radiant isn't only a GUI here. Use Low/Medium while iterating, High for a final pass.
+- **Link** — runs `linker_modtools.exe`: reads the map/mod's **`.zone`** file(s) and packs every listed asset into the shipped **Fast Files** (`.ff`). An asset that isn't in the `.zone` won't be in the build — that's the classic `Could not find scriptparsetree` / unresolved-external at this stage (**bo3-debugging** owns diagnosing it). Linking is the step that turns "edited in the tools" into "loadable by the game".
+- **Run** — launches the game on the built map/mod.
+
+A normal first build ticks all four; day-to-day you re-tick only what changed (see *Iterate fast* below).
+
+## Assets must be converted before you link
+
+The linker packs **converted** assets, not raw source — so the asset pipeline has to run first:
+
+- **GDT / APE** — models, materials, images, sounds, and FX are defined in **GDTs**, edited in **APE** (`asseteditor_modtools.exe` — Asset Property Editor). Save the GDT after editing; the **GdtDB** service (`GdtDBTray.exe`) indexes GDTs so the linker can find them (the Launcher runs a `gdtdb /update` pass — watch its output line). An asset edited but not saved/indexed links stale.
+- **Model/anim bins** — source models and animations are converted to engine `.bin` via **`export2bin.exe`** / **`exportxbin.exe`** (usually invoked by the export step from Maya/Blender or on GDT convert). A model that shows source-but-not-in-game usually never got binned. Porting/rigging detail lives in **bo3-assets**.
+
+Order per iteration: **save GDT → (GdtDB indexes) → Compile/Light as needed → Link → Run**.
+
+## Usermap vs mod — different build target, different output
+
+Where the build lands and what can be overridden depends on the target (this mirrors the scripting/entry-file split — see **bo3-scripting**):
+
+- **Usermap** — built under `usermaps/<mp_name>/`; the map's own zone. Simpler, but note the usermap trap that **script debug line numbers are stripped** (build as a mod to get real `file '…' line N` — see **bo3-debugging**), and some stock scripts can't be overridden from a map folder.
+- **Mod** — built under `mods/<modname>/`; carries per-line script debug info and can override stock scripts a usermap can't. Prefer a mod build when you need real error lines or to override shipped behavior.
+
+Which assets go into the Fast File is entirely the **`.zone`** (`zone_source/*.zone`) — adding a script/model/sound means adding its line there, then re-linking. Look the exact `.zone` entry syntax up in t7kb.
+
+## Iterate fast — rebuild only what changed
+
+The stages are decoupled on purpose; the slow full build is only for the first pass or a geometry change.
+
+- **Script-only change** (GSC/CSC/Lua) → **Link** alone. No Compile, no Light — scripts aren't in the BSP. Fastest loop.
+- **Entity-only change** (moved/added spawners, script_structs, KVPs — no brush edits) → the map compiler's **`-onlyents`** fast path re-exports just entities. It's invalid the moment any *brush* geometry changed (throws a brush-count mismatch) — that forces a **Full Compile**.
+- **Geometry change** (brushes/patches) → **Full Compile** (+ Light if it affects lighting) → Link.
+- **Lighting-only change** → **Light** → Link; no recompile.
+- **Asset edit** (GDT/model/material) → save + let GdtDB index → **Link**.
+
+When a build hangs or fails, isolate by running one stage at a time and read that stage's output — don't re-run the whole pipeline blind. Capture the exact message and take it to **bo3-debugging**.
+
+## Headless build — the agent can compile for the user
+
+Every stage is a **console binary**; the Launcher GUI only chains them. So an agent can run the whole build from the shell with no GUI.
+
+**Prefer the `t7kb build` subcommand if the `t7kb` binary is installed** (it's the same tool that serves the MCP server, so it usually is). It runs this whole pipeline with every gotcha below handled — cwd, arg passing, the detached light poll, output-file verification — and prints a **compact per-stage summary** (or `--json`) with the first actionable error, instead of the hundreds of lines each tool spews:
+
+```
+t7kb build zm_mymap                          # usermap: compile,light,link (reads $TA_TOOLS_PATH)
+t7kb build zm_mymap --stages link            # script-only iteration — just re-link
+t7kb build my_mod --mod --stages link        # a mod's zone
+t7kb build zm_mymap --onlyents --json        # fast entity-only compile, machine-readable report
+```
+
+Flags: `--stages compile,light,link,run`, `--light low|medium|high`, `--onlyents`, `--mod`, `--tools-path`/`--game-path` (default `$TA_TOOLS_PATH`/`$TA_GAME_PATH`), `--verbose` to stream raw tool output. It exits non-zero and surfaces the parsed error (e.g. a linker `SCRIPT ERROR … line N`) when a stage fails — hand that to **bo3-debugging**.
+
+Under the hood it runs the exact command lines the stock Launcher constructs (below) — reach for these directly only when `t7kb build` isn't available. `%T` = `TA_TOOLS_PATH`, `%G` = `TA_GAME_PATH` (both the BO3 root; the `TA_*` vars must be set — the tools resolve their paths from them), `<map>` = full map name, `<pp>` = its first two letters (`mp`/`zm`), `<mod>`/`<zone>` = mod container and zone name.
+
+```
+# 1. Index GDTs (always first; assets edited but not indexed link stale)
+%T/gdtdb/gdtdb.exe /update
+
+# 2. Compile map geometry (BSP)
+%T\bin\cod2map64.exe -platform pc -navmesh -navvolume -loadFrom %G\map_source\<pp>\<map>.map %G\share\raw\maps\<pp>\<map>.d3dbsp
+#   entity-only fast recompile: swap "-navmesh -navvolume" for "-onlyents"
+
+# 3. Bake lighting / LEDs — headless, no GUI (quality: +low | +medium | +high)
+%T/bin/radiant_modtools.exe -ledSilent +medium +localprobes +forceclean +recompute %G/map_source/<pp>/<map>.map
+
+# 4. Link Fast Files
+%T/bin/linker_modtools.exe -language english -modsource <map>                          # a map
+%T/bin/linker_modtools.exe -language english -fs_game <mod> -modsource <zone>           # a mod (repeat per zone)
+
+# 5. Run
+%G/BlackOps3.exe +set fs_game <mod> +devmap <map>      # drop "+set fs_game <mod>" for a plain usermap
+```
+
+Notes: `-language english` is the minimum (Treyarch's launcher repeats `-language <lang>` per language for an all-languages build); the linker prints an `L3akMod` banner then the zone's link log; a failing stage names itself in its output — feed that to **bo3-debugging**. Run only the stages whose input changed (see *Iterate fast*): a script-only change is `gdtdb /update` → `linker … -modsource` and nothing else.
+
+**Shell gotchas (verified on a real headless build):**
+
+- **Run these from PowerShell or `cmd`, not git-bash/MSYS.** MSYS rewrites the `/update` and `+low`/`+medium` arguments into filesystem paths (silently breaks `gdtdb` and the light step) *and* mis-reports a native exe's exit code — a clean `exit 0` came back as `127`. In PowerShell read the true code from `$LASTEXITCODE`.
+- **Run `cod2map64` with the working directory set to `bin/`.** It loads `default_navmesh_settings.json` from the current directory; launched from elsewhere it aborts navmesh with `ERROR: Unable to load navigation mesh generation settings` (the geometry `.d3dbsp` still writes, but you get no navmesh — AI won't path).
+- **The light step detaches.** `radiant_modtools.exe -ledSilent` is a GUI-subsystem exe: it returns immediately with no captured stdout and no usable exit code, then bakes in the background. Wait for it by polling for the output `.led` (or for the process to exit), not on a synchronous return.
+- **Outputs to expect** (confirm the build by their mtime): compile → `share/raw/maps/<pp>/<map>.d3dbsp` (+ `<map>_navmesh.hkt`, `<map>.d3dprt`); light → `share/raw/maps/<pp>/<map>.led`; link → Fast Files in `usermaps/<map>/zone/` (or `mods/<mod>/zone/`): `<map>.ff` + `<map>.xpak`.
+
+Confirm any flag not shown here against the raw install / t7kb before relying on it.
+
+## Don't invent
+
+Binary names, the `TA_*` vars, the four stages, and the `mp_` rule above are from the shipped mod-tools install — treat them as ground truth. But exact `.zone` syntax, `linker`/`cod2map` command-line flags, and dvars are shipped tokens: confirm them against the raw install (or t7kb) before stating them, and don't assert a build option or flag exists if neither supports it.
