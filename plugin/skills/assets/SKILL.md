@@ -1,6 +1,6 @@
 ---
 name: bo3-assets
-description: How to get a model, material/texture, or animation into Black Ops 3 — extracting from other CoD titles (Wraith, Greyhound, Cordycep), the weapon/character porting pipeline (Maya/Blender export → APE compile → materials → anims), rigging custom models, and common export/GDT pitfalls. Use for porting, custom modeling, texturing, or animation work, as distinct from GSC/CSC scripting.
+description: How to get a model, material/texture, or animation into Black Ops 3 — extracting from other CoD titles (Saluki, Greyhound, Cordycep), the weapon/character porting pipeline (Maya/Blender export → APE compile → materials → anims), rigging custom models, and common export/GDT pitfalls. Use for porting, custom modeling, texturing, or animation work, as distinct from GSC/CSC scripting.
 ---
 
 # Assets: models, materials, porting, animation
@@ -9,22 +9,47 @@ Sourcing here is mixed: raw Discord threads run low reliability (~0.25), but a r
 
 ## Extraction tools aren't interchangeable
 
-- **Wraith** — the classic ripper for BO3/BO2/BO1/MW/MW2/MW3; exports `.MA` (Maya scene) + `.XMODEL_EXPORT` directly. Good default for older titles.
-- **Greyhound** — exports across most CoD games, including live-loading a running game to pull whatever's in memory (e.g. the factory zombie rig, a stock character). Also used to automate GDT/asset creation, not just export.
-- **Cordycep** — needed for newer Treyarch/IW titles (Cold War, MW2019+, Vanguard, Warzone) that Wraith/Greyhound can't reach directly, since it works around the anti-cheat/newer packing rather than reading files live.
-- **Legion** — a *different* tool needed specifically for **Apex Legends**, which packs assets as `.rpak` archives Cordycep doesn't handle. Don't assume Cordycep covers every "newer" title — check which archive format the source game actually uses.
-- **Spiki's tools** — automate GDT/APE asset creation specifically for Treyarch titles (BO3/BO4); pairs well with Greyhound/Cordycep exports to skip a lot of manual APE data entry.
-- **Kronos** or **`export2bin.exe`** (ships in the mod tools' `bin/` folder) — either converts `.xmodel_export`/`.xanim_export` to the `.xmodel_bin`/`.xanim_bin` APE actually wants; Kronos additionally converts ripped textures to `.TIFF` (the only image format BO3 supports).
+Pick by two axes: the **source game** (which tool can even read it) and the **output you need** (raw model / `_bin` / GDT). This landscape churns — the tool that was standard a few years ago is usually superseded now, so treat names below as roles and verify the current build.
+
+**Rippers — source game → raw model/anim/image (Cast, SEModel, SEAnim, `.MA`, `.xmodel_export`):**
+- **Saluki** — the current default; a Rust rewrite that succeeds Greyhound and reads every PC CoD from CoD1 through the latest. Exports models/textures/anims/sounds as Cast/SEModel. On BO3, treat it as the *extract* step and build the GDT afterwards in APE (or MakeCents/Spiki).
+- **Greyhound** — the long-time BO3-era workhorse (a Wraith fork, now maintained by dest1yo); can live-load a running game to pull what's in memory (a factory rig, a stock character). Older builds emitted a `WraithBO3.gdt` (auto GDT of models+materials, written on close); recent builds ship raw formats only.
+- **Kobra** — a Greyhound fork (VenomModding) that re-adds the GDT (and XEffect) support Greyhound cut — reach for it to get the old auto-`WraithBO3.gdt` behaviour back.
+- **Wraith (Archon)** — the original (DTZxPorter), superseded by Greyhound→Saluki and effectively frozen. Keep it only for an old tutorial that specifically calls for it.
+- **Cordycep** — a loader/dumper for modern Ricochet-protected titles (AW, IW, MW2019, MWII, MWIII, Cold War, Vanguard, Warzone): it unpacks the game, then you export with Greyhound/Saluki. Pair it with a ripper rather than expecting it to export on its own.
+- **Legion** — the tool for Apex Legends `.rpak` archives. Confirm the source game's archive format first, since one ripper rarely covers everything "newer."
+
+**Getting to `_bin` (what APE loads) — mind the format bridge:**
+- **`export2bin.exe` / `exportxbin.exe`** ship in the mod tools' `bin/` folder. They take `xmodel_export`/`xanim_export` (the text format) and produce `_bin`; `exportxbin` also converts the other way (`_bin → _export`). Their input is the `*_export` format.
+- Since those converters read `*_export` while Saluki emits Cast/SEModel, route Cast through **Maya/Blender** (import via the Cast/SEModel plugin, re-export as `xmodel_export` with the CoD tools) and *then* to `_bin`. A ripper that already emits `xmodel_export` (older Wraith/Greyhound) feeds the converter directly. For a weapon/character you open Maya anyway (joints, materials), so this bridge is free; for a bare prop it is one extra hop.
+- **ExportX** (DTZxPorter, standalone) does the same conversion with a watcher mode that converts on save — the modern stand-in for the older **Kronos** converter (also DTZxPorter's, now superseded). Prefer ExportX or the shipped `export2bin`.
+- **GameImageUtil** (Scobalula) preps ripped images into what BO3 wants (power-of-2, TIFF).
+
+**Producing a GDT — two different meanings:**
+- *Content GDT* (the xmodel/material/image asset for a ported model): author it in APE, or automate it — **MakeCents** (drag-drop: `_export`→`_bin`, dds→TIFF, and writes the xmodel+material GDT) or **Spiki's tools** (Treyarch-title GDT/APE automation for BO3/BO4).
+- *Config GDT* (BO3's own logic assets — AI behavior trees/ASM, physicspresets, weaponfiles, sounddefs/aliases, tables, FX, script bundles): **HydraX** (Scobalula) decompiles these into GDTs under `source_data`. It is BO3→BO3 and covers the logic assets, so pair it with a ripper for the models/images.
+
+**Whole-map geometry:**
+- **Husky** (Scobalula) — extracts a whole level's BSP geometry to OBJ.
+- **C2M** (sheilan102) — load a map in-game, then export it (OBJ/MTL + PNG).
+
+**Iterate faster / keep GDTs clean:**
+- **NevisX** — live GDT updates, so changes show without a full recompile.
+- **GDTDupePurger** — clears duplicate GDT assets (the `Duplicate '<type>' asset` error).
+- **Harmony** (Scobalula; the repo/folder may read "Harmonix") — edits sound aliases live from CSV, the audio counterpart to NevisX; the bulk of audio work lives in **bo3-atmosphere**.
+- **CoDCharacterTools** (KingslayerKyle, Maya) — automates porting a playable character rig from another CoD to T7.
+
+Look up exact tool versions, flags, and export settings in t7kb or the tool's own docs — this list is a starting point that goes stale.
 
 ## The weapon porting pipeline (also the template for character/prop ports)
 
 Order matters here — skipping ahead (e.g. exporting before attaching joints) is the usual cause of a silently broken port:
 
-1. **Obtain** the source assets (Wraith/Greyhound/Cordycep/Legion — pick per source game, see above). Rip **every** piece — scope, magazine, and body are separate models.
+1. **Obtain** the source assets (Saluki/Greyhound/Cordycep/Legion — pick per source game, see above). Rip **every** piece — scope, magazine, and body are separate models.
 2. **Prepare in Maya.** Open the `.ma` via `File > Open`, never drag-and-drop — dragging merges it into the scene and namespaces everything, causing problems later.
 3. **Attach imported joints** to the main model's root (`j_gun`/`tag_weapon`).
 4. **Export** via **Call of Duty Tools → Export XModel**, selecting the full hierarchy (**`Select > Hierarchy`**, not just the root/`tag_origin` — clicking only the root joint looks like it selected everything but doesn't, and is the single most common "export fails silently" cause).
-5. **Convert** with Kronos or `export2bin.exe` to `.xmodel_bin`.
+5. **Convert** the exported `xmodel_export` from step 4 to `.xmodel_bin` with `export2bin.exe`/`exportxbin.exe` (shipped in `bin/`) or ExportX. This Maya-produced `xmodel_export` is also what bridges a Cast/SEModel rip (e.g. Saluki) into a format the converter accepts.
 6. **Compile in APE**: new GDT (save it under `Black Ops 3\source_data` — a GDT saved elsewhere silently won't reappear in APE/Radiant next session), `xmodel` asset, type **animated**, `BulletCollisionLOD` = LOD0, submodels parented to the main model's root tag.
 
 **ADS export tags depend on the source game** — a common silent-fail point: from a Treyarch-source rig, export only `tag_view`+`tag_torso` for ADS; from an IW-source rig, export only `tag_view`+`tag_ads`. Grabbing the wrong pair for the source you ripped from is a frequent cause of broken ADS.
@@ -33,7 +58,7 @@ Order matters here — skipping ahead (e.g. exporting before attaching joints) i
 
 **Materials**: BO3 is PBR — diffuse/albedo, ambient occlusion, normal, specular, gloss. From an older CoD, the color map (`_c`) maps to diffuse and the environment map (`_e`/`_env`) maps to gloss. Weapon materials: `Material Category` = Geometry, `Material Type` = `lit_weapon`. Two easy-to-hit pitfalls: leaving **Surface Type** at `<error>`/`error` (use `<none>` instead), and non-power-of-2 image dimensions (BO3 requires power-of-2 textures). Set one material's fields, then duplicate + rename for the rest rather than re-entering settings each time — same trick works for xanim assets.
 
-**Animations**: convert with the community `conversion_rig.ma` (root bone becomes a child of `t7:tag_weapon_right`, rename joints with `renameRig.mel`, import the anim, strip the rig with `removeNamespace.mel`, rename the root back to `tag_weapon`). **Cold War's animation filenames are dehashed** — pull weapon anims from Modern Warfare instead, it works more reliably. Compile in APE as an `xanim` asset — the settings differ by animation kind: **viewmodel anims** use Use Bones unchecked / `Type` = `relative`; **everything else (world/character anims)** uses Use Bones checked / `Type` = `delta` — mixing these up is a common cause of a ported anim looking right on the weapon but broken on the world model, or vice versa. Check **Looping** for idle/sprint-loop/slide-loop/swim anims regardless of type.
+**Animations**: convert with the community `conversion_rig.ma` (root bone becomes a child of `t7:tag_weapon_right`, rename joints with `renameRig.mel`, import the anim, strip the rig with `removeNamespace.mel`, rename the root back to `tag_weapon`). **Cold War's animation filenames are dehashed** — pull weapon anims from Modern Warfare instead, it works more reliably. Compile in APE as an `xanim` asset — the settings differ by animation kind: **viewmodel anims** use Use Bones unchecked / `Type` = `relative`; **everything else (world/character anims)** uses Use Bones checked / `Type` = `delta` — mixing these up is a common cause of a ported anim looking right on the weapon but broken on the world model, or vice versa. Check **Looping** for idle/sprint-loop/slide-loop/swim anims regardless of type. For the full DCC→`.xanim_export`→`export2bin`→APE pipeline and its many silent-failure traps (the Quality field's frame-doubling, the export2bin single-argument mode, notetracks that must be added in APE not Maya, the required Model File), see **bo3-animation**.
 
 Finish: `bulletweapon` asset in APE, add to the map's zone file (`weapon,<name>`), drag it in from Radiant's entity browser.
 
@@ -56,7 +81,7 @@ Scene/cinematic, vehicle, killstreak, and collectible data lives in **script bun
 ## Common pitfalls
 
 - **Blender's current Blender-COD plugin (the GitHub one) can break UV export.** If ported textures look wrong/shifted after export, community consensus is to fall back to a legacy release rather than debug the current one.
-- **Duplicate GDT asset errors** (`Duplicate 'material' asset '<name>' found in ...gdt:<line>`) mean the same asset name exists in two GDTs (yours and a shared/stock one) — delete your duplicate entry, don't rename around it; it's a naming collision, not a corruption.
+- **Duplicate GDT asset errors** (`Duplicate 'material' asset '<name>' found in ...gdt:<line>`) mean the same asset name exists in two GDTs (yours and a shared/stock one) — delete your duplicate entry, don't rename around it; it's a naming collision, not a corruption. **GDTDupePurger** clears these in bulk.
 - **Ragdoll behavior for a custom model** goes through `RagdollSettings` — a dragged-in stock ragdoll setup silently keeps stock proportions/behavior unless you edit it for your model.
 
 ## Don't invent
