@@ -49,12 +49,21 @@ Prefer a **hook** (Inversion of Control): most stock systems expose seams so you
 
 When there is **no** hook and you must change stock behavior, you **can and sometimes should override**: copy the stock file into your mod/map `scripts/` at the **same path**, add it to your **`.zone`**, and the engine loads your version instead of the shared one. Caveats: some scripts override only from a **mod**, not a map folder (a common "my copy is ignored"); override the **narrowest** script (overriding low-level shared like `array_shared` breaks its dependents); and an override diverges from stock, so reach for a hook first.
 
-## `init` vs `main` (REGISTER_SYSTEM_EX)
+## System registration: `REGISTER_SYSTEM` vs `REGISTER_SYSTEM_EX`
 
-`REGISTER_SYSTEM_EX("name", &init, &main, undefined)` runs `init` then `main`. Split responsibilities:
+Both self-register a feature so its entry point(s) run automatically at the engine's **system-init phase** — the map file only needs to `#using` the file, no explicit call. They differ only in how many phases you get:
 
-- **`init`** — everything that must *exist before runtime*: `clientfield::register` (must happen here, before the first network frame), `flag::init`, instantiate the system's state `class`, register callbacks / spawn functions, `#precache` setup.
+- **`REGISTER_SYSTEM("name", &__init__, undefined)`** — one entry point, `__init__`. Use it when a single init-time pass is all you need.
+- **`REGISTER_SYSTEM_EX("name", &init, &main, undefined)`** — two, `init` then `main`. Use it when you also need a runtime phase.
+
+Split responsibilities across the two phases:
+
+- **`init` / `__init__`** — setup that must *exist before runtime*: `clientfield::register` (must happen here, before the first network frame), `flag::init`, instantiate the system's state `class`, register callbacks / spawn functions, `#precache`.
 - **`main`** — *runtime*: wait for the game to start, then the loops, spawns, and behavior.
+
+Treyarch's own labelling of which of the two phases is the "pre-load" vs "post-load" one is famously confusing and even the community disagrees on it — don't lean on a precise ordering; lean on the functional split above. **Map-placed entities (Radiant triggers, `script_struct`s) are available by the time either phase runs** — only entities you `Spawn()` yourself in script aren't there until that code runs — so a lookup like `GetEntArray("my_trigger")` works from `__init__`.
+
+For a small map-local feature you don't need a system at all: a plain `feature::init()` call from the map's `zm_<map>.gsc` `main()` is fine, and is how map templates wire things up. Reach for `REGISTER_SYSTEM` when the feature is a self-contained file you'd rather have auto-register (the map file just `#using`s it) than call explicitly — both are correct, it's a coupling/style choice, not a timing one.
 
 ## Entry files: `zm_usermap.gsc` vs `zm_<map>.gsc`
 
@@ -88,7 +97,7 @@ Match these exactly — and when **editing an existing file, don't infer style f
 - **No padding inside brackets.** Write `func(arg)` and `arr[i]`, never `func( arg )` or `arr[ i ]` — no space after `(`/`[` or before `)`/`]`.
 - **Naming.** `snake_case` for functions and variables; `UPPER_SNAKE` for `#define` constants; **prefix private functions with `_`** (and use the `private` keyword); registered system entry points are often `__init__` / `__main__`.
 - **Regions.** Group distinct areas of a file with `/* region NAME */ … /* endregion */`.
-- **Debug in dev blocks.** Wrap debug/dev-only code in `/# … #/` — it's compiled out of release. A `#define DEBUG_X 0` flag + `PRINT_DEBUG_X` macro is the alternative when you want a runtime-toggleable print you can ship.
+- **Debug prints: use a `#define`-gated macro.** Guard debug output with a `#define`-toggled macro in the feature `.gsh`, the way Treyarch's own shipped systems do (e.g. hellround): `#define DEBUG_X 0` then `#define PRINT_X_DEBUG(__str) if(DEBUG_X) IPrintLnBold(__str)` (no commas inside `__str` — concatenate with `+`), called as `PRINT_X_DEBUG("msg " + val);`. Flip the flag to 1 to enable, back to 0 to ship. This is the reliable map-side path; it needs no dev/developer dvar to fire.
 - **IoC over hard calls.** Bind systems by registering callbacks / function pointers (e.g. an optional subsystem hooking a round-state event) rather than calling across them directly — less coupling.
 - **Validate before use.** `isdefined()` is the baseline against `undefined`; use the specific predicates (`IsPlayer`, `IsAlive`, `IsArray`, `IsEntity`, `IsFunctionPtr`, …) to check *kind/state*, not just existence.
 - **Constants in the `.gsh`**, `#insert`ed — one place to tune.

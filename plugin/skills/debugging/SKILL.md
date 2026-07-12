@@ -1,6 +1,6 @@
 ---
 name: bo3-debugging
-description: How to diagnose Black Ops 3 modding problems — make errors visible (developer/logfile, dev blocks, the S.R.E. call stack), get real line numbers, tell compile vs linker vs unresolved-external vs runtime apart, and drive the interactive dvar/devgui toolkit. Use when a map won't build or compile, won't load, crashes, or a script misbehaves at runtime, and when reading a script error, console output, or log file.
+description: How to diagnose Black Ops 3 modding problems — make errors visible (developer/logfile, debug macros, the S.R.E. call stack), get real line numbers, tell compile vs linker vs unresolved-external vs runtime apart, and drive the interactive dvar/devgui toolkit. Use when a map won't build or compile, won't load, crashes, or a script misbehaves at runtime, and when reading a script error, console output, or log file.
 ---
 
 # Debugging BO3 mods
@@ -17,7 +17,6 @@ In **Launcher → dvars** (or `+set …` on the command line), set:
 
 - **`developer 2`** — verbose script-error detail (`1` is the lighter dev mode).
 - **`logfile 1`** — async write (faster). Use **`logfile 2`** when chasing a hard crash: it syncs every line, so the tail survives the crash instead of being lost.
-- **`scr_mod_enable_devblock 1`** — runs your `/# … #/` dev blocks, so `assert`/`assertmsg` and debug prints inside them actually fire. This is a *separate* toggle from `developer`; without it, dev-block code stays silent.
 
 Reproduce, then read the **S.R.E. (script runtime error)** in the console — it prints the error plus a **call stack** naming the file for each frame. The full log is `console_mp.log`, written at the **`fs_game` root**: for a **usermap** that's the **game root** (`…/Call of Duty Black Ops III/console_mp.log`, *not* the `usermaps/<map>` folder); for a **mod** it's `mods/<modname>/console_mp.log`. Cheats/dev need the map launched via `devmap` or a loaded mod (`sv_cheats`).
 
@@ -49,4 +48,4 @@ Once it loads but *misbehaves*, drive it instead of rebuilding. Set dvars from t
 - **Isolate AI**: `g_spawnai 0` / `ai_disableSpawn` to remove zombies from the equation; `ai_showNavMesh`, `ai_showNavPaths`, `ai_showNavVolume` to see why pathing breaks.
 - **Geometry/collision**: `r_showCollision`, `r_showTris`, `g_bDebugRenderBulletMeshes`.
 - **Clientfields**: `com_clientFieldsDebug` for the server↔client state you can't otherwise see.
-- **In-script**: `assert`/`assertmsg` and prints inside `/# … #/` dev blocks; `IPrintLnBold` for a quick on-screen value; GSC debug-draw built-ins for world-space issues (look the exact names up in t7kb). The full dvar set lives in t7kb — name the symptom and search.
+- **In-script**: a `#define`-gated `PRINT_X_DEBUG` macro for map-side debug prints (see the scripting skill); `assert`/`assertmsg`; `IPrintLnBold` for a quick on-screen value; GSC debug-draw built-ins for world-space issues (look the exact names up in t7kb). The full dvar set lives in t7kb — name the symptom and search.
