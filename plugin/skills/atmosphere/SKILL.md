@@ -15,6 +15,10 @@ Sound variants aren't a naming convention you invent — they're gated through *
 
 **Gotcha:** `user_aliases.csv` is the example file the mod tools ship — it gets **overwritten on mod-tools updates**, so anything you add there is eventually lost. Create your own CSV named after your mod/map (same header row, same folder) and add it as its own `Sources` entry in the `.szc` instead.
 
+**Aliases are rebuilt at the *link* step** — there's no separate sound-zone build. Edit the CSV, re-**link** the map, and the new/changed aliases are in the fastfile; a script-only relink picks them up too.
+
+**`Storage` (loaded / streamed / primed) matters for timing.** A `streamed` one-shot can silently fail to fire when triggered at a precise instant (e.g. the first frame of a scripted sequence) — the stream isn't ready yet. For short one-shots that *must* play on cue, set `Storage` to **`loaded`** (held in memory, fires instantly); keep long loops/ambience `streamed`. If a callback provably runs (debug print fires) but you hear nothing, suspect the alias — WAV format (48 kHz/16-bit PCM) first, then `Storage`.
+
 **Don't reinvent what's already loaded**: roughly 6,600 sound aliases and ~1,150 ZM FX / ~470 MP FX ship usable without declaring anything — search t7kb for an existing alias/FX before authoring a new one.
 
 **Ambient rooms** (looping ambience + reverb per space) are defined in an ambients CSV (`share\raw\sound\ambients\`) and placed via a `trigger_multiple` in Radiant with `targetname: ambient_room`, `script_ambientroom: <name>`, and `CLIENTSIDE_TRIGGER` checked — size the trigger to match the room. `script_ambientpriority` breaks ties on overlapping triggers. Zombies' stock `_zm_audio.csc` already drives ambient-room switching (e.g. forcing a room during last stand); community setups (e.g. Ardivee's `_ambient_room.csc`) hook the same pattern for custom per-area ambience.

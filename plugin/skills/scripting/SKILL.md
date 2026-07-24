@@ -88,6 +88,24 @@ GSC is the **server** (gameplay, AI, spawning, score); CSC is the **client** (HU
 
 **GSC-FX gotcha:** if FX must run from GSC, spawn the model, wait a frame (`WAIT_SERVER_FRAME`), then `PlayFXOnTag` — FX spawned on the same frame as the model often won't play.
 
+## Playing animations on a `script_model` (and why "move + animate" is fiddly)
+
+On a plain `script_model` the **reliable playback primitive is `AnimScripted`** — which `scene::play` / `animation::play` wrap, and which shipped code also calls directly with a **string** anim anchored at a passed transform (e.g. `vehicle_death_shared` plays a crush anim: `self AnimScripted("anim_notify", self.origin, self.angles, crush_anim, "normal", …)`). **`SetAnim` and the `SetAnimKnob*` family are reported not to work on plain script_models in T7** — this is community-sourced (t7kb, ~0.25) and consistent with working map scripts that animate server script_models via `AnimScripted` instead, but it is *not* a shipped-token guarantee: treat it as a strong heuristic and test `SetAnim` on your own model before relying on it. `SetAnim` *does* work for **vehicles and AI** — their entity *type* carries an animtree/ASM, which is why a driving vehicle animates its turret relative to itself (`vehicle_shared`, `vehicleriders_shared`) — and for some CSC cases. Don't casually reach for `SetAnim(%anim)` on a script_model.
+
+Two prerequisites before `AnimScripted` on a script_model:
+
+- **Load an animtree:** `model UseAnimTree(#animtree)`, with `#using_animtree("generic")` (or a custom `.atr` you author/extend — both work; the tree just has to contain the anim) at the top of the file. Skipping this is a classic "plays in APE, silent in-game."
+- **Name the anim by string:** `model AnimScripted("notify", origin, angles, "my_xanim", "normal", "my_xanim", rate, blend)`. It **anchors at the `origin`/`angles` you pass** and plays the anim — root/delta motion included — from that **fixed world transform**; it does **not** track an entity you move afterwards. (`IsPlayingAnimScripted` / `StopAnimScripted(blend, b_clear)` manage it.)
+
+**Moving *and* animating**, given the anchor is frozen at play time, is one of:
+
+- **Re-anchor each frame** — drive a `script_model` align's `.origin` and re-issue the scene/`AnimScripted` at its new transform every tick. This repo's zipline does exactly this: `_travel` moves `align_model.origin` while `_glide_pose` re-plays `scene::play(IDLE)` every 0.05s so the pose re-anchors onto the moved align.
+- **Split phases** — movement by `LinkTo`/engine vehicle path with rotor/exhaust as **FX** (not anim), then hand off to one stationary anchored anim. BO1 Hue City's heli intro is this: a vehicle flies a node path in, is deleted, and a fake static model plays the anchored crash.
+- **Bake the travel into the anim** — an anim carrying root motion slides the model along its *baked* path from the fixed anchor (a zip, a flythrough); fine when the path is fixed, useless when it's data-driven from Radiant nodes.
+- **Make it a real vehicle/AI** — then `SetAnim` animates relative to the moving entity for free, at the cost of the full vehicle/ASM setup.
+
+Confirm `AnimScripted` / `UseAnimTree` signatures against the raw install and t7kb. See **bo3-animation** for compiling the anim and **bo3-atmosphere** for the FX side.
+
 ## Code style & conventions
 
 Match these exactly — and when **editing an existing file, don't infer style from it**: the stock scripts and usermap templates use tabs and `( padded )` calls, and mirroring them is the single most common way these rules get ignored. The first two are the most-violated.
@@ -98,8 +116,22 @@ Match these exactly — and when **editing an existing file, don't infer style f
 - **Naming.** `snake_case` for functions and variables; `UPPER_SNAKE` for `#define` constants; **prefix private functions with `_`** (and use the `private` keyword); registered system entry points are often `__init__` / `__main__`.
 - **Regions.** Group distinct areas of a file with `/* region NAME */ … /* endregion */`.
 - **Debug prints: use a `#define`-gated macro.** Guard debug output with a `#define`-toggled macro in the feature `.gsh`, the way Treyarch's own shipped systems do (e.g. hellround): `#define DEBUG_X 0` then `#define PRINT_X_DEBUG(__str) if(DEBUG_X) IPrintLnBold(__str)` (no commas inside `__str` — concatenate with `+`), called as `PRINT_X_DEBUG("msg " + val);`. Flip the flag to 1 to enable, back to 0 to ship. This is the reliable map-side path; it needs no dev/developer dvar to fire.
+- **Runtime debug triggers: use a `ModVar`, not a plain dvar.** A plain dvar can only be set at launch in a shipped usermap, so `heli_test 1` typed in the in-game console won't reach a `GetDvarInt`-polling loop. Register the name as a **mod variable** instead — settable live from the console — the way zm_test's hellround systems do (`zm_hellround_meteor.gsc` etc.): `ModVar("name", "")` to register/reset, then poll each frame and consume it:
+  ```gsc
+  ModVar("name", "");
+  while (true)
+  {
+      WAIT_SERVER_FRAME;
+      val = GetDvarString("name", "");
+      if (!isdefined(val) || val == "") { continue; }
+      ModVar("name", "");            // reset so it fires once per console entry
+      switch (Int(val)) { case 1: do_thing(); break; }
+  }
+  ```
+  Then in-game: type `name 1` in the console. Thread this from the system's `init`/`main`; guard against re-entry if the action is long-running.
 - **IoC over hard calls.** Bind systems by registering callbacks / function pointers (e.g. an optional subsystem hooking a round-state event) rather than calling across them directly — less coupling.
 - **Validate before use.** `isdefined()` is the baseline against `undefined`; use the specific predicates (`IsPlayer`, `IsAlive`, `IsArray`, `IsEntity`, `IsFunctionPtr`, …) to check *kind/state*, not just existence.
+- **Ternary must be fully parenthesized.** GSC/CSC *has* `cond ? a : b`, but the **whole expression** must be wrapped in parens — `x = (cond ? a : b);` (as stock does: `return ( x >= 0 ? 1 : -1 );`). Parenthesizing only the condition — `x = (cond) ? a : b;` — is a compile error (`syntax error, unexpected TOKEN_CONDITIONAL, expecting TOKEN_SEMICOLON`).
 - **Constants in the `.gsh`**, `#insert`ed — one place to tune.
 - **System state in a `class` instance** on `level` (`level.my_system = new my_system();`), not scattered `level.foo_*` fields.
 - **`flag::init("name")`** before you wait on or set a flag.

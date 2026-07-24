@@ -20,6 +20,7 @@ BO3 ships **no Maya plugin** — export is a community tool, **CoDMayaTools** (a
 - **Maya version:** the old Ray1235 build is **Python 2** and dies on Maya 2020+ with `Missing parentheses in call to 'print'`. On 2022+/2024 use a **Python-3 fork** (e.g. `xCortlandx/CoDMayaTools`, "Maya 2022+"). If the menu never appears, run `import CoDMayaTools` in the Script Editor and read the error — a `print` SyntaxError means wrong (Py2) fork.
 - **First-run registry:** CoDMayaTools stores its config in `HKCU\Software\CoDMayaTools`. On a fresh install its first-run wizard can crash (`menuItem: Object 'AutoUpdate' not found`); pre-seed the keys to skip it — `CurrentGame`=`CoD12` (BO3's internal id), `RootPath` and `CoD12RootPath` = the BO3 root.
 - **Import format is Cast.** DTZxPorter **deprecated SEanim/SEModel**; the current importer is the **Cast** plugin (`castplugin.py` + `cast.py`), loaded via the Plug-in Manager. Every modern ripper (Greyhound/Kobra/Saluki) already emits `.cast`.
+- **For the FX (`.efx`) that go *with* an animation** (a rotor blur, a muzzle/impact effect tied to the anim): **rip with Kobra, not Greyhound.** Greyhound dropped XEffect/GDT export and emits **zero `.efx`**; Kobra (its fork) re-added them, so BO1/older effects come out under `Kobra/.../<game>/fx/**.efx`. If your extraction has models/anims but no effects, that's why — see **bo3-fx** for editing/playing them.
 
 ## Importing a ripped anim to re-export it
 

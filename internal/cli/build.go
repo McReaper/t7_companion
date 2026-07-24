@@ -19,11 +19,13 @@ import (
 // so an agent can build a map or mod without the GUI Launcher and get back a
 // compact per-stage summary (plus the first actionable error) instead of the
 // hundreds of lines each tool spews. It shells the same binaries the Launcher
-// does — cod2map64, radiant_modtools, linker_modtools, gdtdb — with the three
-// non-obvious things they need baked in: cod2map runs with cwd=bin (else it
-// can't load default_navmesh_settings.json), args are passed via exec (no shell,
-// so no MSYS/`/update` mangling), and the detached light step is waited on by
-// polling for its .led output rather than a synchronous exit code.
+// does — cod2map64, radiant_modtools, linker_modtools, gdtdb — with the non-obvious
+// things they need baked in: each tool runs with cwd = its own exe directory like the
+// Launcher (cod2map needs cwd=bin to load default_navmesh_settings.json; gdtdb ties its
+// recorded asset paths to cwd, so a different cwd makes it flag every asset as a phantom
+// duplicate), args are passed via exec (no shell, so no MSYS/`/update` mangling), and the
+// detached light step is waited on by polling for its .led output rather than a synchronous
+// exit code.
 
 type buildOpts struct {
 	toolsPath string
@@ -84,30 +86,43 @@ func newBuildCmd() *cobra.Command {
 }
 
 func runBuild(cmd *cobra.Command, o *buildOpts, name string) error {
+	stdout := cmd.OutOrStdout()
+	rep, err := runBuildReport(o, name, stdout)
+	if err != nil {
+		return err
+	}
+	return finishBuild(stdout, o.jsonOut, rep)
+}
+
+// runBuildReport runs the mod-tools pipeline and returns the per-stage report. A
+// non-nil error is only a preflight/validation failure (bad args, no tools path,
+// tools not found) before any stage ran — stage failures are carried in the report
+// (rep.OK / rep.FailedStage). stdout receives per-tool output only when o.verbose.
+func runBuildReport(o *buildOpts, name string, stdout io.Writer) (buildReport, error) {
 	if len(name) < 2 {
-		return fmt.Errorf("map/mod name %q is too short", name)
+		return buildReport{}, fmt.Errorf("map/mod name %q is too short", name)
 	}
 
 	tools := firstNonEmpty(o.toolsPath, os.Getenv("TA_TOOLS_PATH"))
 	tools = strings.TrimRight(tools, `\/`)
 	if tools == "" {
-		return fmt.Errorf("no mod-tools path: pass --tools-path or set TA_TOOLS_PATH")
+		return buildReport{}, fmt.Errorf("no mod-tools path: pass --tools-path or set TA_TOOLS_PATH")
 	}
 	game := firstNonEmpty(o.gamePath, os.Getenv("TA_GAME_PATH"), tools)
 	game = strings.TrimRight(game, `\/`)
 
 	bin := filepath.Join(tools, "bin")
 	if _, err := os.Stat(filepath.Join(bin, "linker_modtools.exe")); err != nil {
-		return fmt.Errorf("mod tools not found at %s — build needs a Windows BO3 mod-tools install", bin)
+		return buildReport{}, fmt.Errorf("mod tools not found at %s — build needs a Windows BO3 mod-tools install", bin)
 	}
 
 	stages, err := parseStages(o.stages)
 	if err != nil {
-		return err
+		return buildReport{}, err
 	}
 	quality, err := normalizeLight(o.light)
 	if err != nil {
-		return err
+		return buildReport{}, err
 	}
 
 	pp := name[:2]
@@ -119,7 +134,6 @@ func runBuild(cmd *cobra.Command, o *buildOpts, name string) error {
 	if o.isMod {
 		rep.Kind = "mod"
 	}
-	stdout := cmd.OutOrStdout()
 
 	run := func(sr stageResult) bool {
 		rep.Stages = append(rep.Stages, sr)
@@ -132,9 +146,12 @@ func runBuild(cmd *cobra.Command, o *buildOpts, name string) error {
 
 	// gdtdb /update first (the Launcher does this before every build group).
 	if !o.skipGDT && (stages["compile"] || stages["light"] || stages["link"]) {
-		gdtdb := filepath.Join(tools, "gdtdb", "gdtdb.exe")
-		if !run(runStage("gdt", bin, gdtdb, 5*time.Minute, o.verbose, stdout, "/update")) {
-			return finishBuild(stdout, o.jsonOut, rep)
+		gdtdbDir := filepath.Join(tools, "gdtdb")
+		gdtdb := filepath.Join(gdtdbDir, "gdtdb.exe")
+		// Run gdtdb from its OWN directory, like the stock Launcher: it ties recorded asset paths to
+		// its cwd, so a different cwd makes a Launcher-built db flag every asset as a phantom duplicate.
+		if !run(runStage("gdt", gdtdbDir, gdtdb, 5*time.Minute, o.verbose, stdout, "/update")) {
+			return rep, nil
 		}
 	}
 
@@ -160,7 +177,7 @@ func runBuild(cmd *cobra.Command, o *buildOpts, name string) error {
 				sr.Note = "wrote " + filepath.Base(d3dbsp)
 			}
 			if !run(sr) {
-				return finishBuild(stdout, o.jsonOut, rep)
+				return rep, nil
 			}
 		}
 	}
@@ -169,7 +186,7 @@ func runBuild(cmd *cobra.Command, o *buildOpts, name string) error {
 		if o.isMod {
 			run(stageSkipped("light", "not applicable to a mod"))
 		} else if !run(runLight(bin, mapSrc, led, quality)) {
-			return finishBuild(stdout, o.jsonOut, rep)
+			return rep, nil
 		}
 	}
 
@@ -182,7 +199,7 @@ func runBuild(cmd *cobra.Command, o *buildOpts, name string) error {
 			args = []string{"-language", o.language, "-modsource", name}
 		}
 		if !run(runStage("link", bin, linker, 20*time.Minute, o.verbose, stdout, args...)) {
-			return finishBuild(stdout, o.jsonOut, rep)
+			return rep, nil
 		}
 	}
 
@@ -190,7 +207,7 @@ func runBuild(cmd *cobra.Command, o *buildOpts, name string) error {
 		run(runGame(game, name, o.isMod))
 	}
 
-	return finishBuild(stdout, o.jsonOut, rep)
+	return rep, nil
 }
 
 // runStage runs one tool to completion, capturing combined output, and returns a
