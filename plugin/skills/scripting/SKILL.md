@@ -5,7 +5,7 @@ description: How to write good GSC/CSC for Black Ops 3 — header/usings, the st
 
 # Writing GSC/CSC for Black Ops 3
 
-Server logic is **GSC**, client logic is **CSC** — separate files, separate namespaces, identical language. This skill is the craft; look up exact signatures/KVPs/APIs in **t7kb** (`search` then `get`), and for the conceptual model (scopes, entities, notifies, threads, `undefined`, the finite entity pool, cooperative scheduling) retrieve the "How GSC Scripting Works" guide. t7kb also indexes real, well-structured mod code — retrieve a worked example to see the conventions below applied in practice.
+Server logic is **GSC**, client logic is **CSC** — separate files, separate namespaces, identical language. This skill is the craft; look up exact signatures/KVPs/APIs in **t7kb** (`search` then `get`), and for the conceptual model (scopes, entities, notifies, threads, `undefined`, the finite entity pool, cooperative scheduling) retrieve the "How GSC Scripting Works" guide. t7kb also indexes real, well-structured mod code — retrieve a worked example to see the conventions below applied in practice. To study how a mechanic is built in another CoD title as *structural* reference — never for BO3 token names — see **bo3-crossref**.
 
 ## Tooling
 
@@ -105,6 +105,16 @@ Two prerequisites before `AnimScripted` on a script_model:
 - **Make it a real vehicle/AI** — then `SetAnim` animates relative to the moving entity for free, at the cost of the full vehicle/ASM setup.
 
 Confirm `AnimScripted` / `UseAnimTree` signatures against the raw install and t7kb. See **bo3-animation** for compiling the anim and **bo3-atmosphere** for the FX side.
+
+## Driving the first-person CAMERA from an animation (get-up, mantle, scripted FP moment)
+
+An animation can move the player's **view**, not just render arms. The robust mechanism — transposed from MW3's `_id_72AD`, found by reading the source game per **bo3-crossref** — uses **neither a weapon nor an XCam** (both were tried and were the wrong path for a camera-*moving* clip):
+
+- Spawn a **node** (a viewhands `script_model`) and play the clip on it via a **camera-less scene bundle** (`scene::play`) — the node's animated `tag_camera` carries the motion.
+- Link the player's view to it: `player PlayerLinkToDelta(mount, "tag_origin", 1, …)`. `PlayerLinkToDelta` seats the player's **ORIGIN** on its target and the engine then re-adds the player's own eye height — so link to a **mount** `LinkTo`'d one `GetPlayerViewHeight()` **below** the node's `tag_camera` (no magic number), and the eye lands on the animated camera.
+- **Ground the clip:** play the node lowered by the low pose's *lowest-hand height above the anim root* (read it off the `.xanim_export`), so the downed hands touch the floor instead of hovering.
+
+Make it multiplayer- and disconnect-safe: the scene bundle **AllowMultiple** (independent per-player instances); show the node **only to its owner** (`node SetInvisibleToAll(); node SetVisibleToPlayer(self);`) so nobody sees floating arms; and **own the teardown on a world entity** (the align/node), never `endon("death"/"disconnect")` on a thread holding the spawned entities — that skips cleanup and leaks them. Instead race the clip's end against `death`/`disconnect` and always Delete. Worked end-to-end in this repo's `_recovery.gsc`; the Maya side (retargeting the arms onto BO3 viewhands) is **bo3-anim-retarget**.
 
 ## Code style & conventions
 

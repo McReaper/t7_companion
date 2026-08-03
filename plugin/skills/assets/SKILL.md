@@ -5,7 +5,7 @@ description: How to get a model, material/texture, or animation into Black Ops 3
 
 # Assets: models, materials, porting, animation
 
-Sourcing here is mixed: raw Discord threads run low reliability (~0.25), but a real chunk of this domain is backed by UGX/ModMe/T7-wiki writeups (~0.70) and a few schema/source-verified references (~0.90 — e.g. collmaps, script bundles). Check the `reliability` score per hit rather than assuming this whole domain is low-confidence. Look up exact APE fields, GDT syntax, and material settings in **t7kb** (`search` then `get`); this skill is the pipeline and the gotchas around it.
+Sourcing here is mixed: raw Discord threads run low reliability (~0.25), but a real chunk of this domain is backed by UGX/ModMe/T7-wiki writeups (~0.70) and a few schema/source-verified references (~0.90 — e.g. collmaps, script bundles). Check the `reliability` score per hit rather than assuming this whole domain is low-confidence. Look up exact APE fields, GDT syntax, and material settings in **t7kb** (`search` then `get`); this skill is the pipeline and the gotchas around it. For the *source* game itself — decoding its engine lineage and finding its GSC/asset dumps to learn the real names and structure of what you're ripping — see **bo3-crossref**.
 
 ## Extraction tools aren't interchangeable
 
@@ -21,8 +21,9 @@ Pick by two axes: the **source game** (which tool can even read it) and the **ou
 
 **Getting to `_bin` (what APE loads) — mind the format bridge:**
 - **`export2bin.exe` / `exportxbin.exe`** ship in the mod tools' `bin/` folder. They take `xmodel_export`/`xanim_export` (the text format) and produce `_bin`; `exportxbin` also converts the other way (`_bin → _export`). Their input is the `*_export` format.
+  - ⚠️ On the `_bin → _export` direction, `exportxbin` v1.0.0 may abort with `ERROR: Failed to decompress binary file … return: 0`. That's the **tool**, not a corrupt rip — the bins decompress fine (they're plain LZ4: magic `*LZ4*`, size at +5, block stream at +9). Its drag-and-drop mode is its documented primary usage; from the command line **`exportx.exe -m export`** (next bullet) is the reliable route.
 - Since those converters read `*_export` while Saluki emits Cast/SEModel, route Cast through **Maya/Blender** (import via the Cast/SEModel plugin, re-export as `xmodel_export` with the CoD tools) and *then* to `_bin`. A ripper that already emits `xmodel_export` (older Wraith/Greyhound) feeds the converter directly. For a weapon/character you open Maya anyway (joints, materials), so this bridge is free; for a bare prop it is one extra hop.
-- **ExportX** (DTZxPorter, standalone) does the same conversion with a watcher mode that converts on save — the modern stand-in for the older **Kronos** converter (also DTZxPorter's, now superseded). Prefer ExportX or the shipped `export2bin`.
+- **ExportX** (DTZxPorter, standalone — <https://dtzxporter.com/tools/exportx>) does the same conversion with a watcher mode that converts on save — the modern stand-in for the older **Kronos** converter (also DTZxPorter's, now superseded). Prefer ExportX or the shipped `export2bin`. It also unpacks a `_bin` **back** to text (`exportx.exe -f <file>.xmodel_bin -m export`, vs the default `-m bin`), giving a `VERSION 7` `.xmodel_export` with mesh *and* skeleton — that's how a loose ripped `.xmodel_bin` gets into Maya without recompiling and re-ripping. Check `NUMBONES`/`NUMVERTS`/`NUMFACES` in the first lines.
 - **GameImageUtil** (Scobalula) preps ripped images into what BO3 wants (power-of-2, TIFF).
 
 **Producing a GDT — two different meanings:**

@@ -60,6 +60,8 @@ export2bin.exe pb_zipline_enter.xanim_export      # ✅ correct: writes the fram
 
 So: **export with the notetrack list cleared** (or strip the `NOTETRACKS` section from the text so every `PART` is `NUMTRACKS 0`), convert cleanly, then re-add the notetracks on the **APE xanim asset** (its Notetrack / FX / Sound sections). Record the frames first — a scene/script that waits on a notify (`… waittill("my_note")`) needs them, but the *first* build/test usually doesn't, so don't let missing notetracks block getting the anim in-game.
 
+Related crash, same area: an export that dies on `ValueError: No object matches name: XAnimExporterInfo.notetracks[N]` is a **CoDMayaTools bug**, not a problem with your anim — `cmds.getAttr` *raises* on a never-written element of a multi attribute, so any export slot that has never held a notetrack blows up before writing anything. The one-line patch is in **bo3-anim-retarget**.
+
 ## The APE xanim asset
 
 Create a new `xanim` asset (don't derive from a stock one) and set:

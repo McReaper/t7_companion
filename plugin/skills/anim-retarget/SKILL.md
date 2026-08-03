@@ -1,6 +1,6 @@
 ---
 name: bo3-anim-retarget
-description: How to port a full-body/first-person animation from an older CoD (BO1/BO2/WAW/MW) onto the Black Ops 3 skeleton in Maya, and get it playing in-game — the cross-generation skeleton mismatch (shared joint names but different bind-pose axes → twisted limbs), the HumanIK retarget workflow, the characterize-in-bind-pose-FIRST trap, transferring fingers/camera with direct constraints, baking, the in-game gotchas (`Player`-object scene needs the anim in `all_player.atr`; first-person `int_` vs third-person `ch_` variants), and driving a first-person cinematic CAMERA in Zombies with an XCam (`PlayMainCamXCam`) since a scene's view-lock is SP-only. Use when a ported/retargeted anim looks bound but limbs are mis-rotated/exploding, when porting a character/player anim across CoD generations, when a scripted-scene player animation errors `unable to find animation '<name>' in tree 'all_player'`, when a first-person cinematic camera won't move (body animates but view stays put), or when the CoDMayaTools XCam export throws Py3 errors or the linker rejects the xcam (`JSON: Value is not an int64_t`). Distinct from bo3-animation (the export/`export2bin`/APE-xanim pipeline) and bo3-assets (model/material porting) — this is the Maya retargeting + XCam craft and its traps.
+description: How to port a full-body/first-person animation from an older CoD (BO1/BO2/WAW/MW) onto the Black Ops 3 skeleton in Maya, and get it playing in-game — the cross-generation skeleton mismatch (shared joint names but different bind-pose axes → twisted limbs), the HumanIK retarget workflow, the characterize-in-bind-pose-FIRST trap, transferring fingers/camera with direct constraints, baking, the in-game gotchas (`Player`-object scene needs the anim in `all_player.atr`; first-person `int_` vs third-person `ch_` variants), and driving a first-person cinematic CAMERA in Zombies with an XCam (`PlayMainCamXCam`) since a scene's view-lock is SP-only. Also covers the separate VIEWHANDS/viewmodel case, where HumanIK is unusable (an arms-only rig can never fill its required biped bones) and the port runs on `-mo` constraints instead: co-locating the rigs, the MW3→BO3 finger index shift, the duplicate-short-name clash that makes the Cast anim importer silently half-apply a clip, the constant `tag_torso` rotation MW3 bakes in that BO3 renders as arms tilted ~90°, arms drifting/stretching because MW3's are longer (anchor the shoulder by the wrist), the BO3 wrist-twist chain (`j_wristtwist1..6`) left at bind so the sleeve pinches, fingers rendering curled, and driving a camera-moving first-person get-up by linking the player to the animated node (MW3 `_id_72AD`) rather than a weapon or XCam. Use when a ported/retargeted anim looks bound but limbs are mis-rotated/exploding, when first-person arms come out rotated/offset from the camera in game, when ported viewhands drift/stretch/deform or the wrist looks pinched (candy-wrapper) or fingers stay curled, when a first-person get-up must move the camera as it travels, when porting a character/player/viewmodel anim across CoD generations, when a scripted-scene player animation errors `unable to find animation '<name>' in tree 'all_player'`, when a first-person cinematic camera won't move (body animates but view stays put), or when a CoDMayaTools export throws `No object matches name: XAnimExporterInfo.notetracks[N]`, Py3 errors, or the linker rejects the xcam (`JSON: Value is not an int64_t`). Distinct from bo3-animation (the export/`export2bin`/APE-xanim pipeline) and bo3-assets (model/material porting) — this is the Maya retargeting + XCam craft and its traps.
 ---
 
 # Retargeting an animation onto the BO3 skeleton
@@ -41,7 +41,11 @@ You cannot retarget onto rig A and render the baked anim on model B if their ske
 - **Choose ONE rig for a group of NPCs and stick to it.** Retarget every NPC anim onto that same rig, render every NPC on that same model. Don't mix skins across skeletons.
 - **The xanim asset's `model` field must be that same rig's `.xmodel_bin`** — the exact model you rigged onto, "not another one." A bare model *name* there fails to link (`GetFileAttributesEx … failed` / `xanim not found`); it must be a real bin **path** relative to `model_export\`.
 - **Characterize that rig once, `Export Character Definition`, reuse it** for every anim in the group (seconds vs re-mapping ~20 bones each).
-- **Getting a loose `.xmodel_bin` into Maya as a target rig:** you need a **`.cast`** (Porter deprecated XETool/SEModel/Wraith utils — Cast is the only importer now). There's no offline bin→cast converter: compile the bin into a BO3 map/mod and **re-rip it with Greyhound/Saluki** to produce the `.cast`.
+- **Getting a loose `.xmodel_bin` into Maya as a target rig — unpack it, don't recompile-and-re-rip.** A `.xmodel_bin` is an **LZ4-compressed `.xmodel_export`** (magic `*LZ4*`, `uint32` decompressed size at +5, LZ4 **block** stream at +9), so mesh *and* skeleton are recoverable as text. Three converters can do it — `export2bin.exe` (Treyarch, in `bin\`, EXPORT→BIN only), `exportxbin.exe` (Scobalula, <https://github.com/Scobalula/exportxbin>, both directions), and **`exportx.exe`** ("ExportX", DTZxPorter, <https://dtzxporter.com/tools/exportx>, both directions). ExportX is the one that worked from the command line:
+  ```
+  exportx.exe -f <path>\model_LOD0.xmodel_bin -m export     # -m bin (default) goes the other way
+  ```
+  Verify the first lines — `NUMBONES` / `NUMVERTS` / `NUMFACES` — then import via CoDMayaTools. ExportX is a standalone exe; drop it in `bin\` next to the other two. If `exportxbin` reports `Failed to decompress binary file … return: 0`, that's the **tool**, not a bad rip — try its drag-and-drop mode (its documented primary usage) or switch to ExportX rather than re-ripping. Fall back to "compile into a map/mod and re-rip with Greyhound/Saluki as `.cast`" only when you actually want Cast (materials/images alongside the rig).
 
 ## Why not manual constraints
 
@@ -130,9 +134,71 @@ Then: make the layer **active** (highlighted), rotate the joint, `S`. A constant
 
 CoDMayaTools exports **what's selected**. Clicking only the root joint *looks* like it grabbed the skeleton but exports **one bone** → a tiny file with `NUMPARTS 1`. Use **Select → Hierarchy** (or `select -r \`listRelatives -ad -type "joint" -f "Joints1"\`;`) before *Export XAnim*. **Verify** the export is large and `NUMPARTS` equals the joint count — a multi-MB text file, not a few hundred KB. Then convert per **bo3-animation** (Quality 0, notetracks cleared, single-arg `export2bin`/`exportxbin`, verify the `*LZ4*…55 c3` header).
 
+## Retargeting onto VIEWHANDS (first-person arms) — a different job, HumanIK is out
+
+Everything above assumes a biped. A **viewhands** rig is arms-only — no `j_mainroot`, no spine, no legs — so **HumanIK cannot characterise it at all**: Lock only enables once the required biped bones are filled, and they never will be. Drive it with direct constraints instead. Worked end-to-end on MW3 `berlin_sgt_down_recovery_vm` → `c_zom_der_dempsey_viewhands` (110 bones); the reusable scripts live in the workspace's `_maya/`.
+
+**`-mo` on every constraint, and co-locate the rigs first.** The two rigs' bind axes differ by **40° (pinky) to 174° (right metacarpals), median 54°** — a plain `orientConstraint` copies the *absolute* source axis and twists every joint at rest, so `-mo` (offset captured in bind) is mandatory, not optional. And co-locate before constraining: MW3 is rooted at `tag_origin` with `tag_view` at Z=152.4 while the **BO3 root IS `tag_view`** at 0. Constrain across that gap and `-mo` bakes a ~150-unit offset into the constraint; every rotation of the source then swings the target through a huge arc and the arms fly off sideways. After co-locating, `tag_view`/`tag_ads`/`tag_cambone`/`tag_camera` match to 0.00.
+
+**Pick the constraint type from the measured channels, not from habit.** Read the source anim's per-bone translation amplitude first, then:
+
+| | use | because |
+|---|---|---|
+| root (`tag_view`), `tag_camera` | `parentConstraint -mo` | only where the residual offset is ~0, so there is no lever arm to swing |
+| shoulders | `pointConstraint -mo` + `orientConstraint -mo` | MW3 drives the arms by **translating the shoulders** (140–164 units); a pointConstraint offset is not rotated by the source, so no lever arm |
+| everything else | `orientConstraint -mo` | positions below the root must come from the target's own bone lengths |
+
+Measure rather than assume: in this clip `tag_torso`'s translation amplitude was **0.00** — the `parentConstraint` it looked like it needed was pure noise.
+
+**Finger names lie.** MW3 → BO3 is an index shift plus a rename, and the two rigs share enough short names that a by-name mapping *looks* correct while silently moving every phalanx one joint down the chain:
+
+- `j_<finger>_<side>_0/1/2` → `j_<finger>_<side>_1/2/3` (index, mid, ring, pinky, thumb)
+- `j_pinkypalm_*` → `j_pinkybase_*`, `j_ringpalm_*` → `j_ringbase_*` (the metacarpals — they *do* have counterparts)
+- `j_webbing_*`, `j_sleave_reshape_*` → nothing on the BO3 side; drop them
+
+Only ~36 of the 66 animated bones match by name. Rebuild the table from the two hierarchies (dump both hands and align them by chain depth) before trusting any of it on another title.
+
+**Both rigs share short joint names, and the Cast anim importer will not say so loudly.** Import an anim with both rigs in the scene and every *shared* track is refused with `Unable to animate "<bone>" … name conflict in the scene`, while source-only names apply fine — leaving a half-animated rig that looks plausible. Prefix the target rig's joints (`bo3_*`) before importing, strip the prefix after baking. An xanim exported with `bo3_j_wrist_le` binds to no model. When renaming a hierarchy, sort **deepest-first and re-query each pass**: `listRelatives -ad` order is not guaranteed, and renaming a parent first invalidates every stored child path.
+
+### The trap that actually causes "arms rotated 90° in game"
+
+**MW3 keeps `tag_torso` permanently rotated** — a *constant* `(101.7, 8.2, 68.0)` local to `tag_ads`, identical on every frame — and authors the arms in that frame. BO3 **anchors the viewmodel on `tag_torso` and expects it at identity**. `orientConstraint -mo` copies the MW3 convention faithfully, offset included, and that constant ~100° is what renders as arms tilted off to the side while the camera looks fine.
+
+Because the offset is *constant*, push it down into the arms with no change to the animation: after the bake, **zero `tag_torso`'s rotation, then restore the shoulders' world transforms** (sample them per frame first). Everything below the shoulders keeps its local keys and follows. Verify: torso local rotation → `(0,0,0)`, shoulder world positions **unchanged to the decimal**, shoulder local rotation moves into the same range as a working reference.
+
+### How to diagnose this class of bug
+
+Load a **working anim of the same class** onto the same rig and compare **local rotations** — they encode the axis convention independently of pose and scale. Choose the reference carefully: a stock weapon idle is a *bad* one (it animates nothing but the arms), a **ported cinematic** is the right one. `t6_deathanim` (a BO2 death anim running as a BO3 viewmodel) reads `tag_torso (0,0,0)` on every frame, which is what exposed the 100°.
+
+`CoDMayaTools`' **`ImportXAnim` is a dead stub** — it parses a compiled xanim and `print()`s, building nothing. To get a reference anim into Maya, rip it as `.cast` with Greyhound while the map that contains it is loaded.
+
+**Watch the units when comparing.** `.cast` is **centimetres**, `.xmodel_export`/`.xanim_export` are **inches** (game units) — CoDMayaTools scales by 2.54 on import and back on export. A distance read in Maya and the same distance read in the exported file differ by exactly 2.54; if a ratio of 2.54 shows up in a discrepancy, that is what it is, not a bug. Rotations are scale-free, which is another reason to compare those.
+
+### Dead ends — measured, do not repeat
+
+All of these looked reasonable and each made the in-game result worse:
+
+| attempt | result |
+|---|---|
+| clear `tag_view` + `tag_ads` | no change, arms still offset |
+| rebase per-frame onto `tag_camera` | view frozen; hands sit ~12 units below the view axis, permanently invisible |
+| …and pin torso to camera | arms gone entirely |
+| rebase by a constant `inv(camera @ frame 0)` | view detaches from the body |
+
+The lesson: the world placement was never the problem, and neither was the camera. Fix the **constant torso rotation** and leave the tag chain otherwise alone.
+
+### Arms longer than BO3, the wrist-twist chain, fingers left curled — three post-bake fixes
+
+The base `-mo` retarget binds and plays, but three artifacts survive it. All three are implemented in this repo's `_maya/retarget_setup.py` (`anchor_arms`, `prealign_fingers`) and `retarget_finish.py` (`distribute_wrist_twist`):
+
+- **MW3 arms are LONGER, so the hand lands wrong.** Pinning the shoulder 1:1 leaves the hand short by the length gap; pinning shoulder *and* wrist forces the span to MW3's length and **stretches the forearm → the skinned mesh deforms**. Fix (`anchor_arms`): point-constrain the shoulder to a **weighted blend of MW3's wrist and shoulder** — weight `r = BO3_arm / MW3_arm` on the shoulder, `1-r` on the wrist — which drops it onto the MW3 shoulder→wrist line at BO3-arm distance from the wrist, so the rigid BO3 arm lands its wrist on MW3's with nothing stretched. Keep the shoulder orient-constrained too; it rides off-screen.
+- **MW3 has ONE wrist joint; BO3 viewhands have `j_wristtwist1..6`** that spread pronation from elbow to wrist so the sleeve doesn't pinch ("candy wrapper"). The retarget only drives `j_wrist`, leaving the chain at bind. Post-bake (`distribute_wrist_twist`), extract the wrist's **pure twist** (swing-twist quaternion decomposition — project the vector part onto the roll axis, so bend doesn't leak) and key each twist joint to **a fraction of it = its rest position along the forearm**, computed from geometry. The numbering is **not** elbow-to-wrist order, so an index-based `i/N` spreads it backwards — measure each joint's position, don't assume.
+- **Fingers render curled when MW3's hand is flat.** They're orient-constrained but never prealigned, so `-mo` bakes BO3's *curled* rest pose as the baseline. Fix (`prealign_fingers`): before constraining, aim each proximal finger bone's **direction** at MW3's (bend only — leave the roll to `-mo`, or the axis-convention twist comes back).
+
 ## Playing it in-game: two things that bite
 
 - **First-person (`int_`) vs third-person (`ch_`) variants.** A shipped IGC exports both: `int_*` is the **player** (first person — carries `tag_camera` + `tag_view`, the arms/body you see), `ch_*` is a **third-person body** with no camera (that's the *NPC beside you*, not the player). Retarget `int_` onto a BO3 **viewbody** (which has `tag_camera`); retarget `ch_` onto a full body. Set the xanim asset's **Model File** to the rig it was authored on (the viewbody for `int_`) so the `tag_camera` track survives.
+- **A viewhands anim can play through a WEAPON — but that's the wrong tool for a camera-moving clip.** Give the player a weapon whose anim slots all point at your clip, then `SwitchToWeaponImmediate` — that is how the ported `t6_deathanim` runs a BO2 death animation in ZM. Clone a working `grenadeweapon` entry, swap the anim names, and stretch `raiseTime` to the clip length or the engine cuts to idle early; its other dependencies (`wpn_t7_none_view`/`_world`, `vm_ap9_ads_base_*`, `hud_us_grenade`) are all stock. The xanim asset itself is `type relative` + `useBones 0` for a viewmodel — `delta` + `useBones 1` is for world/character anims, and mixing them up is a classic cause of "right on the weapon, broken on the world model". **But for a get-up / mantle that *moves the view and travels*, the weapon path is a dead end** (a ripped weapon-viewhands model came in with broken partial skinning, and the weapon doesn't cleanly carry big camera travel) — link the player to an animated node instead (the scope-check note under the camera section below, GSC in **bo3-scripting**).
 - **A scene bundle with a `Player` object plays through the player's animtree, not the raw xanim.** If the scene's object is `type Player` / `player 1`, the engine looks the anim up in **`all_player`** and you get `unable to find animation '<name>' in tree 'all_player'` at runtime — even though the xanim linked fine. **Fix:** add the anim's name to `share/raw/animtrees/all_player.atr` (a plain indented list) **and its generated copy** under `share/raw/animtrees/gen/animtrees/all_player.atr`. This is the same animtree override the zipline used for its `pb_zipline_*` player anims. Non-player scene objects (`Prop`) don't need this — they play the xanim directly.
 - **An animated prop (ported IGC fxanim: rope, cloth, debris) uses `AnimScripted`, NOT `scene::play` or `SetAnim`.** Playing such a model's anim via a scene bundle's `MainAnim` — or via `SetAnim` on its animtree — leaves the mesh **frozen** (the model spawns, no bones move). What works is the cymbal-monkey verb: `model UseAnimTree(#animtree); model AnimScripted("note", origin, angles, %anim);` — it advances the scripted anim frame-by-frame on the model's own skeleton. The anim must still be listed in the animtree you `#using_animtree`.
 - **Don't attach an IGC fxanim prop to its moving parent — play it at the shared scene origin.** A ripped fxanim (e.g. a rappel rope hanging off a heli) typically has **no root motion** (its `tag_origin`/PART 0 is static every frame) yet its *child bones* carry the full world-space sweep (verify: PART 1's `OFFSET` varies hugely across frames). Since the prop anim and the vehicle anim were authored on the **same IGC origin**, `AnimScripted`-ing the prop at that same origin makes it track the moving vehicle *for free*. `LinkTo`, the scene `AlignTargetTag`, and `scene::play` **on** the vehicle all fight this — each either froze the rope or killed the vehicle's own anim. Attach nothing; co-locate the origins.
@@ -148,6 +214,8 @@ Verifying the anim is *not* the problem: parse the exported `.xcam_export`/`.xan
 
 **The correct mechanism is an XCam** — a dedicated camera animation asset, played per-client with **`PlayMainCamXCam` (CSC)**. Because it's CSC/per-client, it also satisfies "every player sees the cinematic" in co-op (each client plays it on its own camera). `PlayMainCamXCam` is how the shipped campaign/MP cinematics drive their cameras.
 
+> **Scope check — three ways to move the first-person view; pick by case.** The "scene → XCam" rule above is for a scene playing on the **Player object**. Two other paths exist. (a) A **weapon viewmodel** anim's `tag_camera` moves the view directly (play the clip through a weapon) — verified, and fine for a mostly-static viewmodel, but a **dead end for a camera-*moving* get-up** (see the weapon note above). (b) **Link the player to an animated node** playing a *camera-less* scene bundle, the view riding a mount on the node's moving `tag_camera` (`PlayerLinkToDelta` + `LinkTo`) — this is MW3's `_id_72AD` transposed, and the path that actually carried a traveling first-person get-up; the GSC (mount = one `GetPlayerViewHeight()` below the tag, ground-drop, per-player visibility, resilient teardown) lives in **bo3-scripting**. So "the camera must come from an XCam" is not a universal rule — it's the rule for a scene on the Player object. Counter-pressure to note either way: every stock/ported reference keeps `tag_torso` / `tag_cambone` / `tag_camera` **static** with all motion in the arm joints, so an animated `tag_camera` works but is off the beaten path — if the arms misbehave, suspect the tags before the arms.
+
 ### Making the XCam in Maya
 
 Work in the scene where the retargeted rig's `tag_camera` animates.
@@ -158,9 +226,21 @@ Work in the scene where the retargeted rig's `tag_camera` animates.
 4. **Re-constrain WITH `-mo`** (`parentConstraint -mo tag_camera camera1;`) — now the corrected aim is locked and it follows the anim. (This is the one place `-mo` is right.)
 5. **Bake** the camera, then **Call of Duty Tools → Export XCam** (frame range = full anim). The sub-camera name in the export is your Maya camera's name (e.g. `camera1`) — you need it to play the XCam.
 
-### CoDMayaTools Py3 XCam-export bugs (patch the `.py`)
+### CoDMayaTools export bugs (patch the `.py`)
 
-The community CoDMayaTools forks have **XCam-export code still written for Python 2**; on modern Maya (Py3) each fails with a different traceback. All are one-line fixes in `CoDMayaTools.py`:
+**`ValueError: No object matches name: XAnimExporterInfo.notetracks[1]`** kills an XAnim export outright, and it has nothing to do with your anim. `cmds.getAttr` **raises** on an element of a multi attribute that was never written, so the source's `cmds.getAttr(...) or ""` never gets the chance to default — any export slot that has never had a notetrack saved blows up. Wrap the read:
+
+```python
+def GetNoteList(attr):
+    try:
+        return cmds.getAttr(attr) or ""
+    except Exception:
+        return ""
+```
+
+and call it from the two export paths (`ExportXAnim`, `ExportXCam`). The ~11 other reads live in the notetrack manager windows, which create the attribute before reading it. Reload the script in Maya afterwards — the in-memory copy is still the broken one.
+
+The rest are **XCam-export code still written for Python 2**; on modern Maya (Py3) each fails with a different traceback. All are one-line fixes in `CoDMayaTools.py`:
 
 - `TypeError: a bytes-like object is required, not 'str'` → `…encode('ascii','ignore').replace('\\','/')` — in Py3 `.encode()` returns bytes; **drop the `.encode(...)`**, keep the `.replace`.
 - `TypeError: 'float' object cannot be interpreted as an integer` → `range(0, numframes)` with a float → **`range(0, int(numframes))`**.
