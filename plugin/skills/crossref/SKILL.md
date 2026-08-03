@@ -61,7 +61,7 @@ Game id → title → lineage → community source. The **id** is the anchor (it
 
 Two things to get right:
 
-- **Per-game support is uneven — check the current build's target list.** At time of writing it covers `iw5 iw6 iw7 iw8 iw9`, `s1 s2 s4`, `h1 h2`, `t6`, and `t7 t8 t9 t10` / `jup` (MWIII 2023) — but several (t8/t9/t10, jup) are **work-in-progress**, and **`t7` (Black Ops III) is decompile-only** (no recompile).
+- **Per-game support is uneven — check the current build's target list.** At time of writing it covers `iw5 iw6 iw7 iw8 iw9`, `s1 s2 s4`, `h1 h2`, `t6`, and `t7 t8 t9 t10` / `jup` (MWIII 2023) — but several (t8/t9/t10, jup) are **work-in-progress**, and **`t7` (Black Ops III) is decompile-only** (no recompile). Note `iw9`, `t10` and `jup` have no row in the catalog above — no widely-mirrored dump, so decompiling your own is the only route for those.
 - **For BO3 itself you rarely need it.** The mod tools already ship BO3's GSC/CSC as source under `scripts/`, and that raw source *is* the ground truth (see **bo3-knowledge**). Decompiling `t7` is a fallback for a compiled script your install doesn't ship as source; its output is decompiler-reconstructed (paraphrased), so treat it below the shipped source.
 
 For decompiling BO3's own *logic assets* (AI behavior/ASM, weaponfiles, tables, script bundles) into GDTs — a different job from script bytecode — that's **HydraX**, covered in **bo3-assets**.
