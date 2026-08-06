@@ -79,9 +79,27 @@ Unlike stock assets, a ported or custom xmodel has **no collision unless you giv
 
 Scene/cinematic, vehicle, killstreak, and collectible data lives in **script bundles** — GDT-authored, data-driven assets read at runtime via `struct::get_script_bundle`, `get_script_bundle_list`, and `get_script_bundle_instances` (verified against shipped `struct.gsc`). Reach for a script bundle instead of hardcoding a table in GSC when the data is really asset content (e.g. a set of placeable collectible variants) — it keeps the data in APE/GDT where the rest of the pipeline expects it.
 
+## Hand-authoring a GDT entry: copy a working one, then scrub what you didn't mean to inherit
+
+A GDT is plain text, so you can write entries directly instead of clicking through APE — same result, and it versions. The reliable method is to **copy an existing entry of the same asset type and substitute**, because an xmodel entry alone carries ~70 fields and a `zbarrier` ~140; hand-listing them invites a missing-field failure. But a copied entry drags the donor's asset paths with it, and the resulting errors point at the *donor*, which is confusing until you know to look. All four of these were hit in one sitting porting a BO2 vehicle, in this order:
+
+- **Backslashes in `filename` must be doubled.** `"filename" "folder\\model\\model_lod0.xmodel_bin"` — with single backslashes the GDT parser eats them as escape sequences and the linker reports a path with the separators simply gone (`folderModelmodel_lod0...`), which reads like a string-concatenation bug rather than an escaping one.
+- **Scrub the donor's LOD fields.** `mediumLod` / `lowLod` / `lowestLod` still point at the *donor's* meshes, so your model links with another model's lower LODs. Symptom: `Part 'tag_animate' in lower lod '<donor>' doesn't have the same name as part 'tag_body' in higher lod '<yours>'`. Blank every LOD path you don't actually supply.
+- **`BulletCollisionLOD` must name a LOD you have.** Inherited `Low` on a LOD0-only model gives `Lod 'Low' does not exist in model '<name>', but it is set as the bullet collision`. Same for `ShadowLOD`.
+- **Animated props often fail the LOD bounds check.** `XModel '<name>' failed. Bounding box of all LODs 2.17 times base mesh` on ripped `*_anim_*` props — their exported bounds don't match what the linker expects. Substituting an already-ported equivalent unblocks the build while you sort the source model out.
+
+## `export2bin` resolves its argument against its own working directory
+
+`export2bin.exe path/to/model.xmodel_export` fails with `ERROR: Failed to read file .\model.xmodel_export` — note the `.\`. It ignores the directory you gave it. **Run it with the working directory set to the model's own folder** and pass the bare filename. It writes `.XMODEL_BIN` in caps; rename to lowercase to match the `model_export/` convention. (Same class of cwd sensitivity as `cod2map64` needing to run from `bin/` — see **bo3-compiling**.)
+
+## A failed link isn't always a failed link
+
+The linker can print `done: 0m5.58s` for every zone, write fresh Fast Files, and *still* exit non-zero — a `^3Found N bad bulletmeshes` warning is enough to do it, and wrappers that gate on exit status will report FAIL. **Check the `.ff` timestamps before believing the failure.** The accompanying `zone_source/all/assetinfo/<map>_bulletreport.csv` names the offending models with their triangle counts and average face area (a ripped vehicle at 25k collision tris against a recommended 50-unit average area will trip it) — a real quality warning worth fixing with a proper collmap, but not a build blocker.
+
 ## Common pitfalls
 
 - **Blender's current Blender-COD plugin (the GitHub one) can break UV export.** If ported textures look wrong/shifted after export, community consensus is to fall back to a legacy release rather than debug the current one.
+- **Remapping every material to a placeholder gets a rip linking, and then you forget.** Rewriting the `MATERIAL n "name"` lines in an `.xmodel_export` to one existing material is a legitimate way to see geometry in-game before the material port is done — but the model now *is* that texture, and it looks like an asset bug later. Note it, or don't do it.
 - **Duplicate GDT asset errors** (`Duplicate 'material' asset '<name>' found in ...gdt:<line>`) mean the same asset name exists in two GDTs (yours and a shared/stock one) — delete your duplicate entry, don't rename around it; it's a naming collision, not a corruption. **GDTDupePurger** clears these in bulk.
 - **Ragdoll behavior for a custom model** goes through `RagdollSettings` — a dragged-in stock ragdoll setup silently keeps stock proportions/behavior unless you edit it for your model.
 
