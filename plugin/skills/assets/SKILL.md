@@ -92,6 +92,39 @@ A GDT is plain text, so you can write entries directly instead of clicking throu
 
 `export2bin.exe path/to/model.xmodel_export` fails with `ERROR: Failed to read file .\model.xmodel_export` — note the `.\`. It ignores the directory you gave it. **Run it with the working directory set to the model's own folder** and pass the bare filename. It writes `.XMODEL_BIN` in caps; rename to lowercase to match the `model_export/` convention. (Same class of cwd sensitivity as `cod2map64` needing to run from `bin/` — see **bo3-compiling**.)
 
+## After hand-editing a GDT, `gdtdb /update` does not see it — you need `/rebuild`
+
+The most expensive trap in this whole area, because the symptom is wildly misleading. Edit a GDT by hand, run the normal pipeline, and the linker reports **every asset in the game as missing** — `skybox_default_day`, `luts_t7_default`, the stock zombie spawner, things you never touched — while `gdtdb.exe /update` cheerfully prints `processed (0 GDTs) (0 assets)`. It looks like you corrupted the database. You didn't: the incremental pass just doesn't notice hand-written files.
+
+```
+gdtdb.exe /rebuild        # processed (3004 GDTs) (260203 assets)
+```
+
+Budget ~60-90s and run it after **every** manual GDT edit. And under git-bash, MSYS rewrites `/rebuild` into a filesystem path so the tool silently prints its usage instead of running — prefix with `MSYS2_ARG_CONV_EXCL="*"` (same MSYS argument-mangling as the `/update` and `+medium` flags in **bo3-compiling**).
+
+## Material settings a rip gets wrong, and how to tell
+
+Porting a model's *materials* is where a rip stops looking like the original. These are the ones that bite, all verified porting a BO2 vehicle:
+
+- **`normalHeightScale` — turn it down to ~0.1-0.2.** An older-title normal map reads far too strong in BO3 and produces **hard lighting bands, panel by panel**, that look for all the world like a UV, blend-mask or texture-atlas problem. Diagnose it by blanking `normalMap` for one material and rebuilding: if the banding vanishes, it's intensity, not the map.
+- **`materialType` and `materialCategory` must agree**, or APE warns: `lit`→`Geometry`, `lit_plus`→`Geometry Plus`, `lit_advanced*`→`Geometry Advanced`, `lit_decal`→`Decal`. A copied donor entry usually carries the wrong pairing.
+- **`lit_advanced_fullspec` silently refuses to expose `colorMap`** if `aoMap` and `glossMap` are missing — which a rip never has. Error reads `material '<name>' using technique '...' doesn't expose a 'colorMap' texture`. Drop to `lit`.
+- **The `colorMap` slot needs `coreSemantic` `sRGB3chAlpha`.** Switching a diffuse to `sRGB3ch` to dodge a packed alpha breaks the binding entirely, with the same "doesn't expose a colorMap" error.
+- **`baseImage` is relative to the install root**, so it includes the `texture_assets\\` prefix — not relative to `texture_assets/` itself.
+- **Old-title `SurfaceType` values don't transliterate.** `PAINTED_METAL` → `paintedmetal` (no underscore), and `default` → `<none>`, else the linker aborts with `surfaceTypeName 'default' not in surfaceTypeParms array`.
+
+## Double-sided: `nocull` is a material type, not a flag
+
+A model whose backfaces don't render is fixed by a **`nocull` material type** — `lit_nocull`, `lit_alphatest_nocull`, `lit_transparent_nocull`, `lit_detail_nocull` and `_advanced`/`_plus` variants all ship. `doubleSidedLighting` is *not* it: that controls how backfaces are **lit**, not whether they're drawn, and setting it changes nothing visible.
+
+Worth checking the geometry first so you know which problem you have: if every face of the material has a unique position triple (no duplicated triangles with reversed winding), the mesh is genuinely single-sided and only `nocull` can save it. Duplicating the faces in the export also works but doubles the triangles and is not reversible from the GDT.
+
+## An alpha channel's *percentage* tells you nothing — its distribution does
+
+Ripped diffuse maps frequently carry a packed gloss/spec mask in alpha, and a real alpha cutout looks identical if you only measure "what fraction of pixels are non-opaque". Alpha-testing a packed mask punches **black speckles** through the surface, which reads as a corrupt texture.
+
+Map the alpha spatially instead — a coarse grid of "percent of pixels below threshold" per cell. A genuine cutout is a **compact, sharp-edged region**; a packed mask is scattered noise across the whole sheet. One bus material showed a solid rectangular transparent block over half the texture (real vents), another only 2-3% scattered (gloss mask), and the naming confirmed both — Treyarch shipped a `_opq` twin of the vented material.
+
 ## A failed link isn't always a failed link
 
 The linker can print `done: 0m5.58s` for every zone, write fresh Fast Files, and *still* exit non-zero — a `^3Found N bad bulletmeshes` warning is enough to do it, and wrappers that gate on exit status will report FAIL. **Check the `.ff` timestamps before believing the failure.** The accompanying `zone_source/all/assetinfo/<map>_bulletreport.csv` names the offending models with their triangle counts and average face area (a ripped vehicle at 25k collision tris against a recommended 50-unit average area will trip it) — a real quality warning worth fixing with a proper collmap, but not a build blocker.
