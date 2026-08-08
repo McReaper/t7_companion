@@ -1,6 +1,6 @@
 ---
 name: bo3-anim-retarget
-description: How to port an animation from another CoD generation onto a Black Ops 3 rig in Maya and get it playing in-game — two paths: full-body/biped via HumanIK retargeting, and first-person VIEWHANDS/viewmodel via `-mo` constraints (HumanIK cannot characterise an arms-only rig at all). Covers the cross-generation bind-axis mismatch, baking and export, the three mechanisms that move the first-person view, and the CoDMayaTools export bugs. Use when a ported anim binds but limbs are twisted or exploding, when first-person arms come out rotated ~90° or drift/stretch or fingers stay curled, when a first-person camera won't move, when a scripted scene errors `unable to find animation '<name>' in tree 'all_player'`, or when a CoDMayaTools export throws `notetracks[N]` / Py3 errors or the linker rejects an xcam. Distinct from bo3-animation (the export2bin/APE-xanim pipeline) and bo3-assets (model/material porting).
+description: How to port an animation from another CoD generation onto a Black Ops 3 rig in Maya and get it playing in-game — two paths: full-body/biped via HumanIK retargeting, and first-person VIEWHANDS/viewmodel via `-mo` constraints (HumanIK cannot characterise an arms-only rig at all). Covers the cross-generation bind-axis mismatch, recovering bind pose and re-characterizing when the HumanIK reference pose was captured wrong, why measuring a locked rig reads the solver instead of the skeleton, the two-rigs-one-scene bone-name conflict, baking and export, the three mechanisms that move the first-person view, and the CoDMayaTools export bugs. Use when a ported anim binds but limbs are twisted or exploding, when one side of the body is off and the other is fine, when a joint edit "sticks" but nothing moves in the viewport or re-locking restores the bug, when the Cast anim importer rejects every track with `name conflict in the scene`, when first-person arms come out rotated ~90° or drift/stretch or fingers stay curled, when a first-person camera won't move, when a scripted scene errors `unable to find animation '<name>' in tree 'all_player'`, or when a CoDMayaTools export throws `notetracks[N]` / Py3 errors or the linker rejects an xcam. Distinct from bo3-animation (the export2bin/APE-xanim pipeline) and bo3-assets (model/material porting).
 ---
 
 # Retargeting an animation onto the BO3 skeleton
@@ -81,9 +81,53 @@ So the **order is mandatory**:
 2. **Characterize + Lock it NOW**, in bind.
 3. *Then* import the anim onto it.
 
-Once an anim is on the rig you **cannot reliably get back to bind** to re-characterize — the usual escapes all disappoint: `gotoBindPose` needs the skinned **mesh shape** (errors `No shape found` on a joint or group), and `doEnableNodeItems false animCurve` merely **freezes at the current frame** (which may be the sitting pose, not bind). If you locked in the wrong pose, the clean fix is to **start over from a fresh import in the right order** — faster than fighting it.
+Once an anim is on the rig, `gotoBindPose` disappoints (it needs the skinned **mesh shape**, and errors `No shape found` on a joint or group), and `doEnableNodeItems false animCurve` merely **freezes at the current frame** (which may be the sitting pose, not bind). But you do **not** have to re-import — two commands recover it, and they are much cheaper than rebuilding the scene:
+
+```python
+cmds.select("Joints1", hierarchy=True)
+cmds.dagPose(restore=True, g=True, bindPose=True)      # g=global, or the root's placement is left behind
+```
+
+`bindPose*` nodes are written by Maya at skin time and survive everything; `cmds.ls(type="dagPose")` tells you they're there (one per rig). This is the scripted equivalent of `Skin > Go to Bind Pose` (Rigging menu set, **F3** — the menu doesn't exist in Modeling/Animation).
+
+**Re-locking is NOT enough to fix a bad reference pose.** Unlock, restore bind, re-Lock — and the retarget comes back *bit-identical*, because unlock only re-opens the bone **mapping**; the stance was captured when the character was **created**. The real fix keeps the rig and throws away the character: Source → None, restore bind, **Character Controls → Character → Delete**, create a new character, map, Lock *in bind*. On one BO2→BO3 body port that took the source/target wrist gap from **14.03 left / 2.35 right** (wildly asymmetric) to **6.40 / 6.38** — symmetric, the residual being the genuine A-pose difference between generations, which is what the retarget is *for*.
 
 **Save each definition** (Character Controls → *Export Character Definition*, written to `…/HIKCharacterizationTool6/template/*.xml`). You reuse them for every other anim you port — *Import Character Definition* re-applies the mapping (still locked in bind) in seconds instead of re-clicking ~20 bones. They are plain XML, so you can diff two definitions to spot a bad mapping.
+
+## Never measure a LOCKED rig — you are reading the solver, not the skeleton
+
+Before diagnosing "the wrist is off", check what is driving the joints. A locked HIK character with a Source set **writes the target's joints every evaluation**: their local rotations are *solver output*, not bind pose. Measure that and you will diagnose the symptom as the cause — and any `setAttr` "fix" writes into the attribute, reads back fine, changes nothing in the viewport, and is wiped on the next solve. (Tell: the value sticks, the model doesn't move, and re-locking "restores the bug".)
+
+**The detection trap that hides this:** HIK connects the **compound** `.rotate` plug. `listConnections(joint + ".rotateX", s=True, d=False)` returns **nothing** on a fully-driven joint — querying a child plug does not see a connection on its parent. Query both:
+
+```python
+for p in (".rotate", ".translate", ".rotateX"):
+    if cmds.listConnections(j + p, s=True, d=False):
+        ...   # driven
+```
+
+On a BO2→BO3 zombie pair this reported **22 driven joints** (an `HIKState2SK` node) when locked and **0** when unlocked. So: unlock → `dagPose` restore (above) → *then* measure. A rig that looks asymmetric under the solver can be perfectly symmetric in bind — that exact case cost four diagnostic passes and a "fix" to a skeleton that was never broken.
+
+Useful invariant while measuring: on these rigs **mirrored joints carry identical local ROTATIONS** (the mirror lives in the joint orients), while their local **TRANSLATIONS mirror by negating one axis** — and *which* axis varies per joint (X at the shoulder, Z at the hip), so compare translations in absolute value. Comparing rotations for equality and translations for equal magnitude makes left/right asymmetry fall out immediately. Expect `j_hip` to diverge by ~180° between sides on both BO2 and BO3: that is the leg's mirror convention, not a defect — a genuinely wrong 180° hip puts the foot in the air, not 1 unit off.
+
+## Two rigs in one scene: the anim importer will refuse every shared bone name
+
+Cast puts each rig under a **group** (`Joints`, `Joints1`), *not* a namespace — so both skeletons own the same short names (72 in common on a BO2/BO3 zombie pair). The Cast **anim** importer then rejects tracks with `name conflict in the scene`.
+
+**Prefix the TARGET, never the source.** The anim's tracks are keyed to the *source's* bone names; rename those and the anim binds to nothing. Renaming the target is safe in every direction that matters:
+
+- **It does not break the characterization.** Maya connections are node-based, not name-based — the HIK definition still resolves after the rename (verify: the mapping still lists its ~23 slots, now pointing at `bo3_*`).
+- **It must be undone before export.** An xanim carrying bones called `bo3_j_wrist_le` binds to no model at all. Strip the prefix after the bake, before exporting.
+
+Rename **deepest-first** (`sort(key=lambda p: p.count("|"), reverse=True)`): renaming a parent invalidates the full DAG paths you already collected for its children.
+
+## When HumanIK is the wrong tool
+
+The section above says to prefer HIK over manual constraints, and for most jobs that holds. It is not universal: on a BO2→BO3 **full-body zombie** port, HIK with a correct, symmetric, bind-locked characterization still threw the arm out mid-animation, and the job only shipped on **direct constraints** — Path B's technique applied to a full body (orient everywhere with `-mo`, parent on `tag_origin`/`j_mainroot` to carry root motion, a direction-only pre-align so `-mo` absorbs only the axis convention).
+
+That variant is easier than Path B's because same-generation-family rigs **share bone names** — 72 of 73/78 on this pair, finger chains included — so the pairing can be built at runtime by name instead of hand-written, and the hands come along for free. Bones present on one side only (`j_neck2`, `j_pinkybase_*`, `j_ringbase_*`, `tag_eye`, `j_head_end`) are left unconstrained and correctly follow their parent — the source has no motion to give them.
+
+Don't reach for this first. Do reach for it when a *verified-correct* HIK setup still misbehaves, rather than assuming the characterization must be wrong again.
 
 ## Mapping CoD joints → HumanIK roles
 

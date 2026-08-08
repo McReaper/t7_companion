@@ -1,6 +1,6 @@
 ---
 name: bo3-animation
-description: How to get a custom animation from a DCC (Maya/Blender) compiled into Black Ops 3 and its many silent-failure gotchas — CoDMayaTools on modern Maya, the Cast import (SEanim is deprecated), the Quality field's frame-doubling trap, 30fps/ntsc, the export2bin single-argument conversion mode, why notetracks must be added in APE not Maya, the required Model File on an xanim asset, and how to verify a .xanim_bin actually has the format the linker reads. Use when compiling/porting/converting a character, weapon, or world animation for BO3, or diagnosing xanim errors (`Unexpected error while processing binary token`, `model was not specified`, doubled framerate/frame count, an anim that plays 2× too fast). Distinct from bo3-assets (the broader model/material porting pipeline) and bo3-compiling (the whole-map build) — this is the animation-specific path and its traps.
+description: How to get a custom animation from a DCC (Maya/Blender) compiled into Black Ops 3 and its many silent-failure gotchas — CoDMayaTools on modern Maya, the Cast import (SEanim is deprecated), the Quality field's frame-doubling trap, 30fps/ntsc, the export2bin single-argument conversion mode, why notetracks must be added in APE not Maya, the required Model File on an xanim asset, and how to verify a .xanim_bin actually has the format the linker reads. Use when compiling/porting/converting a character, weapon, or world animation for BO3, or diagnosing xanim errors (`Unexpected error while processing binary token`, `model was not specified`, doubled framerate/frame count, an anim that plays 2× too fast, `has bad angle delta on frame N`, `requires "delta" type animations`, an export with `NUMPARTS 1`). Also covers what the `type` field (delta / delta3d / relative / absolute) actually controls and why AI anims cannot use `relative`, and driving CoDMayaTools headlessly to batch hundreds of anims. Distinct from bo3-assets (the broader model/material porting pipeline) and bo3-compiling (the whole-map build) — this is the animation-specific path and its traps.
 ---
 
 # Getting a custom animation into Black Ops 3
@@ -68,11 +68,35 @@ Create a new `xanim` asset (don't derive from a stock one) and set:
 
 - **Anim File** → the converted `.xanim_bin`.
 - **Model File** → **required.** An empty model is the `^1model was not specified` → `xanim '…' not found` link failure. Point it at the xmodel whose skeleton the anim uses (e.g. the rig it was authored on). If that model is a shipped asset it needs no GDT of its own; otherwise compile it as an xmodel first (see **bo3-assets**).
-- **Type** → `delta` for world/body/character anims, `relative` for viewmodels. When HydraX labelled the source, follow its label (`delta`/`additive`).
+- **Type** → `delta` for world/body/character anims, `relative` for viewmodels. When HydraX labelled the source, follow its label (`delta`/`additive`). Full list from the APE schema (`deffiles/xanim.awi`): `delta`, `delta3d`, `relative`, `absolute`, `mp_torso`, `mp_legs`, `mp_fullbody`, `additive` — where *delta* is "use for AI anims", *absolute* places everything relative to the Maya scene's (0,0,0), and *relative* relative to the parent node. See the `type` section below: for an AI anim this is not a free choice.
+- **Anim File** path is **relative to the export root that matches its extension** — a `.xanim_export`/`.xanim_bin` under `xanim_export/foo/bar.xanim_bin` is written `foo\\bar.xanim_bin` (verify the root by which one actually contains the folder: `xanim_export/sword` exists, `model_export/sword` does not).
 - **Use Bones** → checked for everything except viewmodels.
 - **Looping** → checked only for looping anims (idle/slide/sprint loops).
 
 Then add its line to the map/mod **`.zone`** (`xanim,<name>`), plus any model/scriptbundle it depends on, and **Link** (this is a script/asset change — no map recompile needed unless geometry changed). See **bo3-compiling**.
+
+## `type` on an AI anim is not a free choice — and `delta3d` is the escape hatch
+
+For anything played on a character, `delta` is close to mandatory, and two independent constraints say so:
+
+- **The animation selector tables enforce it.** A xanim reached through an `.ai_ast` fails at link with `… is being used in the animation selector table "<x>" in "<map>.ai_ast" which **requires "delta" type animations**`.
+- **`AnimScripted` depends on it.** A delta anim carries the root's motion as its own track, which is what `GetMoveDelta` / `GetAngleDelta` read and, above all, what **`GetStartOrigin`** needs — *"get the starting origin for an animation, in world coordinates, given its current position and angles"*, i.e. place the entity so the clip **ends** where you want. BO2's TranZit bus does exactly that (`start_origin = getstartorigin(...)` then `animscripted(start_origin, ...)`). In `relative`/`absolute` there is no separate root track: the bones move, the entity stays put.
+
+So when the converter rejects an anim with **`has bad angle delta on frame N`**, do **not** "fix" it by switching to `relative`. It links, and then breaks the moment the anim enters a selector table — later, and further from the cause. **Try `delta3d` instead**: same family, still a root-motion type, and on one BO2→BO3 batch it converted 10 anims that `delta` refused, with no other change.
+
+That fix is empirical, not understood. On those 10, what was *ruled out*: corrupt data (rotation matrices orthonormal to 1e-6), an Euler flip (`filterCurve -euler` changed nothing), the file format (rejected identically as `XANIM_EXPORT` and `XANIM_BIN`), and root tilt (constant at 3.35° across all 91 anims of the batch — a `tag_origin` bind offset, not motion). The only pattern was semantic: all 10 were "character detaches from the vehicle" clips. If `delta3d` is *also* refused by the selector table, that closes the loop and the real problem is the anim data.
+
+## Batch/headless export: `ExportXAnim` needs three things the GUI gives it for free
+
+Driving CoDMayaTools from a script skips the export **button**, which is where some of the setup lives. Each omission fails differently:
+
+- **It exports only what is SELECTED.** `GetJointList` walks the whole hierarchy but includes a joint only if `selectedObjects.hasItem(dagPath)` — so selecting just the root writes a valid file with **`NUMPARTS 1`**, no error. Select every joint (`listRelatives(group, ad=True, type="joint")`), and **assert `NUMPARTS`** against that count after writing; nothing else catches it.
+- **The progress bar is created by the button, not the window.** `ExportXAnim` does `cmds.progressBar(OBJECT_NAMES['progress'][0], edit=True, …)` and dies with `Object 'CoDMayaToolsProgressbar' not found`. Re-create it as `GeneralWindow_ExportSelected` does: a window named `"w" + <progress name>`, a `columnLayout`, then the `progressBar`.
+- **`XAnimExporterInfo` is a SCENE node.** `RefreshXAnimWindow()` creates it (a `renderLayer` holding the notetrack/path attrs). The window's controls survive a scene change; this node does not. In a loop that re-opens a template scene per anim, call `RefreshXAnimWindow()` **after every open** or every export dies on `No object matches name: XAnimExporterInfo.notetracks[1]`.
+
+Set the frame range and FPS by editing the window's fields directly (`<win>_FrameStartField`, `_FrameEndField`, `_FPSField`, `_qualityField`) — `ExportXAnim` reads them, not the playback range.
+
+**`exportxbin.exe` breaks down in bulk.** A folder argument prints `No files processed` despite the tool's own help offering folders, and passing ~90 files in one call **segfaults partway** (48 converted, then a crash — with no non-zero exit to warn you). Convert **one file per invocation** in a loop and count the outputs; that is reliable.
 
 ## Error → cause quick map
 
@@ -82,6 +106,10 @@ Then add its line to the map/mod **`.zone`** (`xanim,<name>`), plus any model/sc
 - APE shows `frameRate 60`/`120`, anim plays 2×/4× too fast → **Quality** field > 0 in the Maya export.
 - Import shows only `Skipping curve track … no matching node` → the **rig wasn't imported first** (anim `.cast` is curves-only).
 - Menu missing / `Missing parentheses in call to 'print'` → **Python-2 CoDMayaTools on modern Maya**; use a Py3 fork.
+- `has bad angle delta on frame N` → try **`type delta3d`**, not `relative` (see the `type` section — `relative` links but breaks at the selector table).
+- `… requires "delta" type animations` (at the `.ai_ast`) → the asset's **Type** is not in the delta family. This is the failure `relative` defers to.
+- Exported file has **`NUMPARTS 1`** → only the root was selected; CoDMayaTools exports the **selection**, not the hierarchy under it.
+- `Object 'CoDMayaToolsProgressbar' not found` / `No object matches name: XAnimExporterInfo.notetracks[1]` → **scripted** export without the button's setup; see the batch section.
 
 ## Don't invent
 

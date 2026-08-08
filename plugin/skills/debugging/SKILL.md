@@ -1,6 +1,6 @@
 ---
 name: bo3-debugging
-description: How to diagnose Black Ops 3 modding problems — make errors visible (developer/logfile, debug macros, the S.R.E. call stack), get real line numbers, tell compile vs linker vs unresolved-external vs runtime apart, and drive the interactive dvar/devgui toolkit. Use when a map won't build or compile, won't load, crashes, or a script misbehaves at runtime, and when reading a script error, console output, or log file.
+description: How to diagnose Black Ops 3 modding problems — make errors visible (developer/logfile, debug macros, the S.R.E. call stack), find and grep the game's `console_mp.log` (and `crashes.log`), get real line numbers, tell compile vs linker vs unresolved-external vs runtime apart, and drive the interactive dvar/devgui toolkit. Use when a map won't build or compile, won't load, crashes, or a script misbehaves at runtime, and when reading a script error, console output, `console_mp.log`, or any BO3 log file.
 ---
 
 # Debugging BO3 mods
@@ -18,13 +18,68 @@ In **Launcher → dvars** (or `+set …` on the command line), set:
 - **`developer 2`** — verbose script-error detail (`1` is the lighter dev mode).
 - **`logfile 1`** — async write (faster). Use **`logfile 2`** when chasing a hard crash: it syncs every line, so the tail survives the crash instead of being lost.
 
-Reproduce, then read the **S.R.E. (script runtime error)** in the console — it prints the error plus a **call stack** naming the file for each frame. The full log is `console_mp.log`, written at the **`fs_game` root**: for a **usermap** that's the **game root** (`…/Call of Duty Black Ops III/console_mp.log`, *not* the `usermaps/<map>` folder); for a **mod** it's `mods/<modname>/console_mp.log`. Cheats/dev need the map launched via `devmap` or a loaded mod (`sv_cheats`).
+Reproduce, then read the **S.R.E. (script runtime error)** — the console prints the error plus a **call stack** naming the file for each frame. Cheats/dev need the map launched via `devmap` or a loaded mod (`sv_cheats`).
 
 Turn this on **before** theorizing — guessing at a hidden error just burns build cycles; get the real message and call stack first.
 
-## Getting real line numbers (the usermap trap)
+## Read `console_mp.log` yourself
 
-As a **usermap**, the call stack shows the file but reads `missing line information` for every frame — no line numbers, even with `developer 2`. To get real `file '…' line N`, **build/run the script as a mod** (a mod build carries the per-line debug info a usermap FastFile doesn't). Also: **stock/base-game frames never show lines** — the shipped FastFiles have no debug info, so trace from the last frame that's in *your own* code.
+`logfile` writes the **whole console to a file on disk** — so read and grep it directly instead of asking the user to copy the console or screenshot an error. Always do this before asking them to re-describe a symptom.
+
+It lands at the **`fs_game` root**: a **mod** run → `mods/<modname>/console_mp.log`; a **usermap** (no `fs_game`) → the **game root** `<bo3_root>/console_mp.log` (*not* `usermaps/<map>/`). Don't assume which — a mod run whose `fs_game` folder is missing falls back to the root, and stale copies from earlier sessions sit in both places. **Glob `<bo3_root>/console_mp.log` plus `<bo3_root>/mods/*/console_mp.log` and take the newest by mtime.**
+
+**Do not assume the file is one session.** It is frequently **appended** across runs, so the first match you grep for is the *oldest* occurrence — very likely a run from before the fix you are testing. Diagnosing several rounds in a row against the same stale block is the single easiest way to burn an afternoon "fixing" things that were never broken.
+
+Always cut to the last session first:
+
+```bash
+start=$(grep -n "Game Initialization" console_mp.log | tail -1 | cut -d: -f1)
+tail -n +$start console_mp.log | grep -c "your error"
+```
+
+The tell that you've been reading the wrong window: **an occurrence count that grows run over run** (2 → 4 → 10 → 14) while the timestamps of the first hit never change. A per-session count is what matters; a cumulative one means you're re-reading history.
+
+Lines are prefixed with an engine timestamp + subsystem tag (`[<ms>][<SUBSYSTEM>]`). What to grep:
+
+- **`script error`** — the S.R.E. block, tagged `SCRIPTERROR`: `******* script error *******`, the message, then `******* Call stack *******` and one `file 'scripts/…'` line per frame (`- missing line information` on a usermap — see below).
+- **`Could not find`** — a missing asset/material/rawfile, tagged `DB`: not in the `.zone`, or never converted.
+- **`Error:`** — the catch-all first pass on a "it just fails" report.
+
+Siblings at the **game root**, both worth checking when there's no S.R.E.: **`crashes.log`** (a hard crash's module list + addresses) and **`console.log`** (the non-`_mp` frontend/LUI log).
+
+## Getting real line numbers
+
+`missing line information` means the frame lives in a **shipped FastFile** — those carry no debug info. It is not a property of usermaps as such: a script **zoned by your own map** does report `file '…' line N` in a usermap build. So the question is never "usermap or mod", it is "is this frame my script or Treyarch's".
+
+When the whole stack is stock (`_zm_behavior.gsc` twice and nothing else), you have two ways to get lines:
+
+- **Build/run as a mod** — carries per-line debug info for stock frames too.
+- **Take the stock script over into your map** (next section). Your copy is your script, so it reports lines — and you can instrument it, which is usually worth more than the line number alone.
+
+## Overriding a stock script from a *usermap* — the assetlist CSV
+
+The received wisdom that "a usermap can't override stock scripts, only a mod can" is **incomplete**. Dropping your copy at the same path under `usermaps/<map>/scripts/…` and zoning it is not enough — the stock one is still pulled in by the patch asset list and wins. The missing step:
+
+**Comment the stock entry out of `zone_source/all/assetlist/zm_patch.csv`.**
+
+```
+//scriptparsetree,scripts/zm/_zm_behavior.gsc
+```
+
+That file lists every stock script the zm patch zone contributes; commenting a line removes it from the build, and your zoned copy takes its place. Shipped installs already ship several lines commented this way (`_zm_ai_dogs`, `_zm_pack_a_punch`, `_zm_weapons`), which is the confirmation the mechanism is intended. Back the CSV up first — it is a shared, install-wide file, so the change affects every map you build until you undo it.
+
+## Instrument rather than theorise
+
+When an error's call stack is stock and unhelpful, the fastest route to the answer is almost never more reasoning about which branch "must" be at fault. Take the file over (above) and **mark every candidate site**, then let the log say which one runs:
+
+```gsc
+IPrintLnBold("^3SG#7 L547");
+self SetGoal( goalPos );
+```
+
+One run, and the last tag before the error is the line. This costs ten minutes and ends the guessing; a chain of plausible-but-unverified hypotheses costs hours and, worse, produces "fixes" to things that were never broken — two of which can silently cancel each other out and make a correct fix look like a failure.
+
+**Read the assert text.** Treyarch's asserts routinely carry the failing value: `assert fail: bus_window` names the exact string that didn't resolve, which is the whole diagnosis. If an assert *should* be firing and isn't in your log, suspect you are reading the wrong session (above) before concluding the code path wasn't reached.
 
 ## Diagnose by stage
 

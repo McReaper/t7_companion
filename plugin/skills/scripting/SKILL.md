@@ -47,7 +47,17 @@ A `#using` only makes a call *resolvable* — the target script must **also be i
 
 Prefer a **hook** (Inversion of Control): most stock systems expose seams so you never touch their source — register a spawn function (`add_global_spawn_function`), set a `level.*` function pointer the stock script calls, or use the callback/flag it fires. Stock systems (perks, powerups, AI) are extended this way.
 
-When there is **no** hook and you must change stock behavior, you **can and sometimes should override**: copy the stock file into your mod/map `scripts/` at the **same path**, add it to your **`.zone`**, and the engine loads your version instead of the shared one. Caveats: some scripts override only from a **mod**, not a map folder (a common "my copy is ignored"); override the **narrowest** script (overriding low-level shared like `array_shared` breaks its dependents); and an override diverges from stock, so reach for a hook first.
+When there is **no** hook and you must change stock behavior, you **can and sometimes should override**: copy the stock file into your mod/map `scripts/` at the **same path**, add it to your **`.zone`**, and the engine loads your version instead of the shared one.
+
+**From a usermap that is not enough — and the missing step is not "use a mod".** The stock copy is still contributed by the patch asset list and wins, which is where the "some scripts only override from a mod" folklore comes from. Also comment its line out of **`zone_source/all/assetlist/zm_patch.csv`**:
+
+```
+//scriptparsetree,scripts/zm/_zm_behavior.gsc
+```
+
+Stock installs already ship several lines commented exactly this way (`_zm_ai_dogs`, `_zm_pack_a_punch`, `_zm_weapons`), so the mechanism is intended rather than a trick. It is a shared, **install-wide** file: back it up, and remember the change affects every map you build until you revert it. This is also the cheapest way to get **line numbers** on a stock script's error, and to instrument it — see **bo3-debugging**.
+
+Other caveats: override the **narrowest** script (overriding low-level shared like `array_shared` breaks its dependents), and an override diverges from stock, so reach for a hook first.
 
 ## System registration: `REGISTER_SYSTEM` vs `REGISTER_SYSTEM_EX`
 

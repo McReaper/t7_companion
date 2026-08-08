@@ -27,6 +27,22 @@ The actual spawn recipe is entity setup, not scripting: a spawner entity `actor/
 
 **Zombies with no valid target just stand still** — a solo player downed, or anyone under Zombie Blood, leaves nothing for zombies to path toward. Fix with lightweight `script_noteworthy = zombie_poi` structs for a simple case, or the full `zm_giant_cleanup_mgr` hook (`enemy_location_override`/`no_target_override`) for `dog_location`-based relocation in a more involved one.
 
+## A riser's `script_string` must be matched by an `exterior_goal`, or the AI throws at spawn
+
+A riser's `script_string` is not decoration: `_zm_spawner`'s spawn path copies it onto the zombie as **`find_flesh_struct_string`**, and `findNodesService` in `_zm_behavior.gsc` then walks `level.exterior_goals` looking for one whose **`script_string` is equal**. `find_flesh` is the special value meaning "no entrance, just chase" — it returns early and is always safe. **Any other value must be declared by an `exterior_goal` struct somewhere**, or `node` stays undefined and you get, in this order:
+
+```
+assert fail: <the string it wanted>
+undefined is not a field object
+SetGoal() unsupported goal type
+```
+
+on every zombie that rises there — while zombies from a `find_flesh` riser in the same map behave perfectly, which makes it look intermittent rather than deterministic. The assert names the missing string, so read it before theorising.
+
+**The trap that produces this:** `script_string` set on the **prefab instance** (the `misc_prefab` entity) does **not** propagate to the entities inside it. A barrier prefab placed with `script_string "receiver_set_entry_a"` still has an `exterior_goal` carrying no `script_string` at all, so nothing declares that entry. Put the KVP on the `exterior_goal` **struct itself** — which for a stock prefab means taking a local copy of it rather than editing shared content.
+
+And check for **more than one**: a map can have several risers asking for different entries, and fixing the first one you find leaves the others throwing exactly the same error, which reads as "the fix didn't work".
+
 ## Tuning zombie/player stats
 
 Zombie health is **script-set, not a dvar**: `zombie_utility::set_zombie_var(zvar, value, is_float, column)` with vars `zombie_health_start` / `zombie_health_increase` / `zombie_health_increase_multiplier` (there's no single `level.zombie_health` to read or set directly). On the player side, the same function with `"player_base_health"` changes starting health. Power-up drop rates are dvar-controlled — search t7kb for the specific dvar name before assuming a hardcoded value.
