@@ -56,17 +56,25 @@ When the whole stack is stock (`_zm_behavior.gsc` twice and nothing else), you h
 - **Build/run as a mod** — carries per-line debug info for stock frames too.
 - **Take the stock script over into your map** (next section). Your copy is your script, so it reports lines — and you can instrument it, which is usually worth more than the line number alone.
 
-## Overriding a stock script from a *usermap* — the assetlist CSV
+## Overriding *any* stock asset from a *usermap* — the assetlist CSVs
 
-The received wisdom that "a usermap can't override stock scripts, only a mod can" is **incomplete**. Dropping your copy at the same path under `usermaps/<map>/scripts/…` and zoning it is not enough — the stock one is still pulled in by the patch asset list and wins. The missing step:
+The received wisdom that "a usermap can't override stock content, only a mod can" is **wrong**, and the rule is not about scripts. **The linker skips any asset an upstream zone already contributes** — your zone inherits them through its `>class,…` / `>group,…` header — so your copy is silently ignored no matter how correctly you zone it. Building as a mod does not help: same class, same skip.
 
-**Comment the stock entry out of `zone_source/all/assetlist/zm_patch.csv`.**
+**Comment the stock entry out of the assetlist CSV that contributes it**, under `zone_source/all/assetlist/`:
 
 ```
-//scriptparsetree,scripts/zm/_zm_behavior.gsc
+//scriptparsetree,scripts/zm/_zm_behavior.gsc      zm_patch.csv
+//rawfile,animtrees/generic.atr                    core_common.csv
 ```
 
-That file lists every stock script the zm patch zone contributes; commenting a line removes it from the build, and your zoned copy takes its place. Shipped installs already ship several lines commented this way (`_zm_ai_dogs`, `_zm_pack_a_punch`, `_zm_weapons`), which is the confirmation the mechanism is intended. Back the CSV up first — it is a shared, install-wide file, so the change affects every map you build until you undo it.
+Then your zoned copy takes its place. **Any asset type, and the file is whichever list names it** — `zm_patch.csv`, `core_common.csv`, `zm_common.csv`, `zm_levelcommon.csv`. Don't assume `zm_patch.csv`: `grep -rn "<asset path>" zone_source/` and comment the line you actually find. Shipped installs already ship several lines commented this way (`_zm_ai_dogs`, `_zm_pack_a_punch`, `_zm_weapons`), which is the confirmation the mechanism is intended. These are shared, install-wide files — back them up (or keep them in git), because the change affects every map built from that tree until undone.
+
+**Diagnose it by size, not by theory.** When an edit to a shared raw file seems to have no effect, append a few KB of junk to it, relink, and compare the `.ff` size before and after:
+
+- **delta 0** → the linker is not packing your file at all; you need the CSV line commented (above).
+- **delta > 0** → it *is* in the build, and your bug is elsewhere.
+
+That one measurement replaces a long chain of plausible guesses, and it works for any raw asset — animtrees, animtables, behavior trees, scripts.
 
 ## Instrument rather than theorise
 
