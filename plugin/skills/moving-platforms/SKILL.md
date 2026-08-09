@@ -1,6 +1,6 @@
 ---
 name: bo3-moving-platforms
-description: How to build something in Black Ops 3 zombies that moves and carries things — buses, trains, elevators, tanks, moving platforms — using a `script_vehicle` on `info_vehicle_node` paths plus a `moving_platform_enabled` `script_brushmodel`, and how to make zbarriers, clips, triggers and zombies ride along with `LinkTo`. Covers the `AttachPath`-vs-`DrivePath` split, the `moving_platform_enabled` / `DYNAMICPATH` / `script_disconnectpaths` / `script_badplace` KVP semantics, and why AI pathing on a mover only works on the linked brushmodel. Use when a platform drifts instead of following its nodes, teleports or freezes at the end of its path, sinks into the floor, when zombies freeze or stop seeing the player the moment someone stands on a moving surface, when a vehicle path hangs the server at load (`EXE_ERR_SERVER_TIMEOUT`, black screen), or when porting TranZit's bus / a train / an elevator. Distinct from bo3-zombies-ai (navmesh, spawners and traversals on static geometry) and bo3-mapping (brushwork and sealing) — this is the moving-carrier craft and its silent failures.
+description: How to build something in Black Ops 3 zombies that moves and carries things — buses, trains, elevators, tanks, moving platforms — using a `script_vehicle` on `info_vehicle_node` paths plus a `moving_platform_enabled` `script_brushmodel`, and how to make zbarriers, clips, triggers and zombies ride along with `LinkTo`. Covers the `AttachPath`-vs-`DrivePath` split, the `moving_platform_enabled` / `DYNAMICPATH` / `script_disconnectpaths` / `script_badplace` KVP semantics, and why AI pathing on a mover only works on the linked brushmodel. Use when a platform drifts instead of following its nodes, teleports or freezes at the end of its path, sinks into the floor, when zombies freeze or stop seeing the player the moment someone stands on a moving surface, when a boarding zombie plays its climb animation perfectly and then snaps back outside, when a use prompt on a mover only appears after walking away and coming back or vanishes between two neighbouring triggers, when a vehicle path hangs the server at load (`EXE_ERR_SERVER_TIMEOUT`, black screen), or when porting TranZit's bus / a train / an elevator. Distinct from bo3-zombies-ai (navmesh, spawners and traversals on static geometry) and bo3-mapping (brushwork and sealing) — this is the moving-carrier craft and its silent failures.
 ---
 
 # Moving carriers in BO3 zombies
@@ -99,6 +99,34 @@ Everything downstream follows from that: the tear/climb anims are `animscripted`
 
 **Debugging a link: measure the offset in the parent's local space, not world space.** `WorldToLocalCoords` is rotation-invariant; a world-space delta also changes when the parent merely turns, which reports a false "drift" on every corner. (Cost me a false alarm on a link that was working fine.)
 
+Two more link facts, both **measured**, both cheap to lose a session to. **Re-issuing `LinkTo` on an entity the engine already considers linked does nothing** — a second call with a different offset is silently ignored, so a re-anchor has to `Unlink()` first. And **a `LinkTo` does not move the entity until the next server tick**, so anything sampled on the same frame reads the *pre-link* placement; a probe that skips a `WAIT_SERVER_FRAME` reports the link's own work as drift.
+
+## An anim never moves a linked entity — the anchor holds it and the travel is in the bones
+
+The trap that eats a port of BO2's boarding sequence, and it is invisible because the animation looks perfect.
+
+**Measured:** sampling a boarding zombie's position *in the vehicle's own frame* for the whole climb-in anim reported a **peak displacement of 0** while the body was plainly climbing through the window and ending up inside. `AnimScripted` parks the entity on the anchor it is handed; the **rendered pose** follows that anchor, the **entity** follows its link, and the two are independent. Nothing the animation does will ever relocate a linked actor — which is also why a stale anchor "leaves the zombie behind" visually while its collision never moved at all.
+
+So on a mover the relocation is explicit, it happens **after** `StopAnimScripted`, and the destination is a **local offset projected on the parent's frame, re-read at the moment of the move**. Composing the world point up front instead cost a 325-unit miss: a second of animation is ~110 units of bus, plus its rotation.
+
+```gsc
+v_org = vehicle GetTagOrigin( str_tag );          // read HERE, not before the anim
+v_ang = vehicle GetTagAngles( str_tag );
+v_dest = v_org + VectorScale( AnglesToForward( v_ang ), v_delta[0] )
+               + VectorScale( AnglesToRight( v_ang ),   v_delta[1] )
+               + VectorScale( AnglesToUp( v_ang ),      v_delta[2] );
+```
+
+That is the shape Origins' tank uses for its own arrival points — `zm_tomb_tank::tank_get_jump_down_offset` composes exactly this from a `tank_offset` field **authored on a map struct**. Which is the real lesson: the tank never needs a fixup because **its tags are the destinations**. `climb_tag` is five lines — `linkto` / `animscripted` / `donotetracks` / `unlink` / `setgoalpos( self.origin )` — with no `AnimMode`, `OrientMode`, `PathMode` or teleport anywhere in the file; the link does the moving and the anim only dresses it. Ported anims whose tags land *outside* the vehicle (BO2's window joints sit on the window plane) have to build the destination, and `GetMoveDelta` on an un-flattened twin export is where the reach comes from when the played anim's root was pinned flat to preserve its lateral anchoring.
+
+## A use prompt on a mover has to be a map-placed trigger
+
+**A player holds one use trigger at a time**, so two overlapping volumes cancel and someone standing between two of them gets **no prompt at all**. BO3's answer for barriers is a **per-player** trigger — `zm_unitrigger::unitrigger_force_per_player_triggers( stub, true )` in `_zm_blockers.gsc` — which is exactly why its shipped barrier radius (`94.21`) can be generous without neighbouring barriers fighting. That escape is closed on a mover: unitriggers register at a fixed origin (`register_static_unitrigger`) and there is nothing in `_zm_unitrigger.gsc` to follow a parent.
+
+Which leaves shaping the volumes so they never touch — Radiant's job, not a radius guessed in script. BO2 does precisely that: its bus rebuild trigger is **placed in the map** and picked up by `script_noteworthy` `"rebuild"`, then wired with `enablelinkto()` / `linkto( bus )` / `setmovingplatformenabled( 1 )`. Note the **bare** `linkto` with no tag and no offsets, which is what preserves the transform the mapper authored.
+
+Getting the prompt to appear is its own trap, all three **measured**: `SetInvisibleToAll()` does **not** come back with a later `SetVisibleToAll()` — once hidden it stays hidden; `TriggerEnable` does **not** re-evaluate the prompt of a player already standing inside the volume, so the hint only returns after leaving and re-entering. The shipped form is per-player and per-frame — `blockertrigger_update_prompt` is one `SetInvisibleToPlayer( player, !can_use )` plus one `SetHintString`, re-run for every player on every update. Note also that stock never gates a barrier prompt on whether boards are missing (`blockerstub_update_prompt` only asks whether the *player* can use it); "nothing left to repair" is handled by **deleting** the trigger.
+
 ## `moving_platform_enabled` and `DYNAMICPATH` are different jobs — they never co-occur
 
 Both are real, both are engine-side, and mixing them up is easy because both sound like "make pathing work on this".
@@ -107,6 +135,8 @@ Both are real, both are engine-side, and mixing them up is easy because both sou
 - **`DYNAMICPATH`** `1` — note the **uppercase, singular** spelling. "Recut the navmesh when this moves or disappears." Shipped on `zm_giant`'s debris/doors and the MP bomb-site prefabs.
 
 Across every entity in the shipped `map_source/` that carries either, **not one carries both**. Obstacle versus floor. A moving platform does **not** want `DYNAMICPATH` — it reconnects paths unnecessarily.
+
+**Verified in-game, and worth knowing because it is the one remedy the community offers:** ticking `DYNAMICPATH` on a bus's `moving_platform_enabled` brush made zombies stop seeing a player aboard *entirely* — strictly worse than without it, and removing it restored the previous behaviour. The advice to pair the two comes from a Discord thread that is itself unresolved (t7kb, 0.25); treat it as ruled out rather than untried.
 
 Two spelling traps that cost real time: the KVP is `DYNAMICPATH`, so a case-sensitive search for `dynamicpaths` finds nothing and you conclude it doesn't exist. And `moving_platform` (no `_enabled`) exists too — but as a **value** (`vehicletype`/`targetname`), not a key.
 

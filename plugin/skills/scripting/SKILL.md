@@ -43,6 +43,8 @@ A `#using` only makes a call *resolvable* — the target script must **also be i
 
 `scripts/shared/` is a deep stdlib reached through those namespaces: `util::`, `array::`, `math::`, `clientfield::`, `flag::`, `spawner::`, plus zombies helpers in `zm_utility::` / `_zm_utility`. Before writing a helper, `search` t7kb for one — most already ship, and reusing them keeps your code working when Treyarch internals shift.
 
+**But read the body of a stdlib predicate before you branch on it.** `util::use_button_held()` **returns false the first time it is asked**, whoever asks: its first call is what *starts* the tracking thread (`self thread button_held_think( BUTTON_USE )`) and it then returns the `self._holding_button[...]` slot that thread has not filled in yet. Code that asks once and gives up on a false — a hold-to-repeat loop testing it before its first iteration — never repeats, and it looks exactly like the player not holding the button. Stock gets away with it because its unitriggers have been polling the same helper since the prompt appeared, long before the interaction starts. For a one-shot question use the engine call, `player UseButtonPressed()`. (**Measured.**)
+
 ## Extending stock behavior: hook first, override when blocked
 
 Prefer a **hook** (Inversion of Control): most stock systems expose seams so you never touch their source — register a spawn function (`add_global_spawn_function`), set a `level.*` function pointer the stock script calls, or use the callback/flag it fires. Stock systems (perks, powerups, AI) are extended this way.
@@ -114,7 +116,20 @@ Two prerequisites before `AnimScripted` on a script_model:
 - **Bake the travel into the anim** — an anim carrying root motion slides the model along its *baked* path from the fixed anchor (a zip, a flythrough); fine when the path is fixed, useless when it's data-driven from Radiant nodes.
 - **Make it a real vehicle/AI** — then `SetAnim` animates relative to the moving entity for free, at the cost of the full vehicle/ASM setup.
 
-Confirm `AnimScripted` / `UseAnimTree` signatures against the raw install and t7kb. See **bo3-animation** for compiling the anim and **bo3-atmosphere** for the FX side.
+Confirm `AnimScripted` / `UseAnimTree` signatures against the raw install and t7kb. See **bo3-animation** for compiling the anim and **bo3-atmosphere** for the FX side. On a moving parent there is a further trap — an anim cannot relocate a `LinkTo`'d entity at all — which **bo3-moving-platforms** owns.
+
+## An `AnimScripted` notify fires once per NOTETRACK, not once at the end
+
+So `waittill`-ing on it returns on the animation's **first** notetrack — a footstep, a sound cue, anything — and whatever you do next (typically `StopAnimScripted`) cuts the animation in half. The symptom is an anim that plays a fraction of its length for no visible reason, and it changes with the anim rather than with your code, which is what makes it baffling.
+
+The shipped code says so plainly once you look at why it is shaped the way it is: `zombie_shared::DoNoteTracks( flagName )` is a `for(;;)` loop around `self waittill( flagName, note )`, and `HandleNoteTrack` returns a value — ending the loop — only for `"end"`, `"finish"` or `"undefined"`. Everything else falls through and it waits again. A loop would be pointless if the notify fired once.
+
+Two correct waits, depending on what you have:
+
+- **`zombie_shared::DoNoteTracks( "my_notify" )`** — the stock idiom, and the only one that also runs the notetrack handlers (footstep sounds, board tears, melee hits). Needs the animation to actually carry an `end` notetrack, or it waits forever.
+- **`wait GetAnimLength( str_anim )`** — deterministic, and the right fallback for a ported anim whose notetracks were lost in conversion (see **bo3-animation**). Loses the handlers.
+
+The note argument can also arrive **undefined** — `DoNoteTracks` normalises it to the string `"undefined"` before dispatching, and `HandleNoteTrack` treats that as a terminator alongside `"end"`. Don't assume a bare `waittill` on the notify is safe just because it happened to work on one anim: whether it returns early is a property of *that* animation's notetrack list, not of your code.
 
 ## Driving the first-person CAMERA from an animation (get-up, mantle, scripted FP moment)
 

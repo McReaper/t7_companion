@@ -60,6 +60,10 @@ export2bin.exe pb_zipline_enter.xanim_export      # ✅ correct: writes the fram
 
 So: **export with the notetrack list cleared** (or strip the `NOTETRACKS` section from the text so every `PART` is `NUMTRACKS 0`), convert cleanly, then re-add the notetracks on the **APE xanim asset** (its Notetrack / FX / Sound sections). Record the frames first — a scene/script that waits on a notify (`… waittill("my_note")`) needs them, but the *first* build/test usually doesn't, so don't let missing notetracks block getting the anim in-game.
 
+**A ported anim usually arrives with its notetracks already gone, and nothing tells you.** Extractors keep them — a Greyhound/Wraith `.seanim` carries a `(frame, name)` list behind its `PRESENCE_NOTE` flag — but a hand-rolled `seanim → .xanim_export` converter typically *parses* that list and then writes `NUMTRACKS 0` unconditionally, so they vanish between two files that both look fine. Read them back off the **source** `.seanim` before concluding an animation never had any, then put the frames into the APE asset.
+
+Why that matters well beyond footsteps: **BO3 delivers an AI's melee damage from a notetrack**, not from the animation itself — `_zm_behavior::notetrackBoardMelee`, registered on `NOTETRACK_ZOMBIES_BOARD_MELEE`, is what calls `DoDamage`. An attack anim stripped of its notes therefore plays perfectly and hits nobody, and re-creating the timing in script means guessing at frames the animator already chose. Reading them back is also how you discover a swing is a **double** one: BO2's bus window attack carries `fire` at frames 16 *and* 95 of 151, so a single re-timed impact lands in the pause between the two real swings and reads as random damage. (**Verified** by parsing the shipped seanims.)
+
 Related crash, same area: an export that dies on `ValueError: No object matches name: XAnimExporterInfo.notetracks[N]` is a **CoDMayaTools bug**, not a problem with your anim — `cmds.getAttr` *raises* on a never-written element of a multi attribute, so any export slot that has never held a notetrack blows up before writing anything. The one-line patch is in **bo3-anim-retarget**.
 
 ## The APE xanim asset
