@@ -1,6 +1,6 @@
 ---
 name: bo3-zombies-ai
-description: How to work with zombies/character AI in Black Ops 3 — behavior trees, spawners, custom traversals, navmesh, and custom zombie variants. This is in-game AI (zombie/character behavior, pathing, spawning) — not LLM/agent AI, don't conflate the two. Use for custom zombie types/variants, AI not behaving/pathing/attacking correctly, or spawner logic.
+description: How to work with zombies/character AI in Black Ops 3 — behavior trees (`.ai_bt`/`.ai_asm`/`.ai_am`/`.ai_ast`), spawners and risers, custom traversals, navmesh, custom zombie variants, and the engine flags a script holding a zombie has to manage (`maxsightdistsqrd`, `SetPlayerCollision`, `ForceTeleport`, `PathMode`). This is in-game AI (zombie/character behavior, pathing, spawning) — not LLM/agent AI, don't conflate the two. Use for custom zombie types/variants, spawner logic, or AI not behaving/pathing/attacking correctly: zombies replaying an idle "dance", `assert fail` on a riser's `script_string`, zombies losing sight of a player they can plainly see, a scripted zombie that blocks the player like invisible geometry until it dies, or one parked at melee range that neither swings nor closes. Distinct from bo3-moving-platforms (AI carried by a vehicle/train/elevator and boarding it) — this is AI on static geometry.
 ---
 
 # Zombie / character AI in Black Ops 3
@@ -42,6 +42,31 @@ on every zombie that rises there — while zombies from a `find_flesh` riser in 
 **The trap that produces this:** `script_string` set on the **prefab instance** (the `misc_prefab` entity) does **not** propagate to the entities inside it. A barrier prefab placed with `script_string "receiver_set_entry_a"` still has an `exterior_goal` carrying no `script_string` at all, so nothing declares that entry. Put the KVP on the `exterior_goal` **struct itself** — which for a stock prefab means taking a local copy of it rather than editing shared content.
 
 And check for **more than one**: a map can have several risers asking for different entries, and fixing the first one you find leaves the others throwing exactly the same error, which reads as "the fix didn't work".
+
+## Zombies see 128 units, and nothing ever puts it back
+
+`zombie_setup_attack_properties` — the function every zombie goes through when it is released to fight — clamps sight hard, and the comment above it says why it was done rather than what it costs:
+
+```gsc
+//try to prevent always turning towards the enemy
+self.maxsightdistsqrd = 128 * 128;      // _zm_spawner.gsc
+```
+
+Nothing restores it afterwards. The spawner default it overwrites is `1024 * 1024`, or `script_sightrange` when the KVP is present (`spawner_shared.gsc`), so a zombie is left with **1/64 of the sighted area** it was spawned with. Inside a house that is invisible and deliberate. It stops being invisible the moment distance is part of the design — an open street, a zombie carried away from the player on a vehicle, anything that should notice a player it can plainly see — and it reads as "the AI is broken" rather than as a tuning value, because every other state on the zombie looks healthy.
+
+If your zombies go blind at a suspiciously round distance, restore it right after the setup call, honouring the KVP if the mapper set one:
+
+```gsc
+self.maxsightdistsqrd = (isdefined(self.script_sightrange) ? self.script_sightrange : 1024 * 1024);
+```
+
+## A zombie you hold in script stops behaving like a zombie
+
+Scripted control (an `AnimScripted` sequence, a forced hold position) suspends the behaviours the rest of the game assumes are running, and each one fails in a way that doesn't look like it came from your script:
+
+- **It becomes a wall.** A scripted body cannot yield, so it seals off whatever it is standing in — typically the doorway the player is trying to use — and the block only disappears when the zombie dies, which is what makes it read as level geometry. `PushPlayer( true )` cannot save you: it is shipped **commented out** in `zombie_setup_attack_properties` (*"push the player out of the way so they use traversals in the house."*), and pushing requires a body with behaviour left to yield with. Drop `self SetPlayerCollision( 0 )` for the length of the sequence and restore `1` the instant it ends — stock uses the same flag on a ragdolling zombie. Don't leave it off: a body that should be solid then isn't.
+- **A hold position exactly at melee range is a dead band.** Melee is gated on `DistanceSquared(...) > ZM_MELEE_DIST_SQ` (`zombie.gsc`, `ZM_MELEE_DIST` `64` in `zombie.gsh`/`skeleton.gsh`), so a zombie parked *at* 64 units neither closes nor swings, and jitters between the two. Park it well inside — half that is comfortable.
+- **`ForceTeleport( position, angles, updategoalpos, resetEntity )` does more than move it.** `updategoalpos` defaults to **true**, so a teleport silently rewrites the goal you just set; `resetEntity` resets the entity's behaviours. `spawner_shared::teleport_spawned` passes reset `true` by default. Pass both explicitly when the order of teleport-then-goal matters, and note the call returns a value worth testing.
 
 ## Tuning zombie/player stats
 

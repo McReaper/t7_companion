@@ -1,6 +1,6 @@
 ---
 name: bo3-animation
-description: How to get a custom animation from a DCC (Maya/Blender) compiled into Black Ops 3 and its many silent-failure gotchas — CoDMayaTools on modern Maya, the Cast import (SEanim is deprecated), the Quality field's frame-doubling trap, 30fps/ntsc, the export2bin single-argument conversion mode, why notetracks must be added in APE not Maya, the required Model File on an xanim asset, and how to verify a .xanim_bin actually has the format the linker reads. Use when compiling/porting/converting a character, weapon, or world animation for BO3, or diagnosing xanim errors (`Unexpected error while processing binary token`, `model was not specified`, doubled framerate/frame count, an anim that plays 2× too fast, `has bad angle delta on frame N`, `requires "delta" type animations`, an export with `NUMPARTS 1`). Also covers what the `type` field (delta / delta3d / relative / absolute) actually controls and why AI anims cannot use `relative`, and driving CoDMayaTools headlessly to batch hundreds of anims. Distinct from bo3-assets (the broader model/material porting pipeline) and bo3-compiling (the whole-map build) — this is the animation-specific path and its traps.
+description: How to get a custom animation from a DCC (Maya/Blender) compiled into Black Ops 3 and its many silent-failure gotchas — CoDMayaTools on modern Maya, the Cast import (SEanim is deprecated), the Quality field's frame-doubling trap, 30fps/ntsc, the export2bin single-argument conversion mode, why notetracks must be added in APE not Maya, the required Model File on an xanim asset, and how to verify a .xanim_bin actually has the format the linker reads. Use when compiling/porting/converting a character, weapon, or world animation for BO3, when reading or patching a `.xanim_export` by hand (its `PART`/`FRAME`/`OFFSET` layout, and why shifting or rebasing one cannot move where the anim plays), or diagnosing xanim errors (`Unexpected error while processing binary token`, `model was not specified`, `has no XANIM_BIN file specified`, `unable to find animation '<name>' in tree`, doubled framerate/frame count, an anim that plays 2× too fast, `has bad angle delta on frame N`, `requires "delta" type animations`, an export with `NUMPARTS 1`). Also covers what the `type` field (delta / delta3d / relative / absolute) actually controls and why AI anims cannot use `relative`, and driving CoDMayaTools headlessly to batch hundreds of anims. Distinct from bo3-assets (the broader model/material porting pipeline) and bo3-compiling (the whole-map build) — this is the animation-specific path and its traps.
 ---
 
 # Getting a custom animation into Black Ops 3
@@ -54,6 +54,17 @@ export2bin.exe pb_zipline_enter.xanim_export      # ✅ correct: writes the fram
 
 **Verify the output format, don't trust exit 0.** A correct BO3 `.xanim_bin` is `*LZ4*`-wrapped and its decompressed body starts with a 4-byte token header then `Export filename:` (`55 c3 00 00 45 78 …`). If the decompressed body starts straight with `//` (`2f 2f`), it's the raw un-framed form and the linker will reject it. Compare against any stock `xanim_export/**/*.XANIM_BIN`.
 
+## Reading a `.xanim_export` by hand — and why translating one changes nothing in game
+
+The text format is simple enough to inspect or patch with a script, which is worth knowing because it settles arguments that are otherwise guesswork: a header (`NUMPARTS`, then `PART <i> "<joint>"`), then one `FRAME n` block per frame listing each `PART i` with its `OFFSET x y z`, `SCALE`, and three `X`/`Y`/`Z` rotation rows.
+
+Two facts about the numbers, both **verified by inspection** on a Treyarch character rig:
+
+- **`PART 0` is `tag_origin` — the root — and `PART 1` is `j_mainroot`.** Travel is the root's, so measure `PART 0`. Measuring `j_mainroot` instead manufactures a discrepancy of a few units that does not exist, and sends you hunting a bug that was never there.
+- **`OFFSET`s are absolute in the animation's own space**, not parent-relative. So translating a whole clip really is one constant subtracted from every `OFFSET` of every `PART` on every frame.
+
+**And that translation is a no-op for playback.** It is tempting — shift an export so the body ends at `(0,0,0)`, and unlinking should leave the entity exactly where the clip finished. It does nothing: `AnimScripted` is handed the **starting** transform and the engine reads travel from the root track, so shifting the file moves start and end together and the played result is identical. When an anim lands in the wrong place the **anchor** is wrong, not the file — fix it in script with `GetStartOrigin`/`GetStartAngles` (place the entity so the clip lands where you want) or `GetMoveDelta( anim, 0, 1, ent )` (read the travel), and don't touch the export. See **bo3-scripting** for playing it and **bo3-moving-platforms** for the moving-parent case.
+
 ## Notetracks: add them in APE, never bake them in Maya
 
 **CoDMayaTools writes notetracks in a syntax the Treyarch/Scobalula converters cannot parse** — export2bin/exportxbin choke exactly on the `FRAME n "note"` line at the tail of the file (`Failed to find token … at 0x…` near EOF; or the binary form fails deep at a fixed token offset). This is a known, silent killer of an otherwise-valid anim.
@@ -78,6 +89,16 @@ Create a new `xanim` asset (don't derive from a stock one) and set:
 - **Looping** → checked only for looping anims (idle/slide/sprint loops).
 
 Then add its line to the map/mod **`.zone`** (`xanim,<name>`), plus any model/scriptbundle it depends on, and **Link** (this is a script/asset change — no map recompile needed unless geometry changed). See **bo3-compiling**.
+
+**An anim you play by string through an animtree has to be declared in three places, and each omission fails at a different stage** — which is why fixing one and re-linking looks like the fix didn't work:
+
+| Declaration | Where | What its absence gives you |
+|---|---|---|
+| the `xanim` asset | the GDT (via APE) | a link failure naming the asset — **measured**: `xanim asset '<name>' has no XANIM_BIN file specified`, linker exit `4001000` |
+| `xanim,<name>` | the `.zone` | the asset never enters the fastfile, so it is simply absent at runtime |
+| the anim's name | the `.atr` animtree, under a group | links clean, then `unable to find animation '<name>' in tree '<tree>'` when you play it |
+
+The animtree also needs its own `rawfile,animtrees/<tree>.atr` zone line — and on the script side `#using_animtree` without it kills the server silently at load (**bo3-moving-platforms**).
 
 ## `type` on an AI anim is not a free choice — and `delta3d` is the escape hatch
 
@@ -114,6 +135,9 @@ Set the frame range and FPS by editing the window's fields directly (`<win>_Fram
 - `… requires "delta" type animations` (at the `.ai_ast`) → the asset's **Type** is not in the delta family. This is the failure `relative` defers to.
 - Exported file has **`NUMPARTS 1`** → only the root was selected; CoDMayaTools exports the **selection**, not the hierarchy under it.
 - `Object 'CoDMayaToolsProgressbar' not found` / `No object matches name: XAnimExporterInfo.notetracks[1]` → **scripted** export without the button's setup; see the batch section.
+- `xanim asset '<name>' has no XANIM_BIN file specified` (linker exit `4001000`) → zoned but **not declared in the GDT**; three declarations are needed, see the APE section.
+- `unable to find animation '<name>' in tree '<tree>'` → the anim is built and zoned but **not listed in the `.atr`**.
+- Right pose, wrong **place** → the **anchor** passed to `AnimScripted`, never the export. Editing the file cannot fix it.
 
 ## Don't invent
 
