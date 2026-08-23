@@ -5,7 +5,7 @@ description: How to search the t7kb knowledge base for Black Ops 3 / BO3 / Treya
 
 # Answering BO3 modding questions with t7kb
 
-You have a local knowledge base of the Black Ops 3 modding community via the **t7kb** MCP server — tools `search` (hybrid keyword + semantic) and `get` (full document by `doc_id`). For any non-trivial BO3 modding question, query it before answering from memory; the corpus is the authority on what BO3 modding actually contains, your training data is not.
+You have a local knowledge base of the Black Ops 3 modding community via the **t7kb** MCP server — tools `t7kb:search` (hybrid keyword + semantic) and `t7kb:get` (full document by `doc_id`). For any non-trivial BO3 modding question, query it before answering from memory; the corpus is the authority on what BO3 modding actually contains, your training data is not.
 
 _If the `t7kb` tools aren't available, the knowledge base isn't installed — run `/t7kb:setup` first._
 
@@ -13,10 +13,10 @@ _If you're working under a BO3 mod-tools root (has `raw/`, `share_raw/`, `userma
 
 ## Query it well
 
-- **Search broad, then narrow.** Issue several short, differently-phrased `search` queries (symptom-side, mechanism-side, exact-jargon-side). The full-text index is conjunctive, so a single phrasing misses the long tail.
-- **Read full bodies.** `get` the top `doc_id`s — don't answer from snippets.
+- **Search broad, then narrow.** Issue several short, differently-phrased `t7kb:search` queries (symptom-side, mechanism-side, exact-jargon-side). The full-text index is conjunctive, so a single phrasing misses the long tail.
+- **Read full bodies.** `t7kb:get` the top `doc_id`s — don't answer from snippets.
 - **Weigh reliability.** Each result carries a `reliability` score. On conflict, prefer higher-reliability sources and surface the disagreement when it matters.
-- **Cite.** When a claim comes from the kb, name the `source` + `url`.
+- **Cite.** When a claim comes from the corpus, name the `source` + `url`.
 
 ## Verify shipped tokens against ground truth
 
@@ -29,8 +29,8 @@ Check the project's `AGENTS.md`/`CLAUDE.md` first for a "Raw mod-tools root" fac
 The raw mod-tools install is the preferred ground truth, but it may be absent (not installed, on another machine, or a headless run). Do not silently fall back to low-reliability sources:
 
 - **Detect and disclose.** If you cannot locate the install, say so in your answer, and mark any shipped-token claim (function name, KVP, asset field, error string, path) as corroborated by community sources only — not verified against shipped files.
-- **Last-resort web supplement.** When the kb is thin and the install is unavailable, a targeted web search may fill gaps. Rank it strictly below the kb and the install, never as ground truth. Prefer higher-reliability sources (e.g. UGX, resolved/accepted threads) over random posts, keep the "may be paraphrased or subtly wrong" caution, and state in the answer what was verified versus merely corroborated.
-- **Ordering.** Always: kb → raw install → web. Drop any claim you cannot ground in at least one of these.
+- **Last-resort web supplement.** When the corpus is thin and the install is unavailable, a targeted web search may fill gaps. Rank it strictly below the corpus and the install, never as ground truth. Prefer higher-reliability sources (e.g. UGX, resolved/accepted threads) over random posts, keep the "may be paraphrased or subtly wrong" caution, and state in the answer what was verified versus merely corroborated.
+- **Ordering.** Always: corpus → raw install → web. Drop any claim you cannot ground in at least one of these.
 
 ## Don't invent
 

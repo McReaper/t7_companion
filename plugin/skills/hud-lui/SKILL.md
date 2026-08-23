@@ -1,11 +1,11 @@
 ---
 name: bo3-hud-lui
-description: How to work with LUI (Black Ops 3's HUD/menu system) and its embedded Lua — the L3akMod prerequisite, the Engine/element/stock-widget API surface, layout via anchors and margins, events and function overrides, the GSC/CSC <-> Lua bridge (clientfields), zoning Lua files, overriding vs hooking, and common UI-error causes. Use for HUD elements, custom menus/widgets, perk icons, loading/preview screens, hintstring color, and any Lua-in-BO3 task. Distinct from GSC/CSC — see bo3-scripting for that.
+description: How to work with LUI (Black Ops 3's HUD/menu system) and its embedded Lua — the L3akMod prerequisite, the Engine/element/stock-widget API surface, layout via anchors and margins, events and function overrides, zoning Lua files, overriding vs hooking, and common UI-error causes. Use for HUD elements, custom menus/widgets, perk icons, loading/preview screens, hintstring color, and any Lua-in-BO3 task. Owns only the Lua half of the GSC/CSC <-> Lua clientfield bridge — subscribing to a model and reading its value in a widget; registering the clientfield and calling `set` on it is GSC/CSC and belongs to bo3-scripting, which also owns GSC/CSC generally.
 ---
 
 # Working with LUI/HUD and Lua in Black Ops 3
 
-**Lua is where most of BO3's UI lives — LUI (the menu/HUD system) — and it is a separate language and separate craft from GSC/CSC.** Gameplay logic is GSC (server) / CSC (client); most menus, widgets, and HUD overlays are LUI, written in Lua (technically HavokScript) — though not everything on-screen is: simple always-visible HUD text/timers can be built in pure GSC via `NewHudElem()` (see the typewriter-intro pattern below), no Lua involved. Look up exact API names, `Enum.*` values, and specific widget classes in **t7kb** (`search` then `get`) — this skill is the craft and the gotchas around it. Sourcing here mixes raw Discord (~0.25 reliability) with curated wiki writeups (~0.70-0.85) — prefer the latter when they disagree.
+**Lua is where most of BO3's UI lives — LUI (the menu/HUD system) — and it is a separate language and separate craft from GSC/CSC.** Gameplay logic is GSC (server) / CSC (client); most menus, widgets, and HUD overlays are LUI, written in Lua (technically HavokScript) — though not everything on-screen is: simple always-visible HUD text/timers can be built in pure GSC via `NewHudElem()` (see the typewriter-intro pattern below), no Lua involved. Look up exact API names, `Enum.*` values, and specific widget classes in **t7kb** (`t7kb:search` then `t7kb:get`) — this skill is the craft and the gotchas around it. Sourcing here mixes raw Discord (~0.25 reliability) with curated wiki writeups (~0.70-0.85) — prefer the latter when they disagree.
 
 ## Prerequisite: L3akMod
 
@@ -59,7 +59,7 @@ Naming the file `t7hud_zm_factory.lua` and zoning it as `rawfile,ui/uieditor/men
 
 ## The `Engine` namespace: LUI's bridge to the game
 
-`Engine.<Name>(...)` calls reach outside the UI tree — this is not the complete surface, just the commonly useful part; search t7kb for anything not listed here.
+`Engine.<Name>(...)` calls reach outside the UI tree — this is not the complete surface, just the commonly useful part; run `t7kb:search` for anything not listed here.
 
 | Category | Functions |
 |---|---|
@@ -136,10 +136,10 @@ Lua files ship as raw source or precompiled:
 - `#precache("lui_menu", "<name>")` in GSC/CSC to register a custom menu; `#precache("lui_menu_data", "<property>")` for a menu property name; `#precache("eventstring", "<name>")` for a LUI event name.
 - For a **map**, a Lua file usually needs `LuiLoad` called from GSC/CSC (see above); for a **mod**, it typically doesn't. Each widget you force-load also needs its child widgets zoned — a missing child is a common "why is nothing showing" cause.
 
-## The GSC/CSC ↔ Lua bridge
+## The GSC/CSC ↔ Lua bridge: this skill owns only the Lua half
 
 Two distinct channels, don't mix them up:
-- **Server/client state → Lua (clientfields).** Same clientfield mechanism bo3-scripting documents for CSC — `clientfield::register` both sides in `init`, then `set` server-side. On the Lua side, a widget subscribes (`subscribeToGlobalModel`) and reads the value (`Engine.GetModelValue`). This is how HUD elements reflect server-driven state (health, notifications, custom UI models via `clientfield::set_player_uimodel`).
+- **Server/client state → Lua (clientfields).** `clientfield::register` both sides in `init`, then `set` server-side — that GSC/CSC half is **bo3-scripting**'s, not covered again here. On the Lua side, a widget subscribes (`subscribeToGlobalModel`) and reads the value (`Engine.GetModelValue`) — the half this skill actually owns. This is how HUD elements reflect server-driven state (health, notifications, custom UI models via `clientfield::set_player_uimodel`).
 - **Lua button press → your Lua handler.** Register directly on the button's own `click` event: `MyButton:registerEventHandler("click", OnClick)` (see Events above). There's no separate GSC-side "menu response" channel to wire up for a plain button press — the handler runs in Lua; call back into GSC/CSC only if the click needs to change gameplay state, via whatever mechanism that system already exposes (a dvar, an `Engine.Exec`'d command, etc.).
 - **Menus freeze after prolonged use** when a widget is missing its **back-button** and/or `lose_focus` callback — every focusable widget needs both `gain_focus`/`lose_focus` handlers and a way to go back (`GoBack(menu, controller)` on the back button / Escape), or focus gets stuck.
 

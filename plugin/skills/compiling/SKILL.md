@@ -1,11 +1,11 @@
 ---
 name: bo3-compiling
-description: How to actually build a Black Ops 3 map or mod — the Mod Tools Launcher pipeline (Compile the map, Light/LEDs, Link the Fast Files, Run), what each mod-tools binary does, the TA_* environment, converting GDT/assets before linking, usermap-vs-mod builds, fast iteration (which stage to re-run), and the exact console command lines to run the whole build headlessly so an agent can compile for the user without the GUI. Use when building/compiling/linking/lighting a map or mod, driving the Launcher or its binaries from the command line, deciding what to rebuild, or working out whether a build actually succeeded — the linker returns non-zero for warnings too (`exit status 1000`, `Found 1 bad bulletmeshes`, `t7kb build` reporting `ok: false` on a Fast File that is perfectly current), and the verdict lives in `zone_source/all/assetinfo/<map>.errorlog` and `<map>.csv`. As distinct from diagnosing the resulting errors (bo3-debugging) or the geometry that causes compile failures (bo3-mapping).
+description: How to build a Black Ops 3 map or mod — the Mod Tools Launcher pipeline (Compile the map, Light/LEDs, Link the Fast Files, Run), what each mod-tools binary does, the TA_* environment, converting GDT/assets before linking, usermap-vs-mod builds, fast iteration (which stage to re-run), and driving the whole build headlessly for the user — the `t7kb:build` MCP tool first, `t7kb build`/raw binaries as fallbacks. Use when building/compiling/linking/lighting a map or mod, driving the Launcher or its binaries from the command line, deciding what to rebuild, or working out whether a build actually succeeded — the linker returns non-zero for warnings too (`exit status 1000`, `Found 1 bad bulletmeshes`, `t7kb:build`/`t7kb build` reporting `ok: false` on a Fast File that is perfectly current), and the verdict lives in `zone_source/all/assetinfo/<map>.errorlog` and `<map>.csv`. As distinct from diagnosing the resulting errors (bo3-debugging) or the geometry that causes compile failures (bo3-mapping).
 ---
 
 # Building & compiling BO3 maps and mods
 
-Shipping a map/mod is a **pipeline of separate stages**, each a different tool with its own inputs — the craft is knowing which stage owns which output so you rebuild only what changed and read failures at the right stage. This skill is the workflow and its gotchas; look exact zone syntax, dvars, and binary flags up in **t7kb** (`search` then `get`) and confirm shipped tokens against the raw mod-tools install. For *reading* a build error see **bo3-debugging** (compile vs linker vs unresolved-external vs runtime); for geometry that fails the map compile (leaks, triangle budget) see **bo3-mapping**.
+Shipping a map/mod is a **pipeline of separate stages**, each a different tool with its own inputs — the craft is knowing which stage owns which output so you rebuild only what changed and read failures at the right stage. This skill is the workflow and its gotchas; look exact zone syntax, dvars, and binary flags up in **t7kb** (`t7kb:search` then `t7kb:get`) and confirm shipped tokens against the raw mod-tools install. For *reading* a build error see **bo3-debugging** (compile vs linker vs unresolved-external vs runtime); for geometry that fails the map compile (leaks, triangle budget) see **bo3-mapping**.
 
 ## The Launcher and its environment
 
@@ -56,9 +56,17 @@ When a build hangs or fails, isolate by running one stage at a time and read tha
 
 ## Headless build — the agent can compile for the user
 
-Every stage is a **console binary**; the Launcher GUI only chains them. So an agent can run the whole build from the shell with no GUI.
+Every stage is a **console binary**; the Launcher GUI only chains them. An agent can drive the whole build with no GUI, in this order of preference: the `t7kb:build` MCP tool, then the `t7kb build` shell subcommand if no MCP server is registered, then the raw mod-tools binaries only if `t7kb` itself isn't installed. All three run the identical pipeline underneath, so drop down a tier only when the one above genuinely isn't available to you — not as a first instinct.
 
-**Prefer the `t7kb build` subcommand if the `t7kb` binary is installed** (it's the same tool that serves the MCP server, so it usually is). It runs this whole pipeline with every gotcha below handled — cwd, arg passing, the detached light poll, output-file verification — and prints a **compact per-stage summary** (or `--json`) with the first actionable error, instead of the hundreds of lines each tool spews:
+### `t7kb:build` — the MCP tool, use this first
+
+If this skill fired over MCP, the `t7kb` server is very likely already registered — it's the same server that exposes `t7kb:search`/`t7kb:get` — so call the `build` tool directly instead of shelling out. Its parameters (from the tool's own schema): `name` (required, e.g. `"zm_mymap"`), `stages` (comma list `compile,light,link,run`, default `"compile,light,link"`; pass `"link"` alone for a script-only change), `mod` (bool, target is `mods/<name>` instead of a usermap; default `false`), `light` (`low`|`medium`|`high`, default `"medium"`), `onlyents` (bool, fast entity-only compile; default `false`), `language` (default `"english"`), `skip_gdt` (bool, skip the `gdtdb /update` pass; default `false`), `tools_path`/`game_path` (default `$TA_TOOLS_PATH`/`$TA_GAME_PATH`). It returns the same compact per-stage JSON report as `t7kb build --json` below, first-actionable-error included — and it inherits the same `ok: false`-on-a-warning trap, see the exit-code section further down.
+
+**It runs synchronously and can take minutes (link) to 20–30 minutes (a full compile+light)** — set a long client-side timeout; a long wait is normal, not a hang.
+
+### `t7kb build` — the shell fallback, when no MCP server is registered
+
+No MCP server this session, or you specifically want the CLI's `--json`/`--verbose` output? The same tool ships this subcommand. It runs the whole pipeline with every gotcha below handled — cwd, arg passing, the detached light poll, output-file verification — and prints a **compact per-stage summary** (or `--json`) with the first actionable error, instead of the hundreds of lines each tool spews:
 
 ```
 t7kb build zm_mymap                          # usermap: compile,light,link (reads $TA_TOOLS_PATH)
@@ -69,7 +77,9 @@ t7kb build zm_mymap --onlyents --json        # fast entity-only compile, machine
 
 Flags: `--stages compile,light,link,run`, `--light low|medium|high`, `--onlyents`, `--mod`, `--tools-path`/`--game-path` (default `$TA_TOOLS_PATH`/`$TA_GAME_PATH`), `--verbose` to stream raw tool output. It exits non-zero and surfaces the parsed error (e.g. a linker `SCRIPT ERROR … line N`) when a stage fails — hand that to **bo3-debugging**.
 
-Under the hood it runs the exact command lines the stock Launcher constructs (below) — reach for these directly only when `t7kb build` isn't available. `%T` = `TA_TOOLS_PATH`, `%G` = `TA_GAME_PATH` (both the BO3 root; the `TA_*` vars must be set — the tools resolve their paths from them), `<map>` = full map name, `<pp>` = its first two letters (`mp`/`zm`), `<mod>`/`<zone>` = mod container and zone name.
+### Last resort: the raw Launcher binaries, only if `t7kb` itself isn't installed
+
+Both tiers above already run these exact command lines for you, gotchas and all — reach for them directly only when neither `t7kb:build` nor `t7kb build` is available, never as a shortcut around them. `%T` = `TA_TOOLS_PATH`, `%G` = `TA_GAME_PATH` (both the BO3 root; the `TA_*` vars must be set — the tools resolve their paths from them), `<map>` = full map name, `<pp>` = its first two letters (`mp`/`zm`), `<mod>`/`<zone>` = mod container and zone name.
 
 ```
 # 1. Index GDTs (always first; assets edited but not indexed link stale)
@@ -103,7 +113,7 @@ Confirm any flag not shown here against the raw install / t7kb before relying on
 
 ## The linker exits non-zero on warnings — read the errorlog, not the exit code
 
-**Measured on a real build.** A link whose only complaint was `^3Found 1 bad bulletmeshes, dumped to …_bulletreport.csv`, and which printed `done: 0m7.08s` for every zone, still returned **1000**. The Fast File was correct and current. Anything that gates on the exit code — including `t7kb build`, which then reports `ok: false` with `exit status 1000` and no message — will call that build failed, and you can lose real time "fixing" a build that already works.
+**Measured on a real build.** A link whose only complaint was `^3Found 1 bad bulletmeshes, dumped to …_bulletreport.csv`, and which printed `done: 0m7.08s` for every zone, still returned **1000**. The Fast File was correct and current. Anything that gates on the exit code — including `t7kb build`/`t7kb:build`, either of which then reports `ok: false` with `exit status 1000` and no message — will call that build failed, and you can lose real time "fixing" a build that already works.
 
 The `^3` prefix is a colour code marking the line as a warning. A genuine failure names the asset and does **not** print `done:`.
 

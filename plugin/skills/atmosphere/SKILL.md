@@ -1,15 +1,15 @@
 ---
 name: bo3-atmosphere
-description: How to make a Black Ops 3 map sound and feel right — sound aliases and ambient rooms, sun/sky/SSI and reflection probes, visionsets for runtime color grading, the four fog types, FX (particles, exploders, lens flares), and weather. Use for anything about audio, lighting mood, fog, particle FX, or weather/sky in a BO3 map.
+description: How to make a Black Ops 3 map sound and feel right — sound aliases, ambient rooms and reverb, sun/sky/SSI and reflection probes, visionsets for runtime color grading, the four fog sections (world/lit/sun/atmospheric) and their two placeable volumes, weather (rain/snow/lightning), and exploders. Use when an alias plays silently or not at all, ambient-room reverb doesn't switch between spaces, fog or the sky/sun looks wrong, a visionset color-grade won't apply, or weather FX (rain/snow) leaks indoors or doesn't play. Distinct from bo3-fx (owns building/editing the `.efx` particle effect itself — elements, rotation, materials): this is wiring and playing an existing effect for mood — precache, occlusion, ambience, fog, and light.
 ---
 
 # Atmosphere: sound, lighting, fog & FX in Black Ops 3
 
-This skill covers the audiovisual-polish layer of mapping — everything that makes a space *feel* right rather than just work. Look up exact CSV columns, KVPs, and error strings in **t7kb** (`search` then `get`); this skill is the craft and the gotchas around it.
+This skill covers the audiovisual-polish layer of mapping — everything that makes a space *feel* right rather than just work. Look up exact CSV columns, KVPs, and error strings in **t7kb** (`t7kb:search` then `t7kb:get`); this skill is the craft and the gotchas around it.
 
 ## Sound: aliases are the unit, not WAV files
 
-A **sound alias** is a named entry in a CSV under `<game>\share\raw\sound\aliases\` — code/script/triggers reference the alias name, never a WAV path directly, so the underlying file can change without touching callers. Add a new alias CSV as an `ALIAS` source in the map's `.szc`, with `Name` matching the CSV's base filename. Lean on a **template alias** (`share\raw\sound\templates\`) for the boilerplate columns (bus, volume, curves, limiting) and only override what you need per-alias — the column list is huge (~80 fields) and most modders only ever touch a handful (`FileSpec`, `VolMin`/`VolMax`, `Template`, `Looping`, `Subtitle`). **Every source WAV must be 48 kHz, signed 16-bit PCM** (export via Audacity) — the single most-repeated requirement across every audio how-to, and the most common reason an alias silently fails to play.
+A **sound alias** is a named entry in a CSV under `<game>/share/raw/sound/aliases/` — code/script/triggers reference the alias name, never a WAV path directly, so the underlying file can change without touching callers. Add a new alias CSV as an `ALIAS` source in the map's `.szc`, with `Name` matching the CSV's base filename. Lean on a **template alias** (`share/raw/sound/templates/`) for the boilerplate columns (bus, volume, curves, limiting) and only override what you need per-alias — the column list is huge (~80 fields) and most modders only ever touch a handful (`FileSpec`, `VolMin`/`VolMax`, `Template`, `Looping`, `Subtitle`). **Every source WAV must be 48 kHz, signed 16-bit PCM** (export via Audacity) — the single most-repeated requirement across every audio how-to, and the most common reason an alias silently fails to play.
 
 Sound variants aren't a naming convention you invent — they're gated through **sound contexts**: `ringoff_plr` selects an indoor/outdoor/underwater variant, `water` selects under/over-water, both resolved automatically from the listener's context (this is also what drives a weapon's indoor/outdoor decay tail, not a manual column).
 
@@ -19,9 +19,9 @@ Sound variants aren't a naming convention you invent — they're gated through *
 
 **`Storage` (loaded / streamed / primed) matters for timing.** A `streamed` one-shot can silently fail to fire when triggered at a precise instant (e.g. the first frame of a scripted sequence) — the stream isn't ready yet. For short one-shots that *must* play on cue, set `Storage` to **`loaded`** (held in memory, fires instantly); keep long loops/ambience `streamed`. If a callback provably runs (debug print fires) but you hear nothing, suspect the alias — WAV format (48 kHz/16-bit PCM) first, then `Storage`.
 
-**Don't reinvent what's already loaded**: roughly 6,600 sound aliases and ~1,150 ZM FX / ~470 MP FX ship usable without declaring anything — search t7kb for an existing alias/FX before authoring a new one.
+**Don't reinvent what's already loaded**: roughly 6,600 sound aliases and ~1,150 ZM FX / ~470 MP FX ship usable without declaring anything — run `t7kb:search` for an existing alias/FX before authoring a new one.
 
-**Ambient rooms** (looping ambience + reverb per space) are defined in an ambients CSV (`share\raw\sound\ambients\`) and placed via a `trigger_multiple` in Radiant with `targetname: ambient_room`, `script_ambientroom: <name>`, and `CLIENTSIDE_TRIGGER` checked — size the trigger to match the room. `script_ambientpriority` breaks ties on overlapping triggers. Zombies' stock `_zm_audio.csc` already drives ambient-room switching (e.g. forcing a room during last stand); community setups (e.g. Ardivee's `_ambient_room.csc`) hook the same pattern for custom per-area ambience.
+**Ambient rooms** (looping ambience + reverb per space) are defined in an ambients CSV (`share/raw/sound/ambients/`) and placed via a `trigger_multiple` in Radiant with `targetname: ambient_room`, `script_ambientroom: <name>`, and `CLIENTSIDE_TRIGGER` checked — size the trigger to match the room. `script_ambientpriority` breaks ties on overlapping triggers. Zombies' stock `_zm_audio.csc` already drives ambient-room switching (e.g. forcing a room during last stand); community setups (e.g. Ardivee's `_ambient_room.csc`) hook the same pattern for custom per-area ambience.
 
 ## Sun, sky & SSI: the primary light source
 
@@ -48,9 +48,9 @@ Fog is a single `fog` GDT asset with **four independently-toggleable sections**,
 
 For runtime/scripted fog changes bypassing the asset/volume entirely, `SetExpFog(startDist, halfwayDist, r, g, b, transitionTime)` is the direct GSC call (all 6 args required — older references showing five are wrong).
 
-## FX: particles, precache, lens flares
+## FX for atmosphere: precache the effect, don't just place it
 
-Follow the official FX Quickstart flow for creating a new effect and wiring it to an entity/trigger; for **weather-style FX (rain, snow)** make sure the effect is **precached** — a common "it doesn't play" report traces back to a missing precache rather than a broken FX asset. **The `_outdoor` FX techset (meant to cull weather FX indoors) does not work in the released mod tools** — don't rely on it to keep rain/snow out of interiors; handle that with occlusion volumes instead (see Weather below). The **blood-splatter** screen effect is **off by default** and needs a `blood.csc` override to enable.
+Wiring an already-built effect onto an entity/trigger follows the official FX Quickstart flow; building or editing the `.efx` itself (elements, rotation, materials) is **bo3-fx**'s craft, not this one — hand off there for anything about the particle asset itself. For **weather-style FX (rain, snow)** make sure the effect is **precached** — a common "it doesn't play" report traces back to a missing precache rather than a broken FX asset. **The `_outdoor` FX techset (meant to cull weather FX indoors) does not work in the released mod tools** — don't rely on it to keep rain/snow out of interiors; handle that with occlusion volumes instead (see Weather below). The **blood-splatter** screen effect is **off by default** and needs a `blood.csc` override to enable.
 
 ## Weather & skybox
 

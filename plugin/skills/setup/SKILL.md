@@ -1,13 +1,13 @@
 ---
 name: setup
-description: Install or update the t7kb Black Ops 3 knowledge base and register its MCP server. Run this once after installing the plugin (invoked as /t7kb:setup).
+description: How to install, update, or repair the t7kb Black Ops 3 knowledge-base tool — downloads the binary and database, registers the `t7kb` MCP server via `claude mcp add`, and offers the AGENTS.md/CLAUDE.md primer at the BO3 mod-tools root. Typically run once right after installing the plugin, invoked explicitly as `/t7kb:setup` — but also use whenever the user asks to install, set up, reinstall, or update t7kb, wants its MCP server (re)registered, or reports the `search`/`get` tools are missing, unavailable, or won't connect.
 ---
 
 # Install t7kb
 
 One-time setup: download the t7kb tool + database, then register it as an MCP server so it auto-starts in future sessions. Do these steps for the user's OS, reporting what you run.
 
-## 1. Run the installer
+## 1. Run the installer — it's idempotent, don't force a redownload
 
 Detect the OS and run the matching command. It downloads the binary, the embedding model, and the ~0.9 GB database archive into one folder, and prints the install path. Both installers are idempotent: if a binary + database are already present at the target path, they skip the download instead of re-fetching ~0.9 GB — so it's safe to run this even if the user already installed manually or in a prior session.
 
@@ -31,7 +31,9 @@ Only pass the force flag below if the user explicitly wants to reinstall/update.
   ```
   Installs to `%LOCALAPPDATA%\t7kb`; binary at `%LOCALAPPDATA%\t7kb\t7kb.exe`. Add `-Force` (run the script directly, not piped, to pass args) to reinstall/update.
 
-## 2. Register the MCP server
+**Validate before moving on:** check the command's output for an error (network failure, permission denied, disk space) rather than assuming success. If it failed, stop and report the exact error — don't proceed to step 2 and register an MCP server for a binary that was never installed.
+
+## 2. Register the MCP server — always double-quote the path
 
 Use the **absolute path** to the installed binary from step 1 (include `.exe` on Windows — a path without the extension fails to spawn on Windows). **Always double-quote the path**, even if it looks safe unquoted:
 
@@ -41,9 +43,11 @@ claude mcp add t7kb -- "/absolute/path/to/t7kb" mcp
 
 Example paths: `~/.t7kb/t7kb` (Linux/macOS, expand `~` to the real home) or `C:\Users\<you>\AppData\Local\t7kb\t7kb.exe` (Windows).
 
-On Windows this command still runs through a POSIX-style shell (the Bash tool is git-bash), which treats an unquoted backslash as an escape character and silently drops it before a non-special letter — `C:\Users\victo\AppData\Local\t7kb\t7kb.exe` becomes `C:UsersvictoAppDataLocalt7kbt7kb.exe`, a path that can't spawn. Double-quoting the argument (as above) prevents this. If the MCP server was registered before this fix, or ever fails to connect, run `claude mcp list` (or inspect the registered command) and re-add it with the quoted path if the backslashes are missing.
+On Windows this command still runs through a POSIX-style shell (the Bash tool is git-bash), which treats an unquoted backslash as an escape character and silently drops it before a non-special letter — `C:\Users\victo\AppData\Local\t7kb\t7kb.exe` becomes `C:UsersvictoAppDataLocalt7kbt7kb.exe`, a path that can't spawn. Double-quoting the argument (as above) prevents this.
 
-## 3. Offer the workspace primer
+**Validate the registration before moving on:** run `claude mcp list` and confirm the `t7kb` entry shows the full path with backslashes intact (Windows) or the full absolute path (Linux/macOS). If a path was registered before this fix, or the server ever fails to connect, this is the first thing to check — re-run the `claude mcp add` command above with the quoted path to fix it.
+
+## 3. Offer the workspace primer — and record the root bo3-knowledge depends on
 
 Walk up from the current directory to find the **BO3 mod-tools root** — the folder containing `raw/`, `share_raw/`, `usermaps/`, or `mods/` as siblings (a map/mod project usually lives *inside* that tree, e.g. `usermaps/<name>/`, not at the root itself). That root is also where Treyarch's shipped files live, so it's the same tree the "verify against ground truth" guidance in `bo3-knowledge` points at.
 
@@ -77,8 +81,8 @@ Dropping both once at the BO3 root means every session opened anywhere under it 
 
 If `CLAUDE.md` already exists at the root, don't overwrite it — offer to add the `@AGENTS.md` import line to it instead (with confirmation), or just tell the user they can add it themselves. Skip the primer/path-recording entirely if no BO3-root markers are found — don't write these into unrelated repos.
 
-## 4. Confirm
+## 4. Confirm — never claim success if a step failed
 
-Tell the user setup is done and that the `t7kb` MCP tools (`search`, `get`) become available in the **next session** (or after `/reload-plugins`). The 3.5 GB database unpacks itself automatically the first time the server runs.
+Tell the user setup is done and that the `t7kb:search` and `t7kb:get` MCP tools become available in the **next session** (or after `/reload-plugins`). The 3.5 GB database unpacks itself automatically the first time the server runs.
 
-If the install or registration fails, report the exact error — don't claim success.
+If the install or registration failed at any step above, report the exact error there instead of reaching this step — don't claim success.

@@ -1,11 +1,11 @@
 ---
 name: bo3-debugging
-description: How to diagnose Black Ops 3 modding problems — make errors visible (developer/logfile, debug macros, the S.R.E. call stack), find and grep the game's `console_mp.log` (and `crashes.log`), get real line numbers, tell compile vs linker vs unresolved-external vs runtime apart, and drive the interactive dvar/devgui toolkit. Use when a map won't build or compile, won't load, crashes, or a script misbehaves at runtime, and when reading a script error, console output, `console_mp.log`, or any BO3 log file.
+description: How to diagnose Black Ops 3 modding problems — make errors visible (developer/logfile, debug macros, the S.R.E. call stack), find and grep the game's `console_mp.log` (and `crashes.log`), get real line numbers, tell compile vs linker vs unresolved-external vs runtime apart, and drive the interactive dvar/devgui toolkit. Use when a map won't build or compile, won't load, crashes, or a script misbehaves at runtime — a compile error like `unexpected $end, expecting TOKEN_SEMICOLON`, a linker failure (`Could not find scriptparsetree`, `Error linking script`), a call stack tagged `missing line information`, or an `assert fail:` value — and when reading a script error, console output, `console_mp.log`, or any BO3 log file.
 ---
 
 # Debugging BO3 mods
 
-Most "it just fails" reports are a **visibility** problem — the fix is to make the engine tell you what's wrong, then work the error from its stage. Look the exact message up in **t7kb** (`search` the string, `get` the top hits — there's an error-list reference plus the Discord/forum causes tidy docs omit); this skill is the method and the toolkit around it.
+Most "it just fails" reports are a **visibility** problem — the fix is to make the engine tell you what's wrong, then work the error from its stage. Look the exact message up in **t7kb** (`t7kb:search` the string, `t7kb:get` the top hits — there's an error-list reference plus the Discord/forum causes tidy docs omit); this skill is the method and the toolkit around it.
 
 ## Tooling: catch it before you build
 
@@ -99,7 +99,7 @@ One run, and the last tag before the error is the line. This costs ten minutes a
 ## Method
 
 1. Reproduce with real output on (above); capture the **exact** message + call stack.
-2. `search` t7kb for the error string and key tokens; `get` the top hits — the corpus (Discord/forums) carries causes tidy docs omit.
+2. Run `t7kb:search` for the error string and key tokens; `t7kb:get` the top hits — the corpus (Discord/forums) carries causes tidy docs omit.
 3. For any Treyarch-shipped token the error names (function, KVP, asset path), confirm the correct form against the raw mod-tools install before "fixing" it.
 
 ## Interactive & visual debugging

@@ -1,11 +1,11 @@
 ---
 name: bo3-mapping
-description: How to build Black Ops 3 maps in Radiant — grid/brushwork discipline, structural vs detail, sealing the level against BSP leaks, CSG/patches for terrain and curves, prefabs, and collision via clip brushes. Use for any Radiant/map-building task (blockout, compile, terrain, prefabs) and for diagnosing compile or leak errors that trace back to geometry.
+description: How to build Black Ops 3 maps in Radiant — grid/brushwork discipline, structural vs detail brushes, sealing the level against BSP leaks (`.lin` leakfile, sky brush box), CSG/patches for terrain and curves, prefab-then-rotate ordering, zone (`info_volume`) coverage, and clip textures (`clip_player`, `weaponClip`, `clip_nosight`) vs a `dyn_model`'s collmap/physpreset exception. Use when you hit `WROTE BSP LEAKFILE`, a `MAX_MAP_TRIANGLES` overflow, a compile hang on "coalescing coincident windings", an `-onlyents` brush-count mismatch, a prefab with distorted scale after rotating the source brush first, or a player dying while just standing still (zone coverage, not a leak). Distinct from bo3-compiling (running the build pipeline itself) — this is the geometry that causes or fixes those failures.
 ---
 
 # Building BO3 maps in Radiant
 
-Radiant is brush/patch geometry, not code — the craft here is grid discipline, sealing the level, and knowing which compile error points at which kind of geometry mistake. Look up exact texture names, dvars, and specific error strings in **t7kb** (`search` then `get`); this skill is the method and the recurring gotchas around it.
+Radiant is brush/patch geometry, not code — the craft here is grid discipline, sealing the level, and knowing which compile error points at which kind of geometry mistake. Look up exact texture names, dvars, and specific error strings in **t7kb** (`t7kb:search` then `t7kb:get`); this skill is the method and the recurring gotchas around it.
 
 ## Grid discipline and brush basics
 

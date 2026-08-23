@@ -1,6 +1,6 @@
 ---
 name: bo3-crossref
-description: How to use other Call of Duty titles' GSC/CSC source and script dumps as reference when modding Black Ops 3 — the game/engine decoder ring (t5/t6/t8/t9 Treyarch, iw4–iw8/h1/h2 Infinity Ward, s1/s2/s4 Sledgehammer), which lineages actually transfer, and xensik's gsc-tool for (de)compiling scripts across games. Use when porting from another CoD (source-side naming/structure) or studying how a mechanic is implemented elsewhere to reimplement it in BO3. These are references for structure/approach only — never a source of BO3 token names; verify shipped BO3 tokens against the raw install per bo3-knowledge. For the BO3 asset-porting pipeline itself see bo3-assets; for writing the BO3 GSC/CSC see bo3-scripting.
+description: How to use other Call of Duty titles' GSC/CSC source and script dumps as reference when modding Black Ops 3 — the game/engine decoder ring (t5/t6/t8/t9 Treyarch, iw4–iw8/h1/h2 Infinity Ward, s1/s2/s4 Sledgehammer), which lineages actually transfer, and xensik's gsc-tool for (de)compiling scripts across games. Use when porting from another CoD (source-side naming/structure) or studying how a mechanic is implemented elsewhere to reimplement it in BO3. These are references for structure/approach only — never a source of BO3 token names; verify shipped BO3 tokens against the raw install per bo3-knowledge. Distinct from bo3-assets (the BO3-side extract/compile/material/anim porting pipeline itself) and bo3-anim-retarget (the Maya HumanIK/`-mo` cross-generation retarget craft) — this skill only finds and reads the other game's source, it doesn't do the port or the retarget; for writing the BO3 GSC/CSC itself see bo3-scripting.
 ---
 
 # Cross-referencing other Call of Duty titles
@@ -20,7 +20,7 @@ Cross-game source describes *other games*. **bo3-knowledge**'s governing constra
 - **Treyarch line (`t5 t6 t7 t8 t9`) transfers most** — shared zombies architecture, powerup/perk lineage, and stdlib heritage. Mind the *syntax* split: BO3's `#using`/`#namespace`, `&func` pointers, `#insert` macros, and clientfields are the **t7-era** system, shared by **t8/t9** (so those read closest to BO3 line-for-line, though t8 moved the compiled format on again); **t5/t6 predate it** and use path-based `maps\...::func()` includes, so from BO1/BO2 you port the *concept and structure* and translate the syntax. **BO2 (`t6`) zombies is the direct ancestor of BO3 zombies** — the best lineage read for round logic, powerups, and perks.
 - **Infinity Ward line (`iw4`–`iw8`, `h1/h2`) and Sledgehammer line (`s1 s2 s4`) are more divergent** — different stdlib, calling conventions, and asset APIs. Reach for them mainly (a) **source-side when porting an asset** from that game — the dump tells you the real function/asset/anim names of what you're extracting (pairs with **bo3-assets**), and (b) as a **second opinion on a mechanic's general approach** — never for names you'll paste into BO3.
 
-## The catalog
+## The catalog: the id is the anchor, not the repo name
 
 Game id → title → lineage → community source. The **id** is the anchor (it's what gsc-tool and rippers use); repo names churn, so treat these as starting points and confirm the current mirror.
 
@@ -69,6 +69,7 @@ For decompiling BO3's own *logic assets* (AI behavior/ASM, weaponfiles, tables, 
 ## Where this hands off
 
 - **Porting an asset?** Use the source-game dump for the *names and structure* of what you're ripping, then follow **bo3-assets** for the extract → APE compile → materials → anims pipeline on the BO3 side (and **bo3-animation** for the anim compile specifics).
+- **Porting an animation specifically?** This skill only gets you as far as the source game's rig/anim and its real names — the cross-generation retarget itself (HumanIK characterization, bind-pose traps, `-mo` constraints for a viewhands rig) is **bo3-anim-retarget**'s craft, not this one's. Hand off there once you have the source asset identified.
 - **Reimplementing a mechanic?** Study the source for shape only, then write it per **bo3-scripting** (header/usings, stdlib, hooks, clientfields) and confirm every BO3 signature in t7kb + the raw install.
 
 ## Don't invent

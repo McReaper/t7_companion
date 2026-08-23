@@ -5,83 +5,86 @@ description: How to write good GSC/CSC for Black Ops 3 — header/usings, the st
 
 # Writing GSC/CSC for Black Ops 3
 
-Server logic is **GSC**, client logic is **CSC** — separate files, separate namespaces, identical language. This skill is the craft; look up exact signatures/KVPs/APIs in **t7kb** (`search` then `get`), and for the conceptual model (scopes, entities, notifies, threads, `undefined`, the finite entity pool, cooperative scheduling) retrieve the "How GSC Scripting Works" guide. t7kb also indexes real, well-structured mod code — retrieve a worked example to see the conventions below applied in practice. To study how a mechanic is built in another CoD title as *structural* reference — never for BO3 token names — see **bo3-crossref**.
+Server logic is **GSC**, client logic is **CSC** — separate files, separate namespaces, identical language. This skill is the craft; look up exact signatures/KVPs/APIs in **t7kb** (`t7kb:search` then `t7kb:get`), and for the conceptual model (scopes, entities, notifies, threads, `undefined`, the finite entity pool, cooperative scheduling) retrieve the "How GSC Scripting Works" guide. t7kb also indexes real, well-structured mod code — retrieve a worked example to see the conventions below applied in practice. To study how a mechanic is built in another CoD title as *structural* reference — never for BO3 token names — see **bo3-crossref**.
 
 ## Tooling
 
 Script in **VS Code with the GSCode extension** (Blakintosh's GSC/CSC language server) — the best language support available: real syntax highlighting, completion, and inline diagnostics with awareness of the BO3 API, catching typos and bad calls before you ever build. (It's the same project behind t7kb's `gscode-api` reference.) Install it from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=blakintosh.gscode) (extension id `blakintosh.gscode`, or grab the `.vsix` there); source at [github.com/Blakintosh/gscode](https://github.com/Blakintosh/gscode). Recommend it to anyone scripting BO3.
 
-## Header: declare dependencies explicitly
+## Header: declare dependencies explicitly, in a fixed order
 
-A file opens with `#using` (import a namespace), `#insert` (text-inline a `.gsh` of `#define` macros), then `#namespace`, optional `#precache`, and the system registration. Group and comment the `#using` block (stdlib, then feature scripts, then AI). You reach for the same handful constantly — a default starter set (add/drop per file):
+A file's top isn't free-form — follow this order:
 
-```gsc
-// almost every file
-#using scripts\shared\system_shared;       // REGISTER_SYSTEM(_EX)
-#using scripts\shared\util_shared;
-#using scripts\shared\clientfield_shared;
-#using scripts\shared\callbacks_shared;
-#using scripts\shared\array_shared;
-#using scripts\shared\flag_shared;
-#using scripts\shared\math_shared;
-#using scripts\codescripts\struct;
-// zombies work
-#using scripts\zm\_zm_utility;
-#using scripts\shared\ai\zombie_utility;
-#using scripts\zm\_zm_powerups;
-#using scripts\zm\_zm_spawner;
-#using scripts\zm\_zm_score;
-#using scripts\shared\spawner_shared;
-
-#insert scripts\shared\shared.gsh;          // WAIT_SERVER_FRAME, IS_TRUE, … — basically always
-#insert scripts\shared\version.gsh;
-```
+1. **`#using`** — import each namespace you call into. Group and comment the block (stdlib, then feature scripts, then AI). You reach for the same handful constantly — a default starter set (add/drop per file):
+   ```gsc
+   // almost every file
+   #using scripts\shared\system_shared;       // REGISTER_SYSTEM(_EX)
+   #using scripts\shared\util_shared;
+   #using scripts\shared\clientfield_shared;
+   #using scripts\shared\callbacks_shared;
+   #using scripts\shared\array_shared;
+   #using scripts\shared\flag_shared;
+   #using scripts\shared\math_shared;
+   #using scripts\codescripts\struct;
+   // zombies work
+   #using scripts\zm\_zm_utility;
+   #using scripts\shared\ai\zombie_utility;
+   #using scripts\zm\_zm_powerups;
+   #using scripts\zm\_zm_spawner;
+   #using scripts\zm\_zm_score;
+   #using scripts\shared\spawner_shared;
+   ```
+2. **`#insert`** — text-inline a `.gsh` of `#define` macros:
+   ```gsc
+   #insert scripts\shared\shared.gsh;          // WAIT_SERVER_FRAME, IS_TRUE, … — basically always
+   #insert scripts\shared\version.gsh;
+   ```
+3. **`#namespace`** — declare the file's own namespace.
+4. **`#precache`** (optional) — precache any asset the file needs.
+5. **System registration** — `REGISTER_SYSTEM`/`REGISTER_SYSTEM_EX`, if this file self-registers (see below).
 
 A `#using` only makes a call *resolvable* — the target script must **also be in your `.zone`**, or you get `Could not find scriptparsetree "scripts/…"` / an unresolved external despite the `#using`. When changing a stock script, also make sure you're editing the copy the zone actually loads.
 
 ## Lean on the standard library — don't reinvent
 
-`scripts/shared/` is a deep stdlib reached through those namespaces: `util::`, `array::`, `math::`, `clientfield::`, `flag::`, `spawner::`, plus zombies helpers in `zm_utility::` / `_zm_utility`. Before writing a helper, `search` t7kb for one — most already ship, and reusing them keeps your code working when Treyarch internals shift.
+`scripts/shared/` is a deep stdlib reached through those namespaces: `util::`, `array::`, `math::`, `clientfield::`, `flag::`, `spawner::`, plus zombies helpers in `zm_utility::` / `_zm_utility`. Before writing a helper, run `t7kb:search` for one — most already ship, and reusing them keeps your code working when Treyarch internals shift.
 
 **But read the body of a stdlib predicate before you branch on it.** `util::use_button_held()` **returns false the first time it is asked**, whoever asks: its first call is what *starts* the tracking thread (`self thread button_held_think( BUTTON_USE )`) and it then returns the `self._holding_button[...]` slot that thread has not filled in yet. Code that asks once and gives up on a false — a hold-to-repeat loop testing it before its first iteration — never repeats, and it looks exactly like the player not holding the button. Stock gets away with it because its unitriggers have been polling the same helper since the prompt appeared, long before the interaction starts. For a one-shot question use the engine call, `player UseButtonPressed()`. (**Measured.**)
 
 ## Extending stock behavior: hook first, override when blocked
 
-Prefer a **hook** (Inversion of Control): most stock systems expose seams so you never touch their source — register a spawn function (`add_global_spawn_function`), set a `level.*` function pointer the stock script calls, or use the callback/flag it fires. Stock systems (perks, powerups, AI) are extended this way.
+Work through these in order — don't reach for an override just because it's the more obvious lever:
 
-When there is **no** hook and you must change stock behavior, you **can and sometimes should override**: copy the stock file into your mod/map `scripts/` at the **same path**, add it to your **`.zone`**, and the engine loads your version instead of the shared one.
-
-**From a usermap that is not enough — and the missing step is not "use a mod".** The stock copy is still contributed by the patch asset list and wins, which is where the "some scripts only override from a mod" folklore comes from. Also comment its line out of **`zone_source/all/assetlist/zm_patch.csv`**:
-
-```
-//scriptparsetree,scripts/zm/_zm_behavior.gsc
-```
-
-Stock installs already ship several lines commented exactly this way (`_zm_ai_dogs`, `_zm_pack_a_punch`, `_zm_weapons`), so the mechanism is intended rather than a trick. It is a shared, **install-wide** file: back it up, and remember the change affects every map you build until you revert it. This is also the cheapest way to get **line numbers** on a stock script's error, and to instrument it — see **bo3-debugging**.
-
-Other caveats: override the **narrowest** script (overriding low-level shared like `array_shared` breaks its dependents), and an override diverges from stock, so reach for a hook first.
+1. **Look for a hook first** (Inversion of Control): most stock systems expose seams so you never touch their source — register a spawn function (`add_global_spawn_function`), set a `level.*` function pointer the stock script calls, or use the callback/flag it fires. Stock systems (perks, powerups, AI) are extended this way.
+2. **No hook, and you must change stock behavior → override it.** Copy the stock file into your mod/map `scripts/` at the **same path**, add it to your **`.zone`**; the engine loads your version instead of the shared one.
+3. **From a usermap, that alone is not enough — and the missing step is not "use a mod".** The stock copy is still contributed by the patch asset list and wins over yours, which is where the "some scripts only override from a mod" folklore comes from. Also comment its line out of **`zone_source/all/assetlist/zm_patch.csv`**:
+   ```
+   //scriptparsetree,scripts/zm/_zm_behavior.gsc
+   ```
+   Stock installs already ship several lines commented exactly this way (`_zm_ai_dogs`, `_zm_pack_a_punch`, `_zm_weapons`), so the mechanism is intended rather than a trick. It is a shared, **install-wide** file: back it up, and remember the change affects every map you build until you revert it. This is also the cheapest way to get **line numbers** on a stock script's error, and to instrument it — see **bo3-debugging**.
+4. **Override the narrowest script that covers the change.** Overriding low-level shared code (`array_shared`) breaks every dependent of it, and an override diverges from stock going forward — the other reason to reach for a hook first.
 
 ## System registration: `REGISTER_SYSTEM` vs `REGISTER_SYSTEM_EX`
 
-Both self-register a feature so its entry point(s) run automatically at the engine's **system-init phase** — the map file only needs to `#using` the file, no explicit call. They differ only in how many phases you get:
+Both self-register a feature so its entry point(s) run automatically at the engine's **system-init phase** — the map file only needs to `#using` the file, no explicit call. Decide the split in this order:
 
-- **`REGISTER_SYSTEM("name", &__init__, undefined)`** — one entry point, `__init__`. Use it when a single init-time pass is all you need.
-- **`REGISTER_SYSTEM_EX("name", &init, &main, undefined)`** — two, `init` then `main`. Use it when you also need a runtime phase.
-
-Split responsibilities across the two phases:
-
-- **`init` / `__init__`** — setup that must *exist before runtime*: `clientfield::register` (must happen here, before the first network frame), `flag::init`, instantiate the system's state `class`, register callbacks / spawn functions, `#precache`.
-- **`main`** — *runtime*: wait for the game to start, then the loops, spawns, and behavior.
+1. **One init-time pass is all you need?** Use `REGISTER_SYSTEM("name", &__init__, undefined)` — one entry point, `__init__`.
+2. **You also need a runtime phase?** Use `REGISTER_SYSTEM_EX("name", &init, &main, undefined)` — two entry points, `init` then `main`.
+3. **Put setup that must exist before runtime in `init`/`__init__`:** `clientfield::register` (must happen here, before the first network frame), `flag::init`, instantiate the system's state `class`, register callbacks / spawn functions, `#precache`.
+4. **Put everything else — the runtime behavior — in `main`:** wait for the game to start, then the loops, spawns, and behavior.
+5. **Feature is small and map-local?** Skip the system entirely: a plain `feature::init()` call from the map's `zm_<map>.gsc` `main()` is fine, and is how map templates wire things up. `REGISTER_SYSTEM` is for a self-contained file you'd rather have auto-register (the map file just `#using`s it) than call explicitly — both are correct, it's a coupling/style choice, not a timing one.
 
 Treyarch's own labelling of which of the two phases is the "pre-load" vs "post-load" one is famously confusing and even the community disagrees on it — don't lean on a precise ordering; lean on the functional split above. **Map-placed entities (Radiant triggers, `script_struct`s) are available by the time either phase runs** — only entities you `Spawn()` yourself in script aren't there until that code runs — so a lookup like `GetEntArray("my_trigger")` works from `__init__`.
 
-For a small map-local feature you don't need a system at all: a plain `feature::init()` call from the map's `zm_<map>.gsc` `main()` is fine, and is how map templates wire things up. Reach for `REGISTER_SYSTEM` when the feature is a self-contained file you'd rather have auto-register (the map file just `#using`s it) than call explicitly — both are correct, it's a coupling/style choice, not a timing one.
-
 ## Entry files: `zm_usermap.gsc` vs `zm_<map>.gsc`
 
-`zm_usermap.gsc` (`#namespace zm_usermap`) is the **shared usermap framework** — opt-in, fx init, character/loadout/perk/sound setup. Your map file `zm_<map>.gsc` (e.g. `zm_test.gsc`) is **your** entry point: its `main()` calls `zm_usermap::main()` **first**, then wires your own map-specific systems and logic. Put custom content in the map file; don't fork the usermap scaffold.
+Wiring a usermap's entry point follows a fixed sequence:
 
-Wiring from the map file's own `main()` is fine — a usermap's `zm_<map>.gsc`/`.csc` `main()` runs early enough to register callbacks, clientfields, and spawn hooks, so you do **not** need a system for small map-local additions. When a feature outgrows a few functions, give it **its own file** instead: `_<feature>.gsc` / `_<feature>.csc` (own `#namespace`, added to the `.zone`). Self-register it with `REGISTER_SYSTEM("<feature>", &__init__, undefined)` so its `__init__` runs automatically at the system-init phase — the map file only needs to `#using` it, no explicit `init()` call. That's the clean home for anything with real init logic and it keeps the map file thin. Server and client halves are separate files sharing a `_<feature>.gsh` of constants.
+1. **`zm_usermap.gsc`** (`#namespace zm_usermap`) is the **shared usermap framework** — opt-in, fx init, character/loadout/perk/sound setup. Don't fork it.
+2. **Your map file, `zm_<map>.gsc`** (e.g. `zm_test.gsc`), is **your** entry point. Its `main()` must call `zm_usermap::main()` **first**.
+3. **Wire your own map-specific systems and logic after that call, in the same `main()`.** It runs early enough to register callbacks, clientfields, and spawn hooks, so small map-local additions don't need a system of their own.
+4. **When a feature outgrows a few functions, give it its own file:** `_<feature>.gsc` / `_<feature>.csc` (own `#namespace`, added to the `.zone`), server and client halves sharing a `_<feature>.gsh` of constants.
+5. **Self-register that file** with `REGISTER_SYSTEM("<feature>", &__init__, undefined)` so its `__init__` runs automatically at the system-init phase — the map file only needs to `#using` it, no explicit `init()` call. That's the clean home for anything with real init logic, and it keeps the map file thin.
 
 ## Threading & scope discipline
 
