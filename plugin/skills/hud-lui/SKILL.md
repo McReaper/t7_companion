@@ -1,6 +1,6 @@
 ---
 name: bo3-hud-lui
-description: How to work with LUI (Black Ops 3's HUD/menu system) and its embedded Lua — the L3akMod prerequisite, the Engine/element/stock-widget API surface, layout via anchors and margins, events and function overrides, zoning Lua files, overriding vs hooking, and common UI-error causes. Use for HUD elements, custom menus/widgets, perk icons, loading/preview screens, hintstring color, and any Lua-in-BO3 task. Owns only the Lua half of the GSC/CSC <-> Lua clientfield bridge — subscribing to a model and reading its value in a widget; registering the clientfield and calling `set` on it is GSC/CSC and belongs to bo3-scripting, which also owns GSC/CSC generally.
+description: How to work with LUI (Black Ops 3's HUD/menu system) and its embedded Lua — the L3akMod prerequisite, the Engine/element/stock-widget API surface, layout via anchors and margins, events and function overrides, zoning Lua files, overriding vs hooking, and common UI-error causes. Use for HUD elements, custom menus/widgets, perk icons, loading/preview screens, hintstring color codes, and any Lua-in-BO3 task. The text inside a string is bo3-localization's (`.str` files, reference naming, per-language linking) — this skill owns the widget drawing it. Owns only the Lua half of the GSC/CSC <-> Lua clientfield bridge — subscribing to a model and reading its value in a widget; registering the clientfield and calling `set` on it is GSC/CSC and belongs to bo3-scripting, which also owns GSC/CSC generally.
 ---
 
 # Working with LUI/HUD and Lua in Black Ops 3
@@ -150,11 +150,10 @@ Two distinct channels, don't mix them up:
 - **Custom fonts** override named stock TTFs — `default.ttf` (general menu text), `escom.ttf`/`FoundryGridnik-Medium.ttf`/`FoundryGridnik-Bold.ttf` (scoreboard/hintstring-adjacent), `RefrigeratorDeluxe-Regular.ttf`, `wearetrippinshort.ttf` — by dropping your replacement into a `fonts` folder and zoning `ttf,fonts/<name>.ttf`. **Must be a real TTF, not OTF** — an OTF causes heavy in-game lag rather than an obvious error.
 - Font/UI errors or "no UI at all" are usually a **path or linking problem**: wrong font path relative to the raw/usermap root, a widget created but never added/linked to its parent, or a Lua file that's zoned but never actually `require`d/loaded (or `LuiLoad`ed, for a map). Bisect by commenting out custom Lua files and re-enabling one at a time rather than guessing.
 
-## Hintstrings & localization
+## Hintstring color: `^1`–`^9` inline, Lua only past the palette
 
-- Basic color in a hintstring uses `^1`–`^9` (and `^0`) inline in the string, e.g. `"^3some text^7 more text"` (`^7` resets to white) — no Lua needed for this. Custom colors beyond that palette *do* require Lua.
-- A hintstring (or any UI text) should reference a `localizedstring`, not a raw literal, inside a `.gsh` — and that string needs a matching `localize,<key>` entry in the zone file, or it fails to resolve (silently breaks the hintstring, not necessarily the trigger itself).
-- `linkerflag,noloc` skips generating the per-language loc files (`en_`, `br_`, …) entirely — saves a fastfile slot if nothing in the map/mod is actually localized, but don't reach for it if you rely on localized strings anywhere (notifies aren't affected either way).
+- Basic color uses `^1`–`^9` (and `^0`) inline in the string, e.g. `"^3some text^7 more text"` (`^7` resets to white) — no Lua needed for this. Custom colors beyond that palette *do* require Lua.
+- The **text itself** should be a localized string, not a raw literal — and the whole `.str` craft (the `<STRFILE>_<REFERENCE>` naming rule, the `triggerstring` precache, per-language files and link passes, `linkerflag,noloc`) belongs to **bo3-localization**. Go there for a prompt that prints its raw reference name instead of the words; it isn't a LUI problem.
 
 ## Tools & examples
 

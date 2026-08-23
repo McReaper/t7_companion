@@ -7,7 +7,7 @@
     {
       "name": "t7kb",
       "source": "./plugin",
-      "description": "Local Black Ops 3 modding knowledge base — hybrid (keyword + semantic) search over the BO3 modding community, served to the agent over MCP, plus grounded skills for scripting, debugging, mapping, building/compiling, assets/porting, animation, cross-generation animation retargeting, zombies AI, HUD/Lua, particle FX, atmosphere, and cross-referencing other Call of Duty titles. Run /t7kb:setup once to install; /t7kb:contribute is the guide for writing new skills."
+      "description": "Local Black Ops 3 modding knowledge base — hybrid (keyword + semantic) search over the BO3 modding community, served to the agent over MCP, plus grounded skills for scripting, debugging, mapping, building/compiling, assets/porting, animation, cross-generation animation retargeting, zombies AI, HUD/Lua, particle FX, atmosphere, localization, and cross-referencing other Call of Duty titles. Run /t7kb:setup once to install; /t7kb:contribute is the guide for writing new skills."
     }
   ]
 }

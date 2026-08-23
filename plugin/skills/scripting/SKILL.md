@@ -91,6 +91,7 @@ Wiring a usermap's entry point follows a fixed sequence:
 - **Thread long-running logic.** A long `wait` loop on the main thread blocks the game and drops connections (`Connection Interrupted`) — `thread` it.
 - **Guard every persistent loop with `endon`.** `level endon("end_game")` is safe on top of *any* function and is the default — add it to any `while(true)`/long loop. For per-entity loops also add `self endon("death")`. Without a guard the loop runs on dead entities or past game end.
 - **Mind `self` vs `level`.** A function threaded on an entity sees it as `self`; level-wide state lives on `level`. Per-player logic (HUD, timers) put on `level` is a frequent silent bug.
+- **`self Delete()` ends the thread that called it**, through the very `self endon("death")` above — so statements after it never run. A pickup that deletes its model and *then* bumps a counter or fires the completion notify silently drops that last step, and it reads as a counting bug rather than a teardown-order one. Settle the bookkeeping while the entity is still alive and delete last, or hand the follow-up to a `level thread`.
 
 ## Server vs client: where sounds, FX, and state run
 
