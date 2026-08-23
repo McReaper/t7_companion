@@ -25,6 +25,7 @@ Durable conventions that hold regardless of the specific task — verify the spe
 - **Don't edit stock scripts in place.** Many can't be overridden from the map/mod folder; hook instead (spawn functions, `level.*` function pointers, callbacks) rather than forking.
 - **Thread long logic and guard it with `endon`.** Un-threaded long `wait` loops freeze the game / drop connections; persistent threads need `self endon("death")` or `level endon("end_game")`. Mind `self` vs `level` scope.
 - **Errors: turn on real output first.** In Launcher → dvars set `dev 2` and `logfile 1`, reproduce, then read the exact message before theorizing. Separate compile vs linker (`scriptparsetree` / unresolved external = something not in the `.zone` or missing `#using`) vs runtime.
+- **Read the log file, don't ask for a screenshot.** `logfile` writes the whole game console to **`console_mp.log`** at the `fs_game` root — `mods/<modname>/console_mp.log` for a mod, the **BO3 root** for a usermap (check both, take the newest; it's rewritten each session). Grep it for `script error` / `Call stack` / `Could not find`. Hard crash with no error: `crashes.log` at the BO3 root.
 
 ## Code style (GSC/CSC) — match exactly, don't copy the file you're editing
 

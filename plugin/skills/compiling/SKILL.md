@@ -1,6 +1,6 @@
 ---
 name: bo3-compiling
-description: How to actually build a Black Ops 3 map or mod — the Mod Tools Launcher pipeline (Compile the map, Light/LEDs, Link the Fast Files, Run), what each mod-tools binary does, the TA_* environment, converting GDT/assets before linking, usermap-vs-mod builds, fast iteration (which stage to re-run), and the exact console command lines to run the whole build headlessly so an agent can compile for the user without the GUI. Use when building/compiling/linking/lighting a map or mod, driving the Launcher or its binaries from the command line, or deciding what to rebuild — as distinct from diagnosing the resulting errors (bo3-debugging) or the geometry that causes compile failures (bo3-mapping).
+description: How to actually build a Black Ops 3 map or mod — the Mod Tools Launcher pipeline (Compile the map, Light/LEDs, Link the Fast Files, Run), what each mod-tools binary does, the TA_* environment, converting GDT/assets before linking, usermap-vs-mod builds, fast iteration (which stage to re-run), and the exact console command lines to run the whole build headlessly so an agent can compile for the user without the GUI. Use when building/compiling/linking/lighting a map or mod, driving the Launcher or its binaries from the command line, deciding what to rebuild, or working out whether a build actually succeeded — the linker returns non-zero for warnings too (`exit status 1000`, `Found 1 bad bulletmeshes`, `t7kb build` reporting `ok: false` on a Fast File that is perfectly current), and the verdict lives in `zone_source/all/assetinfo/<map>.errorlog` and `<map>.csv`. As distinct from diagnosing the resulting errors (bo3-debugging) or the geometry that causes compile failures (bo3-mapping).
 ---
 
 # Building & compiling BO3 maps and mods
@@ -20,7 +20,7 @@ The right-hand Build Options are four independent checkboxes run by the **Build*
 - **Compile** (quality dropdown) — compiles the Radiant `.map` geometry into the level BSP via `cod2map64.exe`: portals/visibility, collision, umbra occlusion. The full pass runs `-navmesh -navvolume`; the fast option is the entity-only `-onlyents` pass (see *Iterate fast*). This is where BSP **leaks** and **`MAX_MAP_TRIANGLES`** surface — see **bo3-mapping** for the geometry side.
 - **Light** (dropdown **Low / Medium / High**) — bakes lighting and writes the **LEDs** (Lighting Export Data) through Radiant. Lighting work is invisible in-game until this runs, and the LEDs must be exported or the map loads unlit. In the GUI this opens Radiant; **it also bakes headlessly** via `radiant_modtools.exe -ledSilent` (see *Headless build* below) — Radiant isn't only a GUI here. Use Low/Medium while iterating, High for a final pass.
 - **Link** — runs `linker_modtools.exe`: reads the map/mod's **`.zone`** file(s) and packs every listed asset into the shipped **Fast Files** (`.ff`). An asset that isn't in the `.zone` won't be in the build — that's the classic `Could not find scriptparsetree` / unresolved-external at this stage (**bo3-debugging** owns diagnosing it). Linking is the step that turns "edited in the tools" into "loadable by the game".
-- **Run** — launches the game on the built map/mod.
+- **Run** — launches the game on the built map/mod. Build stages fail on *their own stdout*; once the game is up, everything it says goes to **`console_mp.log`** instead (with the `logfile` dvar set) — **bo3-debugging** covers where that file lands and what to grep in it.
 
 A normal first build ticks all four; day-to-day you re-tick only what changed (see *Iterate fast* below).
 
@@ -97,9 +97,23 @@ Notes: `-language english` is the minimum (Treyarch's launcher repeats `-languag
 - **Run these from PowerShell or `cmd`, not git-bash/MSYS.** MSYS rewrites the `/update` and `+low`/`+medium` arguments into filesystem paths (silently breaks `gdtdb` and the light step) *and* mis-reports a native exe's exit code — a clean `exit 0` came back as `127`. In PowerShell read the true code from `$LASTEXITCODE`.
 - **Run `cod2map64` with the working directory set to `bin/`.** It loads `default_navmesh_settings.json` from the current directory; launched from elsewhere it aborts navmesh with `ERROR: Unable to load navigation mesh generation settings` (the geometry `.d3dbsp` still writes, but you get no navmesh — AI won't path).
 - **The light step detaches.** `radiant_modtools.exe -ledSilent` is a GUI-subsystem exe: it returns immediately with no captured stdout and no usable exit code, then bakes in the background. Wait for it by polling for the output `.led` (or for the process to exit), not on a synchronous return.
-- **Outputs to expect** (confirm the build by their mtime): compile → `share/raw/maps/<pp>/<map>.d3dbsp` (+ `<map>_navmesh.hkt`, `<map>.d3dprt`); light → `share/raw/maps/<pp>/<map>.led`; link → Fast Files in `usermaps/<map>/zone/` (or `mods/<mod>/zone/`): `<map>.ff` + `<map>.xpak`.
+- **Outputs to expect** (confirm the build by their mtime): compile → `share/raw/maps/<pp>/<map>.d3dbsp` (+ `<map>_navmesh.hkt`, `<map>.d3dprt`); light → `share/raw/maps/<pp>/<map>.led`; link → Fast Files in `usermaps/<map>/zone/` (or `mods/<mod>/zone/`): `<map>.ff` + `<map>.xpak`. One `-language <lang>` pass writes the language-neutral `<map>.ff` **and** that language's `<lang>_<map>.ff`; the other languages' localized Fast Files keep their previous content until you pass their language too. Scripts and models are in the neutral one, so an english-only pass does refresh your code.
 
 Confirm any flag not shown here against the raw install / t7kb before relying on it.
+
+## The linker exits non-zero on warnings — read the errorlog, not the exit code
+
+**Measured on a real build.** A link whose only complaint was `^3Found 1 bad bulletmeshes, dumped to …_bulletreport.csv`, and which printed `done: 0m7.08s` for every zone, still returned **1000**. The Fast File was correct and current. Anything that gates on the exit code — including `t7kb build`, which then reports `ok: false` with `exit status 1000` and no message — will call that build failed, and you can lose real time "fixing" a build that already works.
+
+The `^3` prefix is a colour code marking the line as a warning. A genuine failure names the asset and does **not** print `done:`.
+
+So verify at the artefacts rather than the return value, all under `<map>/zone_source/all/assetinfo/`:
+
+- **`<map>.errorlog`** — the authoritative verdict. It holds the literal `return <code>` line plus the message that produced it.
+- **`<map>.csv`** — the built assetlist. Grep it for the asset you just added; that is how you prove a new xanim/model actually got packed, rather than inferring it from a green build.
+- **`<map>_bulletreport.csv`** — names the bad bulletmesh, if you'd rather clear the warning than keep explaining it.
+
+Plus the `.ff` mtime. A non-zero exit with a fresh `.ff`, a `done:` per zone, and your asset in the CSV is a **successful build**.
 
 ## Don't invent
 
