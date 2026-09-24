@@ -1,6 +1,6 @@
 ---
 name: bo3-moving-platforms
-description: How to build a moving carrier in Black Ops 3 zombies — buses, tanks — a `script_vehicle` on `info_vehicle_node` paths plus a `moving_platform_enabled` `script_brushmodel`, riders via `LinkTo`. Covers `AttachPath` vs `DrivePath` and the `DYNAMICPATH`/`script_badplace` KVPs. Use when a platform drifts, teleports, freezes at path end, or sinks into the floor; zombies freeze or lose the player once someone boards; a boarding zombie's climb anim looks right then snaps back outside; a scripted anim on a mover stutters, drifts behind it, or lands wrong; riders with an accepted goal won't walk; the console floods with navmesh errors; a use prompt reappears after leaving and returning, or vanishes between two triggers; a vehicle path hangs the server at load (`EXE_ERR_SERVER_TIMEOUT`, black screen); or porting TranZit's bus/elevator. Distinct from bo3-zombies-ai (static-ground navmesh/spawners/traversals) and bo3-mapping (brushwork/sealing) — the moving-carrier craft and its silent failures.
+description: How to build a moving carrier in Black Ops 3 zombies — buses, tanks — a `script_vehicle` on `info_vehicle_node` paths plus a `moving_platform_enabled` `script_brushmodel`, riders via `LinkTo`. Covers `AttachPath` vs `DrivePath`, `DYNAMICPATH`/`script_badplace`. Use when a platform drifts, teleports, freezes at path end, or sinks into the floor; zombies freeze or lose the player once someone boards; a boarding zombie's climb anim looks right then snaps back outside; a scripted anim on a mover stutters, drifts behind it, or lands wrong; riders with an accepted goal won't walk; the console floods with navmesh errors; a use prompt won't come back or vanishes between two triggers; a vehicle spawns reversed or 90° off; a vehicle path hangs the server at load (`EXE_ERR_SERVER_TIMEOUT`, black screen); or porting TranZit's bus/elevator. Distinct from bo3-zombies-ai (static-ground navmesh/spawners/traversals) and bo3-mapping (brushwork/sealing) — the moving-carrier craft and its silent failures.
 ---
 
 # Moving carriers in BO3 zombies
@@ -28,19 +28,26 @@ Cause is in the shipped docs: `DrivePath( [node index] , [allow free drive] )` �
 Use the spline-locked pair instead:
 
 ```gsc
-self.drivepath = 0;
 self AttachPath( n_start );      // AttachPath( <node> ) - "Attaches this vehicle to the given path"
 self StartPath();
 self SetSpeed( speed, accel );
 ```
 
-`vehicle_shared.gsc` picks between them on a flag — `if ( IS_TRUE( self.drivepath ) ) DrivePath(...) else StartPath()` — and BO2's bus set `self.drivepath = 0` explicitly. **Both BO2's TranZit bus (`attachpath` + `startpath`) and BO3's Origins tank (`attachpath`) use the locked pair**; only community platform prefabs reach for `DrivePath`, which is why copying one leads you astray.
+**Both BO2's TranZit bus (`attachpath` + `startpath`) and BO3's Origins tank (`attachpath`) use the locked pair**; only community platform prefabs reach for `DrivePath`, which is why copying one leads you astray. Don't port BO2's `self.drivepath = 0` along with it: in BO3 only `vehicle_shared`'s own `paths()`/`go_path()` read that flag, and a map-placed zombies vehicle never runs them (below), so the line is inert.
 
 ## A closed node cycle hangs the server
 
 **Verified the hard way in a real session.** Making the last `info_vehicle_node` `target` the first one — the obvious way to loop a route — produces a black screen at load and `Com_ERROR: EXE_ERR_SERVER_TIMEOUT`, with **no script output at all**. With `SPLINE_NODE` set it is reliably fatal, so a BO3 vehicle path must stay an **open chain**.
 
 To loop a route anyway, keep the chain open and re-`AttachPath`/`StartPath` on the engine's own `reached_end_node` notify (`vehicle_shared.gsc`) instead of closing it. The full working pattern — the loop code, the geometry trick that hides the re-attach, the degenerate-end-node and `wait 0` traps — is in `references/route-loops-and-assets.md`.
+
+## A vehicle that spawns reversed and straightens in the corners is looking too far ahead
+
+Symptom: the vehicle's centre follows the path, but it faces 90° or 180° off, pivots on the spot as it starts, takes the corners tight and only lines up once the geometry forces it round. **Measured, one test each, none of which changed anything:** `angles` on the nodes, `angles` on the `script_vehicle`, the entity order in the BSP, and `SetBrake`.
+
+Cause: `lookahead` is **seconds** and `speed` is **mph** (`bin/t7.def.json`: *"time[sec] vehicle should look ahead"*, *"speed[mph]"*), so the vehicle steers at a point `speed × 17.6 × lookahead` units ahead. A route authored at `speed 90` / `lookahead 3` aims 4,752 units ahead on a 2,249-unit loop, which is always past the end of the path. **Measured:** moving the terminal node moved the initial yaw with it, and re-authoring the nodes at `speed 19` / `lookahead 1` fixed it outright. Treyarch's own `template.map` runs its nodes at 2.5–15 mph and 0.25–1 s. Fix the KVPs, not the script: the vehicle crawled at a `SetSpeed` of 5 the whole time, so it is the node's **authored** speed that sets the distance (inferred from that — at 5 mph the same lookahead would have been a sane 264 units).
+
+Reading that `speed` back from script, and running per-node stops off node KVPs, each carry a trap of their own — both are in `references/route-loops-and-assets.md`.
 
 ## Zombies path on the linked brushmodel, never on the vehicle
 
