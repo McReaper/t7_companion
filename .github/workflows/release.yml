@@ -1,6 +1,6 @@
 # Cuts a GitHub Release via GoReleaser when a v* tag is pushed: builds the
 # pure-Go binaries (Windows + Linux), bundles the embedding model, and generates
-# the changelog from conventional commits. See .goreleaser.yaml.
+# the changelog from conventional commits. See .github/goreleaser.yaml.
 name: release
 
 on:
@@ -34,7 +34,7 @@ jobs:
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
-          args: release --clean
+          args: release --clean --config .github/goreleaser.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

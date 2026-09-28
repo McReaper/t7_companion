@@ -15,6 +15,6 @@ Sources:
 - **wiki-\*** — community wikis (each row links its source page)
 - **forums-\***, **discord-bo3modtools** — community forum / Discord Q&A (anonymized)
 
-The code in this repo is MIT — see [`LICENSE`](LICENSE).
+The code in this repo is MIT — see [`LICENSE`](../LICENSE).
 
 **Removal:** if you authored something bundled here and want it taken out, message the maintainer [McReaper](https://github.com/McReaper) privately and it will be dropped from the next build.

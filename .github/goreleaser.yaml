@@ -3,8 +3,8 @@
 # generated from conventional commits.
 #
 # The version comes from the pushed git tag (e.g. v0.1.0). t7kb.db is NOT built
-# here (large, built upstream in t7_knowledge) — attach it to the release as a
-# separate asset.
+# here (large, built upstream in t7_knowledge) — the release workflow carries it
+# forward from the previous release.
 #
 # Validate locally:  goreleaser check   ·   dry-run:  goreleaser release --snapshot --clean
 version: 2
@@ -39,7 +39,8 @@ archives:
         formats: [zip]
     files:
       - README.md
-      - NOTICE.md
+      - src: docs/NOTICE.md
+        strip_parent: true
       - LICENSE
       - models/**/* # the bundled embedding model (offline)
 

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Guards against pushing a v* tag whose plugin.json version doesn't match.
-# Enable with: git config core.hooksPath .githooks
+# Enable with: git config core.hooksPath .github/hooks
 # This is a local convenience check; .github/workflows/release.yml is the real gate.
 
 zero="0000000000000000000000000000000000000000"

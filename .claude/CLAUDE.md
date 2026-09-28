@@ -20,7 +20,7 @@ The repo is three things in one: the **Go tool**, a **Claude Code plugin**, and 
 - `templates/AGENTS.md` — the vendor-neutral primer a user drops at their **BO3 mod-tools root** (not per-map — ancestor-aware tools pick it up from any `usermaps/`/`mods/` subfolder underneath). `setup`'s step 3 offers to fetch it there, plus a `CLAUDE.md` that does `@AGENTS.md` for Claude Code.
 - `README.md` — the lean **human-facing** front door: install + a one-line connect pointer + CLI.
 - `docs/clients.md` — per-client MCP config (Codex/OpenCode/Cursor/Copilot/Claude) + the AGENTS.md editor table. The detail the README points at; lives only here.
-- `CLAUDE.md` (this file) / `NOTICE.md` / `docs/data-model.md` — contributor + licensing + schema docs.
+- `.claude/CLAUDE.md` (this file) / `docs/NOTICE.md` / `docs/data-model.md` — contributor + licensing + schema docs.
 
 Install is intentionally described for two audiences — the README (human) and the `setup` skill (agent) — but both call the same `install/` scripts, so there is one real source.
 
@@ -59,15 +59,15 @@ Run surfaces:
 
 **MCP shape.** The `search` tool returns ranked `doc_id` / `title` / `source` / `reliability` / snippet — deliberately NOT the RRF/vector internals (noise to an agent; reliability is the one ranking signal it gets). RRF scores are CLI-only.
 
-The DB schema (`documents`, `docs_fts`, `embeddings`) is in `docs/data-model.md`; per-row `source` + `url` carry attribution (`NOTICE.md`).
+The DB schema (`documents`, `docs_fts`, `embeddings`) is in `docs/data-model.md`; per-row `source` + `url` carry attribution (`docs/NOTICE.md`).
 
 ## Releasing
 
-Pushing a `v*` tag runs GoReleaser (`.goreleaser.yaml` + `.github/workflows/release.yml`): it cross-builds the binaries, runs a before-hook that downloads the embedding model into `models/`, and bundles binary + model + docs into per-platform archives. The version is injected via `-ldflags` into `internal/cli.version`.
+Pushing a `v*` tag runs GoReleaser (`.github/goreleaser.yaml` + `.github/workflows/release.yml`): it cross-builds the binaries, runs a before-hook that downloads the embedding model into `models/`, and bundles binary + model + docs into per-platform archives. The version is injected via `-ldflags` into `internal/cli.version`.
 
-- Release notes = curated `header` (tool blurb) + auto-generated `changelog` (grouped by `feat`/`fix`/other, one line per commit as `<short SHA> <subject>` — no author name/email, no full 40-char hash) + curated `footer` (install steps), in that order. Edit `header`/`footer` in `.goreleaser.yaml` for the static parts; the changelog itself needs no per-release edits.
+- Release notes = curated `header` (tool blurb) + auto-generated `changelog` (grouped by `feat`/`fix`/other, one line per commit as `<short SHA> <subject>` — no author name/email, no full 40-char hash) + curated `footer` (install steps), in that order. Edit `header`/`footer` in `.github/goreleaser.yaml` for the static parts; the changelog itself needs no per-release edits.
 - `t7kb.db.zip` is **not** built by CI (it's large and built upstream). The release workflow **carries it forward** from the most recent earlier release that has one, and skips if the new release already has it — so only a *rebuilt* DB needs a manual upload: `gh release upload <tag> t7kb.db.zip --clobber`.
-- Validate config changes with `goreleaser check`; dry-run with `goreleaser release --snapshot --clean`.
+- Validate config changes with `goreleaser check --config .github/goreleaser.yaml`; dry-run with `goreleaser release --snapshot --clean --config .github/goreleaser.yaml`.
 - **`plugin/.claude-plugin/plugin.json`'s `version` must match the tag before you push it.** `.github/workflows/release.yml` gates on this (fails the job if they differ) so the Go release and the Claude Code plugin version can never drift apart — `t7kb update-check` relies on that invariant to tell a user an "update available" also means a matching plugin/skills update exists. Bump the manifest version in the same commit/PR as the release-worthy change, before tagging. A local `pre-push` hook (see Conventions) catches the mismatch earlier, but CI is the real enforcement.
 
 ## Conventions
@@ -75,4 +75,4 @@ Pushing a `v*` tag runs GoReleaser (`.goreleaser.yaml` + `.github/workflows/rele
 - Conventional commits (`feat:`, `fix:`, `refactor:`, `chore:`, scopes like `feat(cli):`) — they drive the version bump intent even though the changelog body is curated.
 - `*.db`, `*.db.zip`, and `models/` are build/ship artifacts — gitignored.
 - Never hard-wrap markdown at 80 columns (or any fixed width). One line per paragraph / list item; let the editor soft-wrap. The maintainer is allergic to fixed-width reflow.
-- Run `git config core.hooksPath .githooks` once per clone to enable the local `pre-push` hook (checks the same `plugin.json`-version-matches-tag invariant as the release CI gate, before you push a tag). Not automatic — a fresh clone won't have it until you run this.
+- Run `git config core.hooksPath .github/hooks` once per clone to enable the local `pre-push` hook (checks the same `plugin.json`-version-matches-tag invariant as the release CI gate, before you push a tag). Not automatic — a fresh clone won't have it until you run this.
