@@ -23,7 +23,7 @@
 T7 Companion turns a general-purpose coding agent into a Black Ops 3 modding partner. It gives the agent a **local, offline knowledge base** of the BO3 modding community — wikis, forums, Discord, decompiled Treyarch scripts, tutorials, mod-tools schemas — plus **skills** that encode the method and the silent-failure traps of each craft, and a **build tool** that compiles your map without the Launcher. It all runs on your machine: one pure-Go binary, `t7kb`, serving a bundled SQLite index over MCP.
 
 > [!TIP]
-> 🔊 Turn the sound on — the demo is narrated.
+> 🔊 Turn on audio for the demo.
 
 https://github.com/user-attachments/assets/0d533897-fd35-4f0d-9774-948546c0af6b
 
