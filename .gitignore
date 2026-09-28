@@ -16,3 +16,4 @@ Thumbs.db
 
 # Eval run output (claude plugin eval)
 plugin/evals/results/
+docs/media/*.mp4
