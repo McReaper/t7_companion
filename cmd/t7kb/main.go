@@ -3,7 +3,7 @@
 // retrieval (BM25 + vector).
 package main
 
-import "github.com/t7-reapy/t7_companion/internal/cli"
+import "github.com/McReaper/t7_companion/internal/cli"
 
 func main() {
 	cli.Execute()

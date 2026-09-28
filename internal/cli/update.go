@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const releaseAPIURL = "https://api.github.com/repos/t7-reapy/t7_companion/releases/latest"
+const releaseAPIURL = "https://api.github.com/repos/McReaper/t7_companion/releases/latest"
 
 type githubRelease struct {
 	TagName string `json:"tag_name"`

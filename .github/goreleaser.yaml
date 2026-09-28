@@ -28,7 +28,7 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-      - -X github.com/t7-reapy/t7_companion/internal/cli.version={{ .Version }}
+      - -X github.com/McReaper/t7_companion/internal/cli.version={{ .Version }}
 
 archives:
   - id: t7kb
@@ -73,13 +73,13 @@ release:
 
     **Claude Code:** skip the manual steps below — the plugin does this for you:
     ```
-    /plugin marketplace add t7-reapy/t7_companion
+    /plugin marketplace add McReaper/t7_companion
     /plugin install t7kb@t7-reapy
     /reload-plugins
     /t7kb:setup
     ```
 
-    **Any other MCP-capable agent (Codex, OpenCode, Cursor, Copilot, ...):** paste this release page, or the [README](https://github.com/t7-reapy/t7_companion), to your agent and it can run the steps below itself — or do it by hand:
+    **Any other MCP-capable agent (Codex, OpenCode, Cursor, Copilot, ...):** paste this release page, or the [README](https://github.com/McReaper/t7_companion), to your agent and it can run the steps below itself — or do it by hand:
 
     1. Download your OS archive (`t7kb_windows_amd64.zip` or `t7kb_linux_amd64.tar.gz`) **and** `t7kb.db.zip`.
     2. Extract the OS archive at your **Black Ops III root**.

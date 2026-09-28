@@ -1,4 +1,4 @@
-module github.com/t7-reapy/t7_companion
+module github.com/McReaper/t7_companion
 
 go 1.25.5
 

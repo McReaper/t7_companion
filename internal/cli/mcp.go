@@ -11,8 +11,8 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
 
-	"github.com/t7-reapy/t7_companion/internal/embed"
-	"github.com/t7-reapy/t7_companion/internal/store"
+	"github.com/McReaper/t7_companion/internal/embed"
+	"github.com/McReaper/t7_companion/internal/store"
 )
 
 func newMCPCmd() *cobra.Command {

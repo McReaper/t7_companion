@@ -4,12 +4,12 @@
 # Cursor) then points at "<dir>\t7kb.exe mcp". Re-runnable, and skips the
 # ~0.9 GB download if already installed — pass -Force to reinstall/update.
 #
-#   irm https://raw.githubusercontent.com/t7-reapy/t7_companion/main/install/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/McReaper/t7_companion/main/install/install.ps1 | iex
 #   .\install.ps1 [-Target <dir>] [-Force]    # default target: %LOCALAPPDATA%\t7kb
 param([string]$Target = "$env:LOCALAPPDATA\t7kb", [switch]$Force)
 
 $ErrorActionPreference = "Stop"
-$repo = "t7-reapy/t7_companion"
+$repo = "McReaper/t7_companion"
 $base = "https://github.com/$repo/releases/latest/download"
 
 $exe = Join-Path $Target "t7kb.exe"

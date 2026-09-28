@@ -5,11 +5,11 @@
 # Cursor) then points at "<dir>/t7kb mcp". Re-runnable, and skips the ~0.9 GB
 # download if already installed — pass --force to reinstall/update.
 #
-#   curl -fsSL https://raw.githubusercontent.com/t7-reapy/t7_companion/main/install/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/McReaper/t7_companion/main/install/install.sh | bash
 #   ./install.sh [target-dir] [--force]      # default target: ~/.t7kb
 set -euo pipefail
 
-REPO="t7-reapy/t7_companion"
+REPO="McReaper/t7_companion"
 BASE="https://github.com/$REPO/releases/latest/download"
 
 FORCE=0

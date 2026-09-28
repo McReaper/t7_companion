@@ -10,8 +10,8 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/t7-reapy/t7_companion/internal/embed"
-	"github.com/t7-reapy/t7_companion/internal/store"
+	"github.com/McReaper/t7_companion/internal/embed"
+	"github.com/McReaper/t7_companion/internal/store"
 )
 
 // doc topics that are semantically distinct so vector ranking is unambiguous.

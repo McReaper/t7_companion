@@ -21,13 +21,13 @@ Only pass the force flag below if the user explicitly wants to reinstall/update.
 
 - **Linux / macOS / WSL:**
   ```bash
-  curl -fsSL https://raw.githubusercontent.com/t7-reapy/t7_companion/main/install/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/McReaper/t7_companion/main/install/install.sh | bash
   ```
   Installs to `~/.t7kb`; binary at `~/.t7kb/t7kb`. Add `--force` (piped: `... | bash -s -- --force`) to reinstall/update.
 
 - **Windows (PowerShell):**
   ```powershell
-  irm https://raw.githubusercontent.com/t7-reapy/t7_companion/main/install/install.ps1 | iex
+  irm https://raw.githubusercontent.com/McReaper/t7_companion/main/install/install.ps1 | iex
   ```
   Installs to `%LOCALAPPDATA%\t7kb`; binary at `%LOCALAPPDATA%\t7kb\t7kb.exe`. Add `-Force` (run the script directly, not piped, to pass args) to reinstall/update.
 
@@ -54,10 +54,10 @@ Walk up from the current directory to find the **BO3 mod-tools root** — the fo
 If you find that root and it has no `AGENTS.md` yet, offer to drop the vendor-neutral primer there. Fetch it rather than hand-copy — it's not bundled with the plugin, and this is the single source of truth:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/t7-reapy/t7_companion/main/templates/AGENTS.md -o "<root>/AGENTS.md"
+curl -fsSL https://raw.githubusercontent.com/McReaper/t7_companion/main/templates/AGENTS.md -o "<root>/AGENTS.md"
 ```
 ```powershell
-irm https://raw.githubusercontent.com/t7-reapy/t7_companion/main/templates/AGENTS.md -OutFile "<root>\AGENTS.md"
+irm https://raw.githubusercontent.com/McReaper/t7_companion/main/templates/AGENTS.md -OutFile "<root>\AGENTS.md"
 ```
 
 You just walked up to `<root>` *because* it's the raw mod-tools install — the same ground truth `t7kb:knowledge-base`'s "verify against ground truth" section tells the agent to search for on every question. Save that discovery so nobody has to repeat it: append a short, project-specific section to the fetched `AGENTS.md` (this is appending a fact after the canonical fetch, not hand-copying the primer itself, so it doesn't fight the single-source-of-truth rule):

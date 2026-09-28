@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/t7-reapy/t7_companion/internal/embed"
+	"github.com/McReaper/t7_companion/internal/embed"
 )
 
 // newEmbedCmd is a hidden helper to sanity-check the embedder.

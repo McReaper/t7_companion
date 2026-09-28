@@ -5,7 +5,7 @@
 </div>
 
 <p align="center">
-    <a href="https://github.com/t7-reapy/t7_companion/releases/latest"><img src="https://img.shields.io/github/v/release/t7-reapy/t7_companion?sort=semver" alt="Latest release"/></a>
+    <a href="https://github.com/McReaper/t7_companion/releases/latest"><img src="https://img.shields.io/github/v/release/McReaper/t7_companion?sort=semver" alt="Latest release"/></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"/></a>
     <img src="https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white" alt="Go 1.25"/>
     <img src="https://img.shields.io/badge/runs-offline-brightgreen" alt="Runs offline"/>
@@ -45,7 +45,7 @@ flowchart LR
 Install the plugin, then let it set everything up — it downloads `t7kb` and the database and registers the MCP server:
 
 ```
-/plugin marketplace add t7-reapy/t7_companion
+/plugin marketplace add McReaper/t7_companion
 /plugin install t7kb@t7-reapy
 /reload-plugins
 /t7kb:setup
@@ -59,10 +59,10 @@ Install the plugin, then let it set everything up — it downloads `t7kb` and th
 Run the installer — or paste this README to your agent and let it do it:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/t7-reapy/t7_companion/main/install/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/McReaper/t7_companion/main/install/install.sh | bash
 ```
 ```powershell
-irm https://raw.githubusercontent.com/t7-reapy/t7_companion/main/install/install.ps1 | iex
+irm https://raw.githubusercontent.com/McReaper/t7_companion/main/install/install.ps1 | iex
 ```
 
 Then register `t7kb mcp` as a stdio server — **[docs/clients.md](docs/clients.md)** has copy-paste config for each client. The skills are a Claude Code feature; on other agents, drop [`templates/AGENTS.md`](templates/AGENTS.md) at your BO3 mod-tools root for the same core guidance.

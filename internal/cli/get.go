@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/t7-reapy/t7_companion/internal/store"
+	"github.com/McReaper/t7_companion/internal/store"
 )
 
 func newGetCmd() *cobra.Command {
