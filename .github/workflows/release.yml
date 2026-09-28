@@ -37,3 +37,30 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # t7kb.db.zip is built upstream and too large for GoReleaser, so each release
+      # would otherwise ship without it. Carry the newest one forward from the most
+      # recent earlier release that has it. Idempotent: a release that already has
+      # the asset (e.g. a freshly rebuilt DB uploaded by hand) is left alone.
+      - name: Carry the knowledge base forward from the previous release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="$GITHUB_REF_NAME"
+          has_db() { gh release view "$1" --json assets --jq '.assets[].name' | grep -qx 't7kb.db.zip'; }
+          if has_db "$tag"; then
+            echo "$tag already has t7kb.db.zip — nothing to do"
+            exit 0
+          fi
+          src=""
+          for t in $(gh release list --limit 50 --json tagName --jq '.[].tagName'); do
+            [ "$t" = "$tag" ] && continue
+            if has_db "$t"; then src="$t"; break; fi
+          done
+          if [ -z "$src" ]; then
+            echo "::warning::no earlier release has t7kb.db.zip — upload it by hand: gh release upload $tag t7kb.db.zip"
+            exit 0
+          fi
+          echo "copying t7kb.db.zip from $src to $tag"
+          gh release download "$src" --pattern t7kb.db.zip --dir "$RUNNER_TEMP"
+          gh release upload "$tag" "$RUNNER_TEMP/t7kb.db.zip"
