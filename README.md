@@ -21,9 +21,7 @@ flowchart LR
 > [!NOTE]
 > The **skills** ship as a **Claude Code plugin** (auto-loaded there). On other agents they aren't delivered automatically — paste the same guidance into your project: see [`templates/AGENTS.md`](templates/AGENTS.md) and [docs/clients.md](docs/clients.md). The `t7kb` / MCP loop below it is universal.
 
-<video src="docs/media/t7_companion_demo.mp4" controls muted width="100%"></video>
-
-*Can't see the player? [Watch the demo (MP4)](docs/media/t7_companion_demo.mp4).*
+https://github.com/user-attachments/assets/0d533897-fd35-4f0d-9774-948546c0af6b
 
 ## 📥 Install & connect
 
