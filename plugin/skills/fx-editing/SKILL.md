@@ -1,6 +1,6 @@
 ---
-name: bo3-fx
-description: How to build, edit, and play Black Ops 3 particle FX (.efx, iwfx format) in Radiant's FX Editor: model vs sprite elements and their rotation (angleVelRoll vs the sprite rotGraph "Rotation" curve, inert unless it ramps 0→1), the Effect-category material FX needs (effect_lit_emissive_blend, effectMap not diffuseMap), a cloned stock material's junk (desaturationAmount, colorObjMin/Max, textureAtlasColumnCount), the two-sprites-flipped-180° both-sides trick, wagon-wheel aliasing at 60fps, playing FX via PlayFXOnTag, zoning it, and porting FX from an older CoD (Kobra not Greyhound, for BO1 .efx). Use when a model won't spin or spins jerky, an FX texture renders stretched/cut/discolored, a material throws "type mismatch"/"Can't find material"/"Unknown editor elem" at link, need a rotor/prop spinning with no script, or wiring an .efx onto a vehicle/tag. Distinct from bo3-atmosphere (wiring/playing an existing effect for mood) — this is the .efx build/edit craft: elements, rotation, materials.
+name: fx-editing
+description: How to build, edit, and play Black Ops 3 particle FX (.efx, iwfx format) in Radiant's FX Editor — model vs sprite elements and their rotation (angleVelRoll vs the sprite rotGraph "Rotation" curve, inert unless it ramps 0→1), the Effect-category material FX needs (effect_lit_emissive_blend, effectMap not diffuseMap), a cloned stock material's junk (desaturationAmount, colorObjMin/Max, textureAtlasColumnCount), the two-sprites-flipped-180° both-sides trick, wagon-wheel aliasing at 60fps, playing FX via PlayFXOnTag, zoning it, and porting FX from an older CoD (Kobra not Greyhound, for BO1 .efx). Use when a model won't spin or spins jerky, an FX texture renders stretched/cut/discolored, a material throws "type mismatch"/"Can't find material"/"Unknown editor elem" at link, need a rotor/prop spinning with no script, or wiring an .efx onto a vehicle/tag. Distinct from t7kb:atmosphere (wiring/playing an existing effect for mood) — this is the .efx build/edit craft (elements, rotation, materials).
 ---
 
 # Editing and playing BO3 FX (.efx)
@@ -9,9 +9,9 @@ BO3 effects are **`.efx` files in the `iwfx` text format** (header `iwfx 2` or `
 
 ## Getting an FX out of an older CoD: Kobra, not Greyhound
 
-**Greyhound dropped XEffect (FX) and GDT export** in recent builds — it emits models/anims/images/sounds only, **zero `.efx`**. **Kobra** (VenomModding's Greyhound fork) re-added XEffect + GDT, so **BO1/older FX come out of Kobra**, under `.../black_ops_1/fx/**.efx`. If a `find` for `*.efx` in your extraction is empty, you ripped with Greyhound — re-rip that title with Kobra. (Same split noted in **bo3-assets**/**bo3-animation**: Kobra for FX and GDTs.)
+**Greyhound dropped XEffect (FX) and GDT export** in recent builds — it emits models/anims/images/sounds only, **zero `.efx`**. **Kobra** (VenomModding's Greyhound fork) re-added XEffect + GDT, so **BO1/older FX come out of Kobra**, under `.../black_ops_1/fx/**.efx`. If a `find` for `*.efx` in your extraction is empty, you ripped with Greyhound — re-rip that title with Kobra. (Same split noted in **t7kb:assets**/**t7kb:animation**: Kobra for FX and GDTs.)
 
-BO1 `.efx` are `iwfx 2` — **identical field schema to stock BO3 `iwfx 2`**, so a copied BO1 effect loads in BO3 **as-is**, no format conversion. Copy it into `share/raw/fx/_reapy/…`; the only work is importing the models/materials it references (below).
+BO1 `.efx` are `iwfx 2` — **identical field schema to stock BO3 `iwfx 2`** (BO3 ships both — ~8,400 `iwfx 2` and ~1,500 `iwfx 3`), so a copied BO1 effect loads in BO3 **as-is**, no format conversion. Copy it into your own folder under `share/raw/fx/` (e.g. `share/raw/fx/_mymap/…`); the only work is importing the models/materials it references (below).
 
 ## Element types and — the big one — how each ROTATES
 
@@ -59,15 +59,15 @@ You cannot show fast, sharp, *distinct* spinning blades at 60 fps without strobo
 Vehicles play rotor FX automatically via the vehicle def (`rotorMain*Fx`), but a **script_model** heli/prop needs it played by hand:
 
 ```gsc
-#precache("fx", "_reapy/fx_huey_main_blade_full");
+#precache("fx", "_mymap/fx_huey_main_blade_full");      // GSC; a CSC file precaches with "client_fx"
 // init:
-level._effect["heli_rotor_main"] = "_reapy/fx_huey_main_blade_full";
+level._effect["heli_rotor_main"] = "_mymap/fx_huey_main_blade_full";
 // play (fx rides the tag on the moving heli; looping fx loops until stopped):
 main_rotor_fx = PlayFXOnTag(level._effect["heli_rotor_main"], heli, "main_rotor_jnt");
 // cleanup: if (isdefined(main_rotor_fx)) { main_rotor_fx Delete(); }
 ```
 
-Zone it with `fx,_reapy/fx_huey_main_blade_full` — that pulls the effect and its referenced models/materials. `PlayFXOnTag` attaches to the tag, so on a scripted/animated heli the rotor FX follows the body and crash for free.
+Zone it with `fx,_mymap/fx_huey_main_blade_full` — that pulls the effect and its referenced models/materials. `PlayFXOnTag` attaches to the tag, so on a scripted/animated heli the rotor FX follows the body and crash for free.
 
 ## The Radiant FX Editor ↔ disk `.efx` sync trap
 

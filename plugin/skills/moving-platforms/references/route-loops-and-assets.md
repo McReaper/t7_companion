@@ -1,4 +1,4 @@
-Deep-dive detail for **bo3-moving-platforms** (`plugin/skills/moving-platforms/SKILL.md`) — the full mechanics behind points that skill only summarizes. Read the parent skill first; come here for the working code, the measured geometry, and the shipped GDT names.
+Deep-dive detail for **t7kb:moving-platforms** (`plugin/skills/moving-platforms/SKILL.md`) — the full mechanics behind points that skill only summarizes. Read the parent skill first; come here for the working code, the measured geometry, and the shipped GDT names.
 
 Contents:
 
@@ -10,6 +10,8 @@ Contents:
 - [Getting a use prompt to actually appear](#getting-a-use-prompt-to-actually-appear)
 - [The parked-case navmesh cutter (Origins tank)](#the-parked-case-navmesh-cutter-origins-tank)
 - [When an anim's destination isn't a tag](#when-an-anims-destination-isnt-a-tag)
+- [One use trigger at a time](#one-use-trigger-at-a-time)
+- [Traversals can't move](#traversals-cant-move)
 
 ## A closed node cycle hangs the server
 
@@ -101,3 +103,17 @@ For the *parked* case, the Origins tank does connect the ground navmesh to a mov
 ## When an anim's destination isn't a tag
 
 The parent skill covers the normal case — an anim that ends on a tag, where `GetStartOrigin`/`GetStartAngles` hand you the boarding spot directly. A port whose joints sit outside the vehicle (BO2's window anims are anchored on the window plane) has no tag to land on, so the destination has to be derived instead: read the travel with `GetMoveDelta( anim, 0, 1, self )` and project it on the parent's frame **at the moment of the move**, after `StopAnimScripted`. Deriving it this way beats measuring a constant per animation, because a re-export then carries its own arrival with it.
+
+## One use trigger at a time
+
+**A player holds one use trigger at a time**, so two overlapping volumes cancel and someone standing between them gets **no prompt at all**. BO3's per-player escape for barriers — `zm_unitrigger::unitrigger_force_per_player_triggers` — doesn't reach a mover: unitriggers register at a fixed origin, and there is nothing in `_zm_unitrigger.gsc` to follow a parent.
+
+So shape the volumes so they never touch — Radiant's job, not a radius guessed in script — the way BO2's bus rebuild trigger does: **placed in the map**, wired with `enablelinkto()` / `linkto( bus )` with no tag or offset (preserving the mapper's transform) / `setmovingplatformenabled( 1 )`.
+
+Getting the prompt to actually appear is its own trap: `SetInvisibleToAll()` and `TriggerEnable` don't behave the way their names suggest for a player already standing inside the volume. The full three-part mechanism, plus how stock signals "nothing left to repair," is in `references/route-loops-and-assets.md`.
+
+## Traversals can't move
+
+BO3 exposes only `LinkTraversal( <node> )` and `UnlinkTraversal( <node> )` — *"Creates / Destroys a user edge connecting two path nodes"*. You can enable and disable a traversal; there is no API to reposition one, and the geometry is compiled. Community reports add that a traversal needs a static brush underneath to work at all.
+
+So a traversal on a moving carrier is a dead end, and BO2's bus uses none: boarding is `linkto` plus scripted jump anims. Treat the Origins tank's mantle traversal as a stationary-only mechanism unless you've confirmed otherwise.

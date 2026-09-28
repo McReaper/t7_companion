@@ -1,6 +1,6 @@
 ---
-name: bo3-crossref
-description: How to use other Call of Duty titles' GSC/CSC source and script dumps as reference when modding Black Ops 3 — the game/engine decoder ring (t5/t6/t8/t9 Treyarch, iw4–iw8/h1/h2 Infinity Ward, s1/s2/s4 Sledgehammer), which lineages actually transfer, and xensik's gsc-tool for (de)compiling scripts across games. Use when porting from another CoD (source-side naming/structure) or studying how a mechanic is implemented elsewhere to reimplement it in BO3. These are references for structure/approach only — never a source of BO3 token names; verify shipped BO3 tokens against the raw install per bo3-knowledge. Distinct from bo3-assets (the BO3-side extract/compile/material/anim porting pipeline itself) and bo3-anim-retarget (the Maya HumanIK/`-mo` cross-generation retarget craft) — this skill only finds and reads the other game's source, it doesn't do the port or the retarget; for writing the BO3 GSC/CSC itself see bo3-scripting.
+name: crossref
+description: How to use other Call of Duty titles' GSC/CSC source and script dumps as reference when modding Black Ops 3 — the game/engine decoder ring (t5/t6/t8/t9 Treyarch, iw4–iw8/h1/h2 Infinity Ward, s1/s2/s4 Sledgehammer), which lineages actually transfer, and xensik's gsc-tool for (de)compiling scripts across games. Use when porting from another CoD (source-side naming/structure) or studying how a mechanic is implemented elsewhere to reimplement it in BO3. These are references for structure/approach only — never a source of BO3 token names; verify shipped BO3 tokens against the raw install per t7kb:knowledge-base. Distinct from t7kb:assets (the BO3-side extract/compile/material/anim porting pipeline itself) and t7kb:anim-retarget (the Maya HumanIK/`-mo` cross-generation retarget craft) — this skill only finds and reads the other game's source, it doesn't do the port or the retarget; for writing the BO3 GSC/CSC itself see t7kb:scripting.
 ---
 
 # Cross-referencing other Call of Duty titles
@@ -9,7 +9,7 @@ Other CoD titles' GSC/CSC — decompiled dumps and leaked/reconstructed source �
 
 ## The one rule: reference, not BO3 truth
 
-Cross-game source describes *other games*. **bo3-knowledge**'s governing constraint applies here — "cross-game intuitions (other CoD titles, generic engine terms) are usually wrong here." So:
+Cross-game source describes *other games*. **t7kb:knowledge-base**'s governing constraint applies here — "cross-game intuitions (other CoD titles, generic engine terms) are usually wrong here." So:
 
 - **Never paste cross-game GSC into a BO3 script.** Function names, KVPs, asset fields, notetracks, and even calling conventions differ across titles. Read the other game to understand *how a system is shaped* — its state machine, event flow, data layout — then re-implement in BO3 idiom.
 - **Verify every shipped token against the raw BO3 install** (the `scripts/` tree and assets under the mod-tools root) before asserting it exists in BO3. A function that's clearly there in BO2 or Cold War may be renamed, absent, or subtly different in BO3.
@@ -18,7 +18,7 @@ Cross-game source describes *other games*. **bo3-knowledge**'s governing constra
 ## Engine lineage — what transfers
 
 - **Treyarch line (`t5 t6 t7 t8 t9`) transfers most** — shared zombies architecture, powerup/perk lineage, and stdlib heritage. Mind the *syntax* split: BO3's `#using`/`#namespace`, `&func` pointers, `#insert` macros, and clientfields are the **t7-era** system, shared by **t8/t9** (so those read closest to BO3 line-for-line, though t8 moved the compiled format on again); **t5/t6 predate it** and use path-based `maps\...::func()` includes, so from BO1/BO2 you port the *concept and structure* and translate the syntax. **BO2 (`t6`) zombies is the direct ancestor of BO3 zombies** — the best lineage read for round logic, powerups, and perks.
-- **Infinity Ward line (`iw4`–`iw8`, `h1/h2`) and Sledgehammer line (`s1 s2 s4`) are more divergent** — different stdlib, calling conventions, and asset APIs. Reach for them mainly (a) **source-side when porting an asset** from that game — the dump tells you the real function/asset/anim names of what you're extracting (pairs with **bo3-assets**), and (b) as a **second opinion on a mechanic's general approach** — never for names you'll paste into BO3.
+- **Infinity Ward line (`iw4`–`iw8`, `h1/h2`) and Sledgehammer line (`s1 s2 s4`) are more divergent** — different stdlib, calling conventions, and asset APIs. Reach for them mainly (a) **source-side when porting an asset** from that game — the dump tells you the real function/asset/anim names of what you're extracting (pairs with **t7kb:assets**), and (b) as a **second opinion on a mechanic's general approach** — never for names you'll paste into BO3.
 
 ## The catalog: the id is the anchor, not the repo name
 
@@ -62,15 +62,15 @@ Game id → title → lineage → community source. The **id** is the anchor (it
 Two things to get right:
 
 - **Per-game support is uneven — check the current build's target list.** At time of writing it covers `iw5 iw6 iw7 iw8 iw9`, `s1 s2 s4`, `h1 h2`, `t6`, and `t7 t8 t9 t10` / `jup` (MWIII 2023) — but several (t8/t9/t10, jup) are **work-in-progress**, and **`t7` (Black Ops III) is decompile-only** (no recompile). Note `iw9`, `t10` and `jup` have no row in the catalog above — no widely-mirrored dump, so decompiling your own is the only route for those.
-- **For BO3 itself you rarely need it.** The mod tools already ship BO3's GSC/CSC as source under `scripts/`, and that raw source *is* the ground truth (see **bo3-knowledge**). Decompiling `t7` is a fallback for a compiled script your install doesn't ship as source; its output is decompiler-reconstructed (paraphrased), so treat it below the shipped source.
+- **For BO3 itself you rarely need it.** The mod tools already ship BO3's GSC/CSC as source under `scripts/`, and that raw source *is* the ground truth (see **t7kb:knowledge-base**). Decompiling `t7` is a fallback for a compiled script your install doesn't ship as source; its output is decompiler-reconstructed (paraphrased), so treat it below the shipped source.
 
-For decompiling BO3's own *logic assets* (AI behavior/ASM, weaponfiles, tables, script bundles) into GDTs — a different job from script bytecode — that's **HydraX**, covered in **bo3-assets**.
+For decompiling BO3's own *logic assets* (AI behavior/ASM, weaponfiles, tables, script bundles) into GDTs — a different job from script bytecode — that's **HydraX**, covered in **t7kb:assets**.
 
 ## Where this hands off
 
-- **Porting an asset?** Use the source-game dump for the *names and structure* of what you're ripping, then follow **bo3-assets** for the extract → APE compile → materials → anims pipeline on the BO3 side (and **bo3-animation** for the anim compile specifics).
-- **Porting an animation specifically?** This skill only gets you as far as the source game's rig/anim and its real names — the cross-generation retarget itself (HumanIK characterization, bind-pose traps, `-mo` constraints for a viewhands rig) is **bo3-anim-retarget**'s craft, not this one's. Hand off there once you have the source asset identified.
-- **Reimplementing a mechanic?** Study the source for shape only, then write it per **bo3-scripting** (header/usings, stdlib, hooks, clientfields) and confirm every BO3 signature in t7kb + the raw install.
+- **Porting an asset?** Use the source-game dump for the *names and structure* of what you're ripping, then follow **t7kb:assets** for the extract → APE compile → materials → anims pipeline on the BO3 side (and **t7kb:animation** for the anim compile specifics).
+- **Porting an animation specifically?** This skill only gets you as far as the source game's rig/anim and its real names — the cross-generation retarget itself (HumanIK characterization, bind-pose traps, `-mo` constraints for a viewhands rig) is **t7kb:anim-retarget**'s craft, not this one's. Hand off there once you have the source asset identified.
+- **Reimplementing a mechanic?** Study the source for shape only, then write it per **t7kb:scripting** (header/usings, stdlib, hooks, clientfields) and confirm every BO3 signature in t7kb + the raw install.
 
 ## Don't invent
 

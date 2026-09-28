@@ -1,11 +1,11 @@
 ---
-name: bo3-anim-retarget
-description: How to port an animation from an older CoD generation onto a Black Ops 3 rig in Maya and into the game — HumanIK retargeting for full-body, direct `-mo` constraints for first-person VIEWHANDS/viewmodel (HumanIK cannot characterise an arms-only rig), cross-gen bind-axis mismatch, and a locked rig reading the solver not the skeleton. Use when a ported anim binds but limbs twist/explode, one side is off, the other fine, a joint edit "sticks" (nothing moves, or re-locking restores the bug), the Cast importer rejects a track with `name conflict in the scene`, first-person arms rotate ~90°, drift/stretch, or fingers stay curled, a first-person camera won't move, a scripted scene errors `unable to find animation '<name>' in tree 'all_player'`, or a CoDMayaTools export throws `notetracks[N]`/Py3 errors or the linker rejects an xcam. Distinct from bo3-animation (export2bin/APE-xanim pipeline), bo3-assets (model/material porting), and bo3-crossref (reads another title's source; doesn't retarget).
+name: anim-retarget
+description: How to port an animation from an older CoD generation onto a Black Ops 3 rig in Maya and into the game — HumanIK retargeting for full-body, direct `-mo` constraints for first-person VIEWHANDS/viewmodel (HumanIK cannot characterise an arms-only rig), cross-gen bind-axis mismatch, and a locked rig reading the solver not the skeleton. Use when a ported anim binds but limbs twist/explode, one side is off, the other fine, a joint edit "sticks" (nothing moves, or re-locking restores the bug), the Cast importer rejects a track with `name conflict in the scene`, first-person arms rotate ~90°, drift/stretch, or fingers stay curled, a first-person camera won't move, a scripted scene errors `unable to find animation '…' in tree 'all_player'`, or a CoDMayaTools export throws `notetracks[N]`/Py3 errors or the linker rejects an xcam. Distinct from t7kb:animation (export2bin/APE-xanim pipeline), t7kb:assets (model/material porting), and t7kb:crossref (reads another title's source; doesn't retarget).
 ---
 
 # Retargeting an animation onto the BO3 skeleton
 
-Porting an animation from an **older CoD generation** (BO1/BO2/WAW, or any non-T7 rig) is not "import the anim onto `c_t7_ally_fb` and export." Treyarch reuses joint **names** across games, so the anim *binds* — every joint matches — but the **bind-pose orientations and local axes differ** between generations, so the rotation curves apply in the wrong frame and the result is subtly-to-badly **twisted** (a foot that folds at its middle, fingers splayed, an arm that pops to the wrong side). This skill is that retarget and its hard-won traps. For the export half (`.xanim_export` → `export2bin` → APE xanim asset) see **bo3-animation**; for the broader model/rig porting see **bo3-assets**. Confirm exact bone names against the raw install and the rig you actually ripped.
+Porting an animation from an **older CoD generation** (BO1/BO2/WAW, or any non-T7 rig) is not "import the anim onto `c_t7_ally_fb` and export." Treyarch reuses joint **names** across games, so the anim *binds* — every joint matches — but the **bind-pose orientations and local axes differ** between generations, so the rotation curves apply in the wrong frame and the result is subtly-to-badly **twisted** (a foot that folds at its middle, fingers splayed, an arm that pops to the wrong side). This skill is that retarget and its hard-won traps. For the export half (`.xanim_export` → `export2bin` → APE xanim asset) see **t7kb:animation**; for the broader model/rig porting see **t7kb:assets**. Confirm exact bone names against the raw install and the rig you actually ripped.
 
 ## Two paths — decide which one you're on before you start
 
@@ -75,7 +75,7 @@ To tweak an artifact non-destructively after bake, use an **additive anim layer*
 
 ## Export gotcha: select the HIERARCHY, not the root
 
-CoDMayaTools exports **what's selected**. Clicking only the root joint *looks* like it grabbed the skeleton but exports **one bone** → a tiny file with `NUMPARTS 1`. Use **Select → Hierarchy** (or `select -r \`listRelatives -ad -type "joint" -f "Joints1"\`;`) before *Export XAnim*. **Verify** the export is large and `NUMPARTS` equals the joint count — a multi-MB text file, not a few hundred KB. Then convert per **bo3-animation** (Quality 0, notetracks cleared, single-arg `export2bin`/`exportxbin`, verify the `*LZ4*…55 c3` header).
+CoDMayaTools exports **what's selected**. Clicking only the root joint *looks* like it grabbed the skeleton but exports **one bone** → a tiny file with `NUMPARTS 1`. Use **Select → Hierarchy** (or `select -r \`listRelatives -ad -type "joint" -f "Joints1"\`;`) before *Export XAnim*. **Verify** the export is large and `NUMPARTS` equals the joint count — a multi-MB text file, not a few hundred KB. Then convert per **t7kb:animation** (Quality 0, notetracks cleared, single-arg `export2bin`/`exportxbin`, verify the `*LZ4*…55 c3` header).
 
 ## How to diagnose this class of bug
 
@@ -90,9 +90,9 @@ Load a **working anim of the same class** onto the same rig and compare **local 
 ## Playing it in-game: things that bite
 
 - **First-person (`int_`) vs third-person (`ch_`) variants.** A shipped IGC exports both: `int_*` is the **player** (first person — carries `tag_camera` + `tag_view`, the arms/body you see), `ch_*` is a **third-person body** with no camera (that's the *NPC beside you*, not the player). Retarget `int_` onto a BO3 **viewbody** (which has `tag_camera`); retarget `ch_` onto a full body. Set the xanim asset's **Model File** to the rig it was authored on (the viewbody for `int_`) so the `tag_camera` track survives.
-- **A viewhands anim can play through a WEAPON — but that's the wrong tool for a camera-moving clip.** Give the player a weapon whose anim slots all point at your clip, then `SwitchToWeaponImmediate` — that is how the ported `t6_deathanim` runs a BO2 death animation in ZM. Clone a working `grenadeweapon` entry, swap the anim names, and stretch `raiseTime` to the clip length or the engine cuts to idle early; its other dependencies (`wpn_t7_none_view`/`_world`, `vm_ap9_ads_base_*`, `hud_us_grenade`) are all stock. The xanim asset itself is `type relative` + `useBones 0` for a viewmodel — `delta` + `useBones 1` is for world/character anims, and mixing them up is a classic cause of "right on the weapon, broken on the world model". **But for a get-up / mantle that *moves the view and travels*, the weapon path is a dead end** (a ripped weapon-viewhands model came in with broken partial skinning, and the weapon doesn't cleanly carry big camera travel) — link the player to an animated node instead (see the camera section below, GSC in **bo3-scripting**).
-- **A scene bundle with a `Player` object plays through the player's animtree, not the raw xanim.** If the scene's object is `type Player` / `player 1`, the engine looks the anim up in **`all_player`** and you get `unable to find animation '<name>' in tree 'all_player'` at runtime — even though the xanim linked fine. **Fix:** add the anim's name to `share/raw/animtrees/all_player.atr` (a plain indented list) **and its generated copy** under `share/raw/animtrees/gen/animtrees/all_player.atr`. This is the same animtree override the zipline used for its `pb_zipline_*` player anims. Non-player scene objects (`Prop`) don't need this — they play the xanim directly.
-- **An animated prop (not a character) needs `AnimScripted`, not `scene::play`/`SetAnim`.** Playing a ported IGC fxanim (rope, cloth, debris) via a scene bundle's `MainAnim`, or via `SetAnim` on its animtree, leaves the mesh **frozen** — and don't `LinkTo` it to a moving parent either, co-locate origins instead so it tracks for free. Full mechanism and a worked rappel-rope case: **`references/workflow-extras.md`**.
+- **A viewhands anim can play through a WEAPON — but that's the wrong tool for a camera-moving clip.** Give the player a weapon whose anim slots all point at your clip, then `SwitchToWeaponImmediate` — that is how the ported `t6_deathanim` runs a BO2 death animation in ZM. Clone a working `grenadeweapon` entry, swap the anim names, and stretch `raiseTime` to the clip length or the engine cuts to idle early; its other dependencies (`wpn_t7_none_view`/`_world`, `vm_ap9_ads_base_*`, `hud_us_grenade`) are all stock. The xanim asset itself is `type relative` + `useBones 0` for a viewmodel — `delta` + `useBones 1` is for world/character anims, and mixing them up is a classic cause of "right on the weapon, broken on the world model". **But for a get-up / mantle that *moves the view and travels*, the weapon path is a dead end** (a ripped weapon-viewhands model came in with broken partial skinning, and the weapon doesn't cleanly carry big camera travel) — link the player to an animated node instead (see the camera section below, GSC in **t7kb:scripting**).
+- **A scene bundle with a `Player` object plays through the player's animtree, not the raw xanim.** If the scene's object is `type Player` / `player 1`, the engine looks the anim up in **`all_player`** and you get `unable to find animation '<name>' in tree 'all_player'` at runtime — even though the xanim linked fine. **Fix:** add the anim's name to `share/raw/animtrees/all_player.atr` (a plain indented list) **and its generated copy** under `share/raw/animtrees/gen/animtrees/all_player.atr`. Every player-object scene anim needs this — a zipline's `pb_*` player-body anims did too. Non-player scene objects (`Prop`) don't need this — they play the xanim directly.
+- **An animated prop (not a character) needs `AnimScripted`, not `scene::play`/`SetAnim`.** Playing a ported IGC fxanim (rope, cloth, debris) via a scene bundle's `MainAnim`, or via `SetAnim` on its animtree, leaves the mesh **frozen** — and don't `LinkTo` it to a moving parent either, co-locate origins instead so it tracks for free. Full mechanism and a worked rappel-rope case: **`references/workflow-extras.md`**. This is for xanim props only — a **siege** prop (`*_smod`, APE shows *Is Siege*) is the opposite case: it plays through a client-side scene or `SiegeCmd`, never `AnimScripted` (**t7kb:animation**).
 
 ## Moving the first-person CAMERA: three mechanisms, pick by case
 
@@ -109,7 +109,7 @@ What follows is **not** "always use an XCam" — it's that the view must be driv
 |---|---|
 | a cinematic on a **`Player`-object scene** | **XCam** — `PlayMainCamXCam` (CSC). See below and `references/xcam-camera.md`. |
 | a mostly-static **viewmodel** | play it through a **weapon**; the viewmodel's own `tag_camera` moves the view directly. Verified — but a dead end once the camera has to *travel* (see the weapon note above). |
-| a **get-up / mantle that travels** | **link the player to an animated node** playing a *camera-less* scene bundle: `PlayerLinkToDelta` onto a mount `LinkTo`'d one `GetPlayerViewHeight()` **below** the node's moving `tag_camera`, so the eye lands on the animated camera. This is MW3's `_id_72AD` transposed, and the path that actually carried a traveling first-person get-up; the GSC lives in **bo3-scripting**. |
+| a **get-up / mantle that travels** | **link the player to an animated node** playing a *camera-less* scene bundle: `PlayerLinkToDelta` onto a mount `LinkTo`'d one `GetPlayerViewHeight()` **below** the node's moving `tag_camera`, so the eye lands on the animated camera. This is MW3's `_id_72AD` transposed, and the path that actually carried a traveling first-person get-up; the GSC lives in **t7kb:scripting**. |
 
 Counter-pressure worth knowing whichever you pick: every stock/ported reference keeps `tag_torso` / `tag_cambone` / `tag_camera` **static**, with all motion in the arm joints. An animated `tag_camera` works, but it is off the beaten path — so if the arms misbehave, suspect the tags before the arms.
 
@@ -121,25 +121,9 @@ One correction worth surfacing here because it silently wastes time otherwise: *
 
 Full Maya camera setup steps, the xcam asset's other fields, and the complete FOV/DOF export-field conversion table: **`references/xcam-camera.md`**.
 
-## CoDMayaTools export bugs (patch the `.py`)
+## CoDMayaTools export bugs: patch the `.py`, the anim is fine
 
-**`ValueError: No object matches name: XAnimExporterInfo.notetracks[1]`** kills an XAnim export outright, and it has nothing to do with your anim. `cmds.getAttr` **raises** on an element of a multi attribute that was never written, so the source's `cmds.getAttr(...) or ""` never gets the chance to default — any export slot that has never had a notetrack saved blows up. Wrap the read:
-
-```python
-def GetNoteList(attr):
-    try:
-        return cmds.getAttr(attr) or ""
-    except Exception:
-        return ""
-```
-
-and call it from the two export paths (`ExportXAnim`, `ExportXCam`). The ~11 other reads live in the notetrack manager windows, which create the attribute before reading it. Reload the script in Maya afterwards — the in-memory copy is still the broken one.
-
-The rest are **XCam-export code still written for Python 2**; on modern Maya (Py3) each fails with a different traceback. All are one-line fixes in `CoDMayaTools.py`:
-
-- `TypeError: a bytes-like object is required, not 'str'` → `…encode('ascii','ignore').replace('\\','/')` — in Py3 `.encode()` returns bytes; **drop the `.encode(...)`**, keep the `.replace`.
-- `TypeError: 'float' object cannot be interpreted as an integer` → `range(0, numframes)` with a float → **`range(0, int(numframes))`**.
-- Linker error at build time `JSON: Value is not an int64_t` on the xcam → the export wrote `"framerate": 30.0` / `"numframes": 1096.0` as **floats**; the linker wants ints → cast at the source (`"framerate": int(fps)`, `"numframes": int(fLength)`), or integer-ise those two keys in the `.xcam_export` after export.
+`ValueError: No object matches name: XAnimExporterInfo.notetracks[N]` kills an export for a reason unrelated to your anim (`cmds.getAttr` raises on a never-written multi-attribute element — wrap the read in `try`), and the XCam export is still Python-2 code that fails on modern Maya three different ways (`a bytes-like object is required`, `'float' object cannot be interpreted as an integer`, and the linker's `JSON: Value is not an int64_t` on float `framerate`/`numframes`). All are one-line fixes to `CoDMayaTools.py` — the patches: **`references/workflow-extras.md`**. Reload the script in Maya after patching.
 
 ## Don't invent
 

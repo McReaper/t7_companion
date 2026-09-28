@@ -1,6 +1,6 @@
 ---
-name: bo3-knowledge
-description: How to search the t7kb knowledge base for Black Ops 3 / BO3 / Treyarch mod-tools questions, and the querying/reliability/grounding method every other bo3-* skill builds on. Use as the general entry point for topics without a dedicated craft skill (perks, wonder weapons, easter eggs, community packs, general lore/mechanics). For GSC/CSC, debugging, Radiant mapping, building/compiling, assets/porting, animation, cross-generation animation retargeting, zombies AI, moving platforms and vehicles that carry players or AI (buses, trains, elevators, tanks), HUD/Lua, particle-FX editing, atmosphere, localized/translated on-screen text, or cross-referencing other Call of Duty titles (GSC dumps / porting sources / gsc-tool) specifically, prefer bo3-scripting, bo3-debugging, bo3-mapping, bo3-compiling, bo3-assets, bo3-animation, bo3-anim-retarget, bo3-zombies-ai, bo3-moving-platforms, bo3-hud-lui, bo3-fx, bo3-atmosphere, bo3-localization, or bo3-crossref instead.
+name: knowledge-base
+description: How to search the t7kb knowledge base for Black Ops 3 / BO3 / Treyarch mod-tools questions, and the querying/reliability/grounding method every other bo3-* skill builds on. Use as the general entry point for topics without a dedicated craft skill (perks, wonder weapons, easter eggs, community packs, general lore/mechanics). For GSC/CSC, debugging, Radiant mapping, building/compiling, assets/porting, animation, cross-generation animation retargeting, zombies AI, moving platforms and vehicles that carry players or AI (buses, trains, elevators, tanks), HUD/Lua, particle-FX editing, atmosphere, localized/translated on-screen text, or cross-referencing other Call of Duty titles (GSC dumps / porting sources / gsc-tool) specifically, prefer t7kb:scripting, t7kb:debugging, t7kb:mapping, t7kb:compiling, t7kb:assets, t7kb:animation, t7kb:anim-retarget, t7kb:zombies-ai, t7kb:moving-platforms, t7kb:hud-lui, t7kb:fx-editing, t7kb:atmosphere, t7kb:localization, or t7kb:crossref instead.
 ---
 
 # Answering BO3 modding questions with t7kb
@@ -31,6 +31,14 @@ The raw mod-tools install is the preferred ground truth, but it may be absent (n
 - **Detect and disclose.** If you cannot locate the install, say so in your answer, and mark any shipped-token claim (function name, KVP, asset field, error string, path) as corroborated by community sources only — not verified against shipped files.
 - **Last-resort web supplement.** When the corpus is thin and the install is unavailable, a targeted web search may fill gaps. Rank it strictly below the corpus and the install, never as ground truth. Prefer higher-reliability sources (e.g. UGX, resolved/accepted threads) over random posts, keep the "may be paraphrased or subtly wrong" caution, and state in the answer what was verified versus merely corroborated.
 - **Ordering.** Always: corpus → raw install → web. Drop any claim you cannot ground in at least one of these.
+
+## Community packs are t7kb lookups, not engine behaviour
+
+Perk, box, Pack-a-Punch, trap and craftable packs (Harry Bo21's `hb21_*`, Sphynx's `spx_*`, and the like) install as `include,` zone lines plus copied scripts; their rules — unique trap letters, box numbering — belong to the pack, not to BO3. Answer from the pack's own docs in t7kb, and don't generalise a pack's rule into a claim about stock code. Their scripts often sit inside the install (`share/raw/scripts/Sphynx/`, …) — that doesn't make them ground truth either.
+
+## When the corpus or a skill turns out wrong
+
+If a session proves a t7kb skill wrong, stale, or missing a trap that cost real time, finish the user's task first, then offer once to send the fix upstream — **t7kb:contribute** is how.
 
 ## Don't invent
 

@@ -1,0 +1,34 @@
+name: skills
+
+# Validates the plugin's skills on every PR that touches them — the same checks
+# contributors run locally with plugin/skills/contribute/scripts/check_skills.py.
+on:
+  pull_request:
+    paths:
+      - "plugin/**"
+      - "templates/**"
+      - ".claude-plugin/**"
+  push:
+    branches: [main]
+    paths:
+      - "plugin/**"
+      - "templates/**"
+      - ".claude-plugin/**"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate skills
+        run: python plugin/skills/contribute/scripts/check_skills.py
+      - name: Validate JSON manifests
+        run: |
+          python -m json.tool .claude-plugin/marketplace.json > /dev/null
+          python -m json.tool plugin/.claude-plugin/plugin.json > /dev/null

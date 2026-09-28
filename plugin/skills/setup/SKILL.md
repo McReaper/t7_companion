@@ -43,13 +43,13 @@ claude mcp add t7kb -- "/absolute/path/to/t7kb" mcp
 
 Example paths: `~/.t7kb/t7kb` (Linux/macOS, expand `~` to the real home) or `C:\Users\<you>\AppData\Local\t7kb\t7kb.exe` (Windows).
 
-On Windows this command still runs through a POSIX-style shell (the Bash tool is git-bash), which treats an unquoted backslash as an escape character and silently drops it before a non-special letter — `C:\Users\victo\AppData\Local\t7kb\t7kb.exe` becomes `C:UsersvictoAppDataLocalt7kbt7kb.exe`, a path that can't spawn. Double-quoting the argument (as above) prevents this.
+On Windows this command still runs through a POSIX-style shell (the Bash tool is git-bash), which treats an unquoted backslash as an escape character and silently drops it before a non-special letter — `C:\Users\<you>\AppData\Local\t7kb\t7kb.exe` becomes `C:Users<you>AppDataLocalt7kbt7kb.exe`, a path that can't spawn. Double-quoting the argument (as above) prevents this.
 
 **Validate the registration before moving on:** run `claude mcp list` and confirm the `t7kb` entry shows the full path with backslashes intact (Windows) or the full absolute path (Linux/macOS). If a path was registered before this fix, or the server ever fails to connect, this is the first thing to check — re-run the `claude mcp add` command above with the quoted path to fix it.
 
-## 3. Offer the workspace primer — and record the root bo3-knowledge depends on
+## 3. Offer the workspace primer — and record the root t7kb:knowledge-base depends on
 
-Walk up from the current directory to find the **BO3 mod-tools root** — the folder containing `raw/`, `share_raw/`, `usermaps/`, or `mods/` as siblings (a map/mod project usually lives *inside* that tree, e.g. `usermaps/<name>/`, not at the root itself). That root is also where Treyarch's shipped files live, so it's the same tree the "verify against ground truth" guidance in `bo3-knowledge` points at.
+Walk up from the current directory to find the **BO3 mod-tools root** — the folder containing `raw/`, `share_raw/`, `usermaps/`, or `mods/` as siblings (a map/mod project usually lives *inside* that tree, e.g. `usermaps/<name>/`, not at the root itself). That root is also where Treyarch's shipped files live, so it's the same tree the "verify against ground truth" guidance in `t7kb:knowledge-base` points at.
 
 If you find that root and it has no `AGENTS.md` yet, offer to drop the vendor-neutral primer there. Fetch it rather than hand-copy — it's not bundled with the plugin, and this is the single source of truth:
 
@@ -60,7 +60,7 @@ curl -fsSL https://raw.githubusercontent.com/t7-reapy/t7_companion/main/template
 irm https://raw.githubusercontent.com/t7-reapy/t7_companion/main/templates/AGENTS.md -OutFile "<root>\AGENTS.md"
 ```
 
-You just walked up to `<root>` *because* it's the raw mod-tools install — the same ground truth `bo3-knowledge`'s "verify against ground truth" section tells the agent to search for on every question. Save that discovery so nobody has to repeat it: append a short, project-specific section to the fetched `AGENTS.md` (this is appending a fact after the canonical fetch, not hand-copying the primer itself, so it doesn't fight the single-source-of-truth rule):
+You just walked up to `<root>` *because* it's the raw mod-tools install — the same ground truth `t7kb:knowledge-base`'s "verify against ground truth" section tells the agent to search for on every question. Save that discovery so nobody has to repeat it: append a short, project-specific section to the fetched `AGENTS.md` (this is appending a fact after the canonical fetch, not hand-copying the primer itself, so it doesn't fight the single-source-of-truth rule):
 
 ```markdown
 

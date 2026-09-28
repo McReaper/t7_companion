@@ -1,151 +1,89 @@
 ---
-name: bo3-scripting
-description: How to write good GSC/CSC for Black Ops 3 — header/usings, the standard library, extending stock behavior (hooks vs override), threading/scope, clientfields, init-vs-main, usermap-vs-map entry files, and code-style conventions. Use for any BO3 server- or client-script task (gameplay logic, custom systems, perks/weapons), for how to structure/format a script, for playing an animation from script (`AnimScripted`, `animation::play`, `GetStartOrigin`, notetrack notifies firing early), and for preprocessor/`.gsh` macro failures — `Preprocessor error, No generated data for <file>`, which names no line and is almost always a macro call broken across two lines or carrying a comma inside its argument. The clientfield bridge to LUI/Lua HUD work is covered here on the GSC/CSC side; for the Lua/LUI authoring side itself, see bo3-hud-lui.
+name: scripting
+description: How to write good GSC/CSC for Black Ops 3 — header/usings and `#namespace` call prefixes, the stdlib, extending stock (hooks vs override, zombies' own callback registries), `zm_usermap::main()` ordering, the server/client weapon tables, clientfields, structs vs entities, custom KVPs, unitriggers, playing animations from script, and code style. Use for any BO3 server/client script task, or when a `callback::on_actor_killed`/`on_player_damage` handler never fires in zombies, a damage callback silences the others, `dog_rounds_allowed` or `_zombie_custom_add_weapons` is ignored, a wallbuy shows Cost 0, a custom KVP or `struct::get` is undefined, a unitrigger ignores the press, a one-shot clientfield FX plays once, `Exceeded '256' items for type 'fx'`, an `AnimScripted` wait returns early, or `Preprocessor error, No generated data for` a file. Distinct from t7kb:hud-lui (the Lua side of clientfields) and t7kb:debugging (reading the errors).
 ---
 
 # Writing GSC/CSC for Black Ops 3
 
-Server logic is **GSC**, client logic is **CSC** — separate files, separate namespaces, identical language. This skill is the craft; look up exact signatures/KVPs/APIs in **t7kb** (`t7kb:search` then `t7kb:get`), and for the conceptual model (scopes, entities, notifies, threads, `undefined`, the finite entity pool, cooperative scheduling) retrieve the "How GSC Scripting Works" guide. t7kb also indexes real, well-structured mod code — retrieve a worked example to see the conventions below applied in practice. To study how a mechanic is built in another CoD title as *structural* reference — never for BO3 token names — see **bo3-crossref**.
+Server logic is **GSC**, client logic is **CSC** — separate files, separate namespaces, identical language — and most scripting bugs are not syntax but **plumbing**: a hook set in the wrong order, a callback registry that zombies never dispatches, a table loaded twice. Look up exact signatures/KVPs/APIs in **t7kb** (`t7kb:search` then `t7kb:get`); for the conceptual model (scopes, entities, notifies, threads, `undefined`, the finite entity pool) retrieve the "How GSC Scripting Works" guide. To study how another CoD title shapes a mechanic — structure only, never BO3 token names — see **t7kb:crossref**.
 
-## Tooling
+Script in **VS Code with the GSCode extension** (`blakintosh.gscode`, [marketplace](https://marketplace.visualstudio.com/items?itemName=blakintosh.gscode)) — its inline diagnostics catch unknown functions and bad calls before a build. Recommend it to anyone scripting BO3.
 
-Script in **VS Code with the GSCode extension** (Blakintosh's GSC/CSC language server) — the best language support available: real syntax highlighting, completion, and inline diagnostics with awareness of the BO3 API, catching typos and bad calls before you ever build. (It's the same project behind t7kb's `gscode-api` reference.) Install it from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=blakintosh.gscode) (extension id `blakintosh.gscode`, or grab the `.vsix` there); source at [github.com/Blakintosh/gscode](https://github.com/Blakintosh/gscode). Recommend it to anyone scripting BO3.
+## Header: `#using`, `#insert`, `#namespace` — and the call prefix is the namespace, not the file
 
-## Header: declare dependencies explicitly, in a fixed order
+Top of file, in order: `#using` each script you call into (grouped: stdlib, feature scripts, AI) → `#insert scripts\shared\shared.gsh;` (`WAIT_SERVER_FRAME`, `IS_TRUE`, `DEFAULT`, …) → `#namespace` → optional `#precache` → system registration.
 
-A file's top isn't free-form — follow this order:
+- **The prefix you call with is the target file's `#namespace`, not its filename.** `_zm_utility.gsc` declares `#namespace zm_utility;`, so it is `zm_utility::`; `_zm_score.gsc` → `zm_score::`; `callbacks_shared.gsc` → `callback::` (singular). The obvious filename-shaped prefix fails at link as an unresolved external. Read the target's `#namespace` line before writing the call.
+- **A `#using` only makes a call resolvable** — the target script must also be in your `.zone`, or you get `Could not find scriptparsetree "scripts/…"` despite the `#using`.
 
-1. **`#using`** — import each namespace you call into. Group and comment the block (stdlib, then feature scripts, then AI). You reach for the same handful constantly — a default starter set (add/drop per file):
-   ```gsc
-   // almost every file
-   #using scripts\shared\system_shared;       // REGISTER_SYSTEM(_EX)
-   #using scripts\shared\util_shared;
-   #using scripts\shared\clientfield_shared;
-   #using scripts\shared\callbacks_shared;
-   #using scripts\shared\array_shared;
-   #using scripts\shared\flag_shared;
-   #using scripts\shared\math_shared;
-   #using scripts\codescripts\struct;
-   // zombies work
-   #using scripts\zm\_zm_utility;
-   #using scripts\shared\ai\zombie_utility;
-   #using scripts\zm\_zm_powerups;
-   #using scripts\zm\_zm_spawner;
-   #using scripts\zm\_zm_score;
-   #using scripts\shared\spawner_shared;
-   ```
-2. **`#insert`** — text-inline a `.gsh` of `#define` macros:
-   ```gsc
-   #insert scripts\shared\shared.gsh;          // WAIT_SERVER_FRAME, IS_TRUE, … — basically always
-   #insert scripts\shared\version.gsh;
-   ```
-3. **`#namespace`** — declare the file's own namespace.
-4. **`#precache`** (optional) — precache any asset the file needs.
-5. **System registration** — `REGISTER_SYSTEM`/`REGISTER_SYSTEM_EX`, if this file self-registers (see below).
+## Read the stdlib before you branch on it
 
-A `#using` only makes a call *resolvable* — the target script must **also be in your `.zone`**, or you get `Could not find scriptparsetree "scripts/…"` / an unresolved external despite the `#using`. When changing a stock script, also make sure you're editing the copy the zone actually loads.
+`scripts/shared/` is a deep stdlib (`util::`, `array::`, `math::`, `clientfield::`, `flag::`, `spawner::`, `zm_utility::`) — run `t7kb:search` for a helper before writing one. But predicates carry surprises:
 
-## Lean on the standard library — don't reinvent
-
-`scripts/shared/` is a deep stdlib reached through those namespaces: `util::`, `array::`, `math::`, `clientfield::`, `flag::`, `spawner::`, plus zombies helpers in `zm_utility::` / `_zm_utility`. Before writing a helper, run `t7kb:search` for one — most already ship, and reusing them keeps your code working when Treyarch internals shift.
-
-**But read the body of a stdlib predicate before you branch on it.** `util::use_button_held()` **returns false the first time it is asked**, whoever asks: its first call is what *starts* the tracking thread (`self thread button_held_think( BUTTON_USE )`) and it then returns the `self._holding_button[...]` slot that thread has not filled in yet. Code that asks once and gives up on a false — a hold-to-repeat loop testing it before its first iteration — never repeats, and it looks exactly like the player not holding the button. Stock gets away with it because its unitriggers have been polling the same helper since the prompt appeared, long before the interaction starts. For a one-shot question use the engine call, `player UseButtonPressed()`. (**Measured.**)
+- **`util::use_button_held()` returns false the first time it is asked**, whoever asks: that first call is what *starts* its tracking thread (`self thread button_held_think( BUTTON_USE )`), then it returns a slot the thread hasn't filled yet. A hold-to-repeat loop that tests it once before iterating never repeats — it looks exactly like the player not holding the button. Stock gets away with it because its unitriggers poll the helper from the moment the prompt appears. For a one-shot question use `player UseButtonPressed()`. (**Measured.**)
+- **A raw `level waittill("my_flag")` also wakes on `flag::clear`** — clear sends the same notify (`flag_shared.gsc:166-170`) — and a `waittill` begun after the notify already fired never returns, because notifies aren't latched. Use `flag::wait_till`, which loops on `get()`; `flag::init` before you wait on or set a flag. (`flagsys::` is a separate namespace.)
 
 ## Extending stock behavior: hook first, override when blocked
 
-Work through these in order — don't reach for an override just because it's the more obvious lever:
-
-1. **Look for a hook first** (Inversion of Control): most stock systems expose seams so you never touch their source — register a spawn function (`add_global_spawn_function`), set a `level.*` function pointer the stock script calls, or use the callback/flag it fires. Stock systems (perks, powerups, AI) are extended this way.
-2. **No hook, and you must change stock behavior → override it.** Copy the stock file into your mod/map `scripts/` at the **same path**, add it to your **`.zone`**; the engine loads your version instead of the shared one.
-3. **From a usermap, that alone is not enough — and the missing step is not "use a mod".** The stock copy is still contributed by the patch asset list and wins over yours, which is where the "some scripts only override from a mod" folklore comes from. Also comment its line out of **`zone_source/all/assetlist/zm_patch.csv`**:
+1. **Look for a hook first.** Most stock systems expose seams — a spawn function (`add_global_spawn_function`), a `level.*` function pointer the stock script calls, a callback or flag it fires.
+2. **In zombies, use the zombies registries — the shared `callback::on_*` ones for AI and player damage/death never fire.** `callback::on_actor_killed`, `on_actor_damage`, `on_ai_killed`, `on_ai_damage` register without error and are dispatched nowhere; `on_player_killed`/`on_player_damage` dispatch only from MP's `_globallogic_player.gsc`. Zombies replaces `level.callbackActorKilled`/`callbackActorDamage` with its own wrappers (`_zm.gsc:1349-1350`). Use `zm_spawner::register_zombie_death_event_callback(&f)`, `zm::register_actor_damage_callback`, `zm::register_player_damage_callback`, `callback::on_laststand`. (**Verified in the install**; corpus agrees.)
+3. **A damage callback that isn't yours must pass, or it silences every callback after it.** The dispatch loops return the first non-sentinel value: for `zm::register_actor_damage_callback`/`register_player_damage_callback` the sentinel is **`-1`** — returning the natural `damage` "wins" and stops the loop (`_zm.gsc:5509-5515`, `5822-5830`); for `zm_spawner::register_zombie_damage_callback` it is **`false`**, and returning `true` also skips the damage points award (`_zm_spawner.gsc:1926-1929`). Treyarch's own minigun callback comments exactly this before its `return -1;`.
+4. **A `level.*` function pointer is one slot, and stock either defaults it or overwrites it.** Where stock writes `if(!isdefined(level.x)) level.x = …;` (or `DEFAULT(level.x, …)`), set yours *before* that code runs; where it assigns unconditionally, set yours *after*. Two mods setting the same slot: last wins, silently. Registries (`callback::on_*`, `zm::register_*`) are lists — prefer them. **Grep the stock assignment of that exact variable** before deciding where yours goes.
+5. **No hook, and stock must change → override it.** Copy the stock file into your map/mod `scripts/` at the **same path**, add it to your `.zone`, **and** comment its line out of the assetlist CSV that contributes it — for a zombies script usually `zone_source/all/assetlist/zm_patch.csv`, but grep `zone_source/` for the path rather than assuming (**t7kb:debugging** has the rule for every asset type; it applies to usermaps and mods alike):
    ```
    //scriptparsetree,scripts/zm/_zm_behavior.gsc
    ```
-   Stock installs already ship several lines commented exactly this way (`_zm_ai_dogs`, `_zm_pack_a_punch`, `_zm_weapons`), so the mechanism is intended rather than a trick. It is a shared, **install-wide** file: back it up, and remember the change affects every map you build until you revert it. This is also the cheapest way to get **line numbers** on a stock script's error, and to instrument it — see **bo3-debugging**.
-4. **Override the narrowest script that covers the change.** Overriding low-level shared code (`array_shared`) breaks every dependent of it, and an override diverges from stock going forward — the other reason to reach for a hook first.
+   That CSV is shared and **install-wide**: back it up, and the change affects every map built from that tree until reverted. Override the **narrowest** script that covers the change — overriding `array_shared` breaks every dependent, and every override diverges from stock going forward.
 
-## System registration: `REGISTER_SYSTEM` vs `REGISTER_SYSTEM_EX`
+## Entry files: `zm_usermap::main()` reads some settings, then overwrites others
 
-Both self-register a feature so its entry point(s) run automatically at the engine's **system-init phase** — the map file only needs to `#using` the file, no explicit call. Decide the split in this order:
+Your `zm_<map>.gsc` `main()` calls `zm_usermap::main()` — the shared usermap framework (don't fork it). **What goes before and after that call is not free**, and getting it wrong fails silently in both directions:
 
-1. **One init-time pass is all you need?** Use `REGISTER_SYSTEM("name", &__init__, undefined)` — one entry point, `__init__`.
-2. **You also need a runtime phase?** Use `REGISTER_SYSTEM_EX("name", &init, &main, undefined)` — two entry points, `init` then `main`.
-3. **Put setup that must exist before runtime in `init`/`__init__`:** `clientfield::register` (must happen here, before the first network frame), `flag::init`, instantiate the system's state `class`, register callbacks / spawn functions, `#precache`.
-4. **Put everything else — the runtime behavior — in `main`:** wait for the game to start, then the loops, spawns, and behavior.
-5. **Feature is small and map-local?** Skip the system entirely: a plain `feature::init()` call from the map's `zm_<map>.gsc` `main()` is fine, and is how map templates wire things up. `REGISTER_SYSTEM` is for a self-contained file you'd rather have auto-register (the map file just `#using`s it) than call explicitly — both are correct, it's a coupling/style choice, not a timing one.
+- **Settings it reads with `DEFAULT(...)` go before the call.** `DEFAULT` assigns only when undefined (`shared.gsh`), and `main()` acts on them immediately: `level.dog_rounds_allowed` (`zm_usermap.gsc:146-150` — set it after and dog rounds are already on), `level._zombie_custom_add_weapons` (`:135`, consumed inside `main()` by `zm_weapons::init()`), plus `level.randomize_perk_machine_location`, which `_zm_perks.gsc` reads during the same `main()`. Treyarch's `zm_giant.gsc` marks these `// set before zm_usermap::main`.
+- **Hooks it assigns itself go after the call.** `zm_usermap::main()` unconditionally sets `level.giveCustomLoadout`, `giveCustomCharacters`, the offhand overrides and `_round_start_func` (`:125-127`, `:132-133`, `:154`) — set any of those before and yours is overwritten.
+- Everything else map-specific (start weapon, zones, your systems) goes after. When unsure, open `zm_usermap.gsc` and find the line that touches your variable.
 
-Treyarch's own labelling of which of the two phases is the "pre-load" vs "post-load" one is famously confusing and even the community disagrees on it — don't lean on a precise ordering; lean on the functional split above. **Map-placed entities (Radiant triggers, `script_struct`s) are available by the time either phase runs** — only entities you `Spawn()` yourself in script aren't there until that code runs — so a lookup like `GetEntArray("my_trigger")` works from `__init__`.
+**The weapon table is loaded twice, and players see the client's copy.** The server loads whatever `level._zombie_custom_add_weapons` points at; the client's `zm_usermap.csc` hard-codes `load_weapon_spec_from_table("gamedata/weapons/zm/zm_levelcommon_weapons.csv", 1)` (`:93-96`) and reads no hook, and a second `include_weapon` call in your `.csc` only *adds*. The wallbuy's `Cost:` is filled client-side from the CSC table (`SetWeaponCosts`), the charge server-side from the GSC one — so a weapon only in your GSC table **shows Cost 0 and charges the real price**, and the box's client list diverges from what the server rolls. Fix the client side by overriding `zm_usermap.csc` to point at your table (same override steps as above; its line lives in `zm_levelcommon.csv`), and set the GSC pointer **before** `zm_usermap::main()`. (**Verified in the install**; the Cost 0 symptom is corroborated by several community reports. Setting `level.weapon_cost_client_filled = false` before the call makes the server fill the price instead — install-grounded, untested in game.)
 
-## Entry files: `zm_usermap.gsc` vs `zm_<map>.gsc`
+Features that outgrow a few functions get their own `_<feature>.gsc`/`.csc` (own `#namespace`, zoned), halves sharing a `_<feature>.gsh`, self-registered with `REGISTER_SYSTEM`.
 
-Wiring a usermap's entry point follows a fixed sequence:
+## System registration, structs, and KVPs
 
-1. **`zm_usermap.gsc`** (`#namespace zm_usermap`) is the **shared usermap framework** — opt-in, fx init, character/loadout/perk/sound setup. Don't fork it.
-2. **Your map file, `zm_<map>.gsc`** (e.g. `zm_test.gsc`), is **your** entry point. Its `main()` must call `zm_usermap::main()` **first**.
-3. **Wire your own map-specific systems and logic after that call, in the same `main()`.** It runs early enough to register callbacks, clientfields, and spawn hooks, so small map-local additions don't need a system of their own.
-4. **When a feature outgrows a few functions, give it its own file:** `_<feature>.gsc` / `_<feature>.csc` (own `#namespace`, added to the `.zone`), server and client halves sharing a `_<feature>.gsh` of constants.
-5. **Self-register that file** with `REGISTER_SYSTEM("<feature>", &__init__, undefined)` so its `__init__` runs automatically at the system-init phase — the map file only needs to `#using` it, no explicit `init()` call. That's the clean home for anything with real init logic, and it keeps the map file thin.
+`REGISTER_SYSTEM("name", &__init__, undefined)` runs one init entry point at the system-init phase; `REGISTER_SYSTEM_EX("name", &init, &main, undefined)` adds a runtime `main`. Put `clientfield::register` (before the first network frame), `flag::init`, state `class`es, callbacks and `#precache` in init; loops and behavior in `main`. A small map-local feature can skip the system and be called from the map's `main()` — a coupling choice, not a timing one.
+
+Map-placed entities and structs already exist when either phase runs — but they are fetched differently:
+
+- **A `script_struct` is not an entity.** `GetEnt` returns `undefined` and `GetEntArray` an empty array for it, so a `foreach` over the result silently does nothing. Entities: `GetEntArray("my_trigger", "targetname")` (the key argument is required). Structs: `struct::get_array("my_struct", "targetname")`.
+- **`struct::get`/`get_array` only index nine keys** — `target`, `targetname`, `script_noteworthy`, `script_linkname`, `script_label`, `classname`, `script_unitrigger_type`, `scriptbundlename`, `prefabname` (decompiled `struct.gsc`, t7kb 0.95 — the install's `codescripts/struct.gsc` is a stub). `struct::get_array("2", "script_int")` returns `[]` with no error. Fetch by an indexed key, then filter or `array::sort_by_script_int`. With several matches `struct::get` asserts and returns `undefined` when devblocks run, and otherwise silently returns the first — use `get_array` if duplicates are possible.
+- **A custom KVP you typed in Radiant arrives `undefined`.** Only keys declared in `radiant/keys.txt` reach script — the entity is found and its stock keys read fine, which is what makes it baffling (`target2`/`target3` aren't declared either). Use a generic stock key (`script_int`, `script_float`, `script_string`, `script_vector`), or zone your own copy of `keys.txt` and comment `rawfile,radiant/keys.txt` out of `core_common.csv` — grep for the line, don't trust a remembered line number. (**Verified in the install**; two independent community reports.)
 
 ## Threading & scope discipline
 
-- **Thread long-running logic.** A long `wait` loop on the main thread blocks the game and drops connections (`Connection Interrupted`) — `thread` it.
-- **Guard every persistent loop with `endon`.** `level endon("end_game")` is safe on top of *any* function and is the default — add it to any `while(true)`/long loop. For per-entity loops also add `self endon("death")`. Without a guard the loop runs on dead entities or past game end.
-- **Mind `self` vs `level`.** A function threaded on an entity sees it as `self`; level-wide state lives on `level`. Per-player logic (HUD, timers) put on `level` is a frequent silent bug.
-- **`self Delete()` ends the thread that called it**, through the very `self endon("death")` above — so statements after it never run. A pickup that deletes its model and *then* bumps a counter or fires the completion notify silently drops that last step, and it reads as a counting bug rather than a teardown-order one. Settle the bookkeeping while the entity is still alive and delete last, or hand the follow-up to a `level thread`.
+- **Every loop path needs a yield, and long loops need a `thread`.** A loop that can iterate without `wait`/`waittill` freezes the server — often as a black screen at load with nothing logged. A waiting loop called *without* `thread` never returns, so everything after it in the caller silently never runs (and a long one on the main thread drops connections, `Connection Interrupted`).
+- **Guard persistent loops with `endon`** — `level endon("end_game")` is safe on any function; per-entity loops add `self endon("death")`.
+- **Mind `self` vs `level`.** Per-player state (HUD, timers) put on `level` is a frequent silent bug.
+- **`self Delete()` ends the thread that called it** through that same `endon("death")`, so statements after it never run — a pickup that deletes and *then* bumps a counter silently drops the count. Do the bookkeeping first, delete last.
 
-## Server vs client: where sounds, FX, and state run
+## Server vs client: sounds, FX, and clientfields
 
-GSC is the **server** (gameplay, AI, spawning, score); CSC is the **client** (HUD, FX, sounds, postfx/vision, on-screen feedback). Deciding where a thing runs is a real design choice, not an afterthought:
+GSC is the server (gameplay, AI, score); CSC is the client (HUD, FX, sounds, postfx/vision). HUD/LUI and per-view rendering only run client-side.
 
-- **Some things must be client-side.** HUD/LUI, postfx and vision/screen effects, and other per-view rendering can only run on the client — drive them from CSC.
-- **Push sounds & FX to the client — but through clientfields.** Server-side `PlayFX`/`PlaySound` spawn a temp entity per call → entity-pool pressure and eventual `G_Spawn` errors, so minimize them. Yet raw client tempent events (calling `playfx`/`playsound` directly) are **unreliable** — network packet loss can drop them and desync clients. The robust pattern resolves both: the server `clientfield::set`s an event, the client reacts (a CSC callback) and plays the FX/sound locally. Clientfields are **stateful** — guaranteed to update while the player is connected — which is exactly why they exist. Purely cosmetic, non-critical per-client effects (a hitmarker) can stay loose client-side.
+- **Push sounds & FX to the client — through clientfields.** Server `PlayFX`/`PlaySound` spawn a temp entity per call (entity-pool pressure, `G_Spawn` errors); raw client tempents can be dropped by packet loss. The robust pattern: the server sets a clientfield, a CSC callback plays the effect locally. Purely cosmetic per-client effects (a hitmarker) can stay loose.
+- **The FX precache tables are small and fill up from code you never call.** GSC `#precache("fx", …)` holds 256 unique effects, CSC `#precache("client_fx", …)` 1024; overflow stops the map loading with `BG_Cache_GetIndexInternal - Exceeded '256' items for type 'fx'`. `#precache` is file-scope, so a zoned-but-unused asset-pack script still counts. Precache and play FX client-side, and drop unused packs' GSC precaches. (Corpus, several independent sources.)
+- **Clientfields**: `clientfield::register` on both sides in init, then `set` server-side / react client-side. Size the bitcount to the value — too few bits clips it silently. **The CSC callback only runs when the value changes**: `set("f", 1)` on a field already at `1` sends nothing, so a one-shot FX plays once and never again. Register one-shot events as `"counter"` and fire them with `clientfield::increment` — stock registers dozens this way (`lightning_strike`, the AAT explosions). Each pool has a fixed bit budget stock already spends much of; a full one fails registration with `… in ClientField set scriptmover using 3 bits, but scriptmover is out of space.` (community) — size minimally or move to `world`. The Lua side is **t7kb:hud-lui**; a registration mismatch between halves is **t7kb:debugging**.
+- **If FX must run from GSC,** spawn the model, `WAIT_SERVER_FRAME`, then `PlayFXOnTag` — FX on the model's spawn frame often won't play. `#precache("fx", …)` in GSC, `#precache("client_fx", …)` in CSC.
 
-**Clientfields** are that bridge: `clientfield::register` on both sides (in `init`, before the first network frame), then `set` server-side / react client-side. Size the bitcount to the value — too few bits clips it silently. Look the API and callback flags up in t7kb.
+## Triggers, damage, and destructibles: the notify you'd expect is not the one you get
 
-**GSC-FX gotcha:** if FX must run from GSC, spawn the model, wait a frame (`WAIT_SERVER_FRAME`), then `PlayFXOnTag` — FX spawned on the same frame as the model often won't play.
+- **A `create_unitrigger` interaction arrives as `"trigger_activated"` on the parent, never as `"trigger"`.** The physical trigger only exists while a player is in range; stock `unitrigger_logic` waits on it, filters invalid players (downed, drinking), then does `self.stub.related_parent notify("trigger_activated", player)` (`_zm_unitrigger.gsc:900-924`). Inside the prompt function `self` is the spawned trigger (`self.stub` the stub), so `SetHintString` goes on `self`.
+- **A zombie headshot never arrives as `MOD_HEAD_SHOT`.** The engine sends `MOD_RIFLE_BULLET`/`MOD_PISTOL_BULLET` with `sHitLoc` `"head"`/`"helmet"`; only the globallogic callbacks rewrite it, and zombies bypasses them. Use `zm_utility::is_headshot(weapon, sHitLoc, mod)`, as stock does.
+- **A destructible's Break Notify doesn't arrive under its own name.** `CodeCallback_DestructibleEvent` relays it as `self notify("broken", notify_type, attacker)` (`zm/_destructible.gsc:457-468`) — wait on `"broken"` and compare the note. The stock callback also pattern-matches it first: a name containing `explode`/`explosive` triggers stock explosion logic.
 
-## Playing animations on a `script_model` (and why "move + animate" is fiddly)
+## Playing animations from script
 
-On a plain `script_model` the **reliable playback primitive is `AnimScripted`** — which `scene::play` / `animation::play` wrap, and which shipped code also calls directly with a **string** anim anchored at a passed transform (e.g. `vehicle_death_shared` plays a crush anim: `self AnimScripted("anim_notify", self.origin, self.angles, crush_anim, "normal", …)`). **`SetAnim` and the `SetAnimKnob*` family are reported not to work on plain script_models in T7** — this is community-sourced (t7kb, ~0.25) and consistent with working map scripts that animate server script_models via `AnimScripted` instead, but it is *not* a shipped-token guarantee: treat it as a strong heuristic and test `SetAnim` on your own model before relying on it. `SetAnim` *does* work for **vehicles and AI** — their entity *type* carries an animtree/ASM, which is why a driving vehicle animates its turret relative to itself (`vehicle_shared`, `vehicleriders_shared`) — and for some CSC cases. Don't casually reach for `SetAnim(%anim)` on a script_model.
+On a `script_model`, **`AnimScripted` is the primitive** (it needs `UseAnimTree(#animtree)` + `#using_animtree`), and its origin/angles are where the animation **starts**, frozen at play time — to make a clip *land* somewhere compute the start with `GetStartOrigin`/`GetStartAngles`; editing the export to move its end changes nothing (**t7kb:animation**). Moving *and* animating, `SetAnim`'s limits, and driving the first-person camera from an animation are in **`references/animation-from-script.md`**. On a moving parent, **t7kb:moving-platforms** owns the link-based pattern.
 
-Two prerequisites before `AnimScripted` on a script_model:
-
-- **Load an animtree:** `model UseAnimTree(#animtree)`, with `#using_animtree("generic")` (or a custom `.atr` you author/extend — both work; the tree just has to contain the anim) at the top of the file. Skipping this is a classic "plays in APE, silent in-game."
-- **Name the anim by string:** `model AnimScripted("notify", origin, angles, "my_xanim", "normal", "my_xanim", rate, blend)`. It **anchors at the `origin`/`angles` you pass** and plays the anim — root/delta motion included — from that **fixed world transform**; it does **not** track an entity you move afterwards. (`IsPlayingAnimScripted` / `StopAnimScripted(blend, b_clear)` manage it.)
-
-**That transform is where the animation STARTS**, not an origin for its coordinate space — the end is only ever start-plus-travel. So to make a clip *land* somewhere, compute the start with `GetStartOrigin(<origin>, <angle>, <anim>)` / `GetStartAngles(...)` (*"Get the starting origin for an animation, in world coordinates, given its current position, and angles"*) rather than measuring an arrival by hand; `GetMoveDelta(<anim>, 0, 1, <ent>)` gives the travel when you need it directly. A corollary worth stating because people try it: **editing the export to shift where the clip ends does nothing** — see **bo3-animation**.
-
-**Moving *and* animating**, given the anchor is frozen at play time, is one of:
-
-- **Re-anchor each frame** — drive a `script_model` align's `.origin` and re-issue the scene/`AnimScripted` at its new transform every tick. This repo's zipline does exactly this: `_travel` moves `align_model.origin` while `_glide_pose` re-plays `scene::play(IDLE)` every 0.05s so the pose re-anchors onto the moved align. **Only reach for this when there is no entity to link to.** When there is one, `animation::play(anim, ent, tag)` teleports, links and anchors once, and the engine does the interpolating; re-anchoring on top of a link holds alignment but visibly stutters (**bo3-moving-platforms**).
-- **Split phases** — movement by `LinkTo`/engine vehicle path with rotor/exhaust as **FX** (not anim), then hand off to one stationary anchored anim. BO1 Hue City's heli intro is this: a vehicle flies a node path in, is deleted, and a fake static model plays the anchored crash.
-- **Bake the travel into the anim** — an anim carrying root motion slides the model along its *baked* path from the fixed anchor (a zip, a flythrough); fine when the path is fixed, useless when it's data-driven from Radiant nodes.
-- **Make it a real vehicle/AI** — then `SetAnim` animates relative to the moving entity for free, at the cost of the full vehicle/ASM setup.
-
-Confirm `AnimScripted` / `UseAnimTree` signatures against the raw install and t7kb. See **bo3-animation** for compiling the anim and **bo3-atmosphere** for the FX side. On a moving parent there is a further trap — an anim cannot relocate a `LinkTo`'d entity at all — which **bo3-moving-platforms** owns.
-
-## An `AnimScripted` notify fires once per NOTETRACK, not once at the end
-
-So `waittill`-ing on it returns on the animation's **first** notetrack — a footstep, a sound cue, anything — and whatever you do next (typically `StopAnimScripted`) cuts the animation in half. The symptom is an anim that plays a fraction of its length for no visible reason, and it changes with the anim rather than with your code, which is what makes it baffling.
-
-The shipped code says so plainly once you look at why it is shaped the way it is: `zombie_shared::DoNoteTracks( flagName )` is a `for(;;)` loop around `self waittill( flagName, note )`, and `HandleNoteTrack` returns a value — ending the loop — only for `"end"`, `"finish"` or `"undefined"`. Everything else falls through and it waits again. A loop would be pointless if the notify fired once.
-
-Two correct waits, depending on what you have:
-
-- **`zombie_shared::DoNoteTracks( "my_notify" )`** — the stock idiom, and the only one that also runs the notetrack handlers (footstep sounds, board tears, melee hits). Needs the animation to actually carry an `end` notetrack, or it waits forever.
-- **`wait GetAnimLength( str_anim )`** — deterministic, and the right fallback for a ported anim whose notetracks were lost in conversion (see **bo3-animation**). Loses the handlers.
-
-The note argument can also arrive **undefined** — `DoNoteTracks` normalises it to the string `"undefined"` before dispatching, and `HandleNoteTrack` treats that as a terminator alongside `"end"`. Don't assume a bare `waittill` on the notify is safe just because it happened to work on one anim: whether it returns early is a property of *that* animation's notetrack list, not of your code.
-
-## Driving the first-person CAMERA from an animation (get-up, mantle, scripted FP moment)
-
-An animation can move the player's **view**, not just render arms. The robust mechanism — transposed from MW3's `_id_72AD`, found by reading the source game per **bo3-crossref** — uses **neither a weapon nor an XCam** (both were tried and were the wrong path for a camera-*moving* clip):
-
-- Spawn a **node** (a viewhands `script_model`) and play the clip on it via a **camera-less scene bundle** (`scene::play`) — the node's animated `tag_camera` carries the motion.
-- Link the player's view to it: `player PlayerLinkToDelta(mount, "tag_origin", 1, …)`. `PlayerLinkToDelta` seats the player's **ORIGIN** on its target and the engine then re-adds the player's own eye height — so link to a **mount** `LinkTo`'d one `GetPlayerViewHeight()` **below** the node's `tag_camera` (no magic number), and the eye lands on the animated camera.
-- **Ground the clip:** play the node lowered by the low pose's *lowest-hand height above the anim root* (read it off the `.xanim_export`), so the downed hands touch the floor instead of hovering.
-
-Make it multiplayer- and disconnect-safe: the scene bundle **AllowMultiple** (independent per-player instances); show the node **only to its owner** (`node SetInvisibleToAll(); node SetVisibleToPlayer(self);`) so nobody sees floating arms; and **own the teardown on a world entity** (the align/node), never `endon("death"/"disconnect")` on a thread holding the spawned entities — that skips cleanup and leaks them. Instead race the clip's end against `death`/`disconnect` and always Delete. Worked end-to-end on a ported first-person get-up; the Maya side (retargeting the arms onto BO3 viewhands) is **bo3-anim-retarget**.
+**An `AnimScripted` notify fires once per notetrack, not once at the end.** `waittill`-ing on it returns on the first footstep or sound cue, and a following `StopAnimScripted` cuts the anim short — a symptom that changes with the anim rather than your code. Stock's `zombie_shared::DoNoteTracks( flagName )` is a `for(;;)` around `waittill( flagName, note )` that ends only on `"end"`, `"finish"` or `"undefined"` (an undefined note is normalised to that string). Wait with `DoNoteTracks("my_notify")` (runs the notetrack handlers; needs an `end` notetrack or waits forever) or `wait GetAnimLength(str_anim)` (deterministic; the fallback for a port whose notetracks were lost).
 
 ## Code style & conventions
 
@@ -153,32 +91,16 @@ Match these exactly — and when **editing an existing file, don't infer style f
 
 - **4 spaces, never tabs.**
 - **Always braces.** Never `if (x) doThing();` — write `if (x) { doThing(); }` with the body on its own line(s). Same for loops.
-- **No padding inside brackets.** Write `func(arg)` and `arr[i]`, never `func( arg )` or `arr[ i ]` — no space after `(`/`[` or before `)`/`]`.
-- **Naming.** `snake_case` for functions and variables; `UPPER_SNAKE` for `#define` constants; **prefix private functions with `_`** (and use the `private` keyword); registered system entry points are often `__init__` / `__main__`.
-- **Regions.** Group distinct areas of a file with `/* region NAME */ … /* endregion */`.
-- **Debug prints: use a `#define`-gated macro.** Guard debug output with a `#define`-toggled macro in the feature `.gsh`, the way Treyarch's own shipped systems do (e.g. hellround): `#define DEBUG_X 0` then `#define PRINT_X_DEBUG(__str) if(DEBUG_X) IPrintLnBold(__str)`, called as `PRINT_X_DEBUG("msg " + val);`. Flip the flag to 1 to enable, back to 0 to ship. This is the reliable map-side path; it needs no dev/developer dvar to fire. Keep the *number* of live call sites small and purposeful: dozens of `IPrintLnBold`s firing every frame make the console unreadable, which costs you the one thing you were debugging with — gate categories behind separate flags rather than one master switch.
-- **A macro invocation must fit on one line, with no comma anywhere in an argument.** Both constraints are the preprocessor's, and **both fail identically and unhelpfully**: `Preprocessor error, No generated data for <file>` — no line number, no token, and it names the *file*, so a long `.gsh` gives you nothing to grep for. The comma rule bites hardest inside a **string literal** (`PRINT_X_DEBUG("goal set, waiting")` breaks; `"goal set" + " waiting"` is fine), because that reads as ordinary text rather than as an argument separator. Wrapping a long call across two lines for readability breaks it the same way. When a build dies on that message and nothing else changed, look at the last macro call you touched.
-- **Runtime debug triggers: use a `ModVar`, not a plain dvar.** A plain dvar can only be set at launch in a shipped usermap, so `heli_test 1` typed in the in-game console won't reach a `GetDvarInt`-polling loop. Register the name as a **mod variable** instead — settable live from the console — the way zm_test's hellround systems do (`zm_hellround_meteor.gsc` etc.): `ModVar("name", "")` to register/reset, then poll each frame and consume it:
-  ```gsc
-  ModVar("name", "");
-  while (true)
-  {
-      WAIT_SERVER_FRAME;
-      val = GetDvarString("name", "");
-      if (!isdefined(val) || val == "") { continue; }
-      ModVar("name", "");            // reset so it fires once per console entry
-      switch (Int(val)) { case 1: do_thing(); break; }
-  }
-  ```
-  Then in-game: type `name 1` in the console. Thread this from the system's `init`/`main`; guard against re-entry if the action is long-running.
-- **IoC over hard calls.** Bind systems by registering callbacks / function pointers (e.g. an optional subsystem hooking a round-state event) rather than calling across them directly — less coupling.
-- **Validate before use.** `isdefined()` is the baseline against `undefined`; use the specific predicates (`IsPlayer`, `IsAlive`, `IsArray`, `IsEntity`, `IsFunctionPtr`, …) to check *kind/state*, not just existence.
-- **Ternary must be fully parenthesized.** GSC/CSC *has* `cond ? a : b`, but the **whole expression** must be wrapped in parens — `x = (cond ? a : b);` (as stock does: `return ( x >= 0 ? 1 : -1 );`). Parenthesizing only the condition — `x = (cond) ? a : b;` — is a compile error (`syntax error, unexpected TOKEN_CONDITIONAL, expecting TOKEN_SEMICOLON`).
-- **Constants in the `.gsh`**, `#insert`ed — one place to tune.
-- **System state in a `class` instance** on `level` (`level.my_system = new my_system();`), not scattered `level.foo_*` fields.
-- **`flag::init("name")`** before you wait on or set a flag.
-- **Split a feature into focused sub-files** (e.g. logic / audio / fx) + a `_shared.gsc`/`.gsh` for cross-file state and constants, rather than one giant script.
+- **No padding inside brackets.** `func(arg)` and `arr[i]`, never `func( arg )` or `arr[ i ]`.
+- **Naming.** `snake_case` functions and variables; `UPPER_SNAKE` for `#define`; prefix private functions with `_` (and use `private`); system entry points are often `__init__` / `__main__`.
+- **Regions.** Group areas of a file with `/* region NAME */ … /* endregion */`.
+- **Debug prints: a `#define`-gated macro** in the feature `.gsh` — `#define DEBUG_X 0` then `#define PRINT_X_DEBUG(__str) if(DEBUG_X) IPrintLnBold(__str)`, called as `PRINT_X_DEBUG("msg " + val);` (Treyarch gates debug code with `#define` flags the same way, e.g. `_siegebot.gsc`'s `DEBUG_ON`). It needs no dvar to fire — unlike `/# … #/` dev blocks and `assert`, which need `scr_mod_enable_devblock 1` and don't run on a usermap at all (**t7kb:debugging**). Keep live call sites few and gate categories separately; dozens of per-frame prints bury the one you need.
+- **A macro invocation must fit on one line, with no comma anywhere in an argument.** Both fail identically: `Preprocessor error, No generated data for <file>` — no line, no token, just the file. The comma rule bites inside **string literals** (`PRINT_X_DEBUG("goal set, waiting")` breaks; `"goal set" + " waiting"` is fine). When a build dies on that message, look at the last macro call you touched.
+- **Runtime debug triggers: a `ModVar`, not a plain dvar.** A plain dvar can only be set at launch in a shipped usermap, so typing it in the console never reaches a `GetDvarInt` loop. `ModVar("name", "")` registers a console-settable variable; poll `GetDvarString("name", "")` each `WAIT_SERVER_FRAME`, act on a non-empty value, and reset it with `ModVar("name", "")` so it fires once per entry. (Verified on a real map; `ModVar` appears in no Treyarch script, so this is community practice, not a stock pattern.)
+- **Ternary must be fully parenthesized** — `x = (cond ? a : b);`. Parenthesizing only the condition, `x = (cond) ? a : b;`, is `syntax error, unexpected TOKEN_CONDITIONAL, expecting TOKEN_SEMICOLON`.
+- **Validate before use** with `isdefined()` and the kind predicates (`IsPlayer`, `IsAlive`, `IsArray`, `IsFunctionPtr`, …).
+- **Constants in the `.gsh`**, system state in a `class` instance on `level` (`level.my_system = new my_system();`), and features split into focused sub-files plus a `_shared.gsc`/`.gsh` — not one giant script. Bind systems through callbacks/function pointers rather than hard cross-calls.
 
 ## Don't invent
 
-Stdlib function names, KVPs, and stock system entry points are shipped tokens — confirm exact names against the raw mod-tools install before stating them as fact. If neither t7kb nor the raw install supports a specific function or KVP, don't assert it exists.
+Stdlib function names, KVPs, and stock system entry points are shipped tokens — confirm exact names against Treyarch's scripts in the raw install (`share/raw/scripts/{shared,zm,mp,core}` — not the community trees or your own maps that also live there) before stating them. If neither t7kb nor the raw install supports a function or KVP, don't assert it exists.

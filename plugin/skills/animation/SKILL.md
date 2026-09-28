@@ -1,6 +1,6 @@
 ---
-name: bo3-animation
-description: Getting a DCC (Maya/Blender) anim into Black Ops 3 and its silent-failure gotchas — CoDMayaTools on modern Maya, Cast import (SEanim deprecated), the Quality field's frame-doubling trap, 30fps/ntsc, export2bin's single-argument mode, notetracks belong in APE not Maya, the required Model File, verifying a `.xanim_bin`'s format, and the `type` field (delta/delta3d/relative/absolute). Use when compiling/porting a character, weapon, or world anim; patching a `.xanim_export` by hand (`PART`/`FRAME`/`OFFSET`); or diagnosing xanim errors (`Unexpected error while processing binary token`, `model was not specified`, `has no XANIM_BIN file specified`, `unable to find animation '<name>' in tree`, an anim that plays 2x too fast, `has bad angle delta on frame N`, `requires "delta" type animations`, `NUMPARTS 1`). Distinct from bo3-anim-retarget (cross-gen retargeting), bo3-assets (broader model/material porting), and bo3-compiling (whole-map build) — this is the DCC→`.xanim_bin` compile pipeline.
+name: animation
+description: Getting a DCC (Maya/Blender) anim into Black Ops 3 and its silent-failure gotchas — CoDMayaTools on modern Maya, Cast import (SEanim deprecated), the Quality field's frame-doubling trap, 30fps/ntsc, export2bin's single-argument mode, notetracks belong in APE not Maya, the required Model File, verifying a `.xanim_bin`'s format, and the `type` field (delta/delta3d/relative/absolute). Use when compiling/porting a character, weapon, or world anim; patching a `.xanim_export` by hand (`PART`/`FRAME`/`OFFSET`); or diagnosing xanim errors (`Unexpected error while processing binary token`, `model was not specified`, `has no XANIM_BIN file specified`, `unable to find animation '…' in tree`, an anim that plays 2x too fast, `has bad angle delta on frame N`, `requires "delta" type animations`, `NUMPARTS 1`). Distinct from t7kb:anim-retarget (cross-gen retargeting), t7kb:assets (broader model/material porting), and t7kb:compiling (whole-map build) — this is the DCC→`.xanim_bin` compile pipeline.
 ---
 
 # Getting a custom animation into Black Ops 3
@@ -11,7 +11,7 @@ The pipeline is short but every stage has a silent-failure trap that produces a 
 DCC (Maya) ──export──▶ .xanim_export (TEXT)  ──export2bin──▶ .xanim_bin  ──APE xanim asset──▶ zone (xanim,<name>) ──link──▶ .ff
 ```
 
-Confirm exact APE fields and zone syntax in **t7kb** (`t7kb:search` then `t7kb:get`) and against the raw install; this skill is the pipeline and the gotchas, most of them verified the hard way. For the broader model/material/rig porting flow see **bo3-assets**; for retargeting an anim from an older CoD generation onto the BO3 skeleton see **bo3-anim-retarget**; for the build stages and reading link errors see **bo3-compiling** / **bo3-debugging**; for the scene/notify side that *plays* the anim see **bo3-scripting**.
+Confirm exact APE fields and zone syntax in **t7kb** (`t7kb:search` then `t7kb:get`) and against the raw install; this skill is the pipeline and the gotchas, most of them verified the hard way. For the broader model/material/rig porting flow see **t7kb:assets**; for retargeting an anim from an older CoD generation onto the BO3 skeleton see **t7kb:anim-retarget**; for the build stages and reading link errors see **t7kb:compiling** / **t7kb:debugging**; for the scene/notify side that *plays* the anim see **t7kb:scripting**.
 
 ## Maya setup on a modern install
 
@@ -20,7 +20,7 @@ BO3 ships **no Maya plugin** — export is a community tool, **CoDMayaTools** (a
 - **Maya version:** the old Ray1235 build is **Python 2** and dies on Maya 2020+ with `Missing parentheses in call to 'print'`. On 2022+/2024 use a **Python-3 fork** (e.g. `xCortlandx/CoDMayaTools`, "Maya 2022+"). If the menu never appears, run `import CoDMayaTools` in the Script Editor and read the error — a `print` SyntaxError means wrong (Py2) fork.
 - **First-run registry:** CoDMayaTools stores its config in `HKCU\Software\CoDMayaTools`. On a fresh install its first-run wizard can crash (`menuItem: Object 'AutoUpdate' not found`); pre-seed the keys to skip it — `CurrentGame`=`CoD12` (BO3's internal id), `RootPath` and `CoD12RootPath` = the BO3 root.
 - **Import format is Cast.** DTZxPorter **deprecated SEanim/SEModel**; the current importer is the **Cast** plugin (`castplugin.py` + `cast.py`), loaded via the Plug-in Manager. Every modern ripper (Greyhound/Kobra/Saluki) already emits `.cast`.
-- **For the FX (`.efx`) that go *with* an animation** (a rotor blur, a muzzle/impact effect tied to the anim): **rip with Kobra, not Greyhound.** Greyhound dropped XEffect/GDT export and emits **zero `.efx`**; Kobra (its fork) re-added them, so BO1/older effects come out under `Kobra/.../<game>/fx/**.efx`. If your extraction has models/anims but no effects, that's why — see **bo3-fx** for editing/playing them.
+- **For the FX (`.efx`) that go *with* an animation** (a rotor blur, a muzzle/impact effect tied to the anim): **rip with Kobra, not Greyhound.** Greyhound dropped XEffect/GDT export and emits **zero `.efx`**; Kobra (its fork) re-added them, so BO1/older effects come out under `Kobra/.../<game>/fx/**.efx`. If your extraction has models/anims but no effects, that's why — see **t7kb:fx-editing** for editing/playing them.
 
 ## Importing a ripped anim to re-export it
 
@@ -43,27 +43,21 @@ A ripped **anim `.cast` is curves-only — it carries no skeleton.** Import it i
 Convert that text with the mod tools' **`bin/export2bin.exe`**, and **invoke it as a single argument from the file's own directory**:
 
 ```
-cd <…>/xanim_export/_reapy
+cd <bo3_root>/xanim_export/<your_folder>
 export2bin.exe pb_zipline_enter.xanim_export      # ✅ correct: writes the framed bin next to it
 ```
 
 - The **two-argument `export2bin in out` form is wrong** — it emits raw compressed text with no token framing, which the linker rejects at token (1).
 - A **path argument** fails too: export2bin strips it to a basename and looks in the *current* directory (`Failed to read file .\…`). Run from the folder.
 - **Drag-and-drop onto `export2bin.exe`** in Explorer is the same single-arg mode and works — a console flash then done.
+- **Why the single argument behaves this way:** the tool's own usage line is `export2bin [/single input] [/s] [/v] [/u] [/nt=N] [/o=dirname] [input output|pattern]` — one argument is a **pattern matched in the current directory**, so a whole folder converts with `export2bin /s /u *` from the export root. `/single` and `/o=dirname` are official but untested here. The Launcher's built-in Export2Bin writes to `model_export/export2bin/` by default and, with Overwrite off, logs `Skipping file '…' (file already exists)` — a stale bin with no error. (**Verified** from both binaries' strings.)
 - **From git-bash/MSYS the `/flags` are silently rewritten into paths** (`/v` → `V:/`), so drive export2bin (and gdtdb) from **PowerShell/cmd** or plain drag-drop, never MSYS.
 
 **Verify the output format, don't trust exit 0.** A correct BO3 `.xanim_bin` is `*LZ4*`-wrapped and its decompressed body starts with a 4-byte token header then `Export filename:` (`55 c3 00 00 45 78 …`). If the decompressed body starts straight with `//` (`2f 2f`), it's the raw un-framed form and the linker will reject it. Compare against any stock `xanim_export/**/*.XANIM_BIN`.
 
 ## Reading a `.xanim_export` by hand — and why translating one changes nothing in game
 
-The text format is simple enough to inspect or patch with a script, which is worth knowing because it settles arguments that are otherwise guesswork: a header (`NUMPARTS`, then `PART <i> "<joint>"`), then one `FRAME n` block per frame listing each `PART i` with its `OFFSET x y z`, `SCALE`, and three `X`/`Y`/`Z` rotation rows.
-
-Two facts about the numbers, both **verified by inspection** on a Treyarch character rig:
-
-- **`PART 0` is `tag_origin` — the root — and `PART 1` is `j_mainroot`.** Travel is the root's, so measure `PART 0`. Measuring `j_mainroot` instead manufactures a discrepancy of a few units that does not exist, and sends you hunting a bug that was never there.
-- **`OFFSET`s are absolute in the animation's own space**, not parent-relative. So translating a whole clip really is one constant subtracted from every `OFFSET` of every `PART` on every frame.
-
-**And that translation is a no-op for playback.** It is tempting — shift an export so the body ends at `(0,0,0)`, and unlinking should leave the entity exactly where the clip finished. It does nothing: `AnimScripted` is handed the **starting** transform and the engine reads travel from the root track, so shifting the file moves start and end together and the played result is identical. When an anim lands in the wrong place the **anchor** is wrong, not the file — fix it in script with `GetStartOrigin`/`GetStartAngles` (place the entity so the clip lands where you want) or `GetMoveDelta( anim, 0, 1, ent )` (read the travel), and don't touch the export. See **bo3-scripting** for playing it and **bo3-moving-platforms** for the moving-parent case.
+The text format (`NUMPARTS`, `PART <i> "<joint>"`, then per-`FRAME` `OFFSET`/`SCALE`/rotation rows) is simple enough to inspect or patch with a script. Two facts settle most arguments: **`PART 0` is `tag_origin`** (measure travel there, not on `j_mainroot`), and **`OFFSET`s are absolute** in the anim's own space. And shifting every `OFFSET` so the clip "ends at (0,0,0)" changes nothing in game — `AnimScripted` is handed the **start** transform and reads travel from the root track, so fix a wrong landing with `GetStartOrigin` in script (**t7kb:scripting**), never in the file. Detail: **`references/xanim-export-format.md`**.
 
 ## Notetracks: add them in APE, never bake them in Maya
 
@@ -75,20 +69,20 @@ So: **export with the notetrack list cleared** (or strip the `NOTETRACKS` sectio
 
 Why that matters well beyond footsteps: **BO3 delivers an AI's melee damage from a notetrack**, not from the animation itself — `_zm_behavior::notetrackBoardMelee`, registered on `NOTETRACK_ZOMBIES_BOARD_MELEE`, is what calls `DoDamage`. An attack anim stripped of its notes therefore plays perfectly and hits nobody, and re-creating the timing in script means guessing at frames the animator already chose. Reading them back is also how you discover a swing is a **double** one: BO2's bus window attack carries `fire` at frames 16 *and* 95 of 151, so a single re-timed impact lands in the pause between the two real swings and reads as random damage. (**Verified** by parsing the shipped seanims.)
 
-Related crash, same area: an export that dies on `ValueError: No object matches name: XAnimExporterInfo.notetracks[N]` is a **CoDMayaTools bug**, not a problem with your anim — `cmds.getAttr` *raises* on a never-written element of a multi attribute, so any export slot that has never held a notetrack blows up before writing anything. The one-line patch is in **bo3-anim-retarget**.
+Related crash, same area: an export that dies on `ValueError: No object matches name: XAnimExporterInfo.notetracks[N]` is a **CoDMayaTools bug**, not a problem with your anim — `cmds.getAttr` *raises* on a never-written element of a multi attribute, so any export slot that has never held a notetrack blows up before writing anything. The one-line patch is in **t7kb:anim-retarget**.
 
 ## The APE xanim asset
 
 Create a new `xanim` asset (don't derive from a stock one) and set:
 
 - **Anim File** → the converted `.xanim_bin`.
-- **Model File** → **required.** An empty model is the `^1model was not specified` → `xanim '…' not found` link failure. Point it at the xmodel whose skeleton the anim uses (e.g. the rig it was authored on). If that model is a shipped asset it needs no GDT of its own; otherwise compile it as an xmodel first (see **bo3-assets**).
+- **Model File** → **required.** An empty model is the `^1model was not specified` → `xanim '…' not found` link failure. Point it at the xmodel whose skeleton the anim uses (e.g. the rig it was authored on). If that model is a shipped asset it needs no GDT of its own; otherwise compile it as an xmodel first (see **t7kb:assets**).
 - **Type** → `delta` for world/body/character anims, `relative` for viewmodels. When HydraX labelled the source, follow its label (`delta`/`additive`). Full list from the APE schema (`deffiles/xanim.awi`): `delta`, `delta3d`, `relative`, `absolute`, `mp_torso`, `mp_legs`, `mp_fullbody`, `additive` — where *delta* is "use for AI anims", *absolute* places everything relative to the Maya scene's (0,0,0), and *relative* relative to the parent node. See the `type` section below: for an AI anim this is not a free choice.
 - **Anim File** path is **relative to the export root that matches its extension** — a `.xanim_export`/`.xanim_bin` under `xanim_export/foo/bar.xanim_bin` is written `foo\\bar.xanim_bin` (verify the root by which one actually contains the folder: `xanim_export/sword` exists, `model_export/sword` does not).
 - **Use Bones** → checked for everything except viewmodels.
 - **Looping** → checked only for looping anims (idle/slide/sprint loops).
 
-Then add its line to the map/mod **`.zone`** (`xanim,<name>`), plus any model/scriptbundle it depends on, and **Link** (this is a script/asset change — no map recompile needed unless geometry changed). See **bo3-compiling**.
+Then add its line to the map/mod **`.zone`** (`xanim,<name>`), plus any model/scriptbundle it depends on, and **Link** (this is a script/asset change — no map recompile needed unless geometry changed). See **t7kb:compiling**.
 
 **An anim you play by string through an animtree has to be declared in three places, and each omission fails at a different stage** — which is why fixing one and re-linking looks like the fix didn't work:
 
@@ -98,7 +92,7 @@ Then add its line to the map/mod **`.zone`** (`xanim,<name>`), plus any model/sc
 | `xanim,<name>` | the `.zone` | the asset never enters the fastfile, so it is simply absent at runtime |
 | the anim's name | the `.atr` animtree, under a group | links clean, then `unable to find animation '<name>' in tree '<tree>'` when you play it |
 
-The animtree also needs its own `rawfile,animtrees/<tree>.atr` zone line — and on the script side `#using_animtree` without it kills the server silently at load (**bo3-moving-platforms**).
+The animtree also needs its own `rawfile,animtrees/<tree>.atr` zone line — and on the script side `#using_animtree` without it kills the server silently at load (**t7kb:moving-platforms**).
 
 ## `type` on an AI anim is not a free choice — and `delta3d` is the escape hatch
 
@@ -111,17 +105,15 @@ So when the converter rejects an anim with **`has bad angle delta on frame N`**,
 
 That fix is empirical, not understood. On those 10, what was *ruled out*: corrupt data (rotation matrices orthonormal to 1e-6), an Euler flip (`filterCurve -euler` changed nothing), the file format (rejected identically as `XANIM_EXPORT` and `XANIM_BIN`), and root tilt (constant at 3.35° across all 91 anims of the batch — a `tag_origin` bind offset, not motion). The only pattern was semantic: all 10 were "character detaches from the vehicle" clips. If `delta3d` is *also* refused by the selector table, that closes the loop and the real problem is the anim data.
 
-## Batch/headless export: `ExportXAnim` needs three things the GUI gives it for free
+It is less exotic than it sounds: in the stock GDTs under `xanim_export/` and `model_export/`, `ai_*` anims are `delta`/useBones 1 (665), the viewmodel GDTs' `vm_*` are `relative`/useBones 0 (plus a few movement-bob `additive`), and **33 of 46 Treyarch fxanim props are `delta3d`**.
 
-Driving CoDMayaTools from a script skips the export **button**, which is where some of the setup lives. Each omission fails differently:
+## Batch/headless export: the script path skips setup the GUI does for you
 
-- **It exports only what is SELECTED.** `GetJointList` walks the whole hierarchy but includes a joint only if `selectedObjects.hasItem(dagPath)` — so selecting just the root writes a valid file with **`NUMPARTS 1`**, no error. Select every joint (`listRelatives(group, ad=True, type="joint")`), and **assert `NUMPARTS`** against that count after writing; nothing else catches it.
-- **The progress bar is created by the button, not the window.** `ExportXAnim` does `cmds.progressBar(OBJECT_NAMES['progress'][0], edit=True, …)` and dies with `Object 'CoDMayaToolsProgressbar' not found`. Re-create it as `GeneralWindow_ExportSelected` does: a window named `"w" + <progress name>`, a `columnLayout`, then the `progressBar`.
-- **`XAnimExporterInfo` is a SCENE node.** `RefreshXAnimWindow()` creates it (a `renderLayer` holding the notetrack/path attrs). The window's controls survive a scene change; this node does not. In a loop that re-opens a template scene per anim, call `RefreshXAnimWindow()` **after every open** or every export dies on `No object matches name: XAnimExporterInfo.notetracks[1]`.
+Driving CoDMayaTools' `ExportXAnim` from a script exports only the **selection** (select every joint and assert `NUMPARTS`, or you silently get `NUMPARTS 1`), needs the progress bar and the `XAnimExporterInfo` scene node the export **button** creates (`Object 'CoDMayaToolsProgressbar' not found`, `No object matches name: XAnimExporterInfo.notetracks[1]`), and reads frame range/FPS from the window's fields. `exportxbin.exe` segfaults partway through a large batch with no non-zero exit — convert one file per call and count the outputs. Full recipe: **`references/batch-export.md`**.
 
-Set the frame range and FPS by editing the window's fields directly (`<win>_FrameStartField`, `_FrameEndField`, `_FPSField`, `_qualityField`) — `ExportXAnim` reads them, not the playback range.
+## Siege models are a different pipeline — they refuse xanims
 
-**`exportxbin.exe` breaks down in bulk.** A folder argument prints `No files processed` despite the tool's own help offering folders, and passing ~90 files in one call **segfaults partway** (48 converted, then a crash — with no non-zero exit to warn you). Convert **one file per invocation** in a loop and count the outputs; that is reliable.
+A ported `p7_fxanim_*_smod` prop (rope, cloth, debris destruction) is a **siege** model (APE's xmodel shows *Is Siege*): APE refuses an xanim on it — `This model is a siege model, you can not use it with xanims, you should use sanims.` — and requires the model be typed `rigid` even though it animates (`This is a siege model, it has to be 'rigid'.`). Its animation is a `.siege_anim_source` in a **`sanim`** asset (`animationFile` + `boneLayout` = the `_smod`; stock `model_export/t7_fxanim_zm.gdt` shows the shape), and it plays **client-side only** — a Client-script-type scene (`scriptbundle.awi`: *"it has to be Client Script Type"*), `SiegeCmd`/`animation::play_siege` from CSC, or the `misc_model` KVP `siege_anim`. No GSC can play it. (**Verified in the install**; the Maya "CoD Siege Anim Source" export path is community.)
 
 ## Error → cause quick map
 
@@ -137,6 +129,7 @@ Set the frame range and FPS by editing the window's fields directly (`<win>_Fram
 - `Object 'CoDMayaToolsProgressbar' not found` / `No object matches name: XAnimExporterInfo.notetracks[1]` → **scripted** export without the button's setup; see the batch section.
 - `xanim asset '<name>' has no XANIM_BIN file specified` (linker exit `4001000`) → zoned but **not declared in the GDT**; three declarations are needed, see the APE section.
 - `unable to find animation '<name>' in tree '<tree>'` → the anim is built and zoned but **not listed in the `.atr`**.
+- `This model is a siege model, you can not use it with xanims` → a `_smod` prop: author a **`sanim`**, play it client-side (siege section).
 - Right pose, wrong **place** → the **anchor** passed to `AnimScripted`, never the export. Editing the file cannot fix it.
 
 ## Don't invent
