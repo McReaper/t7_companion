@@ -10,12 +10,12 @@ The go-to companion for working with AI agents on **Black Ops 3 modding** — it
 ```mermaid
 flowchart LR
     S["T7 skills · plugin<br/>grounded BO3 modding skills"] -. guide .-> A
-    A([AI agent]) -- query --> B["t7kb · MCP server"]
+    A([AI agent]) -- "search · get · build" --> B["t7kb · MCP server"]
     B -- "BM25 + vector" --> C[("t7kb.db")]
     C -- hits --> B
-    B -- "ranked, cited results" --> A
-    A -- "build" --> T["BO3 mod tools<br/>gdtdb · cod2map · light · linker"]
-    T -- "per-stage summary + first error" --> A
+    B -- "drives headlessly" --> T["BO3 mod tools<br/>gdtdb · cod2map · light · linker"]
+    T -- "tool output" --> B
+    B -- "cited results · per-stage build report" --> A
 ```
 
 > [!NOTE]
