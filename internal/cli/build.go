@@ -28,16 +28,17 @@ import (
 // exit code.
 
 type buildOpts struct {
-	toolsPath string
-	gamePath  string
-	isMod     bool
-	stages    string
-	onlyEnts  bool
-	light     string
-	language  string
-	skipGDT   bool
-	jsonOut   bool
-	verbose   bool
+	toolsPath  string
+	gamePath   string
+	isMod      bool
+	stages     string
+	onlyEnts   bool
+	light      string
+	language   string
+	skipGDT    bool
+	gdtRebuild bool
+	jsonOut    bool
+	verbose    bool
 }
 
 type stageResult struct {
@@ -80,6 +81,7 @@ func newBuildCmd() *cobra.Command {
 	f.StringVar(&o.light, "light", "medium", "light quality: low|medium|high")
 	f.StringVar(&o.language, "language", "english", "linker language")
 	f.BoolVar(&o.skipGDT, "skip-gdt", false, "skip the gdtdb /update pass before building")
+	f.BoolVar(&o.gdtRebuild, "gdt-rebuild", false, "run gdtdb /rebuild instead of /update (needed after hand-editing a GDT)")
 	f.BoolVar(&o.jsonOut, "json", false, "emit the report as JSON")
 	f.BoolVar(&o.verbose, "verbose", false, "stream each tool's full output as it runs")
 	return cmd
@@ -150,7 +152,11 @@ func runBuildReport(o *buildOpts, name string, stdout io.Writer) (buildReport, e
 		gdtdb := filepath.Join(gdtdbDir, "gdtdb.exe")
 		// Run gdtdb from its OWN directory, like the stock Launcher: it ties recorded asset paths to
 		// its cwd, so a different cwd makes a Launcher-built db flag every asset as a phantom duplicate.
-		if !run(runStage("gdt", gdtdbDir, gdtdb, 5*time.Minute, o.verbose, stdout, "/update")) {
+		gdtArg := "/update"
+		if o.gdtRebuild {
+			gdtArg = "/rebuild" // /update doesn't notice GDTs edited outside APE
+		}
+		if !run(runStage("gdt", gdtdbDir, gdtdb, 10*time.Minute, o.verbose, stdout, gdtArg)) {
 			return rep, nil
 		}
 	}

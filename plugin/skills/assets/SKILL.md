@@ -1,6 +1,6 @@
 ---
 name: assets
-description: How to port a model, material/texture, or rig into Black Ops 3 and hand-author or compile its GDT — picking a ripper per source game (Saluki, Greyhound, Kobra, Cordycep), bridging `_export`/`_bin`, APE material fields (`normalHeightScale`, `colorMap00` emissive, `nocull`, `SurfaceType`), and collision (`CollisionMap`, `scaleCollMap`). Use when a rip's normal map bands per-panel, an emissive part won't glow, a ported model has zero collision, a hand-edited GDT still reports assets missing (`gdtdb /rebuild` vs `/update`), APE throws `doesn't expose a 'colorMap' texture` / `Duplicate 'material' asset` / a LOD bounding-box mismatch, or `exportxbin` aborts with `Failed to decompress binary file`. Distinct from t7kb:animation (the DCC→`.xanim_bin` compile pipeline) and t7kb:anim-retarget (cross-generation Maya HumanIK retargeting) — both assume this pipeline already got the model/rig in. Also distinct from t7kb:crossref (another title's script dumps as reference, not the port itself).
+description: How to port a model, material or rig into Black Ops 3 and author its GDT (by hand or via gdt_edit) — picking a ripper per source game (Saluki, Kobra, Cordycep), bridging `_export`/`_bin`, APE material fields (`normalHeightScale`, `colorMap00` emissive, `nocull`, `SurfaceType`), and collision (`CollisionMap`, `scaleCollMap`). Use when a rip's normal map bands per-panel, an emissive part won't glow, a ported model has zero collision, a GDT edit leaves every asset missing (`gdtdb /rebuild`), a new material fails with `failed to open source file` on a `techsetdef_*.hlsl`, APE throws `doesn't expose a 'colorMap' texture` / `Duplicate 'material' asset` / a LOD bounding-box mismatch, or `exportxbin` aborts with `Failed to decompress binary file`. Distinct from t7kb:animation (the DCC→`.xanim_bin` compile pipeline) and t7kb:anim-retarget (cross-generation Maya HumanIK retargeting) — both assume the model/rig is already in — and t7kb:crossref (another title's source as reference).
 ---
 
 # Assets: models, materials, and porting
@@ -58,6 +58,8 @@ Scene/cinematic, vehicle, killstreak, and collectible data lives in **script bun
 
 ## Hand-authoring a GDT entry: copy a working one, then scrub what you didn't mean to inherit
 
+**Over MCP, use the `gdt_*` tools instead of editing the text:** `t7kb:gdt_find` (where an asset is defined, duplicates, stock or not), `t7kb:gdt_get` (fields, inherited ones included), `t7kb:gdt_schema` (what APE declares for a type, read from its `deffiles/*.awi`; for a material, the texture slots and category its techset really has), and `t7kb:gdt_edit` — which copies a donor with its LOD paths cleared, escapes backslashes, refuses stock GDTs and duplicate names, and validates ranges, combo values, `materialType`/`materialCategory` agreement and image semantics before writing (dry run by default). The traps below are what it guards against, and still apply by hand.
+
 A GDT is plain text, so you can write entries directly instead of clicking through APE — same result, and it versions. The reliable method is to **copy an existing entry of the same asset type and substitute**, because an xmodel entry alone carries ~70 fields and a `zbarrier` ~140; hand-listing them invites a missing-field failure. But a copied entry drags the donor's asset paths with it, and the resulting errors point at the *donor*, which is confusing until you know to look. All four of these were hit in one sitting porting a BO2 vehicle, in this order:
 
 - **Backslashes in `filename` must be doubled.** `"filename" "folder\\model\\model_lod0.xmodel_bin"` — with single backslashes the GDT parser eats them as escape sequences and the linker reports a path with the separators simply gone (`folderModelmodel_lod0...`), which reads like a string-concatenation bug rather than an escaping one.
@@ -69,15 +71,25 @@ A GDT is plain text, so you can write entries directly instead of clicking throu
 
 `export2bin.exe path/to/model.xmodel_export` fails with `ERROR: Failed to read file .\model.xmodel_export` — note the `.\`. It ignores the directory you gave it. **Run it with the working directory set to the model's own folder** and pass the bare filename. It writes `.XMODEL_BIN` in caps; rename to lowercase to match the `model_export/` convention. (Same class of cwd sensitivity as `cod2map64` needing to run from `bin/` — see **t7kb:compiling**.)
 
-## After hand-editing a GDT, `gdtdb /update` does not see it — you need `/rebuild`
+## After editing a GDT, index it from `gdtdb`'s own folder — and know what "everything missing" means
 
-The most expensive trap in this whole area, because the symptom is wildly misleading. Edit a GDT by hand, run the normal pipeline, and the linker reports **every asset in the game as missing** — `skybox_default_day`, `luts_t7_default`, the stock zombie spawner, things you never touched — while `gdtdb.exe /update` cheerfully prints `processed (0 GDTs) (0 assets)`. It looks like you corrupted the database. You didn't: the incremental pass just doesn't notice hand-written files.
+**Verified:** a GDT written outside APE is picked up by the normal pass — `gdtdb /update`, run from the `gdtdb/` folder, reported `processed (1 GDTs) (1 assets)` for a freshly written file, and the asset then linked. So a plain rebuild (the build tool's default `gdtdb /update`) is the first thing to try.
+
+The expensive failure is different and wildly misleading: the linker reports **every asset in the game as missing** — `skybox_default_day`, `luts_t7_default`, things you never touched — while `gdtdb /update` prints `processed (0 GDTs) (0 assets)`. It looks like a corrupted database. Recovery is a full re-index:
 
 ```
-gdtdb.exe /rebuild        # processed (3004 GDTs) (260203 assets)
+gdtdb.exe /rebuild        # processed (3004 GDTs) (260203 assets) — ~60-90s
 ```
 
-Budget ~60-90s and run it after **every** manual GDT edit. And under git-bash, MSYS rewrites `/rebuild` into a filesystem path so the tool silently prints its usage instead of running — prefix with `MSYS2_ARG_CONV_EXCL="*"` (same MSYS argument-mangling as the `/update` and `+medium` flags in **t7kb:compiling**).
+(the build tool's `gdt_rebuild=true`). The likely cause is **where** `gdtdb` ran rather than the hand edit: it records asset paths relative to its working directory, so run it from `gdtdb/` exactly as the Launcher does (**t7kb:compiling**) — and under git-bash, MSYS rewrites `/rebuild`/`/update` into filesystem paths so the tool silently prints its usage; prefix with `MSYS2_ARG_CONV_EXCL="*"` or use PowerShell.
+
+## A material is built through what uses it — never zone it on its own
+
+**Verified on a real link:** a new `lit` material added to a zone as a bare `material,<name>` line fails with `error X1507: failed to open source file: 'techsetdef_buildshadowmap.hlsl'` → `lit#da7372ff.build shadowmap depth: GetDrawMethod(build shadowmap depth) Failed` → `One or more shaders failed to compile`. It looks like a broken install or a broken GDT; it is neither.
+
+The linker never compiles Treyarch's shaders from source (the mod tools don't ship it): it looks each techset variant up in the compiled cache under `share/assetconvert/shaders/pc/v7`. A material used by an **xmodel** is built as `mc/<name>` and one used by **map geometry** as `wc/<name>` (the prefixes a techset lists in `availablePrefixes`) — those variants are cached. A bare zone line asks for the unprefixed variant, which nothing ships precompiled, so the linker tries to compile it and fails. Your `<map>.csv` shows the real name: `techset,mc/lit_alphatest_nocull#e6142445` under `mc/<your_material>`.
+
+So zone the **model** (or place the material on brushes) and let it pull the material in; don't add `material,<name>` for a model material. (Zoning `material,mc/<name>` directly is not a shortcut either — on one test the linker hung with no output.)
 
 ## Material settings a rip gets wrong, and how to tell
 
@@ -90,29 +102,13 @@ Porting a model's *materials* is where a rip stops looking like the original. Th
 - **`baseImage` is relative to the install root**, so it includes the `texture_assets\\` prefix — not relative to `texture_assets/` itself.
 - **Old-title `SurfaceType` values don't transliterate.** `PAINTED_METAL` → `paintedmetal` (no underscore), and `default` → `<none>`, else the linker aborts with `surfaceTypeName 'default' not in surfaceTypeParms array`.
 
-## Emissive lives in `colorMap00`, and the slot names are traps
+## Emissive, double-sided and packed alpha each look like a different bug
 
-A glowing part (screens, eyes, indicator lights) needs a **`lit_emissive*`** material type — there are ~59 of them, so pick the one that also carries whatever else the material needs (`lit_emissive_plus` when you also want gloss, `lit_emissive_advanced_fullspec`, `lit_emissive_transparent`, …).
+- **Emissive goes in `colorMap00`** of a `lit_emissive*` material type — a name that says nothing about emission, so searching for slots by name concludes, wrongly, that BO3 has none; an older title's `_e` map ports straight across.
+- **Double-sided is a `nocull` material type** (`lit_nocull`, …), not `doubleSidedLighting`, which only changes how backfaces are lit.
+- **An alpha channel's percentage tells you nothing** — a packed gloss mask and a real cutout measure the same; alpha-testing the mask punches black speckles. Map the alpha spatially instead.
 
-The emissive map goes in **`colorMap00`**. Nothing in that name says "emissive", and it does **not** turn up if you look for slots by grepping field names ending in *map* — which is how you end up concluding, wrongly, that BO3 has no emissive slot and that the emission has to be composited into the diffuse alpha. **870 of 1362** shipped emissive materials fill it: `mtl_char_ger_zombie_eyes` sets `colorMap00 = zombie_eye`, `mtl_p7_pro_monitor_control_tower` sets it to an `_e` texture. So an older title's separate `_e` map ports **straight across**, no channel packing.
-
-Its image asset is `sRGB3chAlpha` / `diffuseMap` like a diffuse, but **`compressionMethod` = `compressed no alpha`**.
-
-Two neighbours named no better: **gloss is `cosinePowerMap`** (image side `Linear1ch` / `glossMap`; only the `_plus` / `_advanced` categories expose it) and **AO is `occMap`**.
-
-`emissiveFalloff` and `emissiveIncompetence` (APE labels the latter *gameplay intensity*) tune the result — and do **not** copy them from a donor. Across the shipped emissive materials `emissiveIncompetence` splits **681 / 680** between `0` and `1`: a genuine per-material choice, not a default with outliers. Same discipline as `SurfaceType` above — check the *distribution* before copying a value, because where it is 50/50 the donor tells you nothing.
-
-## Double-sided: `nocull` is a material type, not a flag
-
-A model whose backfaces don't render is fixed by a **`nocull` material type** — `lit_nocull`, `lit_alphatest_nocull`, `lit_transparent_nocull`, `lit_detail_nocull` and `_advanced`/`_plus` variants all ship. `doubleSidedLighting` is *not* it: that controls how backfaces are **lit**, not whether they're drawn, and setting it changes nothing visible.
-
-Worth checking the geometry first so you know which problem you have: if every face of the material has a unique position triple (no duplicated triangles with reversed winding), the mesh is genuinely single-sided and only `nocull` can save it. Duplicating the faces in the export also works but doubles the triangles and is not reversible from the GDT.
-
-## An alpha channel's *percentage* tells you nothing — its distribution does
-
-Ripped diffuse maps frequently carry a packed gloss/spec mask in alpha, and a real alpha cutout looks identical if you only measure "what fraction of pixels are non-opaque". Alpha-testing a packed mask punches **black speckles** through the surface, which reads as a corrupt texture.
-
-Map the alpha spatially instead — a coarse grid of "percent of pixels below threshold" per cell. A genuine cutout is a **compact, sharp-edged region**; a packed mask is scattered noise across the whole sheet. One bus material showed a solid rectangular transparent block over half the texture (real vents), another only 2-3% scattered (gloss mask), and the naming confirmed both — Treyarch shipped a `_opq` twin of the vented material.
+Evidence, the slot names around them (`cosinePowerMap`, `occMap`), and how to check each: **`references/material-traps.md`**.
 
 ## A failed link isn't always a failed link
 

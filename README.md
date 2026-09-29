@@ -97,7 +97,11 @@ It returns a short per-stage report (status, duration, first actionable error) i
 | `onlyents` | Fast entity-only compile — invalid after brush edits |
 
 > [!NOTE]
-> Windows only; needs the BO3 Mod Tools installed (`TA_TOOLS_PATH`/`TA_GAME_PATH`, set by the Launcher on first run). `build` is the only tool on the server that changes anything on disk. For a debug run, launch the game with `+set developer 2 +set logfile 2` yourself — a headless run doesn't inherit the Launcher's dvars.
+> Windows only; needs the BO3 Mod Tools installed (`TA_TOOLS_PATH`/`TA_GAME_PATH`, set by the Launcher on first run). `build` and `gdt_edit` are the only tools on the server that change anything on disk. For a debug run, launch the game with `+set developer 2 +set logfile 2` yourself — a headless run doesn't inherit the Launcher's dvars.
+
+### GDT editing it can check
+
+APE's asset databases are plain-text GDTs, and the `gdt_*` MCP tools let the agent work on them directly — with the install's own rules as the schema. `gdt_schema` reads what APE declares for an asset type from its `deffiles/*.awi` (field kinds, ranges, choices, defaults) and, for a material, which texture slots and category its techset really has. `gdt_find` / `gdt_get` locate an asset across every GDT the tools index and show its fields, inherited ones included. `gdt_edit` creates or changes an asset — copying a donor with its LOD paths cleared, escaping paths, refusing stock GDTs and duplicate names, and catching out-of-range values, unknown choices, a `materialType` that doesn't match `materialCategory`, or an image with the wrong semantic — **as a dry run unless told to write**. Then `build` indexes and links it.
 
 ## ⌨️ CLI
 
@@ -107,7 +111,8 @@ The same binary works from a terminal:
 t7kb                         interactive browse: type a query, pick a hit, read it
 t7kb search <query>...       hybrid search  (--bm25 keyword-only · -n N results · --scores)
 t7kb get <doc_id>            print a full document
-t7kb build <name>            compile/light/link  (--stages · --light · --mod · --onlyents · --json)
+t7kb build <name>            compile/light/link  (--stages · --light · --mod · --onlyents · --gdt-rebuild · --json)
+t7kb gdt find|get|schema|edit   GDT lookup, schema and validated edits  (edit is a dry run unless --write)
 t7kb mcp                     run the stdio MCP server
 t7kb update-check            is a newer release out?
 ```
