@@ -44,6 +44,10 @@ func runMCP() error {
 	s.AddTool(searchToolDef(), searchToolHandler(st, emb))
 	s.AddTool(getToolDef(), getToolHandler(st))
 	s.AddTool(buildToolDef(), buildToolHandler())
+	s.AddTools(gdtToolDefs()...)
+	if w, err := workspace(""); err == nil {
+		w.Warm() // index GDT assets in the background, like gdtdb does for APE
+	}
 	return server.ServeStdio(s)
 }
 
@@ -151,6 +155,8 @@ func buildToolDef() mcp.Tool {
 			mcp.Description("Linker language (default \"english\").")),
 		mcp.WithBoolean("skip_gdt",
 			mcp.Description("Skip the gdtdb /update pass before building (default false).")),
+		mcp.WithBoolean("gdt_rebuild",
+			mcp.Description("Run gdtdb /rebuild instead of /update — required after a GDT was edited outside APE (e.g. with gdt_edit), which /update does not notice (default false).")),
 		mcp.WithString("tools_path",
 			mcp.Description("BO3 mod-tools root (default $TA_TOOLS_PATH).")),
 		mcp.WithString("game_path",
@@ -165,14 +171,15 @@ func buildToolHandler() server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 		o := &buildOpts{
-			toolsPath: req.GetString("tools_path", ""),
-			gamePath:  req.GetString("game_path", ""),
-			isMod:     req.GetBool("mod", false),
-			stages:    req.GetString("stages", "compile,light,link"),
-			onlyEnts:  req.GetBool("onlyents", false),
-			light:     req.GetString("light", "medium"),
-			language:  req.GetString("language", "english"),
-			skipGDT:   req.GetBool("skip_gdt", false),
+			toolsPath:  req.GetString("tools_path", ""),
+			gamePath:   req.GetString("game_path", ""),
+			isMod:      req.GetBool("mod", false),
+			stages:     req.GetString("stages", "compile,light,link"),
+			onlyEnts:   req.GetBool("onlyents", false),
+			light:      req.GetString("light", "medium"),
+			language:   req.GetString("language", "english"),
+			skipGDT:    req.GetBool("skip_gdt", false),
+			gdtRebuild: req.GetBool("gdt_rebuild", false),
 		}
 		rep, err := runBuildReport(o, name, io.Discard)
 		if err != nil {
