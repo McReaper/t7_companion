@@ -1,0 +1,54 @@
+name: ci
+
+# Build, lint and test the Go tool on every PR and push to main. Pure Go, no cgo:
+# the Windows binary is cross-compiled here exactly as the release does.
+on:
+  pull_request:
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "0"
+      HF_HOME: ${{ github.workspace }}/.hf # the embedding model TestHybridSearch loads
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Cache the embedding model
+        uses: actions/cache@v4
+        with:
+          path: .hf
+          key: hf-all-MiniLM-L6-v2
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l cmd internal)
+          if [ -n "$unformatted" ]; then echo "not gofmt-formatted:"; echo "$unformatted"; exit 1; fi
+      - name: go vet
+        run: go vet ./...
+      - name: staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./...
+      - name: build
+        run: go build ./...
+      - name: cross-compile (release targets)
+        run: |
+          GOOS=windows GOARCH=amd64 go build -o /dev/null ./cmd/t7kb
+          GOOS=linux GOARCH=amd64 go build -o /dev/null ./cmd/t7kb
+      - name: test
+        run: go test ./...
