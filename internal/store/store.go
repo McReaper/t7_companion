@@ -28,9 +28,9 @@ type Store struct {
 
 // Hit is one fused search result.
 type Hit struct {
-	DocID   string
-	Title   string
-	Source  string
+	DocID       string
+	Title       string
+	Source      string
 	Score       float64 // fused RRF score (higher = better)
 	Reliability float64
 	Snippet     string

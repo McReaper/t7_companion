@@ -74,7 +74,7 @@ func TestStripColor(t *testing.T) {
 func TestExtractErrors(t *testing.T) {
 	in := strings.Join([]string{
 		"just noise",
-		"^1ERROR: bad thing^7",       // color codes stripped
+		"^1ERROR: bad thing^7", // color codes stripped
 		"UNRECOVERABLE ERROR: boom",
 		"unresolved external symbol foo",
 		"ERROR: bad thing", // duplicate of the stripped line above — deduped
