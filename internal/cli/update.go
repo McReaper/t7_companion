@@ -10,7 +10,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const releaseAPIURL = "https://api.github.com/repos/McReaper/t7_companion/releases/latest"
+// releaseAPIURL is a var so tests can point it at a local server.
+var releaseAPIURL = "https://api.github.com/repos/McReaper/t7_companion/releases/latest"
 
 type githubRelease struct {
 	TagName string `json:"tag_name"`
