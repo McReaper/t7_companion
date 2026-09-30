@@ -40,7 +40,8 @@ func runMCP() error {
 		return err
 	}
 
-	s := server.NewMCPServer("t7kb", Version(), server.WithToolCapabilities(false))
+	s := server.NewMCPServer("t7kb", Version(), server.WithToolCapabilities(false),
+		server.WithRecovery()) // a panicking handler must not take the whole stdio server down
 	s.AddTool(searchToolDef(), searchToolHandler(st, emb))
 	s.AddTool(getToolDef(), getToolHandler(st))
 	s.AddTool(buildToolDef(), buildToolHandler())

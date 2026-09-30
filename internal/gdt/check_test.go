@@ -109,14 +109,14 @@ func TestCheckFindsBrokenReferences(t *testing.T) {
 
 func TestReferencedBy(t *testing.T) {
 	w := fixture(t)
-	hits, err := w.ReferencedBy("mine_base")
+	hits, _, err := w.ReferencedBy("mine_base")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(hits) != 1 || hits[0].Asset != "child_mtl" || hits[0].Field != "[parent]" {
 		t.Fatalf("parent reference: %+v", hits)
 	}
-	hits, _ = w.ReferencedBy("my_img")
+	hits, _, _ = w.ReferencedBy("my_img")
 	if len(hits) != 1 || hits[0].Asset != "child_mtl" || hits[0].Field != "colorMap" || hits[0].File != "source_data/mine.gdt" {
 		t.Fatalf("field reference: %+v", hits)
 	}

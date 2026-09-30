@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 )
 
 // Techset is what a material type's techsetdef exposes: the GDT fields it reads,
@@ -56,8 +57,9 @@ func (t *Techset) ExposedFields() map[string]bool {
 
 // Techsets indexes the techsetdef tree (share/raw/techsetdefs_stable).
 type Techsets struct {
-	root   string
-	byName map[string]string // basename without extension -> path
+	root     string
+	byName   map[string]string // basename without extension -> path
+	resolved sync.Map          // material type -> *Techset (shared: callers must not modify it)
 }
 
 // OpenTechsets indexes every *.techsetdef under root.
@@ -109,8 +111,21 @@ var (
 	sourceRE  = regexp.MustCompile(`source\s*=\s*"([^"]+)"`)
 )
 
-// Resolve loads a material type's techsetdef and everything it #includes.
+// Resolve loads a material type's techsetdef and everything it #includes. The
+// result is cached and shared: copy it before changing it.
 func (t *Techsets) Resolve(materialType string) (*Techset, error) {
+	if v, ok := t.resolved.Load(materialType); ok {
+		return v.(*Techset), nil
+	}
+	ts, err := t.resolve(materialType)
+	if err != nil {
+		return nil, err
+	}
+	t.resolved.Store(materialType, ts)
+	return ts, nil
+}
+
+func (t *Techsets) resolve(materialType string) (*Techset, error) {
 	if !t.Exists(materialType) {
 		return nil, fmt.Errorf("no techsetdef for material type %q", materialType)
 	}

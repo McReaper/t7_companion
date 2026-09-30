@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -35,9 +36,11 @@ func workspace(toolsPath string) (*gdt.Workspace, error) {
 	if root == "" {
 		return nil, fmt.Errorf("no mod-tools path: pass tools_path / --tools-path or set TA_TOOLS_PATH")
 	}
+	root = filepath.Clean(root)
+	key := strings.ToLower(root) // C:\x and c:/x are one install
 	wsMu.Lock()
 	defer wsMu.Unlock()
-	if w, ok := wsCache[root]; ok {
+	if w, ok := wsCache[key]; ok {
 		return w, nil
 	}
 	if _, err := os.Stat(root + "/deffiles"); err != nil {
@@ -47,7 +50,7 @@ func workspace(toolsPath string) (*gdt.Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	wsCache[root] = w
+	wsCache[key] = w
 	return w, nil
 }
 
@@ -116,7 +119,10 @@ func gdtGet(w *gdt.Workspace, name, file string, filter string, all bool) (any, 
 	if err != nil {
 		return nil, err
 	}
-	a := f.Find(name)
+	a := f.AtLine(loc.Line)
+	if a == nil || a.Name != name {
+		return nil, fmt.Errorf("%s changed since it was indexed (%q is no longer at line %d) — retry", loc.File, name, loc.Line)
+	}
 	typ, fields, err := w.Resolved(f, a)
 	if err != nil {
 		return nil, err
@@ -187,10 +193,13 @@ func gdtSchema(w *gdt.Workspace, typ, materialType, filter string) (any, error) 
 	var ts *gdt.Techset
 	if typ == "material" && materialType != "" {
 		var err error
-		if ts, err = w.Techsets.Resolve(materialType); err != nil {
+		shared, err := w.Techsets.Resolve(materialType)
+		if err != nil {
 			return nil, err
 		}
-		ts.File = w.Rel(ts.File)
+		cp := *shared // Resolve's result is cached and shared
+		cp.File = w.Rel(cp.File)
+		ts = &cp
 	}
 	switch {
 	case filter != "":
@@ -270,24 +279,52 @@ type gdtImageArg struct {
 	Field        string `json:"field"`
 }
 
-func (it gdtEditItem) request(file string) gdt.EditRequest {
+// request converts JSON values the way a GDT stores them: strings as they are,
+// numbers without exponent, booleans as 1/0 (checkboxes), null as "unset".
+func (it gdtEditItem) request(file string) (gdt.EditRequest, error) {
 	set := map[string]string{}
+	unset := append([]string(nil), it.Unset...)
 	for k, v := range it.Set {
-		set[k] = fmt.Sprint(v)
+		switch x := v.(type) {
+		case nil:
+			unset = append(unset, k)
+		case string:
+			set[k] = x
+		case bool:
+			set[k] = map[bool]string{true: "1", false: "0"}[x]
+		case float64:
+			set[k] = strconv.FormatFloat(x, 'f', -1, 64)
+		default:
+			return gdt.EditRequest{}, fmt.Errorf("set.%s: want a string, number, boolean or null, got %T", k, v)
+		}
 	}
-	r := gdt.EditRequest{File: file, Asset: it.Asset, Type: it.Type, Parent: it.Parent, CopyFrom: it.CopyFrom, Set: set, Unset: it.Unset}
-	if it.Image != nil {
+	r := gdt.EditRequest{File: file, Asset: it.Asset, Type: it.Type, Parent: it.Parent, CopyFrom: it.CopyFrom, Set: set, Unset: unset}
+	if it.Image != nil && *it.Image != (gdtImageArg{}) { // an empty image {} means no image, as on the CLI
 		r.Image = &gdt.ImageSpec{Texture: it.Image.Texture, Semantic: it.Image.Semantic, MaterialType: it.Image.MaterialType, Field: it.Image.Field}
 	}
-	return r
+	return r, nil
 }
 
 func gdtEditBatch(w *gdt.Workspace, file string, items []gdtEditItem, dryRun bool) (any, error) {
 	reqs := make([]gdt.EditRequest, len(items))
 	for i, it := range items {
-		reqs[i] = it.request(file)
+		r, err := it.request(file)
+		if err != nil {
+			return nil, fmt.Errorf("assets[%d] (%s): %w", i, it.Asset, err)
+		}
+		reqs[i] = r
 	}
 	return w.EditBatch(file, reqs, dryRun)
+}
+
+// gdtEditArgs is gdt_edit's whole argument object: one asset's fields plus the
+// call's own parameters, decoded strictly so a typo (copyFrom) is an error.
+type gdtEditArgs struct {
+	gdtEditItem
+	File      string            `json:"file"`
+	Write     bool              `json:"write"`
+	ToolsPath string            `json:"tools_path"`
+	Assets    []json.RawMessage `json:"assets"`
 }
 
 func gdtCheck(w *gdt.Workspace, file, asset string) (any, error) {
@@ -333,12 +370,15 @@ func gdtCheck(w *gdt.Workspace, file, asset string) (any, error) {
 const checkLimit = 25
 
 func gdtRefs(w *gdt.Workspace, name string) (any, error) {
-	hits, err := w.ReferencedBy(name)
+	hits, unreadable, err := w.ReferencedBy(name)
 	if err != nil {
 		return nil, err
 	}
 	out := map[string]any{"asset": name, "referenced_by": hits, "count": len(hits),
 		"note": "GDT fields and derived assets only — material names baked into .xmodel_bin exports and zone/script mentions are not searched"}
+	if len(unreadable) > 0 {
+		out["unreadable_gdts"] = unreadable // not searched: a reference there would be missed
+	}
 	if len(hits) > refsLimit {
 		out["referenced_by"] = hits[:refsLimit]
 		out["truncated"] = fmt.Sprintf("showing %d of %d", refsLimit, len(hits))
@@ -349,13 +389,20 @@ func gdtRefs(w *gdt.Workspace, name string) (any, error) {
 // refsLimit caps gdt_refs' list: a stock image can be used by hundreds of materials.
 const refsLimit = 50
 
-// decodeArg re-marshals a loosely typed MCP argument into a Go value.
+// decodeArg re-marshals a loosely typed MCP argument into a Go value, rejecting
+// unknown keys.
 func decodeArg(v any, into any) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(b, into)
+	return decodeStrict(b, into)
+}
+
+func decodeStrict(b []byte, into any) error {
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.DisallowUnknownFields()
+	return dec.Decode(into)
 }
 
 // ---- MCP
@@ -393,12 +440,12 @@ func gdtToolDefs() []server.ServerTool {
 		{Tool: mcp.NewTool("gdt_edit",
 			mcp.WithDescription("Create or update assets in a GDT, validated against the deffile schema and (for materials) the "+
 				"techset: numeric ranges, combo values, checkboxes, color/vector shapes, unknown keys, materialType/materialCategory "+
-				"agreement, texture fields the techset doesn't read, image semantic mismatches, missing source files, duplicate names. "+
+				"agreement, texture fields the techset doesn't read, image semantic mismatches, missing source files, a second asset of the same type and name. "+
 				"One asset via asset/type/parent/copy_from/image/set/unset, or several at once via assets (applied in order, so a "+
 				"later item can derive from or reference an earlier one; written all-or-nothing). image creates an image asset from "+
 				"a texture, with the semantic taken from the techset slot it fills and the other settings from a stock image of that "+
 				"semantic. DRY RUN BY DEFAULT — returns the changes and issues; pass write=true to save (atomic, with a .bak, other "+
-				"assets left byte-identical). Refuses stock Treyarch GDTs: copy_from the stock asset into your own GDT instead — parent only works within one GDT."),
+				"assets left byte-identical; refused if the file changed on disk meanwhile). Only GDTs under gdtdb's directories. Refuses stock Treyarch GDTs: copy_from the stock asset into your own GDT instead — parent only works within one GDT."),
 			mcp.WithString("file", mcp.Required(), mcp.Description("GDT path relative to the root, e.g. \"source_data/my_map.gdt\" (created if missing).")),
 			mcp.WithString("asset", mcp.Description("Asset name (single-asset form).")),
 			mcp.WithString("type", mcp.Description("Create a full asset of this type (material, xmodel, image, …).")),
@@ -413,24 +460,27 @@ func gdtToolDefs() []server.ServerTool {
 				"same meaning as the single-asset parameters (which are then ignored)."), mcp.Items(map[string]any{"type": "object"})),
 			mcp.WithBoolean("write", mcp.Description("Actually save (default false = dry run).")), tp),
 			Handler: gdtHandler(func(w *gdt.Workspace, r mcp.CallToolRequest) (any, error) {
-				args := r.GetArguments()
-				file, dry := r.GetString("file", ""), !r.GetBool("write", false)
-				if raw, ok := args["assets"]; ok && raw != nil {
-					var items []gdtEditItem
-					if err := decodeArg(raw, &items); err != nil {
-						return nil, fmt.Errorf("assets: %w", err)
-					}
-					return gdtEditBatch(w, file, items, dry)
-				}
-				var it gdtEditItem
-				if err := decodeArg(args, &it); err != nil {
+				var args gdtEditArgs
+				if err := decodeArg(r.GetArguments(), &args); err != nil {
 					return nil, err
 				}
-				if it.Asset == "" {
+				if len(args.Assets) > 0 {
+					items := make([]gdtEditItem, len(args.Assets))
+					for i, raw := range args.Assets {
+						if err := decodeStrict(raw, &items[i]); err != nil {
+							return nil, fmt.Errorf("assets[%d]: %w", i, err)
+						}
+					}
+					return gdtEditBatch(w, args.File, items, !args.Write)
+				}
+				if args.Asset == "" {
 					return nil, fmt.Errorf("pass asset (one asset) or assets (a batch)")
 				}
-				req := it.request(file)
-				req.DryRun = dry
+				req, err := args.request(args.File)
+				if err != nil {
+					return nil, err
+				}
+				req.DryRun = !args.Write
 				return gdtEdit(w, req)
 			})},
 		{Tool: mcp.NewTool("gdt_check",
@@ -552,7 +602,7 @@ func newGDTCmd() *cobra.Command {
 					return err
 				}
 				var items []gdtEditItem
-				if err := json.Unmarshal(b, &items); err != nil {
+				if err := decodeStrict(b, &items); err != nil {
 					return fmt.Errorf("--batch: %w", err)
 				}
 				return run(c.OutOrStdout(), func(w *gdt.Workspace) (any, error) { return gdtEditBatch(w, er.File, items, !write) })
