@@ -2,6 +2,7 @@ package gdt
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -168,14 +169,24 @@ func (w *Workspace) Find(name string) ([]Location, error) {
 	return out, nil
 }
 
-// TypeOf is a definition's asset type, following a derived asset's parent chain.
+// TypeOf is a definition's asset type, following a derived asset's parent chain
+// within its own GDT (where a parent has to be).
 func (w *Workspace) TypeOf(l Location) string {
 	for depth := 0; l.Type == "" && l.Parent != "" && depth < 16; depth++ {
 		locs, err := w.Find(l.Parent)
-		if err != nil || len(locs) == 0 {
+		if err != nil {
 			return ""
 		}
-		l = locs[0]
+		next := l
+		for _, p := range locs {
+			if p.File == l.File {
+				next = p
+			}
+		}
+		if next == l {
+			return ""
+		}
+		l = next
 	}
 	return l.Type
 }
@@ -261,26 +272,24 @@ func (w *Workspace) Abs(file string) string {
 }
 
 // Resolved returns an asset's effective type and fields, walking the derivation
-// chain ("child" [ "parent" ]) so inherited values are visible; own fields win.
-func (w *Workspace) Resolved(a *Asset) (string, []Field, error) {
-	var chain []*Asset
-	seen := map[string]bool{}
-	cur := a
-	for cur != nil && cur.Parent != "" && !seen[cur.Name] {
-		seen[cur.Name] = true
-		chain = append(chain, cur)
-		locs, err := w.Find(cur.Parent)
-		if err != nil || len(locs) == 0 {
+// chain ("child" [ "parent" ]) inside f; own fields win. A derived asset's parent
+// must be in the same GDT — gdtdb rejects it otherwise (`GDT ParseError: … Parent
+// Entity '<name>' does not exist in GDT`), and all 16,972 derived assets of a
+// stock install follow that. A parent missing from f leaves the type unknown.
+func (w *Workspace) Resolved(f *File, a *Asset) (string, []Field, error) {
+	chain := []*Asset{a}
+	seen := map[string]bool{a.Name: true}
+	for cur := a; cur.Parent != ""; {
+		p := f.Find(cur.Parent)
+		if p == nil {
 			break
 		}
-		f, err := w.Load(locs[0].File)
-		if err != nil {
-			break
+		if seen[p.Name] {
+			return "", nil, fmt.Errorf("derivation cycle at %q", p.Name)
 		}
-		cur = f.Find(cur.Parent)
-	}
-	if cur != nil && cur.Parent == "" {
-		chain = append(chain, cur)
+		seen[p.Name] = true
+		chain = append(chain, p)
+		cur = p
 	}
 	typ := ""
 	merged := map[string]string{}
@@ -289,12 +298,15 @@ func (w *Workspace) Resolved(a *Asset) (string, []Field, error) {
 		if chain[i].Type != "" {
 			typ = chain[i].Type
 		}
-		for _, f := range chain[i].Fields {
-			if _, ok := merged[f.Key]; !ok {
-				order = append(order, f.Key)
+		for _, fl := range chain[i].Fields {
+			if _, ok := merged[fl.Key]; !ok {
+				order = append(order, fl.Key)
 			}
-			merged[f.Key] = f.Value
+			merged[fl.Key] = fl.Value
 		}
+	}
+	if root := chain[len(chain)-1]; root.Parent != "" {
+		typ = "" // chain broken: the parent isn't in this GDT
 	}
 	out := make([]Field, 0, len(order))
 	for _, k := range order {

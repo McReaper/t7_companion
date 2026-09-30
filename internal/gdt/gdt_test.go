@@ -79,7 +79,7 @@ Technique( "gbuffer" )
 	write("bin/converter_gdt_dirs_0.txt", "source_data\nmodel_export\n")
 	write("stock.gdtdef", "model_export/stock.gdt\n")
 	write("model_export/stock.gdt", "{\r\n\t\"stock_mtl\" ( \"material.gdf\" )\r\n\t{\r\n\t\t\"materialType\" \"lit\"\r\n\t}\r\n\t\"stock_model\" ( \"xmodel.gdf\" )\r\n\t{\r\n\t\t\"filename\" \"a\\\\b.xmodel_bin\"\r\n\t\t\"lowLod\" \"donor\\\\low.xmodel_bin\"\r\n\t\t\"mediumLod\" \"donor\\\\med.xmodel_bin\"\r\n\t}\r\n}\r\n")
-	write("source_data/mine.gdt", "{\r\n\t\"my_img\" ( \"image.gdf\" )\r\n\t{\r\n\t\t\"semantic\" \"normalMap\"\r\n\t}\r\n\t\"child_mtl\" [ \"stock_mtl\" ]\r\n\t{\r\n\t\t\"colorMap\" \"my_img\"\r\n\t}\r\n}\r\n")
+	write("source_data/mine.gdt", "{\r\n\t\"my_img\" ( \"image.gdf\" )\r\n\t{\r\n\t\t\"semantic\" \"normalMap\"\r\n\t}\r\n\t\"mine_base\" ( \"material.gdf\" )\r\n\t{\r\n\t\t\"materialType\" \"lit\"\r\n\t}\r\n\t\"child_mtl\" [ \"mine_base\" ]\r\n\t{\r\n\t\t\"colorMap\" \"my_img\"\r\n\t}\r\n}\r\n")
 	w, err := Open(root)
 	if err != nil {
 		t.Fatal(err)
@@ -179,7 +179,7 @@ func TestFindFlagsStockAndResolvesParents(t *testing.T) {
 		t.Fatalf("find stock: %v %v", locs, err)
 	}
 	f, _ := w.Load("source_data/mine.gdt")
-	typ, fields, err := w.Resolved(f.Find("child_mtl"))
+	typ, fields, err := w.Resolved(f, f.Find("child_mtl"))
 	if err != nil || typ != "material" {
 		t.Fatalf("resolved type %q %v", typ, err)
 	}

@@ -109,7 +109,7 @@ func TestCheckFindsBrokenReferences(t *testing.T) {
 
 func TestReferencedBy(t *testing.T) {
 	w := fixture(t)
-	hits, err := w.ReferencedBy("stock_mtl")
+	hits, err := w.ReferencedBy("mine_base")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -315,10 +315,26 @@ func TestNamesArePerType(t *testing.T) {
 	if _, err := w.Edit(EditRequest{File: "source_data/pt2.gdt", Asset: "my_img", Type: "image"}); err == nil || !strings.Contains(err.Error(), "Duplicate 'image'") {
 		t.Fatalf("a second image named my_img must be refused: %v", err)
 	}
-	if _, err := w.Edit(EditRequest{File: "source_data/pt2.gdt", Asset: "child_mtl", Parent: "stock_mtl"}); err == nil {
-		t.Fatal("a derived material duplicating a material name must be refused (its type comes from the parent)")
+	if _, err := w.Edit(EditRequest{File: "source_data/mine.gdt", Asset: "my_img", DryRun: true}); err != nil {
+		t.Fatalf("my_img exists in mine.gdt: %v", err)
+	}
+	if _, err := w.Edit(EditRequest{File: "source_data/pt2.gdt", Asset: "x_mtl", Parent: "stock_mtl"}); err == nil ||
+		!strings.Contains(err.Error(), "same GDT") {
+		t.Fatalf("a parent from another GDT must be refused: %v", err)
 	}
 	if d, _ := w.Duplicates("my_img"); len(d) != 0 {
 		t.Fatalf("Duplicates: %v", d)
+	}
+}
+
+func TestParentMustBeInTheSameGDT(t *testing.T) {
+	w := fixture(t)
+	put(t, w, "source_data/orphan.gdt", []byte("{\r\n\t\"far_child\" [ \"stock_mtl\" ]\r\n\t{\r\n\t}\r\n}\r\n"))
+	r, err := w.Check("source_data/orphan.gdt", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasIssue(reportFor(r, "far_child"), "", "error", "is only in model_export/stock.gdt") {
+		t.Fatalf("a parent defined only in another GDT is gdtdb's `Parent Entity does not exist` error: %+v", r.Assets)
 	}
 }
