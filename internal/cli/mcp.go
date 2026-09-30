@@ -51,13 +51,19 @@ func runMCP() error {
 		return err
 	}
 
+	return server.ServeStdio(newMCPServer(st, emb, true))
+}
+
+// newMCPServer registers every toolset on one server — the one runMCP serves,
+// and the one tests drive in-process.
+func newMCPServer(st *store.Store, emb *embed.Embedder, warm bool) *server.MCPServer {
 	s := server.NewMCPServer("t7kb", Version(), server.WithToolCapabilities(false),
 		server.WithRecovery()) // a panicking handler must not take the whole stdio server down
 	for _, ts := range toolsets(st, emb) {
 		s.AddTools(ts.tools...)
-		if ts.warm != nil {
+		if warm && ts.warm != nil {
 			ts.warm()
 		}
 	}
-	return server.ServeStdio(s)
+	return s
 }

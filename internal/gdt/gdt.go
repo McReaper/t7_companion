@@ -321,6 +321,9 @@ func Parse(src []byte) (*File, error) {
 		}
 		pos = a.end
 	}
+	if f.closeOff < pos { // "{}" or "{ … }" on one line: nowhere to insert between the braces
+		f.raw = nil
+	}
 	return f, nil
 }
 
