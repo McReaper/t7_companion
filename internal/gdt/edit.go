@@ -25,12 +25,23 @@ type EditRequest struct {
 	CopyFrom string            // create by copying another asset's type and fields
 	Set      map[string]string // real (unescaped) values
 	Unset    []string
+	Image    *ImageSpec // create an image asset from a texture file (see ImageSpec)
 	DryRun   bool
+}
+
+// ImageSpec creates an image asset from a texture: the semantic comes from the
+// slot it will fill (a material type's techset + field) or is given, and the
+// other fields are copied from a stock image of that semantic.
+type ImageSpec struct {
+	Texture      string // texture file, relative to the root (e.g. texture_assets/my/wall_c.tif)
+	Semantic     string // diffuseMap, normalMap, … — or derive it from the two fields below
+	MaterialType string // techset the image is for, e.g. lit
+	Field        string // material field it will fill, e.g. normalMap
 }
 
 // EditResult reports what an edit did or would do.
 type EditResult struct {
-	File    string   `json:"file"`
+	File    string   `json:"file,omitempty"` // empty inside a batch: the batch names it once
 	Asset   string   `json:"asset"`
 	Type    string   `json:"type"`
 	Created bool     `json:"created"`
@@ -40,22 +51,46 @@ type EditResult struct {
 	Next    []string `json:"next,omitempty"`
 }
 
+// BatchResult reports a multi-asset edit of one GDT: all-or-nothing.
+type BatchResult struct {
+	File    string        `json:"file"`
+	Errors  int           `json:"errors"`
+	Written bool          `json:"written"`
+	Results []*EditResult `json:"results"`
+	Next    []string      `json:"next,omitempty"`
+}
+
 // lodFields are the xmodel fields a copied donor drags along and that then point
 // at the donor's meshes (the `Part … in lower lod … doesn't have the same name` link error).
 var lodFields = []string{"mediumLod", "lowLod", "lowestLod", "lod4File", "lod5File", "lod6File", "lod7File"}
 
-// Edit validates and (unless DryRun or an error was found) applies a request.
+// Edit validates and (unless DryRun or an error was found) applies one request.
 func (w *Workspace) Edit(req EditRequest) (*EditResult, error) {
-	if !strings.EqualFold(filepath.Ext(req.File), ".gdt") {
-		return nil, fmt.Errorf("file must be a .gdt: %q", req.File)
+	br, err := w.EditBatch(req.File, []EditRequest{req}, req.DryRun)
+	if err != nil {
+		return nil, err
 	}
-	path := w.Abs(req.File)
-	res := &EditResult{File: w.Rel(path), Asset: req.Asset}
+	r := br.Results[0]
+	r.File, r.Written, r.Next = br.File, br.Written, br.Next
+	return r, nil
+}
+
+// EditBatch applies several requests to one GDT in memory, validates each, and
+// writes once — only if none has an error (and not a dry run). Later items see
+// earlier ones, so a batch can create a material and then a derived one.
+func (w *Workspace) EditBatch(file string, reqs []EditRequest, dryRun bool) (*BatchResult, error) {
+	if !strings.EqualFold(filepath.Ext(file), ".gdt") {
+		return nil, fmt.Errorf("file must be a .gdt: %q", file)
+	}
+	if len(reqs) == 0 {
+		return nil, fmt.Errorf("nothing to edit")
+	}
+	path := w.Abs(file)
+	br := &BatchResult{File: w.Rel(path)}
 	if w.IsStock(path) {
 		return nil, fmt.Errorf("%s is a stock Treyarch GDT (listed in stock.gdtdef) — don't edit it; "+
-			"create a derived asset in your own GDT instead (parent=%q)", res.File, req.Asset)
+			"create derived assets in your own GDT instead", br.File)
 	}
-
 	var f *File
 	if _, err := os.Stat(path); err == nil {
 		if f, err = ParseFile(path); err != nil {
@@ -64,26 +99,80 @@ func (w *Workspace) Edit(req EditRequest) (*EditResult, error) {
 	} else {
 		f = &File{Path: path, CRLF: true}
 	}
+	var created []*EditResult // for the next-step hints
+	for _, req := range reqs {
+		res, err := w.applyEdit(f, req)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", req.Asset, err)
+		}
+		res.File = ""
+		if res.Created {
+			created = append(created, res)
+		}
+		for _, is := range res.Issues {
+			if is.Level == "error" {
+				br.Errors++
+			}
+		}
+		br.Results = append(br.Results, res)
+	}
+	if br.Errors == 0 && !dryRun {
+		if err := f.Save(); err != nil {
+			return nil, err
+		}
+		w.Touched(path)
+		br.Written = true
+		for _, r := range br.Results {
+			r.Written = true
+		}
+		br.Next = []string{
+			"Build as usual: its `gdtdb /update` pass indexes the changed GDT (it should report processed (1 GDTs)); " +
+				"only if it reports 0 GDTs and the linker then can't find the asset, rebuild with gdt_rebuild=true",
+		}
+		for _, c := range created {
+			name, typ := c.Asset, c.Type
+			switch typ {
+			case "material":
+				br.Next = append(br.Next, fmt.Sprintf("Don't zone material %q on its own: it is built through what uses it — an xmodel "+
+					"(as mc/<name>) or map geometry (as wc/<name>), whose techset variants are the precompiled ones. A bare "+
+					"`material,<name>` line asks for an unprefixed variant that isn't in the shader cache and fails to compile", name))
+			case "image":
+				// pulled in by the material that uses it
+			case "":
+			default:
+				br.Next = append(br.Next, fmt.Sprintf("Add `%s,%s` to the map/mod .zone (or zone something that references it) so the linker packs it", typ, name))
+			}
+		}
+	}
+	return br, nil
+}
 
+// applyEdit applies one request to an in-memory file and validates the result.
+func (w *Workspace) applyEdit(f *File, req EditRequest) (*EditResult, error) {
+	res := &EditResult{File: w.Rel(f.Path), Asset: req.Asset}
+	if req.Asset == "" {
+		return nil, fmt.Errorf("asset name is required")
+	}
 	a := f.Find(req.Asset)
+	imageNote := ""
 	if a == nil {
 		res.Created = true
-		if locs, err := w.Find(req.Asset); err == nil && len(locs) > 0 {
-			var where []string
-			for _, l := range locs {
-				where = append(where, fmt.Sprintf("%s:%d", l.File, l.Line))
-			}
-			return nil, fmt.Errorf("asset %q already exists in %s — a second definition is a `Duplicate asset` link error; "+
-				"edit it there, or pick another name", req.Asset, strings.Join(where, ", "))
-		}
 		a = &Asset{Name: req.Asset}
 		switch {
-		case req.CopyFrom != "":
-			donor, err := w.loadAsset(req.CopyFrom)
+		case req.Image != nil:
+			fields, issues, note, err := w.imageFields(req.Image)
 			if err != nil {
 				return nil, err
 			}
-			typ, fields, err := w.Resolved(donor)
+			a.Type, a.Fields = "image", fields
+			res.Issues = append(res.Issues, issues...)
+			imageNote = note
+		case req.CopyFrom != "":
+			donor, err := w.assetIn(f, req.CopyFrom)
+			if err != nil {
+				return nil, err
+			}
+			typ, fields, err := w.resolvedIn(f, donor)
 			if err != nil {
 				return nil, err
 			}
@@ -97,14 +186,27 @@ func (w *Workspace) Edit(req EditRequest) (*EditResult, error) {
 				}
 			}
 		case req.Parent != "":
-			if _, err := w.loadAsset(req.Parent); err != nil {
+			if _, err := w.assetIn(f, req.Parent); err != nil {
 				return nil, err
 			}
 			a.Parent = req.Parent
 		case req.Type != "":
 			a.Type = req.Type
 		default:
-			return nil, fmt.Errorf("asset %q doesn't exist in %s: pass type, parent, or copy_from to create it", req.Asset, res.File)
+			return nil, fmt.Errorf("asset %q doesn't exist in %s: pass type, parent, copy_from or image to create it", req.Asset, res.File)
+		}
+		// Names are per type: an image and a material may share one.
+		newType, _, err := w.resolvedIn(f, a)
+		if err != nil {
+			return nil, err
+		}
+		if locs, err := w.FindTyped(req.Asset, newType); err == nil && len(locs) > 0 {
+			var where []string
+			for _, l := range locs {
+				where = append(where, fmt.Sprintf("%s:%d", l.File, l.Line))
+			}
+			return nil, fmt.Errorf("%s %q already exists in %s — a second definition is a `Duplicate '%s' asset` link error; "+
+				"edit it there, or pick another name", newType, req.Asset, strings.Join(where, ", "), newType)
 		}
 		f.Add(a)
 	}
@@ -125,12 +227,21 @@ func (w *Workspace) Edit(req EditRequest) (*EditResult, error) {
 		a.Unset(k)
 	}
 
-	typ, fields, err := w.Resolved(a)
+	typ, fields, err := w.resolvedIn(f, a)
 	if err != nil {
 		return nil, err
 	}
 	res.Type = typ
-	res.Issues = append(res.Issues, w.validate(typ, fields, keys)...)
+	res.Issues = append(res.Issues, w.validate(f, typ, fields, keys)...)
+	for _, fr := range w.FileRefs(typ, fields) {
+		changed := false
+		for _, k := range keys {
+			changed = changed || k == fr.Field
+		}
+		if !fr.Exists && (changed || res.Created) {
+			res.Issues = append(res.Issues, Issue{"warning", fr.Field, fmt.Sprintf("source file %s does not exist yet", fr.Path)})
+		}
+	}
 	if res.Issues == nil {
 		res.Issues = []Issue{}
 	}
@@ -149,35 +260,67 @@ func (w *Workspace) Edit(req EditRequest) (*EditResult, error) {
 		res.Changes = append(res.Changes, "- "+k)
 	}
 	if res.Created {
-		res.Changes = append([]string{fmt.Sprintf("+ asset %q (%d fields)", a.Name, len(a.Fields))}, res.Changes...)
-	}
-
-	blocked := false
-	for _, is := range res.Issues {
-		if is.Level == "error" {
-			blocked = true
+		head := []string{fmt.Sprintf("+ asset %q (%d fields)", a.Name, len(a.Fields))}
+		if imageNote != "" {
+			head = append(head, imageNote)
 		}
-	}
-	if !blocked && !req.DryRun {
-		if err := f.Save(); err != nil {
-			return nil, err
-		}
-		w.Touched(path)
-		res.Written = true
-		res.Next = []string{
-			"Build as usual: its `gdtdb /update` pass indexes the changed GDT (it should report processed (1 GDTs)); " +
-				"only if it reports 0 GDTs and the linker then can't find the asset, rebuild with gdt_rebuild=true",
-		}
-		switch {
-		case res.Created && typ == "material":
-			res.Next = append(res.Next, "Don't zone the material on its own: it is built through what uses it — an xmodel "+
-				"(as mc/<name>) or map geometry (as wc/<name>), whose techset variants are the precompiled ones. A bare "+
-				"`material,<name>` line asks for an unprefixed variant that isn't in the shader cache and fails to compile")
-		case res.Created && typ != "":
-			res.Next = append(res.Next, fmt.Sprintf("Add `%s,%s` to the map/mod .zone (or zone something that references it) so the linker packs it", typ, a.Name))
-		}
+		res.Changes = append(head, res.Changes...)
 	}
 	return res, nil
+}
+
+// assetIn finds an asset in the file being edited first, then in the workspace.
+func (w *Workspace) assetIn(f *File, name string) (*Asset, error) {
+	if a := f.Find(name); a != nil {
+		return a, nil
+	}
+	return w.loadAsset(name)
+}
+
+// resolvedIn is Resolved, but a parent defined in the file being edited (maybe
+// earlier in the same batch, not yet on disk) is found there first.
+func (w *Workspace) resolvedIn(f *File, a *Asset) (string, []Field, error) {
+	chain := []*Asset{a}
+	seen := map[string]bool{a.Name: true}
+	cur := a
+	for cur.Parent != "" {
+		p := f.Find(cur.Parent)
+		if p == nil {
+			break
+		}
+		if seen[p.Name] {
+			return "", nil, fmt.Errorf("derivation cycle at %q", p.Name)
+		}
+		seen[p.Name] = true
+		chain = append(chain, p)
+		cur = p
+	}
+	typ, fields, err := w.Resolved(cur)
+	if err != nil {
+		return "", nil, err
+	}
+	merged := map[string]string{}
+	var order []string
+	for _, fl := range fields {
+		merged[fl.Key] = fl.Value
+		order = append(order, fl.Key)
+	}
+	for i := len(chain) - 2; i >= 0; i-- { // cur's fields are already in `fields`
+		if chain[i].Type != "" {
+			typ = chain[i].Type
+		}
+		for _, fl := range chain[i].Fields {
+			if _, ok := merged[fl.Key]; !ok {
+				order = append(order, fl.Key)
+			}
+			merged[fl.Key] = fl.Value
+		}
+	}
+	out := make([]Field, 0, len(order))
+	for _, k := range order {
+		out = append(out, Field{Key: k, Value: merged[k]})
+	}
+	return typ, out, nil
 }
 
 // loadAsset finds a single definition of name and returns it.
@@ -206,7 +349,7 @@ func (w *Workspace) Validate(a *Asset) ([]Issue, string, error) {
 	for _, f := range fields {
 		keys = append(keys, f.Key)
 	}
-	iss := w.validate(typ, fields, keys)
+	iss := w.validate(nil, typ, fields, keys)
 	if iss == nil {
 		iss = []Issue{}
 	}
@@ -214,8 +357,9 @@ func (w *Workspace) Validate(a *Asset) ([]Issue, string, error) {
 }
 
 // validate checks the named keys (the ones being set) against the deffile, and a
-// material's texture fields against what its techset exposes.
-func (w *Workspace) validate(typ string, fields []Field, keys []string) []Issue {
+// material's texture fields against what its techset exposes. Referenced assets
+// are looked up in local (the file being edited, maybe unsaved) before the index.
+func (w *Workspace) validate(local *File, typ string, fields []Field, keys []string) []Issue {
 	var out []Issue
 	if typ == "" {
 		return append(out, Issue{"warning", "", "asset type unknown (derived from a parent that wasn't found) — fields not validated"})
@@ -235,6 +379,9 @@ func (w *Workspace) validate(typ string, fields []Field, keys []string) []Issue 
 			out = append(out, Issue{"warning", k, fmt.Sprintf("not declared in %s.awi — APE won't show it; check the spelling", typ)})
 			continue
 		}
+		if v == "" || e.Varies {
+			continue // empty = the default; a Varies field's kind depends on script state
+		}
 		switch e.Kind {
 		case "Float", "Int":
 			n, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
@@ -246,18 +393,38 @@ func (w *Workspace) validate(typ string, fields []Field, keys []string) []Issue 
 				out = append(out, Issue{"error", k, fmt.Sprintf("%q is not an integer", v)})
 			}
 			if e.Min != nil && e.Max != nil && *e.Min < *e.Max && (n < *e.Min || n > *e.Max) {
-				out = append(out, Issue{"error", k, fmt.Sprintf("%v is outside %v..%v", n, *e.Min, *e.Max)})
+				// a warning: the .awi range is the slider's, and stock GDTs go past it (and link)
+				out = append(out, Issue{"warning", k, fmt.Sprintf("%v is outside APE's slider range %v..%v", n, *e.Min, *e.Max)})
+			}
+		case "Color", "Vector":
+			parts := strings.Fields(v)
+			want := len(strings.Fields(e.Default))
+			bad := want > 0 && len(parts) != want
+			for _, p := range parts {
+				if _, err := strconv.ParseFloat(p, 64); err != nil {
+					bad = true
+				}
+			}
+			if bad {
+				n := want
+				if n == 0 {
+					n = 3
+				}
+				out = append(out, Issue{"error", k, fmt.Sprintf("%q: expected %d space-separated numbers (e.g. %q)", v, n, strings.TrimSpace(strings.Repeat("1 ", n)))})
 			}
 		case "CheckBox":
-			if v != "0" && v != "1" {
+			// converter-written GDTs also store "True"/"False", which link
+			if v != "0" && v != "1" && !strings.EqualFold(v, "true") && !strings.EqualFold(v, "false") {
 				out = append(out, Issue{"error", k, fmt.Sprintf("checkbox wants 0 or 1, got %q", v)})
 			}
 		case "Combo":
-			if len(e.Options) > 1 && v != "" && !contains(e.Options, v) {
+			// "<none>*": converter-written GDTs keep the .awi's default marker on the value;
+			// APE compares choices case-insensitively ("stand" for "Stand")
+			if len(e.Options) > 1 && !optionMatch(e.Options, strings.TrimSuffix(v, "*")) {
 				out = append(out, Issue{"error", k, fmt.Sprintf("%q is not one of: %s", v, strings.Join(e.Options, " | "))})
 			}
 		case "AssetCombo":
-			if v != "" {
+			if local == nil || local.Find(v) == nil {
 				if locs, err := w.Find(v); err == nil && len(locs) == 0 {
 					out = append(out, Issue{"warning", k, fmt.Sprintf("no %s asset named %q in any GDT (fine if it ships in a stock fastfile)", e.AssetType, v)})
 				}
@@ -269,14 +436,14 @@ func (w *Workspace) validate(typ string, fields []Field, keys []string) []Issue 
 		for _, k := range keys {
 			only[k] = true
 		}
-		out = append(out, w.validateMaterial(val, only)...)
+		out = append(out, w.validateMaterial(local, val, only)...)
 	}
 	return out
 }
 
 // validateMaterial checks the material type, its category, and — for the keys in
 // only — image fields the techset doesn't read and image semantic mismatches.
-func (w *Workspace) validateMaterial(val map[string]string, only map[string]bool) []Issue {
+func (w *Workspace) validateMaterial(local *File, val map[string]string, only map[string]bool) []Issue {
 	var out []Issue
 	mt := val["materialType"]
 	if mt == "" {
@@ -303,13 +470,33 @@ func (w *Workspace) validateMaterial(val map[string]string, only map[string]bool
 		if img == "" || s.Semantic == "" || !only[s.Field] {
 			continue
 		}
-		if ia, err := w.loadAsset(img); err == nil && ia != nil {
+		var ia *Asset
+		if local != nil {
+			ia = local.Find(img)
+		}
+		if ia == nil {
+			ia, _ = w.loadAsset(img)
+		}
+		if ia != nil {
 			if sem, ok := ia.Get("semantic"); ok && sem != "" && !strings.EqualFold(Unquote(sem), s.Semantic) {
 				out = append(out, Issue{"warning", s.Field, fmt.Sprintf("image %q has semantic %q but slot %s expects %q (APE: type mismatch)", img, Unquote(sem), s.Name, s.Semantic)})
 			}
 		}
 	}
 	return out
+}
+
+// optionMatch accepts a combo value by label or, for "Label{value}" options
+// ("PitchVelocity{0}", "custom{-1}"), by the value in braces, ignoring case.
+func optionMatch(opts []string, v string) bool {
+	for _, o := range opts {
+		label, inner, braced := strings.Cut(o, "{")
+		if strings.EqualFold(o, v) || strings.EqualFold(strings.TrimSpace(label), v) ||
+			(braced && strings.TrimSpace(strings.TrimSuffix(inner, "}")) == v) {
+			return true
+		}
+	}
+	return false
 }
 
 // isImageField recognises the material fields that hold image asset names.

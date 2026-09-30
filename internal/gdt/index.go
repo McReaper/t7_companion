@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Workspace is a BO3 mod-tools root: the deffiles, the techsetdefs, and every
@@ -15,12 +16,30 @@ type Workspace struct {
 	Deffiles string
 	Techsets *Techsets
 
-	once   sync.Once
-	idx    *index
-	stock  map[string]bool // lower-cased relative paths listed in stock.gdtdef
-	scErr  error
-	schema sync.Map // type -> *Schema
+	once sync.Once
+	idx  *index
+
+	refreshMu   sync.Mutex
+	lastStat    time.Time // last cheap re-stat of indexed files
+	lastWalk    time.Time // last full walk (finds new GDTs)
+	walkRunning bool
+	stock       map[string]bool // lower-cased relative paths listed in stock.gdtdef
+	scErr       error
+	schema      sync.Map // type -> *Schema
+
+	parsedMu sync.Mutex
+	parsed   map[string]parsedFile // abs path -> last parse, for read-only Load
 }
+
+type parsedFile struct {
+	mod  int64
+	size int64
+	f    *File
+}
+
+// parsedMax bounds the Load cache: resolving a material touches its parent's and
+// images' GDTs, often the same few, but a stock GDT can be megabytes.
+const parsedMax = 64
 
 // skipDirs are never descended into inside the GDT directories: VCS data and backups.
 var skipDirs = map[string]bool{".git": true, "backup": true, "_backups": true}
@@ -49,7 +68,47 @@ func (w *Workspace) scan() {
 			f.Close()
 		}
 		w.idx, w.scErr = loadIndex(w.Root)
+		w.lastStat, w.lastWalk = time.Now(), time.Now()
 	})
+}
+
+// Freshness: a long-lived MCP server must see GDTs saved in APE meanwhile.
+// Re-stat the indexed files (cheap) at most every statEvery, and walk the tree
+// for new GDTs in the background at most every walkEvery.
+const (
+	statEvery = 5 * time.Second
+	walkEvery = 2 * time.Minute
+)
+
+func (w *Workspace) refresh() {
+	w.scan()
+	if w.idx == nil {
+		return
+	}
+	w.refreshMu.Lock()
+	now := time.Now()
+	doStat := now.Sub(w.lastStat) >= statEvery
+	doWalk := now.Sub(w.lastWalk) >= walkEvery && !w.walkRunning
+	if doStat {
+		w.lastStat = now
+	}
+	if doWalk {
+		w.lastWalk, w.walkRunning = now, true
+	}
+	w.refreshMu.Unlock()
+	if doStat {
+		w.idx.restat(w.Root)
+	}
+	if doWalk {
+		go func() {
+			if fresh, err := loadIndex(w.Root); err == nil {
+				w.idx.replace(fresh)
+			}
+			w.refreshMu.Lock()
+			w.walkRunning = false
+			w.refreshMu.Unlock()
+		}()
+	}
 }
 
 // Warm builds or refreshes the asset index in the background, so the first
@@ -93,10 +152,12 @@ type Location struct {
 	Stock  bool   `json:"stock"`
 }
 
-// Find returns every definition of an asset name across the workspace's GDTs.
-// More than one is the linker's `Duplicate '<type>' asset` error waiting to happen.
+// Find returns every definition of an asset name across the workspace's GDTs,
+// of any type. Names are per type — an image and a material called "clip" are
+// both fine (Treyarch's own GDTs have 800+ such pairs); only two definitions of
+// the same type are the linker's `Duplicate '<type>' asset` error (see Duplicates).
 func (w *Workspace) Find(name string) ([]Location, error) {
-	w.scan()
+	w.refresh()
 	if w.scErr != nil {
 		return nil, w.scErr
 	}
@@ -107,6 +168,54 @@ func (w *Workspace) Find(name string) ([]Location, error) {
 	return out, nil
 }
 
+// TypeOf is a definition's asset type, following a derived asset's parent chain.
+func (w *Workspace) TypeOf(l Location) string {
+	for depth := 0; l.Type == "" && l.Parent != "" && depth < 16; depth++ {
+		locs, err := w.Find(l.Parent)
+		if err != nil || len(locs) == 0 {
+			return ""
+		}
+		l = locs[0]
+	}
+	return l.Type
+}
+
+// FindTyped returns the definitions of name whose (resolved) type is typ.
+func (w *Workspace) FindTyped(name, typ string) ([]Location, error) {
+	locs, err := w.Find(name)
+	if err != nil {
+		return nil, err
+	}
+	var out []Location
+	for _, l := range locs {
+		if lt := w.TypeOf(l); lt == "" || strings.EqualFold(lt, typ) {
+			l.Type = lt
+			out = append(out, l)
+		}
+	}
+	return out, nil
+}
+
+// Duplicates groups a name's definitions by resolved type and returns only the
+// types defined more than once — the real `Duplicate '<type>' asset` errors.
+func (w *Workspace) Duplicates(name string) (map[string][]Location, error) {
+	locs, err := w.Find(name)
+	if err != nil {
+		return nil, err
+	}
+	by := map[string][]Location{}
+	for _, l := range locs {
+		l.Type = w.TypeOf(l)
+		by[l.Type] = append(by[l.Type], l)
+	}
+	for t, ls := range by {
+		if len(ls) < 2 {
+			delete(by, t)
+		}
+	}
+	return by, nil
+}
+
 // Touched re-indexes one GDT after it was written.
 func (w *Workspace) Touched(path string) {
 	w.scan()
@@ -115,9 +224,32 @@ func (w *Workspace) Touched(path string) {
 	}
 }
 
-// Load parses a GDT given relative to the root (or absolute).
+// Load parses a GDT given relative to the root (or absolute). The result is
+// shared and cached until the file changes on disk: callers must not modify it
+// (edits parse their own copy).
 func (w *Workspace) Load(file string) (*File, error) {
-	return ParseFile(w.Abs(file))
+	path := w.Abs(file)
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	w.parsedMu.Lock()
+	pf, ok := w.parsed[path]
+	w.parsedMu.Unlock()
+	if ok && pf.mod == info.ModTime().UnixNano() && pf.size == info.Size() {
+		return pf.f, nil
+	}
+	f, err := ParseFile(path)
+	if err != nil {
+		return nil, err
+	}
+	w.parsedMu.Lock()
+	if w.parsed == nil || len(w.parsed) >= parsedMax {
+		w.parsed = map[string]parsedFile{}
+	}
+	w.parsed[path] = parsedFile{info.ModTime().UnixNano(), info.Size(), f}
+	w.parsedMu.Unlock()
+	return f, nil
 }
 
 // Abs resolves a root-relative path.

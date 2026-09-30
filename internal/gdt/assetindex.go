@@ -188,6 +188,49 @@ func (idx *index) lookup(name string) []hit {
 	return append([]hit(nil), idx.byName[name]...)
 }
 
+// restat re-reads the indexed GDTs whose size or mtime changed, and drops the
+// ones that disappeared. It does not discover new files (the full walk does).
+func (idx *index) restat(root string) {
+	idx.mu.RLock()
+	var changed, gone []string
+	for rel, fe := range idx.files {
+		info, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
+		switch {
+		case err != nil:
+			gone = append(gone, rel)
+		case info.ModTime().UnixNano() != fe.Mod || info.Size() != fe.Size:
+			changed = append(changed, rel)
+		}
+	}
+	idx.mu.RUnlock()
+	if len(changed) == 0 && len(gone) == 0 {
+		return
+	}
+	idx.mu.Lock()
+	for _, rel := range gone {
+		delete(idx.files, rel)
+	}
+	for _, rel := range changed {
+		p := filepath.Join(root, filepath.FromSlash(rel))
+		if info, err := os.Stat(p); err == nil {
+			idx.files[rel] = &fileEntry{Mod: info.ModTime().UnixNano(), Size: info.Size(), Assets: scanHeaders(p, rel)}
+		}
+	}
+	idx.mu.Unlock()
+	idx.rebuildNames()
+}
+
+// replace swaps in a freshly walked index.
+func (idx *index) replace(fresh *index) {
+	fresh.mu.RLock()
+	files := fresh.files
+	fresh.mu.RUnlock()
+	idx.mu.Lock()
+	idx.files = files
+	idx.mu.Unlock()
+	idx.rebuildNames()
+}
+
 // refreshFile re-reads one GDT (after a write) and updates the in-memory index.
 func (idx *index) refreshFile(root, rel string) {
 	p := filepath.Join(root, filepath.FromSlash(rel))

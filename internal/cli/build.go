@@ -81,7 +81,7 @@ func newBuildCmd() *cobra.Command {
 	f.StringVar(&o.light, "light", "medium", "light quality: low|medium|high")
 	f.StringVar(&o.language, "language", "english", "linker language")
 	f.BoolVar(&o.skipGDT, "skip-gdt", false, "skip the gdtdb /update pass before building")
-	f.BoolVar(&o.gdtRebuild, "gdt-rebuild", false, "run gdtdb /rebuild instead of /update (needed after hand-editing a GDT)")
+	f.BoolVar(&o.gdtRebuild, "gdt-rebuild", false, "run gdtdb /rebuild instead of /update (only if /update reports 0 GDTs and the linker then misses an edited asset)")
 	f.BoolVar(&o.jsonOut, "json", false, "emit the report as JSON")
 	f.BoolVar(&o.verbose, "verbose", false, "stream each tool's full output as it runs")
 	return cmd

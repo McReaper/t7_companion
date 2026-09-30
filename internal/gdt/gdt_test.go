@@ -44,6 +44,8 @@ void GenerateUI( asset Asset )
 	Asset.AddEntry_Path( "filename", "" );
 	Asset.AddEntry_Path( "mediumLod", "" );
 	Asset.AddEntry_Path( "lowLod", "" );
+	Asset.AddEntry_CheckBox( "autogenLod" + lodIndex, false );
+	Asset.AddEntry_Int( "autogenLod" + lodIndex + "Percent", 13, 0, 100 );
 `)
 	write("deffiles/image.awi", `	Asset.AddEntry_Combo( "semantic", "diffuseMap | normalMap | effectMap" );`)
 	write("share/raw/techsetdefs_stable/include/color_base.techsetdef", `
@@ -138,6 +140,13 @@ func TestSchema(t *testing.T) {
 	if e := s.Lookup("attach2_viewModel_b"); e == nil || e.AssetType != "xmodel" {
 		t.Fatal("a name with a runtime prefix must match its literal core anywhere")
 	}
+	x, _ := w.Schema("xmodel")
+	if e := x.Lookup("autogenLod4Percent"); e == nil || e.Kind != "Int" || e.Name != "autogenLod*Percent" {
+		t.Fatalf("the most specific runtime pattern must win: %+v", e)
+	}
+	if e := x.Lookup("autogenLod4"); e == nil || e.Kind != "CheckBox" {
+		t.Fatalf("autogenLod4: %+v", e)
+	}
 	if s.Entries["materialCategory"].Default != "Geometry" {
 		t.Fatal("SetDefaultValue")
 	}
@@ -202,7 +211,7 @@ func TestEditValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []struct{ field, level string }{
-		{"materialCategory", "error"}, {"normalHeightScale", "error"}, {"stencil", "error"},
+		{"materialCategory", "error"}, {"normalHeightScale", "warning"}, {"stencil", "error"},
 		{"noCastShadow", "error"}, {"mysteryKey", "warning"},
 	} {
 		if !issueFor(r, want.field, want.level) {
