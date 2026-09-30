@@ -33,7 +33,7 @@ Targets **Go 1.25** (`go.mod`). The machine's default `go` may be older; `GOTOOL
 - Build: `go build -o t7kb.exe ./cmd/t7kb`
 - Cross-compile (what CI ships): `CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build ./cmd/t7kb`
 - Vet: `go vet ./...`
-- Lint: `gofmt -l cmd internal` (must print nothing) and `go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./...`
+- Lint: `gofmt -l cmd internal` (must print nothing) and `go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 ./...` (the release matching Go 1.25; v0.8 needs 1.26)
 - Test: `go test ./...`
 - Single test: `go test ./internal/store -run TestHybridSearch -v`
 
