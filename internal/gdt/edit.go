@@ -89,7 +89,7 @@ func (w *Workspace) EditBatch(file string, reqs []EditRequest, dryRun bool) (*Ba
 	br := &BatchResult{File: w.Rel(path)}
 	if w.IsStock(path) {
 		return nil, fmt.Errorf("%s is a stock Treyarch GDT (listed in stock.gdtdef) — don't edit it; "+
-			"create derived assets in your own GDT instead", br.File)
+			"copy_from the asset into your own GDT instead (a parent must be in the same GDT, so you can't derive from a stock one)", br.File)
 	}
 	var f *File
 	if _, err := os.Stat(path); err == nil {
@@ -168,11 +168,11 @@ func (w *Workspace) applyEdit(f *File, req EditRequest) (*EditResult, error) {
 			res.Issues = append(res.Issues, issues...)
 			imageNote = note
 		case req.CopyFrom != "":
-			donor, err := w.assetIn(f, req.CopyFrom)
+			df, donor, err := w.assetIn(f, req.CopyFrom)
 			if err != nil {
 				return nil, err
 			}
-			typ, fields, err := w.resolvedIn(f, donor)
+			typ, fields, err := w.Resolved(df, donor)
 			if err != nil {
 				return nil, err
 			}
@@ -186,8 +186,15 @@ func (w *Workspace) applyEdit(f *File, req EditRequest) (*EditResult, error) {
 				}
 			}
 		case req.Parent != "":
-			if _, err := w.assetIn(f, req.Parent); err != nil {
-				return nil, err
+			// gdtdb only resolves a parent inside the same GDT
+			if f.Find(req.Parent) == nil {
+				where := "no GDT"
+				if locs, _ := w.Find(req.Parent); len(locs) > 0 {
+					where = locs[0].File
+				}
+				return nil, fmt.Errorf("parent %q is not in %s (it's in %s): a derived asset's parent must be in the same GDT, "+
+					"or gdtdb fails with `Parent Entity '%s' does not exist in GDT` — use copy_from instead, or create it in that GDT",
+					req.Parent, res.File, where, req.Parent)
 			}
 			a.Parent = req.Parent
 		case req.Type != "":
@@ -196,7 +203,7 @@ func (w *Workspace) applyEdit(f *File, req EditRequest) (*EditResult, error) {
 			return nil, fmt.Errorf("asset %q doesn't exist in %s: pass type, parent, copy_from or image to create it", req.Asset, res.File)
 		}
 		// Names are per type: an image and a material may share one.
-		newType, _, err := w.resolvedIn(f, a)
+		newType, _, err := w.Resolved(f, a)
 		if err != nil {
 			return nil, err
 		}
@@ -227,7 +234,7 @@ func (w *Workspace) applyEdit(f *File, req EditRequest) (*EditResult, error) {
 		a.Unset(k)
 	}
 
-	typ, fields, err := w.resolvedIn(f, a)
+	typ, fields, err := w.Resolved(f, a)
 	if err != nil {
 		return nil, err
 	}
@@ -269,79 +276,33 @@ func (w *Workspace) applyEdit(f *File, req EditRequest) (*EditResult, error) {
 	return res, nil
 }
 
-// assetIn finds an asset in the file being edited first, then in the workspace.
-func (w *Workspace) assetIn(f *File, name string) (*Asset, error) {
+// assetIn finds an asset (and its file) in the file being edited first, then in the workspace.
+func (w *Workspace) assetIn(f *File, name string) (*File, *Asset, error) {
 	if a := f.Find(name); a != nil {
-		return a, nil
+		return f, a, nil
 	}
 	return w.loadAsset(name)
 }
 
-// resolvedIn is Resolved, but a parent defined in the file being edited (maybe
-// earlier in the same batch, not yet on disk) is found there first.
-func (w *Workspace) resolvedIn(f *File, a *Asset) (string, []Field, error) {
-	chain := []*Asset{a}
-	seen := map[string]bool{a.Name: true}
-	cur := a
-	for cur.Parent != "" {
-		p := f.Find(cur.Parent)
-		if p == nil {
-			break
-		}
-		if seen[p.Name] {
-			return "", nil, fmt.Errorf("derivation cycle at %q", p.Name)
-		}
-		seen[p.Name] = true
-		chain = append(chain, p)
-		cur = p
-	}
-	typ, fields, err := w.Resolved(cur)
-	if err != nil {
-		return "", nil, err
-	}
-	merged := map[string]string{}
-	var order []string
-	for _, fl := range fields {
-		merged[fl.Key] = fl.Value
-		order = append(order, fl.Key)
-	}
-	for i := len(chain) - 2; i >= 0; i-- { // cur's fields are already in `fields`
-		if chain[i].Type != "" {
-			typ = chain[i].Type
-		}
-		for _, fl := range chain[i].Fields {
-			if _, ok := merged[fl.Key]; !ok {
-				order = append(order, fl.Key)
-			}
-			merged[fl.Key] = fl.Value
-		}
-	}
-	out := make([]Field, 0, len(order))
-	for _, k := range order {
-		out = append(out, Field{Key: k, Value: merged[k]})
-	}
-	return typ, out, nil
-}
-
 // loadAsset finds a single definition of name and returns it.
-func (w *Workspace) loadAsset(name string) (*Asset, error) {
+func (w *Workspace) loadAsset(name string) (*File, *Asset, error) {
 	locs, err := w.Find(name)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if len(locs) == 0 {
-		return nil, fmt.Errorf("asset %q not found in any GDT under %s", name, w.Root)
+		return nil, nil, fmt.Errorf("asset %q not found in any GDT under %s", name, w.Root)
 	}
 	f, err := w.Load(locs[0].File)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return f.Find(name), nil
+	return f, f.Find(name), nil
 }
 
 // Validate checks an asset's effective fields against its schema.
-func (w *Workspace) Validate(a *Asset) ([]Issue, string, error) {
-	typ, fields, err := w.Resolved(a)
+func (w *Workspace) Validate(f *File, a *Asset) ([]Issue, string, error) {
+	typ, fields, err := w.Resolved(f, a)
 	if err != nil {
 		return nil, "", err
 	}
@@ -475,7 +436,7 @@ func (w *Workspace) validateMaterial(local *File, val map[string]string, only ma
 			ia = local.Find(img)
 		}
 		if ia == nil {
-			ia, _ = w.loadAsset(img)
+			_, ia, _ = w.loadAsset(img)
 		}
 		if ia != nil {
 			if sem, ok := ia.Get("semantic"); ok && sem != "" && !strings.EqualFold(Unquote(sem), s.Semantic) {

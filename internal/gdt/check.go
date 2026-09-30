@@ -124,12 +124,14 @@ func (w *Workspace) Check(file, asset string) (*CheckResult, error) {
 		}
 		res.Checked++
 		rep := AssetReport{Asset: a.Name, Line: a.Line}
-		if a.Parent != "" {
-			if locs, _ := w.Find(a.Parent); len(locs) == 0 {
-				rep.Issues = append(rep.Issues, Issue{"error", "", fmt.Sprintf("parent %q not found in any GDT", a.Parent)})
+		if a.Parent != "" && f.Find(a.Parent) == nil {
+			where := "is in no GDT"
+			if locs, _ := w.Find(a.Parent); len(locs) > 0 {
+				where = "is only in " + locs[0].File
 			}
+			rep.Issues = append(rep.Issues, Issue{"error", "", fmt.Sprintf("parent %q %s, not this GDT — gdtdb: `Parent Entity '%s' does not exist in GDT`", a.Parent, where, a.Parent)})
 		}
-		typ, fields, err := w.Resolved(a)
+		typ, fields, err := w.Resolved(f, a)
 		if err != nil {
 			return nil, err
 		}

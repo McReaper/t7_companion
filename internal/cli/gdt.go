@@ -117,7 +117,7 @@ func gdtGet(w *gdt.Workspace, name, file string, filter string, all bool) (any, 
 		return nil, err
 	}
 	a := f.Find(name)
-	typ, fields, err := w.Resolved(a)
+	typ, fields, err := w.Resolved(f, a)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +165,7 @@ func gdtGet(w *gdt.Workspace, name, file string, filter string, all bool) (any, 
 	if hidden > 0 {
 		v.Hidden = fmt.Sprintf("%d empty, zero or default-valued fields not shown (pass all=true)", hidden)
 	}
-	if iss, _, err := w.Validate(a); err == nil {
+	if iss, _, err := w.Validate(f, a); err == nil {
 		v.Issues = iss
 	}
 	if len(locs) > 1 {
@@ -398,11 +398,11 @@ func gdtToolDefs() []server.ServerTool {
 				"later item can derive from or reference an earlier one; written all-or-nothing). image creates an image asset from "+
 				"a texture, with the semantic taken from the techset slot it fills and the other settings from a stock image of that "+
 				"semantic. DRY RUN BY DEFAULT — returns the changes and issues; pass write=true to save (atomic, with a .bak, other "+
-				"assets left byte-identical). Refuses stock Treyarch GDTs: derive instead (parent)."),
+				"assets left byte-identical). Refuses stock Treyarch GDTs: copy_from the stock asset into your own GDT instead — parent only works within one GDT."),
 			mcp.WithString("file", mcp.Required(), mcp.Description("GDT path relative to the root, e.g. \"source_data/my_map.gdt\" (created if missing).")),
 			mcp.WithString("asset", mcp.Description("Asset name (single-asset form).")),
 			mcp.WithString("type", mcp.Description("Create a full asset of this type (material, xmodel, image, …).")),
-			mcp.WithString("parent", mcp.Description("Create a derived asset of this parent (only overridden fields are stored).")),
+			mcp.WithString("parent", mcp.Description("Create a derived asset of this parent (only overridden fields are stored). The parent must be in the same GDT — gdtdb rejects one from another file.")),
 			mcp.WithString("copy_from", mcp.Description("Create by copying this asset's type and resolved fields (an xmodel's LOD paths are cleared).")),
 			mcp.WithObject("set", mcp.Description("Fields to set, as {\"key\": \"value\"} with real values — paths use single backslashes; escaping is handled.")),
 			mcp.WithArray("unset", mcp.Description("Field keys to remove."), mcp.WithStringItems()),
@@ -569,7 +569,7 @@ func newGDTCmd() *cobra.Command {
 	ef.StringVar(&er.File, "file", "", "GDT path relative to the root (required)")
 	ef.StringVar(&er.Asset, "asset", "", "asset name (required)")
 	ef.StringVar(&er.Type, "type", "", "create a full asset of this type")
-	ef.StringVar(&er.Parent, "parent", "", "create a derived asset of this parent")
+	ef.StringVar(&er.Parent, "parent", "", "create a derived asset of this parent (must be in the same GDT)")
 	ef.StringVar(&er.CopyFrom, "copy-from", "", "create by copying this asset")
 	ef.StringArrayVar(&sets, "set", nil, "key=value (repeatable)")
 	ef.StringArrayVar(&er.Unset, "unset", nil, "key to remove (repeatable)")
