@@ -27,12 +27,12 @@ jobs:
       CGO_ENABLED: "0"
       HF_HOME: ${{ github.workspace }}/.hf # the embedding model TestHybridSearch loads
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: Cache the embedding model
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .hf
           key: hf-all-MiniLM-L6-v2
