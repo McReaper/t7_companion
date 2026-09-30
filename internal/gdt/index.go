@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -30,6 +31,32 @@ type Workspace struct {
 
 	parsedMu sync.Mutex
 	parsed   map[string]parsedFile // abs path -> last parse, for read-only Load
+
+	writeMu sync.Map // lower-cased abs path -> *sync.Mutex: one writer per GDT
+}
+
+// lockFile serialises writes to one GDT within this process.
+func (w *Workspace) lockFile(path string) func() {
+	m, _ := w.writeMu.LoadOrStore(strings.ToLower(filepath.Clean(path)), &sync.Mutex{})
+	mu := m.(*sync.Mutex)
+	mu.Lock()
+	return mu.Unlock
+}
+
+// InGDTDirs reports whether path is under one of the directories gdtdb indexes
+// (bin/converter_gdt_dirs_0.txt) — a GDT anywhere else is never built.
+func (w *Workspace) InGDTDirs(path string) bool {
+	rel := strings.ToLower(w.Rel(path))
+	if rel == ".." || strings.HasPrefix(rel, "../") || filepath.IsAbs(rel) {
+		return false
+	}
+	for _, d := range GDTDirs(w.Root) {
+		d = strings.ToLower(strings.Trim(filepath.ToSlash(d), "/"))
+		if rel == d || strings.HasPrefix(rel, d+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 type parsedFile struct {
@@ -166,6 +193,12 @@ func (w *Workspace) Find(name string) ([]Location, error) {
 	for _, h := range w.idx.lookup(name) {
 		out = append(out, Location{File: h.File, Line: h.Line, Type: h.Type, Parent: h.Parent, Stock: w.stock[strings.ToLower(h.File)]})
 	}
+	sort.Slice(out, func(i, j int) bool { // the index is a map: make "the first definition" stable
+		if out[i].File != out[j].File {
+			return out[i].File < out[j].File
+		}
+		return out[i].Line < out[j].Line
+	})
 	return out, nil
 }
 
@@ -191,7 +224,8 @@ func (w *Workspace) TypeOf(l Location) string {
 	return l.Type
 }
 
-// FindTyped returns the definitions of name whose (resolved) type is typ.
+// FindTyped returns the definitions of name whose (resolved) type is typ. A
+// derived asset whose parent chain is broken has no type and matches none.
 func (w *Workspace) FindTyped(name, typ string) ([]Location, error) {
 	locs, err := w.Find(name)
 	if err != nil {
@@ -199,7 +233,7 @@ func (w *Workspace) FindTyped(name, typ string) ([]Location, error) {
 	}
 	var out []Location
 	for _, l := range locs {
-		if lt := w.TypeOf(l); lt == "" || strings.EqualFold(lt, typ) {
+		if lt := w.TypeOf(l); lt != "" && strings.EqualFold(lt, typ) {
 			l.Type = lt
 			out = append(out, l)
 		}
@@ -220,7 +254,7 @@ func (w *Workspace) Duplicates(name string) (map[string][]Location, error) {
 		by[l.Type] = append(by[l.Type], l)
 	}
 	for t, ls := range by {
-		if len(ls) < 2 {
+		if t == "" || len(ls) < 2 { // unresolved derived assets: no type to collide on
 			delete(by, t)
 		}
 	}

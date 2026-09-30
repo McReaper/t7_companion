@@ -154,7 +154,7 @@ func runBuildReport(o *buildOpts, name string, stdout io.Writer) (buildReport, e
 		// its cwd, so a different cwd makes a Launcher-built db flag every asset as a phantom duplicate.
 		gdtArg := "/update"
 		if o.gdtRebuild {
-			gdtArg = "/rebuild" // /update doesn't notice GDTs edited outside APE
+			gdtArg = "/rebuild" // recovery: /update does index GDTs edited outside APE (verified); this is for a db that lost everything
 		}
 		if !run(runStage("gdt", gdtdbDir, gdtdb, 10*time.Minute, o.verbose, stdout, gdtArg)) {
 			return rep, nil

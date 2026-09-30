@@ -97,7 +97,7 @@ It returns a short per-stage report (status, duration, first actionable error) i
 | `onlyents` | Fast entity-only compile — invalid after brush edits |
 
 > [!NOTE]
-> Windows only; needs the BO3 Mod Tools installed (`TA_TOOLS_PATH`/`TA_GAME_PATH`, set by the Launcher on first run). `build` and `gdt_edit` are the only tools on the server that change anything on disk. For a debug run, launch the game with `+set developer 2 +set logfile 2` yourself — a headless run doesn't inherit the Launcher's dvars.
+> `build` is Windows only (the `gdt_*` tools just read and write text files); both need the BO3 Mod Tools installed (`TA_TOOLS_PATH`/`TA_GAME_PATH`, set by the Launcher on first run). `build` and `gdt_edit` are the only tools on the server that change anything on disk. For a debug run, launch the game with `+set developer 2 +set logfile 2` yourself — a headless run doesn't inherit the Launcher's dvars.
 
 ### GDT editing it can check
 

@@ -38,6 +38,32 @@ type Schema struct {
 	File    string            `json:"file"`
 	Entries map[string]*Entry `json:"-"`
 	order   []string
+
+	lower    map[string]*Entry // lower-cased literal names (built once loaded)
+	patterns []*Entry          // runtime-built names, most specific first
+}
+
+// index builds the lookup tables once the schema is complete.
+func (s *Schema) index() {
+	s.lower = map[string]*Entry{}
+	s.patterns = nil
+	for _, n := range s.order {
+		e := s.Entries[n]
+		if e.Pattern {
+			s.patterns = append(s.patterns, e)
+		} else if _, dup := s.lower[strings.ToLower(n)]; !dup {
+			s.lower[strings.ToLower(n)] = e
+		}
+	}
+	// Several patterns can match ("autogenLod*" and "autogenLod*Percent"): the one
+	// with the most literal text is the most specific.
+	lit := func(e *Entry) int { return len(strings.ReplaceAll(e.Name, "*", "")) }
+	sort.SliceStable(s.patterns, func(i, j int) bool {
+		if lit(s.patterns[i]) != lit(s.patterns[j]) {
+			return lit(s.patterns[i]) > lit(s.patterns[j])
+		}
+		return s.patterns[i].Name < s.patterns[j].Name
+	})
 }
 
 // Ordered returns the entries in declaration order.
@@ -88,24 +114,18 @@ func (s *Schema) Lookup(key string) *Entry {
 	if e, ok := s.Entries[key]; ok && !e.Pattern {
 		return e
 	}
-	for _, e := range s.Entries {
-		if !e.Pattern && strings.EqualFold(e.Name, key) {
+	if s.lower == nil {
+		s.index()
+	}
+	if e, ok := s.lower[strings.ToLower(key)]; ok {
+		return e
+	}
+	for _, e := range s.patterns {
+		if e.re.MatchString(key) {
 			return e
 		}
 	}
-	// Several patterns can match ("autogenLod*" and "autogenLod*Percent"): the one
-	// with the most literal text is the most specific.
-	var best *Entry
-	bestLit := 0
-	for _, e := range s.Entries {
-		if !e.Pattern || !e.re.MatchString(key) {
-			continue
-		}
-		if lit := len(strings.ReplaceAll(e.Name, "*", "")); best == nil || lit > bestLit || (lit == bestLit && e.Name < best.Name) {
-			best, bestLit = e, lit
-		}
-	}
-	return best
+	return nil
 }
 
 // uiOnly kinds are page decoration, never saved to the GDT.
@@ -164,6 +184,7 @@ func LoadSchema(deffiles, assetType string) (*Schema, error) {
 			s.order = append(s.order, name)
 		}
 	}
+	s.index() // before the schema is shared: Lookup must not build it concurrently
 	return s, nil
 }
 

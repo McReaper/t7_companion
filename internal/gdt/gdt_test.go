@@ -3,6 +3,7 @@ package gdt
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -164,7 +165,7 @@ func TestTechsetResolveFollowsIncludes(t *testing.T) {
 	if ex := ts.ExposedFields(); !ex["glossRangeMax"] || ex["specColorMap"] {
 		t.Fatalf("exposed fields: %v", ex)
 	}
-	if !contains(ts.Sources, "gbuffer_lit.hlsl") {
+	if !slices.Contains(ts.Sources, "gbuffer_lit.hlsl") {
 		t.Fatalf("sources: %v", ts.Sources)
 	}
 	if w.Techsets.Exists("color_base") {

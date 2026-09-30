@@ -57,11 +57,11 @@ func (w *Workspace) imageFields(spec *ImageSpec) ([]Field, []Issue, string, erro
 	p := filepath.Join(w.Root, filepath.FromSlash(strings.ReplaceAll(spec.Texture, `\`, "/")))
 	switch wd, ht, err := imageSize(p); {
 	case os.IsNotExist(err):
-		issues = append(issues, Issue{"error", "baseImage", fmt.Sprintf("texture %s does not exist (path is relative to the mod-tools root)", spec.Texture)})
+		issues = append(issues, Issue{"error", "baseImage", fmt.Sprintf("texture %s does not exist (path is relative to the mod-tools root)", spec.Texture), ""})
 	case err != nil:
 		// unknown format: nothing to check
 	case !pow2(wd) || !pow2(ht):
-		issues = append(issues, Issue{"error", "baseImage", fmt.Sprintf("texture is %dx%d — BO3 needs power-of-two dimensions", wd, ht)})
+		issues = append(issues, Issue{"error", "baseImage", fmt.Sprintf("texture is %dx%d — BO3 needs power-of-two dimensions", wd, ht), ""})
 	}
 	cm, _ := a.Get("compressionMethod")
 	note := fmt.Sprintf("settings = each field's most common value across %d stock %s images (compressionMethod %q, override with set)", n, sem, Unquote(cm))
@@ -78,7 +78,7 @@ func (w *Workspace) imageDonor(sem string) ([]Field, int, error) {
 		d := v.(donor)
 		return d.fields, d.n, nil
 	}
-	w.scan()
+	w.refresh()
 	if w.scErr != nil {
 		return nil, 0, w.scErr
 	}
@@ -137,16 +137,23 @@ func (w *Workspace) imageDonor(sem string) ([]Field, int, error) {
 	close(ch)
 	wg.Wait()
 	if n == 0 {
+		if len(stock) == 0 {
+			return nil, 0, fmt.Errorf("no stock GDTs known (stock.gdtdef missing or empty) to take %s image settings from", sem)
+		}
 		return nil, 0, fmt.Errorf("no stock image with semantic %q to take settings from", sem)
 	}
 	sort.Strings(order) // goroutines saw files in any order
 	fields := make([]Field, 0, len(order))
 	for _, k := range order {
-		best, bestN := "", -1
+		best, bestN, total := "", -1, 0
 		for v, c := range counts[k] {
+			total += c
 			if c > bestN || (c == bestN && v < best) {
 				best, bestN = v, c
 			}
+		}
+		if total*2 <= n {
+			continue // a key only a minority of images carry is one of their quirks, not a setting
 		}
 		fields = append(fields, Field{Key: k, Value: best})
 	}

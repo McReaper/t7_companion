@@ -95,22 +95,56 @@ type File struct {
 	Assets []*Asset
 	CRLF   bool // the file used CRLF line endings (stock GDTs do)
 
-	raw      []byte // the parsed source, reused verbatim for every unchanged asset
+	raw      []byte // the parsed source, reused verbatim for every unchanged asset; nil = render it all
 	closeOff int    // offset of the start of the line holding the final "}"
+	byName   map[string][]*Asset
 }
 
 // Add appends a new asset (rendered in APE's layout before the closing brace).
 func (f *File) Add(a *Asset) {
 	a.start, a.end, a.dirty = -1, -1, true
 	f.Assets = append(f.Assets, a)
+	f.byName = nil
 }
 
-// Find returns the asset with that name, or nil.
+// FindAll returns every asset with that name, in file order. Names are per type,
+// so one GDT can hold an image and a material of the same name.
+func (f *File) FindAll(name string) []*Asset {
+	if f.byName == nil {
+		f.byName = make(map[string][]*Asset, len(f.Assets))
+		for _, a := range f.Assets {
+			f.byName[a.Name] = append(f.byName[a.Name], a)
+		}
+	}
+	return f.byName[name]
+}
+
+// Find returns the first asset with that name, or nil. Use FindAll (or a type)
+// where an image and a material may share the name.
 func (f *File) Find(name string) *Asset {
+	if all := f.FindAll(name); len(all) > 0 {
+		return all[0]
+	}
+	return nil
+}
+
+// AtLine returns the asset whose header is on that line, or nil.
+func (f *File) AtLine(line int) *Asset {
 	for _, a := range f.Assets {
-		if a.Name == name {
+		if a.Line == line {
 			return a
 		}
+	}
+	return nil
+}
+
+// ValidName rejects what the GDT format can't hold in a name, parent, type or key.
+func ValidName(what, s string) error {
+	if strings.TrimSpace(s) == "" {
+		return fmt.Errorf("%s is empty", what)
+	}
+	if strings.ContainsAny(s, "\"\\\r\n\t") {
+		return fmt.Errorf("%s %q contains a quote, backslash, tab or line break", what, s)
 	}
 	return nil
 }
@@ -145,6 +179,8 @@ func lex(src []byte) ([]token, error) {
 		case c == '\n':
 			line++
 		case c == ' ' || c == '\t' || c == '\r':
+		case i == 0 && bytes.HasPrefix(src, []byte("\xEF\xBB\xBF")):
+			i += 2 // UTF-8 byte order mark
 		case c == '/' && i+1 < len(src) && src[i+1] == '/':
 			for i < len(src) && src[i] != '\n' {
 				i++
@@ -210,9 +246,11 @@ func Parse(src []byte) (*File, error) {
 		return t, nil
 	}
 	if len(toks) == 0 {
+		f.raw = nil // empty or comment-only: render a fresh file
 		return f, nil
 	}
-	if _, err := expect('{'); err != nil {
+	open, err := expect('{')
+	if err != nil {
 		return nil, err
 	}
 	for p < len(toks) && toks[p].kind != '}' {
@@ -272,6 +310,17 @@ func Parse(src []byte) (*File, error) {
 		return nil, err
 	}
 	f.closeOff = lineStart(last.off)
+	// Surgical writes splice whole lines. If an asset shares a line with a brace
+	// or another asset (a one-line or minified GDT), fall back to rendering the
+	// whole file in APE's layout rather than splicing overlapping spans.
+	pos := lineEnd(open.off)
+	for _, a := range f.Assets {
+		if a.start < pos || a.end > f.closeOff {
+			f.raw = nil
+			break
+		}
+		pos = a.end
+	}
 	return f, nil
 }
 
@@ -330,33 +379,48 @@ func renderAsset(b *strings.Builder, a *Asset, nl string) {
 }
 
 // Save writes the file atomically (temp file + rename), keeping one backup of
-// the previous content as <file>.bak when the file already existed.
+// the previous content as <file>.bak when the file already existed. It refuses
+// to write output that doesn't parse back to the same assets.
 func (f *File) Save() error {
-	if old, err := os.ReadFile(f.Path); err == nil {
-		if err := os.WriteFile(f.Path+".bak", old, 0o644); err != nil {
-			return fmt.Errorf("backup: %w", err)
-		}
+	out := f.Bytes()
+	back, err := Parse(out)
+	if err != nil {
+		return fmt.Errorf("refusing to write %s: the result doesn't parse (%v)", f.Path, err)
+	}
+	if len(back.Assets) != len(f.Assets) {
+		return fmt.Errorf("refusing to write %s: %d assets in memory, %d in the rendered file", f.Path, len(f.Assets), len(back.Assets))
 	}
 	if err := os.MkdirAll(filepath.Dir(f.Path), 0o755); err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(f.Path), ".t7kb-gdt-*")
+	if old, err := os.ReadFile(f.Path); err == nil {
+		if err := writeAtomic(f.Path+".bak", old); err != nil {
+			return fmt.Errorf("backup: %w", err)
+		}
+	}
+	return writeAtomic(f.Path, out)
+}
+
+func writeAtomic(path string, data []byte) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".t7kb-gdt-*")
 	if err != nil {
 		return err
 	}
 	w := bufio.NewWriter(tmp)
-	_, werr := w.Write(f.Bytes())
+	_, werr := w.Write(data)
 	if ferr := w.Flush(); werr == nil {
 		werr = ferr
 	}
 	if cerr := tmp.Close(); werr == nil {
 		werr = cerr
 	}
+	if werr == nil {
+		werr = os.Rename(tmp.Name(), path) // fails on Windows if another program holds the file
+	}
 	if werr != nil {
 		os.Remove(tmp.Name())
-		return werr
 	}
-	return os.Rename(tmp.Name(), f.Path)
+	return werr
 }
 
 // Quote turns a real string into its GDT file form (backslashes and quotes escaped).
