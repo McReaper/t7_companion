@@ -156,7 +156,7 @@ func buildToolDef() mcp.Tool {
 		mcp.WithBoolean("skip_gdt",
 			mcp.Description("Skip the gdtdb /update pass before building (default false).")),
 		mcp.WithBoolean("gdt_rebuild",
-			mcp.Description("Run gdtdb /rebuild instead of /update — required after a GDT was edited outside APE (e.g. with gdt_edit), which /update does not notice (default false).")),
+			mcp.Description("Run gdtdb /rebuild (~1.5 min) instead of /update. /update does pick up GDTs edited outside APE (it reports processed (N GDTs)); use this only if it reports 0 GDTs and the linker then can't find an edited asset (default false).")),
 		mcp.WithString("tools_path",
 			mcp.Description("BO3 mod-tools root (default $TA_TOOLS_PATH).")),
 		mcp.WithString("game_path",
