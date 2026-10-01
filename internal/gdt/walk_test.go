@@ -85,3 +85,36 @@ func TestWalkParallelMatchesWalkDirOnInstall(t *testing.T) {
 	}
 	t.Logf("same %d files", len(par))
 }
+
+func TestIndexCacheRoundTrips(t *testing.T) {
+	w := fixture(t)
+	cache := indexPath(w.Root)
+	old := strings.TrimSuffix(cache, ".gob") + ".json"
+	if err := os.MkdirAll(filepath.Dir(cache), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(old, []byte(`{"v":1}`), 0o644); err != nil { // a version-1 cache
+		t.Fatal(err)
+	}
+	first, err := loadIndex(w.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(old); !os.IsNotExist(err) {
+		t.Errorf("the version-1 JSON cache should be removed once the gob one is written: %v", err)
+	}
+	cached := readIndexCache(cache, w.Root)
+	if len(cached) == 0 || len(cached) != len(first.files) {
+		t.Fatalf("cache holds %d files, index %d", len(cached), len(first.files))
+	}
+	if jobs, _ := staleGDTs(w.Root, cached); len(jobs) != 0 {
+		t.Fatalf("a fresh cache needs no rescan, got %v", jobs)
+	}
+	second, _ := loadIndex(w.Root)
+	if hits := second.lookup("child_mtl"); len(hits) != 1 || hits[0].Parent != "mine_base" || hits[0].File != "source_data/mine.gdt" {
+		t.Fatalf("an index read back from the cache keeps its hits: %+v", hits)
+	}
+	if got := readIndexCache(cache, filepath.Join(w.Root, "other")); len(got) != 0 {
+		t.Fatalf("a cache for another root is ignored")
+	}
+}
