@@ -9,6 +9,7 @@ on:
       - "go.mod"
       - "go.sum"
       - ".github/workflows/ci.yml"
+      - ".golangci.yml"
   push:
     branches: [main]
     paths:
@@ -16,6 +17,7 @@ on:
       - "go.mod"
       - "go.sum"
       - ".github/workflows/ci.yml"
+      - ".golangci.yml"
 
 permissions:
   contents: read
@@ -42,8 +44,10 @@ jobs:
           if [ -n "$unformatted" ]; then echo "not gofmt-formatted:"; echo "$unformatted"; exit 1; fi
       - name: go vet
         run: go vet ./...
-      - name: staticcheck
-        run: go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 ./... # the release built for go.mod's Go 1.25 (setup-go pins GOTOOLCHAIN=local)
+      - name: golangci-lint # staticcheck, errcheck, complexity and size limits: .golangci.yml
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.14.0
       - name: build
         run: go build ./...
       - name: cross-compile (release targets)

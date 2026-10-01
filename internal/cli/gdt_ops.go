@@ -59,20 +59,9 @@ func gdtGet(w *gdt.Workspace, name, file string, filter string, all bool) (any, 
 	if err != nil {
 		return nil, err
 	}
-	if len(locs) == 0 {
-		return nil, fmt.Errorf("asset %q not found in any GDT", name)
-	}
-	loc := locs[0]
-	if file != "" {
-		found := false
-		for _, l := range locs {
-			if strings.EqualFold(l.File, strings.ReplaceAll(file, `\`, "/")) {
-				loc, found = l, true
-			}
-		}
-		if !found {
-			return nil, fmt.Errorf("asset %q is not defined in %s", name, file)
-		}
+	loc, err := pickDefinition(locs, name, file)
+	if err != nil {
+		return nil, err
 	}
 	f, err := w.Load(loc.File)
 	if err != nil {
@@ -87,48 +76,25 @@ func gdtGet(w *gdt.Workspace, name, file string, filter string, all bool) (any, 
 		return nil, err
 	}
 	v := gdtAssetView{Asset: name, File: loc.File, Line: loc.Line, Type: typ, Parent: a.Parent, Stock: loc.Stock, Own: map[string]string{}}
-	own := map[string]bool{}
-	match := func(k string) bool {
-		return filter == "" || strings.Contains(strings.ToLower(k), strings.ToLower(filter))
-	}
-	hidden := 0
 	sc, _ := w.Schema(typ)
-	isDefault := func(k, val string) bool {
-		if val == "" || val == "0" {
-			return true
-		}
-		if sc == nil {
-			return false
-		}
-		e := sc.Lookup(k)
-		return e != nil && e.Default != "" && sameValue(e.Default, val)
-	}
-	show := func(k, val string) bool {
-		if !match(k) {
-			return false
-		}
-		if !all && isDefault(k, val) {
-			hidden++
-			return false
-		}
-		return true
-	}
+	ff := &fieldFilter{filter: strings.ToLower(filter), all: all, schema: sc}
+	own := map[string]bool{}
 	for _, fl := range a.Fields {
 		own[fl.Key] = true
-		if val := gdt.Unquote(fl.Value); show(fl.Key, val) {
+		if val := gdt.Unquote(fl.Value); ff.show(fl.Key, val) {
 			v.Own[fl.Key] = val
 		}
 	}
 	if a.Parent != "" {
 		v.Inherited = map[string]string{}
 		for _, fl := range fields {
-			if val := gdt.Unquote(fl.Value); !own[fl.Key] && show(fl.Key, val) {
+			if val := gdt.Unquote(fl.Value); !own[fl.Key] && ff.show(fl.Key, val) {
 				v.Inherited[fl.Key] = val
 			}
 		}
 	}
-	if hidden > 0 {
-		v.Hidden = fmt.Sprintf("%d empty, zero or default-valued fields not shown (pass all=true)", hidden)
+	if ff.hidden > 0 {
+		v.Hidden = fmt.Sprintf("%d empty, zero or default-valued fields not shown (pass all=true)", ff.hidden)
 	}
 	if iss, _, err := w.Validate(f, a); err == nil {
 		v.Issues = iss
@@ -137,6 +103,59 @@ func gdtGet(w *gdt.Workspace, name, file string, filter string, all bool) (any, 
 		v.Others = locs
 	}
 	return v, nil
+}
+
+// pickDefinition chooses the definition to read: the one in file, else the first.
+func pickDefinition(locs []gdt.Location, name, file string) (gdt.Location, error) {
+	if len(locs) == 0 {
+		return gdt.Location{}, fmt.Errorf("asset %q not found in any GDT", name)
+	}
+	if file == "" {
+		return locs[0], nil
+	}
+	var loc gdt.Location
+	found := false
+	for _, l := range locs {
+		if strings.EqualFold(l.File, strings.ReplaceAll(file, `\`, "/")) {
+			loc, found = l, true // the last match, as before
+		}
+	}
+	if !found {
+		return gdt.Location{}, fmt.Errorf("asset %q is not defined in %s", name, file)
+	}
+	return loc, nil
+}
+
+// fieldFilter decides which fields gdt_get shows: those whose key contains
+// filter, and — unless all — not empty, zero or the .awi's default. It counts
+// the ones it hides.
+type fieldFilter struct {
+	filter string // lower-cased
+	all    bool
+	schema *gdt.Schema
+	hidden int
+}
+
+func (ff *fieldFilter) show(k, val string) bool {
+	if ff.filter != "" && !strings.Contains(strings.ToLower(k), ff.filter) {
+		return false
+	}
+	if !ff.all && ff.isDefault(k, val) {
+		ff.hidden++
+		return false
+	}
+	return true
+}
+
+func (ff *fieldFilter) isDefault(k, val string) bool {
+	if val == "" || val == "0" {
+		return true
+	}
+	if ff.schema == nil {
+		return false
+	}
+	e := ff.schema.Lookup(k)
+	return e != nil && e.Default != "" && sameValue(e.Default, val)
 }
 
 func gdtSchema(w *gdt.Workspace, typ, materialType, filter string) (any, error) {

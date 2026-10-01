@@ -8,7 +8,6 @@ import (
 	_ "image/png" // register the PNG decoder for image.DecodeConfig
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -78,73 +77,66 @@ func (w *Workspace) imageDonor(sem string) ([]Field, int, error) {
 		d := v.(donor)
 		return d.fields, d.n, nil
 	}
-	w.refresh()
-	if w.scErr != nil {
-		return nil, 0, w.scErr
+	stock, err := w.indexedFiles(func(rel string, _ *fileEntry) bool { return w.isStockRel(rel) })
+	if err != nil {
+		return nil, 0, err
 	}
-	var stock []string
-	w.idx.mu.RLock()
-	for rel := range w.idx.files {
-		if w.stock[strings.ToLower(rel)] {
-			stock = append(stock, rel)
-		}
-	}
-	w.idx.mu.RUnlock()
-
 	needle := []byte(`"semantic" "` + sem + `"`)
 	var mu sync.Mutex
 	counts := map[string]map[string]int{} // key -> value -> images
-	var order []string                    // keys in first-seen order
 	n := 0
-	ch := make(chan string)
-	var wg sync.WaitGroup
-	for i := 0; i < runtime.NumCPU(); i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for rel := range ch {
-				b, err := os.ReadFile(filepath.Join(w.Root, filepath.FromSlash(rel)))
-				if err != nil || !bytes.Contains(b, needle) {
-					continue
-				}
-				f, err := Parse(b)
-				if err != nil {
-					continue
-				}
-				mu.Lock()
-				for _, a := range f.Assets {
-					if v, _ := a.Get("semantic"); a.Type != "image" || v != sem {
-						continue
-					}
-					n++
-					for _, fl := range a.Fields {
-						c := counts[fl.Key]
-						if c == nil {
-							c = map[string]int{}
-							counts[fl.Key] = c
-							order = append(order, fl.Key)
-						}
-						c[fl.Value]++
-					}
-				}
-				mu.Unlock()
-			}
-		}()
-	}
-	for _, rel := range stock {
-		ch <- rel
-	}
-	close(ch)
-	wg.Wait()
+	w.readEach(stock, func(_ string, b []byte, err error) {
+		if err != nil || !bytes.Contains(b, needle) {
+			return
+		}
+		f, err := Parse(b)
+		if err != nil {
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		n += countImageFields(f, sem, counts)
+	})
 	if n == 0 {
 		if len(stock) == 0 {
 			return nil, 0, fmt.Errorf("no stock GDTs known (stock.gdtdef missing or empty) to take %s image settings from", sem)
 		}
 		return nil, 0, fmt.Errorf("no stock image with semantic %q to take settings from", sem)
 	}
-	sort.Strings(order) // goroutines saw files in any order
-	fields := make([]Field, 0, len(order))
-	for _, k := range order {
+	fields := majorityFields(counts, n)
+	donorCache.Store(key, donor{fields, n})
+	return fields, n, nil
+}
+
+// countImageFields adds the fields of f's images of semantic sem to counts
+// (key -> value -> images) and returns how many images that was.
+func countImageFields(f *File, sem string, counts map[string]map[string]int) int {
+	n := 0
+	for _, a := range f.Assets {
+		if v, _ := a.Get("semantic"); a.Type != "image" || v != sem {
+			continue
+		}
+		n++
+		for _, fl := range a.Fields {
+			if counts[fl.Key] == nil {
+				counts[fl.Key] = map[string]int{}
+			}
+			counts[fl.Key][fl.Value]++
+		}
+	}
+	return n
+}
+
+// majorityFields keeps, for each key most of the n images carry, its most common
+// value (ties: the smallest), sorted by key.
+func majorityFields(counts map[string]map[string]int, n int) []Field {
+	keys := make([]string, 0, len(counts))
+	for k := range counts {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys) // goroutines saw files in any order
+	fields := make([]Field, 0, len(keys))
+	for _, k := range keys {
 		best, bestN, total := "", -1, 0
 		for v, c := range counts[k] {
 			total += c
@@ -157,8 +149,7 @@ func (w *Workspace) imageDonor(sem string) ([]Field, int, error) {
 		}
 		fields = append(fields, Field{Key: k, Value: best})
 	}
-	donorCache.Store(key, donor{fields, n})
-	return fields, n, nil
+	return fields
 }
 
 type donor struct {

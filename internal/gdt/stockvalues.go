@@ -1,9 +1,6 @@
 package gdt
 
 import (
-	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 )
@@ -26,64 +23,50 @@ func (w *Workspace) stockFieldValues(typ string) map[string]map[string]bool {
 	if v, ok := stockValues.Load(key); ok {
 		return v.(map[string]map[string]bool)
 	}
-	w.refresh()
-	if w.scErr != nil {
+	files, err := w.indexedFiles(func(rel string, fe *fileEntry) bool { return w.isStockRel(rel) && fe.has(typ) })
+	if err != nil {
 		return nil
 	}
-	var files []string
-	w.idx.mu.RLock()
-	for rel, fe := range w.idx.files {
-		if !w.stock[strings.ToLower(rel)] {
-			continue
-		}
-		for _, h := range fe.Assets {
-			if strings.EqualFold(h.Type, typ) {
-				files = append(files, rel)
-				break
-			}
-		}
-	}
-	w.idx.mu.RUnlock()
-
 	out := map[string]map[string]bool{}
 	var mu sync.Mutex
-	ch := make(chan string)
-	var wg sync.WaitGroup
-	for i := 0; i < runtime.NumCPU(); i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for rel := range ch {
-				b, err := os.ReadFile(filepath.Join(w.Root, filepath.FromSlash(rel)))
-				if err != nil {
-					continue
-				}
-				f, err := Parse(b)
-				if err != nil {
-					continue
-				}
-				mu.Lock()
-				for _, a := range f.Assets {
-					if !strings.EqualFold(a.Type, typ) {
-						continue
-					}
-					for _, fl := range a.Fields {
-						k := strings.ToLower(fl.Key)
-						if out[k] == nil {
-							out[k] = map[string]bool{}
-						}
-						out[k][strings.ToLower(strings.TrimSuffix(Unquote(fl.Value), "*"))] = true
-					}
-				}
-				mu.Unlock()
-			}
-		}()
-	}
-	for _, rel := range files {
-		ch <- rel
-	}
-	close(ch)
-	wg.Wait()
+	w.readEach(files, func(_ string, b []byte, err error) {
+		if err != nil {
+			return
+		}
+		f, err := Parse(b)
+		if err != nil {
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		addFieldValues(f, typ, out)
+	})
 	v, _ := stockValues.LoadOrStore(key, out)
 	return v.(map[string]map[string]bool)
+}
+
+// addFieldValues records every (lower-cased) field value of f's assets of typ.
+func addFieldValues(f *File, typ string, out map[string]map[string]bool) {
+	for _, a := range f.Assets {
+		if !strings.EqualFold(a.Type, typ) {
+			continue
+		}
+		for _, fl := range a.Fields {
+			k := strings.ToLower(fl.Key)
+			if out[k] == nil {
+				out[k] = map[string]bool{}
+			}
+			out[k][strings.ToLower(strings.TrimSuffix(Unquote(fl.Value), "*"))] = true
+		}
+	}
+}
+
+// has reports whether the file defines an asset of typ.
+func (fe *fileEntry) has(typ string) bool {
+	for _, h := range fe.Assets {
+		if strings.EqualFold(h.Type, typ) {
+			return true
+		}
+	}
+	return false
 }

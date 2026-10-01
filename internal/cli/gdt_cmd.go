@@ -12,6 +12,9 @@ import (
 	"github.com/McReaper/t7_companion/internal/gdt"
 )
 
+// gdtRun opens the workspace, runs fn and prints its answer as indented JSON.
+type gdtRun func(out io.Writer, fn func(*gdt.Workspace) (any, error)) error
+
 func newGDTCmd() *cobra.Command {
 	var toolsPath string
 	root := &cobra.Command{
@@ -33,103 +36,136 @@ func newGDTCmd() *cobra.Command {
 		enc.SetEscapeHTML(false)
 		return enc.Encode(v)
 	}
+	root.AddCommand(gdtFindCmd(run), gdtGetCmd(run), gdtSchemaCmd(run), gdtEditCmd(run), gdtCheckCmd(run), gdtRefsCmd(run))
+	return root
+}
 
-	find := &cobra.Command{Use: "find <asset>", Short: "List every GDT defining an asset", Args: cobra.ExactArgs(1),
+func gdtFindCmd(run gdtRun) *cobra.Command {
+	return &cobra.Command{Use: "find <asset>", Short: "List every GDT defining an asset", Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, a []string) error {
 			return run(c.OutOrStdout(), func(w *gdt.Workspace) (any, error) { return gdtFind(w, a[0]) })
 		}}
+}
 
-	var getFile, getFilter string
-	var getAll bool
-	get := &cobra.Command{Use: "get <asset>", Short: "Show an asset's fields and validation issues", Args: cobra.ExactArgs(1),
+func gdtGetCmd(run gdtRun) *cobra.Command {
+	var file, filter string
+	var all bool
+	cmd := &cobra.Command{Use: "get <asset>", Short: "Show an asset's fields and validation issues", Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, a []string) error {
-			return run(c.OutOrStdout(), func(w *gdt.Workspace) (any, error) { return gdtGet(w, a[0], getFile, getFilter, getAll) })
+			return run(c.OutOrStdout(), func(w *gdt.Workspace) (any, error) { return gdtGet(w, a[0], file, filter, all) })
 		}}
-	get.Flags().StringVar(&getFile, "file", "", "GDT to read from when defined in several")
-	get.Flags().StringVar(&getFilter, "filter", "", "only fields whose key contains this")
-	get.Flags().BoolVar(&getAll, "all", false, "also show empty and zero fields")
+	cmd.Flags().StringVar(&file, "file", "", "GDT to read from when defined in several")
+	cmd.Flags().StringVar(&filter, "filter", "", "only fields whose key contains this")
+	cmd.Flags().BoolVar(&all, "all", false, "also show empty and zero fields")
+	return cmd
+}
 
-	var mt, schFilter string
-	schema := &cobra.Command{Use: "schema [type]", Short: "Show the fields an asset type declares (and a material type's techset)", Args: cobra.MaximumNArgs(1),
+func gdtSchemaCmd(run gdtRun) *cobra.Command {
+	var mt, filter string
+	cmd := &cobra.Command{Use: "schema [type]", Short: "Show the fields an asset type declares (and a material type's techset)", Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, a []string) error {
 			typ := ""
 			if len(a) == 1 {
 				typ = a[0]
 			}
-			return run(c.OutOrStdout(), func(w *gdt.Workspace) (any, error) { return gdtSchema(w, typ, mt, schFilter) })
+			return run(c.OutOrStdout(), func(w *gdt.Workspace) (any, error) { return gdtSchema(w, typ, mt, filter) })
 		}}
-	schema.Flags().StringVar(&mt, "material-type", "", "for materials: resolve this techset")
-	schema.Flags().StringVar(&schFilter, "filter", "", "only entries matching this")
+	cmd.Flags().StringVar(&mt, "material-type", "", "for materials: resolve this techset")
+	cmd.Flags().StringVar(&filter, "filter", "", "only entries matching this")
+	return cmd
+}
 
-	var er gdt.EditRequest
-	var sets []string
-	var write bool
-	var batch string
-	var img gdt.ImageSpec
-	edit := &cobra.Command{Use: "edit", Short: "Create or update an asset (dry run unless --write)", Args: cobra.NoArgs,
-		RunE: func(c *cobra.Command, _ []string) error {
-			er.Set = map[string]string{}
-			for _, s := range sets {
-				k, v, ok := strings.Cut(s, "=")
-				if !ok {
-					return fmt.Errorf("--set wants key=value, got %q", s)
-				}
-				er.Set[k] = v
-			}
-			er.DryRun = !write
-			if batch != "" {
-				var b []byte
-				var err error
-				if batch == "-" {
-					b, err = io.ReadAll(c.InOrStdin())
-				} else {
-					b, err = os.ReadFile(batch)
-				}
-				if err != nil {
-					return err
-				}
-				var items []gdtEditItem
-				if err := decodeStrict(b, &items); err != nil {
-					return fmt.Errorf("--batch: %w", err)
-				}
-				return run(c.OutOrStdout(), func(w *gdt.Workspace) (any, error) { return gdtEditBatch(w, er.File, items, !write) })
-			}
-			if er.Asset == "" {
-				return fmt.Errorf("--asset is required (or --batch)")
-			}
-			if img != (gdt.ImageSpec{}) {
-				er.Image = &img
-			}
-			return run(c.OutOrStdout(), func(w *gdt.Workspace) (any, error) { return gdtEdit(w, er) })
-		}}
-	ef := edit.Flags()
-	ef.StringVar(&er.File, "file", "", "GDT path relative to the root (required)")
-	ef.StringVar(&er.Asset, "asset", "", "asset name (required)")
-	ef.StringVar(&er.Type, "type", "", "create a full asset of this type")
-	ef.StringVar(&er.Parent, "parent", "", "create a derived asset of this parent (must be in the same GDT)")
-	ef.StringVar(&er.CopyFrom, "copy-from", "", "create by copying this asset")
-	ef.StringArrayVar(&sets, "set", nil, "key=value (repeatable)")
-	ef.StringArrayVar(&er.Unset, "unset", nil, "key to remove (repeatable)")
-	ef.StringVar(&img.Texture, "image-texture", "", "create an image asset from this texture (relative to the root)")
-	ef.StringVar(&img.Semantic, "image-semantic", "", "image semantic (or derive it with --image-material-type + --image-field)")
-	ef.StringVar(&img.MaterialType, "image-material-type", "", "material type (techset) the image is for")
-	ef.StringVar(&img.Field, "image-field", "", "material field the image will fill, e.g. normalMap")
-	ef.StringVar(&batch, "batch", "", "JSON file (or - for stdin): a list of {asset, type, parent, copy_from, image, set, unset}")
-	ef.BoolVar(&write, "write", false, "save the change (default: dry run)")
-	_ = edit.MarkFlagRequired("file")
+// editFlags are `gdt edit`'s flags.
+type editFlags struct {
+	er    gdt.EditRequest
+	sets  []string
+	write bool
+	batch string
+	img   gdt.ImageSpec
+}
 
-	var chkAsset string
-	check := &cobra.Command{Use: "check <file.gdt>", Short: "Diagnose a GDT's assets (references, source files, schema, duplicates)", Args: cobra.ExactArgs(1),
+func gdtEditCmd(run gdtRun) *cobra.Command {
+	ef := &editFlags{}
+	cmd := &cobra.Command{Use: "edit", Short: "Create or update an asset (dry run unless --write)", Args: cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error { return ef.run(c, run) }}
+	fs := cmd.Flags()
+	fs.StringVar(&ef.er.File, "file", "", "GDT path relative to the root (required)")
+	fs.StringVar(&ef.er.Asset, "asset", "", "asset name (required)")
+	fs.StringVar(&ef.er.Type, "type", "", "create a full asset of this type")
+	fs.StringVar(&ef.er.Parent, "parent", "", "create a derived asset of this parent (must be in the same GDT)")
+	fs.StringVar(&ef.er.CopyFrom, "copy-from", "", "create by copying this asset")
+	fs.StringArrayVar(&ef.sets, "set", nil, "key=value (repeatable)")
+	fs.StringArrayVar(&ef.er.Unset, "unset", nil, "key to remove (repeatable)")
+	fs.StringVar(&ef.img.Texture, "image-texture", "", "create an image asset from this texture (relative to the root)")
+	fs.StringVar(&ef.img.Semantic, "image-semantic", "", "image semantic (or derive it with --image-material-type + --image-field)")
+	fs.StringVar(&ef.img.MaterialType, "image-material-type", "", "material type (techset) the image is for")
+	fs.StringVar(&ef.img.Field, "image-field", "", "material field the image will fill, e.g. normalMap")
+	fs.StringVar(&ef.batch, "batch", "", "JSON file (or - for stdin): a list of {asset, type, parent, copy_from, image, set, unset}")
+	fs.BoolVar(&ef.write, "write", false, "save the change (default: dry run)")
+	_ = cmd.MarkFlagRequired("file")
+	return cmd
+}
+
+func (ef *editFlags) run(c *cobra.Command, run gdtRun) error {
+	er := ef.er
+	er.Set = map[string]string{}
+	for _, s := range ef.sets {
+		k, v, ok := strings.Cut(s, "=")
+		if !ok {
+			return fmt.Errorf("--set wants key=value, got %q", s)
+		}
+		er.Set[k] = v
+	}
+	er.DryRun = !ef.write
+	if ef.batch != "" {
+		items, err := ef.readBatch(c.InOrStdin())
+		if err != nil {
+			return err
+		}
+		return run(c.OutOrStdout(), func(w *gdt.Workspace) (any, error) { return gdtEditBatch(w, er.File, items, !ef.write) })
+	}
+	if er.Asset == "" {
+		return fmt.Errorf("--asset is required (or --batch)")
+	}
+	if ef.img != (gdt.ImageSpec{}) {
+		img := ef.img
+		er.Image = &img
+	}
+	return run(c.OutOrStdout(), func(w *gdt.Workspace) (any, error) { return gdtEdit(w, er) })
+}
+
+// readBatch reads --batch: a JSON file, or stdin for "-".
+func (ef *editFlags) readBatch(stdin io.Reader) ([]gdtEditItem, error) {
+	var b []byte
+	var err error
+	if ef.batch == "-" {
+		b, err = io.ReadAll(stdin)
+	} else {
+		b, err = os.ReadFile(ef.batch)
+	}
+	if err != nil {
+		return nil, err
+	}
+	var items []gdtEditItem
+	if err := decodeStrict(b, &items); err != nil {
+		return nil, fmt.Errorf("--batch: %w", err)
+	}
+	return items, nil
+}
+
+func gdtCheckCmd(run gdtRun) *cobra.Command {
+	var asset string
+	cmd := &cobra.Command{Use: "check <file.gdt>", Short: "Diagnose a GDT's assets (references, source files, schema, duplicates)", Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, a []string) error {
-			return run(c.OutOrStdout(), func(w *gdt.Workspace) (any, error) { return gdtCheck(w, a[0], chkAsset) })
+			return run(c.OutOrStdout(), func(w *gdt.Workspace) (any, error) { return gdtCheck(w, a[0], asset) })
 		}}
-	check.Flags().StringVar(&chkAsset, "asset", "", "only check this asset")
+	cmd.Flags().StringVar(&asset, "asset", "", "only check this asset")
+	return cmd
+}
 
-	refs := &cobra.Command{Use: "refs <asset>", Short: "List the assets that reference an asset (fields and derived parents)", Args: cobra.ExactArgs(1),
+func gdtRefsCmd(run gdtRun) *cobra.Command {
+	return &cobra.Command{Use: "refs <asset>", Short: "List the assets that reference an asset (fields and derived parents)", Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, a []string) error {
 			return run(c.OutOrStdout(), func(w *gdt.Workspace) (any, error) { return gdtRefs(w, a[0]) })
 		}}
-
-	root.AddCommand(find, get, schema, edit, check, refs)
-	return root
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -123,83 +122,7 @@ func (w *Workspace) Check(file, asset string) (*CheckResult, error) {
 			continue
 		}
 		res.Checked++
-		rep := AssetReport{Asset: a.Name, Line: a.Line}
-		if a.Parent != "" && f.Find(a.Parent) == nil {
-			where := "is in no GDT"
-			if locs, _ := w.Find(a.Parent); len(locs) > 0 {
-				where = "is only in " + locs[0].File
-			}
-			rep.Issues = append(rep.Issues, Issue{"error", "", fmt.Sprintf("parent %q %s, not this GDT — gdtdb: `Parent Entity '%s' does not exist in GDT`", a.Parent, where, a.Parent), ""})
-		}
-		typ, fields, err := w.Resolved(f, a)
-		if err != nil { // a derivation cycle: report it on this asset and keep checking the rest
-			rep.Issues = append(rep.Issues, Issue{"error", "", err.Error() + " — gdtdb can't resolve this asset", ""})
-			typ, fields = "", nil
-		}
-		rep.Type = typ
-		if locs, _ := w.FindTyped(a.Name, typ); typ != "" && len(locs) > 1 {
-			var where []string
-			for _, l := range locs {
-				where = append(where, fmt.Sprintf("%s:%d", l.File, l.Line))
-			}
-			rep.Issues = append(rep.Issues, Issue{"error", "", fmt.Sprintf("%s defined more than once (Duplicate '%s' asset at link): %s", typ, typ, strings.Join(where, ", ")), ""})
-		}
-		if typ != "" {
-			var keys []string
-			for _, fl := range fields {
-				keys = append(keys, fl.Key)
-			}
-			for _, is := range w.validate(f, typ, fields, keys) {
-				switch is.Code {
-				case codeUndeclared: // script-built fields APE wrote; only new keys get this warning (gdt_edit)
-				case codeNoAsset: // reported below with the expected type
-				case codeStaleSlot: // left by an earlier materialType: Treyarch's own GDTs keep ~40k of these and link
-				default:
-					rep.Issues = append(rep.Issues, is)
-				}
-			}
-			for _, r := range w.Refs(typ, fields) {
-				locs, _ := w.Find(r.Target)
-				switch {
-				case len(locs) == 0:
-					rep.Issues = append(rep.Issues, Issue{"warning", r.Field, fmt.Sprintf("%s %q is in no GDT — fine only if it ships in a stock fastfile", r.Type, r.Target), ""})
-				default:
-					ok, found := false, ""
-					for _, l := range locs {
-						lt := w.TypeOf(l) // a derived target takes its parent's type
-						if lt == "" {
-							ok = true // unresolvable: don't guess
-						}
-						if found == "" {
-							found = lt
-						}
-						for _, want := range strings.Split(r.Type, "|") { // "xmodel | character | aitype"
-							if strings.EqualFold(lt, strings.TrimSpace(want)) {
-								ok = true
-							}
-						}
-					}
-					if !ok {
-						// only the core types are declared precisely: elsewhere the .awi's target is
-						// loose (stock "camo" fields name a weaponcamotable where it says weaponcamo)
-						level := "warning"
-						if coreTypes[strings.ToLower(r.Type)] {
-							level = "error"
-						}
-						rep.Issues = append(rep.Issues, Issue{level, r.Field, fmt.Sprintf("%q is a %s, but this field expects a %s", r.Target, found, r.Type), ""})
-					}
-				}
-			}
-			for _, fr := range w.FileRefs(typ, fields) {
-				if !fr.Exists {
-					if _, known := fileFields[typ][fr.Field]; known {
-						rep.Issues = append(rep.Issues, Issue{"error", fr.Field, fmt.Sprintf("source file %s does not exist", fr.Path), ""})
-					} else { // FX, surface FX, collision maps: stock ones ship compiled, not on disk
-						rep.Issues = append(rep.Issues, Issue{"warning", fr.Field, fmt.Sprintf("%s is not on disk — fine only if it ships in a stock fastfile", fr.Path), ""})
-					}
-				}
-			}
-		}
+		rep := w.checkAsset(f, a)
 		for _, is := range rep.Issues {
 			if is.Level == "error" {
 				res.Errors++
@@ -217,6 +140,123 @@ func (w *Workspace) Check(file, asset string) (*CheckResult, error) {
 	return res, nil
 }
 
+// checkAsset runs every diagnostic over one asset of f.
+func (w *Workspace) checkAsset(f *File, a *Asset) AssetReport {
+	rep := AssetReport{Asset: a.Name, Line: a.Line}
+	rep.Issues = append(rep.Issues, w.parentIssues(f, a)...)
+	typ, fields, err := w.Resolved(f, a)
+	if err != nil { // a derivation cycle: report it on this asset and keep checking the rest
+		rep.Issues = append(rep.Issues, Issue{"error", "", err.Error() + " — gdtdb can't resolve this asset", ""})
+		typ, fields = "", nil
+	}
+	rep.Type = typ
+	if typ == "" {
+		return rep
+	}
+	rep.Issues = append(rep.Issues, w.duplicateIssues(a.Name, typ)...)
+	rep.Issues = append(rep.Issues, w.schemaIssues(f, typ, fields)...)
+	for _, r := range w.Refs(typ, fields) {
+		rep.Issues = append(rep.Issues, w.refIssues(r)...)
+	}
+	rep.Issues = append(rep.Issues, w.fileIssues(typ, fields)...)
+	return rep
+}
+
+// parentIssues: a derived asset's parent must be in the same GDT.
+func (w *Workspace) parentIssues(f *File, a *Asset) []Issue {
+	if a.Parent == "" || f.Find(a.Parent) != nil {
+		return nil
+	}
+	where := "is in no GDT"
+	if locs, _ := w.Find(a.Parent); len(locs) > 0 {
+		where = "is only in " + locs[0].File
+	}
+	return []Issue{{"error", "", fmt.Sprintf("parent %q %s, not this GDT — gdtdb: `Parent Entity '%s' does not exist in GDT`", a.Parent, where, a.Parent), ""}}
+}
+
+// duplicateIssues: two definitions of the same resolved type fail the link.
+func (w *Workspace) duplicateIssues(name, typ string) []Issue {
+	locs, _ := w.FindTyped(name, typ)
+	if len(locs) < 2 {
+		return nil
+	}
+	var where []string
+	for _, l := range locs {
+		where = append(where, fmt.Sprintf("%s:%d", l.File, l.Line))
+	}
+	return []Issue{{"error", "", fmt.Sprintf("%s defined more than once (Duplicate '%s' asset at link): %s", typ, typ, strings.Join(where, ", ")), ""}}
+}
+
+// schemaIssues validates every field, minus the kinds gdt_check doesn't report.
+func (w *Workspace) schemaIssues(f *File, typ string, fields []Field) []Issue {
+	keys := make([]string, 0, len(fields))
+	for _, fl := range fields {
+		keys = append(keys, fl.Key)
+	}
+	var out []Issue
+	for _, is := range w.validate(f, typ, fields, keys) {
+		switch is.Code {
+		case codeUndeclared: // script-built fields APE wrote; only new keys get this warning (gdt_edit)
+		case codeNoAsset: // reported by refIssues with the expected type
+		case codeStaleSlot: // left by an earlier materialType: Treyarch's own GDTs keep ~40k of these and link
+		default:
+			out = append(out, is)
+		}
+	}
+	return out
+}
+
+// refIssues: a typed reference must name an asset, of the type the field expects.
+func (w *Workspace) refIssues(r Ref) []Issue {
+	locs, _ := w.Find(r.Target)
+	if len(locs) == 0 {
+		return []Issue{{"warning", r.Field, fmt.Sprintf("%s %q is in no GDT — fine only if it ships in a stock fastfile", r.Type, r.Target), ""}}
+	}
+	found := ""
+	for _, l := range locs {
+		lt := w.TypeOf(l) // a derived target takes its parent's type
+		if lt == "" || typeIn(lt, r.Type) {
+			return nil // unresolvable (don't guess), or the right type
+		}
+		if found == "" {
+			found = lt
+		}
+	}
+	// only the core types are declared precisely: elsewhere the .awi's target is
+	// loose (stock "camo" fields name a weaponcamotable where it says weaponcamo)
+	level := "warning"
+	if coreTypes[strings.ToLower(r.Type)] {
+		level = "error"
+	}
+	return []Issue{{level, r.Field, fmt.Sprintf("%q is a %s, but this field expects a %s", r.Target, found, r.Type), ""}}
+}
+
+// typeIn reports whether typ is one of the .awi's "xmodel | character | aitype".
+func typeIn(typ, wanted string) bool {
+	for _, want := range strings.Split(wanted, "|") {
+		if strings.EqualFold(typ, strings.TrimSpace(want)) {
+			return true
+		}
+	}
+	return false
+}
+
+// fileIssues: source files must be on disk — an error only for the ones gdt
+// knows are needed (LODs, xanim exports, image textures).
+func (w *Workspace) fileIssues(typ string, fields []Field) []Issue {
+	var out []Issue
+	for _, fr := range w.FileRefs(typ, fields) {
+		switch _, known := fileFields[typ][fr.Field]; {
+		case fr.Exists:
+		case known:
+			out = append(out, Issue{"error", fr.Field, fmt.Sprintf("source file %s does not exist", fr.Path), ""})
+		default: // FX, surface FX, collision maps: stock ones ship compiled, not on disk
+			out = append(out, Issue{"warning", fr.Field, fmt.Sprintf("%s is not on disk — fine only if it ships in a stock fastfile", fr.Path), ""})
+		}
+	}
+	return out
+}
+
 // RefHit is one place that references an asset.
 type RefHit struct {
 	File  string `json:"file"`
@@ -231,67 +271,30 @@ type RefHit struct {
 // the GDTs it couldn't read or parse, so a silent miss can't pass for "unused".
 // Source files (models' material names inside .xmodel_bin) are not searched.
 func (w *Workspace) ReferencedBy(name string) ([]RefHit, []string, error) {
-	w.refresh()
-	if w.scErr != nil {
-		return nil, nil, w.scErr
+	files, err := w.indexedFiles(nil)
+	if err != nil {
+		return nil, nil, err
 	}
-	w.idx.mu.RLock()
-	files := make([]string, 0, len(w.idx.files))
-	for rel := range w.idx.files {
-		files = append(files, rel)
-	}
-	w.idx.mu.RUnlock()
-
 	needle := []byte(`"` + Quote(name) + `"`)
 	var mu sync.Mutex
 	var out []RefHit
 	var bad []string
-	ch := make(chan string)
-	var wg sync.WaitGroup
-	for i := 0; i < runtime.NumCPU(); i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for rel := range ch {
-				b, err := os.ReadFile(filepath.Join(w.Root, filepath.FromSlash(rel)))
-				if err == nil && !bytes.Contains(b, needle) {
-					continue
-				}
-				var f *File
-				if err == nil {
-					f, err = Parse(b)
-				}
-				if err != nil {
-					mu.Lock()
-					bad = append(bad, fmt.Sprintf("%s: %v", rel, err))
-					mu.Unlock()
-					continue
-				}
-				for _, a := range f.Assets {
-					var hits []RefHit
-					if a.Parent == name {
-						hits = append(hits, RefHit{File: rel, Line: a.Line, Asset: a.Name, Field: "[parent]"})
-					}
-					for _, fl := range a.Fields {
-						// no self-skip: a material "clip" whose colorMap is the image "clip" is a real reference
-						if Unquote(fl.Value) == name {
-							hits = append(hits, RefHit{File: rel, Line: a.Line, Asset: a.Name, Type: a.Type, Field: fl.Key})
-						}
-					}
-					if len(hits) > 0 {
-						mu.Lock()
-						out = append(out, hits...)
-						mu.Unlock()
-					}
-				}
-			}
-		}()
-	}
-	for _, rel := range files {
-		ch <- rel
-	}
-	close(ch)
-	wg.Wait()
+	w.readEach(files, func(rel string, b []byte, err error) {
+		if err == nil && !bytes.Contains(b, needle) {
+			return
+		}
+		var f *File
+		if err == nil {
+			f, err = Parse(b)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		if err != nil {
+			bad = append(bad, fmt.Sprintf("%s: %v", rel, err))
+			return
+		}
+		out = append(out, refsIn(f, rel, name)...)
+	})
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].File != out[j].File {
 			return out[i].File < out[j].File
@@ -300,4 +303,21 @@ func (w *Workspace) ReferencedBy(name string) ([]RefHit, []string, error) {
 	})
 	sort.Strings(bad)
 	return out, bad, nil
+}
+
+// refsIn lists the assets of f that derive from name or have a field equal to it.
+func refsIn(f *File, rel, name string) []RefHit {
+	var hits []RefHit
+	for _, a := range f.Assets {
+		if a.Parent == name {
+			hits = append(hits, RefHit{File: rel, Line: a.Line, Asset: a.Name, Field: "[parent]"})
+		}
+		for _, fl := range a.Fields {
+			// no self-skip: a material "clip" whose colorMap is the image "clip" is a real reference
+			if Unquote(fl.Value) == name {
+				hits = append(hits, RefHit{File: rel, Line: a.Line, Asset: a.Name, Type: a.Type, Field: fl.Key})
+			}
+		}
+	}
+	return hits
 }

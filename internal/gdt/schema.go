@@ -261,86 +261,99 @@ func entryName(arg string) (name string, re *regexp.Regexp, ok bool) {
 }
 
 func fillArgs(e *Entry, kind string, args []string, vars *awiVars) {
-	str := func(i int) (string, bool) {
-		if i >= len(args) {
-			return "", false
-		}
-		a := strings.TrimSpace(args[i])
-		if len(a) >= 2 && a[0] == '"' && a[len(a)-1] == '"' {
-			return a[1 : len(a)-1], true
-		}
-		return a, false
-	}
-	num := func(i int) *float64 {
-		if i >= len(args) {
-			return nil
-		}
-		v, err := strconv.ParseFloat(strings.TrimSpace(args[i]), 64)
-		if err != nil {
-			return nil
-		}
-		return &v
-	}
 	switch kind {
 	case "Float", "Int":
-		if d := num(0); d != nil {
+		if d := numArg(args, 0); d != nil {
 			e.Default = strconv.FormatFloat(*d, 'f', -1, 64)
 		}
-		e.Min, e.Max = num(1), num(2)
+		e.Min, e.Max = numArg(args, 1), numArg(args, 2)
 	case "CheckBox":
-		if v, _ := str(0); v == "true" {
+		switch v, _ := strArg(args, 0); v {
+		case "true":
 			e.Default = "1"
-		} else if v == "false" {
+		case "false":
 			e.Default = "0"
 		}
 	case "Combo":
-		// the options are a literal or a static variable (awivars.go); a variable
-		// assigned in several branches contributes every value it can hold
-		var lists []string
-		ok := false
-		if len(args) > 0 {
-			lists, ok = vars.eval(args[0])
-		}
-		e.openOptions = !ok
-		for _, v := range lists {
-			for _, o := range strings.Split(v, "|") {
-				o = strings.TrimSpace(o)
-				if strings.HasSuffix(o, "*") {
-					o = strings.TrimSuffix(o, "*")
-					if e.Default == "" {
-						e.Default = o
-					}
-				}
-				if o != "" && !contains(e.Options, o) {
-					e.Options = append(e.Options, o)
-				}
-			}
-		}
-		if e.Default == "" && len(e.Options) > 0 {
-			e.Default = e.Options[0]
-		}
-		// AddEntry_Combo( name, options, true ): an editable combo — a scene object's
-		// Name is any targetname, a notetrack's function any script function
-		if len(args) > 1 && strings.TrimSpace(args[1]) == "true" {
-			e.Editable = true
-		}
+		fillCombo(e, args, vars)
 	case "AssetCombo":
-		if v, lit := str(0); lit {
+		if v, lit := strArg(args, 0); lit {
 			e.AssetType = v
 		}
 	case "String", "Path", "Texture", "Text":
-		if v, lit := str(0); lit {
+		if v, lit := strArg(args, 0); lit {
 			e.Default = v
 		}
 	case "Vector", "Color":
 		var vs []string
 		for i := range args {
-			if n := num(i); n != nil {
+			if n := numArg(args, i); n != nil {
 				vs = append(vs, strconv.FormatFloat(*n, 'f', -1, 64))
 			}
 		}
 		e.Default = strings.Join(vs, " ")
 	}
+}
+
+// fillCombo reads a combo's options: a literal or a static variable
+// (awivars.go) — a variable assigned in several branches contributes every value
+// it can hold. A "*" marks the default, else it's the first option.
+func fillCombo(e *Entry, args []string, vars *awiVars) {
+	var lists []string
+	ok := false
+	if len(args) > 0 {
+		lists, ok = vars.eval(args[0])
+	}
+	e.openOptions = !ok
+	for _, v := range lists {
+		for _, o := range strings.Split(v, "|") {
+			e.addOption(strings.TrimSpace(o))
+		}
+	}
+	if e.Default == "" && len(e.Options) > 0 {
+		e.Default = e.Options[0]
+	}
+	// AddEntry_Combo( name, options, true ): an editable combo — a scene object's
+	// Name is any targetname, a notetrack's function any script function
+	if len(args) > 1 && strings.TrimSpace(args[1]) == "true" {
+		e.Editable = true
+	}
+}
+
+func (e *Entry) addOption(o string) {
+	if strings.HasSuffix(o, "*") {
+		o = strings.TrimSuffix(o, "*")
+		if e.Default == "" {
+			e.Default = o
+		}
+	}
+	if o != "" && !contains(e.Options, o) {
+		e.Options = append(e.Options, o)
+	}
+}
+
+// strArg returns argument i unquoted, and whether it was a string literal.
+func strArg(args []string, i int) (string, bool) {
+	if i >= len(args) {
+		return "", false
+	}
+	a := strings.TrimSpace(args[i])
+	if len(a) >= 2 && a[0] == '"' && a[len(a)-1] == '"' {
+		return a[1 : len(a)-1], true
+	}
+	return a, false
+}
+
+// numArg returns argument i as a number, or nil.
+func numArg(args []string, i int) *float64 {
+	if i >= len(args) {
+		return nil
+	}
+	v, err := strconv.ParseFloat(strings.TrimSpace(args[i]), 64)
+	if err != nil {
+		return nil
+	}
+	return &v
 }
 
 var chainRE = regexp.MustCompile(`^\s*\.\s*(\w+)\s*\(`)

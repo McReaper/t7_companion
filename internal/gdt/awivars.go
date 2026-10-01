@@ -89,64 +89,79 @@ func (v *awiVars) values(name string) ([]string, bool) {
 // as in AngelScript), """heredocs""", static variables and +.
 func (v *awiVars) eval(expr string) ([]string, bool) {
 	acc := []string{""}
-	join := func(next []string) bool {
-		var out []string
-		for _, a := range acc {
-			for _, b := range next {
-				out = append(out, a+b)
-			}
-		}
-		if len(out) > maxValues {
-			return false
-		}
-		acc = out
-		return true
-	}
 	s, terms := strings.TrimSpace(expr), 0
 	for s != "" {
-		switch {
-		case strings.HasPrefix(s, `"""`):
-			end := strings.Index(s[3:], `"""`)
-			if end < 0 {
-				return nil, false
-			}
-			join([]string{s[3 : 3+end]})
-			s = s[3+end+3:]
-		case s[0] == '"':
-			i := 1
-			var b strings.Builder
-			for ; i < len(s) && s[i] != '"'; i++ {
-				if s[i] == '\\' && i+1 < len(s) {
-					i++
-				}
-				b.WriteByte(s[i])
-			}
-			if i >= len(s) {
-				return nil, false
-			}
-			join([]string{b.String()})
-			s = s[i+1:]
-		case s[0] == '+':
-			s = s[1:]
-		default:
-			id := identRE.FindString(s)
-			if id == "" {
-				return nil, false
-			}
-			rest := strings.TrimSpace(s[len(id):])
-			if rest != "" && rest[0] != '+' && rest[0] != '"' { // a call, an index, an operator
-				return nil, false
-			}
-			vals, ok := v.values(id)
-			if !ok || !join(vals) {
-				return nil, false
-			}
-			s = rest
+		if s[0] == '+' {
+			s = strings.TrimSpace(s[1:])
+			continue
 		}
-		s = strings.TrimSpace(s)
+		vals, rest, ok := v.term(s)
+		if !ok {
+			return nil, false
+		}
+		if acc = product(acc, vals); acc == nil {
+			return nil, false
+		}
+		s = strings.TrimSpace(rest)
 		terms++
 	}
 	return acc, terms > 0
+}
+
+// term reads the literal, heredoc or variable at the start of s: its values and
+// what follows it.
+func (v *awiVars) term(s string) ([]string, string, bool) {
+	switch {
+	case strings.HasPrefix(s, `"""`):
+		end := strings.Index(s[3:], `"""`)
+		if end < 0 {
+			return nil, "", false
+		}
+		return []string{s[3 : 3+end]}, s[3+end+3:], true
+	case s[0] == '"':
+		lit, n, ok := stringLiteral(s)
+		return []string{lit}, s[n:], ok
+	}
+	id := identRE.FindString(s)
+	if id == "" {
+		return nil, "", false
+	}
+	rest := strings.TrimSpace(s[len(id):])
+	if rest != "" && rest[0] != '+' && rest[0] != '"' { // a call, an index, an operator
+		return nil, "", false
+	}
+	vals, ok := v.values(id)
+	return vals, rest, ok
+}
+
+// stringLiteral reads the "…" at the start of s (escapes resolved) and its length.
+func stringLiteral(s string) (string, int, bool) {
+	var b strings.Builder
+	i := 1
+	for ; i < len(s) && s[i] != '"'; i++ {
+		if s[i] == '\\' && i+1 < len(s) {
+			i++
+		}
+		b.WriteByte(s[i])
+	}
+	if i >= len(s) {
+		return "", 0, false
+	}
+	return b.String(), i + 1, true
+}
+
+// product concatenates every a with every b; nil past maxValues.
+func product(as, bs []string) []string {
+	var out []string
+	for _, a := range as {
+		for _, b := range bs {
+			out = append(out, a+b)
+		}
+	}
+	if len(out) > maxValues {
+		return nil
+	}
+	return out
 }
 
 var identRE = regexp.MustCompile(`^[A-Za-z_]\w*`)

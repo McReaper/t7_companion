@@ -77,27 +77,19 @@ func (w *Workspace) EditBatch(file string, reqs []EditRequest, dryRun bool) (*Ba
 	if len(reqs) == 0 {
 		return nil, fmt.Errorf("nothing to edit")
 	}
-	path := filepath.Clean(w.Abs(file))
+	path, err := w.editablePath(file)
+	if err != nil {
+		return nil, err
+	}
 	br := &BatchResult{File: w.Rel(path)}
-	if !w.InGDTDirs(path) {
-		return nil, fmt.Errorf("%s is outside the directories gdtdb indexes (%s, from bin/converter_gdt_dirs_0.txt) — it would never be built",
-			br.File, strings.Join(GDTDirs(w.Root), ", "))
-	}
-	if w.IsStock(path) {
-		return nil, fmt.Errorf("%s is a stock Treyarch GDT (listed in stock.gdtdef) — don't edit it; "+
-			"copy_from the asset into your own GDT instead (a parent must be in the same GDT, so you can't derive from a stock one)", br.File)
-	}
 	unlock := w.lockFile(path)
 	defer unlock()
-	var f *File
 	before, statErr := os.Stat(path)
+	f := &File{Path: path, CRLF: true}
 	if statErr == nil {
-		var err error
 		if f, err = ParseFile(path); err != nil {
 			return nil, err
 		}
-	} else {
-		f = &File{Path: path, CRLF: true}
 	}
 	var created []*EditResult // for the next-step hints
 	for _, req := range reqs {
@@ -109,68 +101,88 @@ func (w *Workspace) EditBatch(file string, reqs []EditRequest, dryRun bool) (*Ba
 		if res.Created {
 			created = append(created, res)
 		}
-		for _, is := range res.Issues {
-			if is.Level == "error" {
-				br.Errors++
-			}
-		}
+		br.Errors += countErrors(res.Issues)
 		br.Results = append(br.Results, res)
 	}
-	if br.Errors == 0 && !dryRun {
-		// APE (or anything else) may have saved the file since we read it.
-		now, err := os.Stat(path)
-		changed := (statErr == nil) != (err == nil) ||
-			(err == nil && (now.ModTime() != before.ModTime() || now.Size() != before.Size()))
-		if changed {
-			return nil, fmt.Errorf("%s changed on disk while it was being edited (saved in APE?) — nothing written; run the edit again", br.File)
-		}
-		if err := f.Save(); err != nil {
-			return nil, err
-		}
-		w.Touched(path)
-		br.Written = true
-		for _, r := range br.Results {
-			r.Written = true
-		}
-		br.Next = []string{
-			"Build as usual: its `gdtdb /update` pass indexes the changed GDT (it should report processed (1 GDTs)); " +
-				"only if it reports 0 GDTs and the linker then can't find the asset, rebuild with gdt_rebuild=true",
-		}
-		for _, c := range created {
-			name, typ := c.Asset, c.Type
-			switch typ {
-			case "material":
-				br.Next = append(br.Next, fmt.Sprintf("Don't zone material %q on its own: it is built through what uses it — an xmodel "+
-					"(as mc/<name>) or map geometry (as wc/<name>), whose techset variants are the precompiled ones. A bare "+
-					"`material,<name>` line asks for an unprefixed variant that isn't in the shader cache and fails to compile", name))
-			case "image":
-				// pulled in by the material that uses it
-			case "":
-			default:
-				br.Next = append(br.Next, fmt.Sprintf("Add `%s,%s` to the map/mod .zone (or zone something that references it) so the linker packs it", typ, name))
-			}
+	if br.Errors > 0 || dryRun {
+		return br, nil
+	}
+	// APE (or anything else) may have saved the file since we read it.
+	if changedSince(path, before, statErr) {
+		return nil, fmt.Errorf("%s changed on disk while it was being edited (saved in APE?) — nothing written; run the edit again", br.File)
+	}
+	if err := f.Save(); err != nil {
+		return nil, err
+	}
+	w.Touched(path)
+	br.Written = true
+	for _, r := range br.Results {
+		r.Written = true
+	}
+	br.Next = nextSteps(created)
+	return br, nil
+}
+
+// editablePath resolves file and refuses the GDTs an edit must not touch:
+// outside what gdtdb indexes (never built), or a stock one.
+func (w *Workspace) editablePath(file string) (string, error) {
+	path := filepath.Clean(w.Abs(file))
+	if !w.InGDTDirs(path) {
+		return "", fmt.Errorf("%s is outside the directories gdtdb indexes (%s, from bin/converter_gdt_dirs_0.txt) — it would never be built",
+			w.Rel(path), strings.Join(GDTDirs(w.Root), ", "))
+	}
+	if w.IsStock(path) {
+		return "", fmt.Errorf("%s is a stock Treyarch GDT (listed in stock.gdtdef) — don't edit it; "+
+			"copy_from the asset into your own GDT instead (a parent must be in the same GDT, so you can't derive from a stock one)", w.Rel(path))
+	}
+	return path, nil
+}
+
+func countErrors(iss []Issue) int {
+	n := 0
+	for _, is := range iss {
+		if is.Level == "error" {
+			n++
 		}
 	}
-	return br, nil
+	return n
+}
+
+// changedSince reports whether path was created, deleted or modified since the
+// stat that returned before/statErr.
+func changedSince(path string, before os.FileInfo, statErr error) bool {
+	now, err := os.Stat(path)
+	if (statErr == nil) != (err == nil) {
+		return true
+	}
+	return err == nil && (now.ModTime() != before.ModTime() || now.Size() != before.Size())
+}
+
+// nextSteps tells the agent what to do after a write: build, and zone what it created.
+func nextSteps(created []*EditResult) []string {
+	next := []string{
+		"Build as usual: its `gdtdb /update` pass indexes the changed GDT (it should report processed (1 GDTs)); " +
+			"only if it reports 0 GDTs and the linker then can't find the asset, rebuild with gdt_rebuild=true",
+	}
+	for _, c := range created {
+		switch c.Type {
+		case "material":
+			next = append(next, fmt.Sprintf("Don't zone material %q on its own: it is built through what uses it — an xmodel "+
+				"(as mc/<name>) or map geometry (as wc/<name>), whose techset variants are the precompiled ones. A bare "+
+				"`material,<name>` line asks for an unprefixed variant that isn't in the shader cache and fails to compile", c.Asset))
+		case "image", "": // an image is pulled in by the material that uses it
+		default:
+			next = append(next, fmt.Sprintf("Add `%s,%s` to the map/mod .zone (or zone something that references it) so the linker packs it", c.Type, c.Asset))
+		}
+	}
+	return next
 }
 
 // applyEdit applies one request to an in-memory file and validates the result.
 func (w *Workspace) applyEdit(f *File, req EditRequest) (*EditResult, error) {
 	res := &EditResult{File: w.Rel(f.Path), Asset: req.Asset}
-	if err := ValidName("asset name", req.Asset); err != nil {
+	if err := req.validNames(); err != nil {
 		return nil, err
-	}
-	for what, v := range map[string]string{"parent": req.Parent, "type": req.Type, "copy_from": req.CopyFrom} {
-		if v != "" {
-			if err := ValidName(what, v); err != nil {
-				return nil, err
-			}
-		}
-	}
-	for k := range req.Set {
-		if err := ValidName("field key", k); err != nil {
-			return nil, err
-		}
 	}
 	a, err := w.target(f, req)
 	if err != nil {
@@ -186,63 +198,28 @@ func (w *Workspace) applyEdit(f *File, req EditRequest) (*EditResult, error) {
 		res.Issues = append(res.Issues, issues...)
 		f.Add(a)
 	}
-
 	before := map[string]string{}
 	for _, fl := range a.Fields {
 		before[fl.Key] = fl.Value
 	}
-	keys := make([]string, 0, len(req.Set))
-	for k := range req.Set {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys := sortedKeys(req.Set)
 	for _, k := range keys {
 		a.Set(k, Quote(req.Set[k]))
 	}
 	for _, k := range req.Unset {
 		a.Unset(k)
 	}
-
-	typ, fields, err := w.Resolved(f, a)
+	typ, fields, err := w.applyEffects(f, a, req.Set)
 	if err != nil {
 		return nil, err
 	}
-	if fx := w.apeEffects(typ, req.Set); len(fx) > 0 { // what APE writes when those fields change
-		for k, v := range fx {
-			a.Set(k, Quote(v))
-		}
-		if typ, fields, err = w.Resolved(f, a); err != nil {
-			return nil, err
-		}
-	}
 	res.Type = typ
 	res.Issues = append(res.Issues, w.validate(f, typ, fields, keys)...)
-	for _, fr := range w.FileRefs(typ, fields) {
-		changed := false
-		for _, k := range keys {
-			changed = changed || k == fr.Field
-		}
-		if !fr.Exists && (changed || res.Created) {
-			res.Issues = append(res.Issues, Issue{"warning", fr.Field, fmt.Sprintf("source file %s does not exist yet", fr.Path), ""})
-		}
-	}
+	res.Issues = append(res.Issues, w.missingSources(typ, fields, keys, res.Created)...)
 	if res.Issues == nil {
 		res.Issues = []Issue{}
 	}
-
-	for _, fl := range a.Fields {
-		old, had := before[fl.Key]
-		switch {
-		case !had && !res.Created:
-			res.Changes = append(res.Changes, fmt.Sprintf("+ %s = \"%s\"", fl.Key, Unquote(fl.Value)))
-		case had && old != fl.Value:
-			res.Changes = append(res.Changes, fmt.Sprintf("~ %s: \"%s\" -> \"%s\"", fl.Key, Unquote(old), Unquote(fl.Value)))
-		}
-		delete(before, fl.Key)
-	}
-	for k := range before {
-		res.Changes = append(res.Changes, "- "+k)
-	}
+	res.Changes = changeList(before, a, res.Created)
 	if res.Created {
 		head := []string{fmt.Sprintf("+ asset %q (%d fields)", a.Name, len(a.Fields))}
 		if imageNote != "" {
@@ -251,6 +228,85 @@ func (w *Workspace) applyEdit(f *File, req EditRequest) (*EditResult, error) {
 		res.Changes = append(head, res.Changes...)
 	}
 	return res, nil
+}
+
+// validNames refuses names and keys the GDT format can't hold.
+func (req EditRequest) validNames() error {
+	if err := ValidName("asset name", req.Asset); err != nil {
+		return err
+	}
+	for what, v := range map[string]string{"parent": req.Parent, "type": req.Type, "copy_from": req.CopyFrom} {
+		if v != "" {
+			if err := ValidName(what, v); err != nil {
+				return err
+			}
+		}
+	}
+	for k := range req.Set {
+		if err := ValidName("field key", k); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func sortedKeys(m map[string]string) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// applyEffects resolves the asset after also writing what APE writes when the
+// set fields change (apeeffects.go).
+func (w *Workspace) applyEffects(f *File, a *Asset, set map[string]string) (string, []Field, error) {
+	typ, fields, err := w.Resolved(f, a)
+	if err != nil {
+		return "", nil, err
+	}
+	fx := w.apeEffects(typ, set)
+	if len(fx) == 0 {
+		return typ, fields, nil
+	}
+	for k, v := range fx {
+		a.Set(k, Quote(v))
+	}
+	return w.Resolved(f, a)
+}
+
+// missingSources warns about source files not on disk among the fields just set
+// (or all of a new asset's).
+func (w *Workspace) missingSources(typ string, fields []Field, keys []string, created bool) []Issue {
+	var out []Issue
+	for _, fr := range w.FileRefs(typ, fields) {
+		if !fr.Exists && (created || contains(keys, fr.Field)) {
+			out = append(out, Issue{"warning", fr.Field, fmt.Sprintf("source file %s does not exist yet", fr.Path), ""})
+		}
+	}
+	return out
+}
+
+// changeList describes an asset's fields against their values before the edit:
+// + added, ~ changed, - removed (in field order, removals sorted). A new asset's
+// fields are summarised by the caller rather than listed as additions.
+func changeList(before map[string]string, a *Asset, created bool) []string {
+	var out []string
+	for _, fl := range a.Fields {
+		old, had := before[fl.Key]
+		switch {
+		case !had && !created:
+			out = append(out, fmt.Sprintf("+ %s = \"%s\"", fl.Key, Unquote(fl.Value)))
+		case had && old != fl.Value:
+			out = append(out, fmt.Sprintf("~ %s: \"%s\" -> \"%s\"", fl.Key, Unquote(old), Unquote(fl.Value)))
+		}
+		delete(before, fl.Key)
+	}
+	for _, k := range sortedKeys(before) {
+		out = append(out, "- "+k)
+	}
+	return out
 }
 
 // newAsset builds the asset a request creates — from a texture (image), a donor
