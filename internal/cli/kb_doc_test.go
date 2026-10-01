@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"regexp"
 	"strconv"
@@ -13,7 +14,7 @@ import (
 	"github.com/McReaper/t7_companion/internal/store"
 )
 
-var nextOffsetRE = regexp.MustCompile(`and offset (\d+)\.\]\n$`)
+var nextOffsetRE = regexp.MustCompile(`and offset (\d+);[^\]]*\]\n$`)
 
 // readAll follows a document's pages the way an agent does and returns the
 // body they add up to and how many pages it took.
@@ -143,5 +144,54 @@ func TestPagingOnTheRealCorpus(t *testing.T) {
 			t.Fatalf("%s: %d pages give %d of %d bytes", id, pages, len(got), len(d.Body))
 		}
 		t.Logf("%s: %d bytes in %d pages", id, len(d.Body), pages)
+	}
+}
+
+func TestGetFindJumpsToThePassage(t *testing.T) {
+	var b strings.Builder
+	for i := 0; i < 2000; i++ {
+		fmt.Fprintf(&b, "filler line %d about nothing in particular — ✓\n", i)
+	}
+	b.WriteString("the hintstring uses ^3 for yellow and ^7 to reset\n")
+	for i := 0; i < 2000; i++ {
+		fmt.Fprintf(&b, "more filler %d\n", i)
+	}
+	b.WriteString("a second HINTSTRING note\n")
+	b.WriteString(strings.Repeat("x", 5000) + " needle far into a very long minified line\n")
+	d := &store.Doc{DocID: "x::thread", Title: "Thread", Source: "x", Body: b.String()}
+	hint := strings.Index(d.Body, "the hintstring")
+
+	page, err := docPage(d, 0, "HintString uses", pageSize(0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(pageBody(page), "the hintstring uses ^3") {
+		t.Fatalf("find starts the page at the matching line, case-insensitively: %.80q", pageBody(page))
+	}
+	if !strings.Contains(page, fmt.Sprintf("(continued from offset %d)", hint)) {
+		t.Fatal("the page says where it starts")
+	}
+
+	next, err := docPage(d, hint+len("the hintstring"), "hintstring", pageSize(0))
+	if err != nil || !strings.HasPrefix(pageBody(next), "a second HINTSTRING note") {
+		t.Fatalf("find with offset finds the next occurrence: %v %.60q", err, pageBody(next))
+	}
+
+	far, err := docPage(d, 0, "needle", 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body := pageBody(far); !strings.Contains(body, "needle") || strings.Count(body, "x") > findContext+1 {
+		t.Fatalf("on a very long line the page starts just before the match: %d x's", strings.Count(body, "x"))
+	}
+
+	if _, err := docPage(d, 0, "not in there", 1000); err == nil || !strings.Contains(err.Error(), "is not in the document") {
+		t.Fatalf("a find that matches nothing is an error, not a silent first page: %v", err)
+	}
+	if _, err := docPage(d, len(d.Body)+1, "x", 1000); err == nil {
+		t.Fatal("find from an offset past the end is an error")
+	}
+	if i := indexFoldASCII("Ünïcode ÉCOLE then école", "école"); i != strings.Index("Ünïcode ÉCOLE then école", "école") {
+		t.Fatalf("only ASCII is folded, so byte offsets stay exact: %d", i)
 	}
 }

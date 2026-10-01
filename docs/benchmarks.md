@@ -42,6 +42,8 @@ It builds each answer with the same functions the MCP handlers use and counts to
 
 `get` serves long bodies a page at a time (16,000 characters by default, `max_chars` up to 64,000, `offset` for the next part). Corpus bodies have a median of 1.2k characters but a p99 of 275k and a maximum of 98 MB (`source-workspace` indexes whole GDTs and scripts; 1,347 documents exceed 100k characters). Before paging, the same `get` rows had a p90 of 3,790 / 5,597 and a max of **38,278 / 41,308** tokens; the median is unchanged, since 90%+ of documents fit in one page. A full page of a GDT is ~5.3k tokens rather than ~4k: paths and numbers tokenize denser than prose.
 
+Paging only costs answer quality when the passage the search matched sits past the first page: of the bench queries' 48 top-3 hits, 41 fit in one page, and of the 7 paged ones the snippet's passage was on page 1 for 4. With `find` set to a phrase from the snippet, it is in the page returned for all 7.
+
 ## Latency and memory
 
 | Benchmark | Result |

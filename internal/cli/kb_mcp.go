@@ -70,10 +70,12 @@ func getToolDef() mcp.Tool {
 	return mcp.NewTool("get",
 		mcp.WithDescription("Fetch a document's body by its doc_id (from a search result). Long documents "+
 			"(whole scripts, GDTs, transcripts) come a page at a time — about 16k characters by default — "+
-			"ending with the offset to pass for the next part; most documents fit in one page."),
+			"ending with the offset to pass for the next part; most documents fit in one page. To reach a "+
+			"passage deep in a long one, pass find with a term from it (e.g. from the search snippet)."),
 		mcp.WithString("doc_id", mcp.Required(),
 			mcp.Description("The doc_id to fetch, e.g. \"gscode-api::api.gsc.setclientfield\".")),
 		mcp.WithNumber("offset", mcp.Description("Where to start in the body, from a previous page's truncation note (default 0).")),
+		mcp.WithString("find", mcp.Description("Start the page at this word or phrase (case-insensitive), e.g. a term from the search snippet — the way to reach a passage deep in a long document. With offset (e.g. the one in a page's truncation note), finds the next occurrence after it.")),
 		mcp.WithNumber("max_chars", mcp.Description("Page size in characters (default 16000, at most 64000).")),
 	)
 }
@@ -91,7 +93,7 @@ func getToolHandler(st *store.Store) server.ToolHandlerFunc {
 		if doc == nil {
 			return mcp.NewToolResultError("no such doc_id: " + docID), nil
 		}
-		page, err := renderDoc(doc, req.GetInt("offset", 0), pageSize(req.GetInt("max_chars", 0)))
+		page, err := docPage(doc, req.GetInt("offset", 0), req.GetString("find", ""), pageSize(req.GetInt("max_chars", 0)))
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}

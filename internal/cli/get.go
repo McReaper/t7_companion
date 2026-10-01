@@ -8,6 +8,7 @@ import (
 
 func newGetCmd() *cobra.Command {
 	var offset, maxChars int
+	var find string
 	var all bool
 	cmd := &cobra.Command{
 		Use:   "get <doc_id>",
@@ -31,7 +32,7 @@ func newGetCmd() *cobra.Command {
 			if all {
 				size = 0
 			}
-			page, err := renderDoc(doc, offset, size)
+			page, err := docPage(doc, offset, find, size)
 			if err != nil {
 				return err
 			}
@@ -41,6 +42,7 @@ func newGetCmd() *cobra.Command {
 	}
 	cmd.Flags().IntVar(&offset, "offset", 0, "where to start in the body (from a previous page's truncation note)")
 	cmd.Flags().IntVar(&maxChars, "max-chars", defaultPageChars, fmt.Sprintf("page size in characters (at most %d)", maxPageChars))
+	cmd.Flags().StringVar(&find, "find", "", "start the page at this word or phrase (case-insensitive; with --offset, the next occurrence after it)")
 	cmd.Flags().BoolVar(&all, "all", false, "print the whole body, however long")
 	return cmd
 }
