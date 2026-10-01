@@ -13,7 +13,8 @@ import (
 // Entry is one field APE's property page declares for an asset type, read
 // statically from the AngelScript deffile (deffiles/<type>.awi). Only the
 // declaration is known: the .awi's own validation functions are script and are
-// not executed here.
+// not executed here — the few that matter are ported (validateLODs,
+// surfaceTypeSet, apeeffects.go).
 type Entry struct {
 	Name      string   `json:"name"`
 	Pattern   bool     `json:"pattern,omitempty"` // name built at runtime: Name has a * for each runtime part ("autogenLod*Percent")
@@ -21,7 +22,8 @@ type Entry struct {
 	Default   string   `json:"default,omitempty"`
 	Min       *float64 `json:"min,omitempty"`
 	Max       *float64 `json:"max,omitempty"`
-	Options   []string `json:"options,omitempty"`    // Combo choices (when static)
+	Options   []string `json:"options,omitempty"`    // Combo choices (when static: a literal or a static variable)
+	Editable  bool     `json:"editable,omitempty"`   // Combo that also takes free text: Options are suggestions
 	AssetType string   `json:"asset_type,omitempty"` // AssetCombo target type ("image", "xanim", …)
 	Title     string   `json:"title,omitempty"`
 	Tooltip   string   `json:"tooltip,omitempty"`
@@ -29,7 +31,10 @@ type Entry struct {
 	RelPath   string   `json:"relative_path,omitempty"` // Path entries: directory the value is relative to
 	Varies    bool     `json:"varies,omitempty"`        // declared again with another kind or target (script branches): not type-checked
 
-	re *regexp.Regexp // Pattern entries: the literal parts in order, anything between
+	// a Combo whose options (in this or another declaration) aren't static: any
+	// value may be valid, so none is checked
+	openOptions bool
+	re          *regexp.Regexp // Pattern entries: the literal parts in order, anything between
 }
 
 // Schema is the set of fields declared for one asset type.
@@ -41,6 +46,8 @@ type Schema struct {
 
 	lower    map[string]*Entry // lower-cased literal names (built once loaded)
 	patterns []*Entry          // runtime-built names, most specific first
+
+	glossPresets map[string][2]string // material: glossSurfaceType -> glossRangeMin/Max (apeeffects.go)
 }
 
 // index builds the lookup tables once the schema is complete.
@@ -96,6 +103,8 @@ func (e *Entry) merge(d *Entry) {
 		e.Max = d.Max
 	}
 	e.Hidden = e.Hidden || d.Hidden
+	e.Editable = e.Editable || d.Editable
+	e.openOptions = e.openOptions || d.openOptions
 }
 
 func containsFold(xs []string, v string) bool {
@@ -142,6 +151,8 @@ func LoadSchema(deffiles, assetType string) (*Schema, error) {
 	}
 	s := &Schema{Type: assetType, File: path, Entries: map[string]*Entry{}}
 	code := expandIncludes(deffiles, stripComments(string(src)), map[string]bool{path: true})
+	vars := parseAwiVars(code)
+	s.glossPresets = glossPresets(code)
 	for _, m := range addEntryRE.FindAllStringSubmatchIndex(code, -1) {
 		kind := code[m[2]:m[3]]
 		args, end := balanced(code, m[1]-1)
@@ -171,7 +182,7 @@ func LoadSchema(deffiles, assetType string) (*Schema, error) {
 			}
 			d := &Entry{Name: name, Pattern: re != nil, Kind: kind, re: re}
 			if nNames == 1 {
-				fillArgs(d, kind, parts[1:])
+				fillArgs(d, kind, parts[1:], vars)
 			} else {
 				d.Kind = "Float" // one component of a multi-field control
 			}
@@ -219,7 +230,7 @@ func entryName(arg string) (name string, re *regexp.Regexp, ok bool) {
 	gap := func(s string) { // anything but "+" between literals is a runtime part
 		if strings.Trim(s, " \t\r\n+") != "" {
 			disp.WriteString("*")
-			rx.WriteString(".*")
+			rx.WriteString(".+") // a runtime part is never empty: "*name" must not claim a plain "name" key
 		}
 	}
 	for i := 0; ; {
@@ -249,7 +260,7 @@ func entryName(arg string) (name string, re *regexp.Regexp, ok bool) {
 	return name, regexp.MustCompile("(?i)^" + rx.String() + "$"), true
 }
 
-func fillArgs(e *Entry, kind string, args []string) {
+func fillArgs(e *Entry, kind string, args []string, vars *awiVars) {
 	str := func(i int) (string, bool) {
 		if i >= len(args) {
 			return "", false
@@ -283,20 +294,35 @@ func fillArgs(e *Entry, kind string, args []string) {
 			e.Default = "0"
 		}
 	case "Combo":
-		if v, lit := str(0); lit {
+		// the options are a literal or a static variable (awivars.go); a variable
+		// assigned in several branches contributes every value it can hold
+		var lists []string
+		ok := false
+		if len(args) > 0 {
+			lists, ok = vars.eval(args[0])
+		}
+		e.openOptions = !ok
+		for _, v := range lists {
 			for _, o := range strings.Split(v, "|") {
 				o = strings.TrimSpace(o)
 				if strings.HasSuffix(o, "*") {
 					o = strings.TrimSuffix(o, "*")
-					e.Default = o
+					if e.Default == "" {
+						e.Default = o
+					}
 				}
-				if o != "" {
+				if o != "" && !contains(e.Options, o) {
 					e.Options = append(e.Options, o)
 				}
 			}
-			if e.Default == "" && len(e.Options) > 0 {
-				e.Default = e.Options[0]
-			}
+		}
+		if e.Default == "" && len(e.Options) > 0 {
+			e.Default = e.Options[0]
+		}
+		// AddEntry_Combo( name, options, true ): an editable combo — a scene object's
+		// Name is any targetname, a notetrack's function any script function
+		if len(args) > 1 && strings.TrimSpace(args[1]) == "true" {
+			e.Editable = true
 		}
 	case "AssetCombo":
 		if v, lit := str(0); lit {

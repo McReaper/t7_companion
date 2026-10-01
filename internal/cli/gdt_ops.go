@@ -178,7 +178,7 @@ func gdtSchema(w *gdt.Workspace, typ, materialType, filter string) (any, error) 
 		}
 	}
 	out := map[string]any{"type": typ, "deffile": w.Rel(sc.File), "count": len(entries),
-		"note": "declarations read statically from the .awi; its script validation functions are not run"}
+		"note": "declarations read statically from the .awi (combo options too when held in a static variable); its script isn't run, but gdt_edit/gdt_check apply the rules its validation callbacks enforce"}
 	if keep == nil && len(entries) > schemaDetailLimit {
 		// Too big to detail in one answer: list names only; filter for details.
 		out["fields"] = strings.Join(names, " ")
