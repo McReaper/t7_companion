@@ -45,23 +45,28 @@ archives:
       - models/**/* # the bundled embedding model (offline)
 
 # Auto-generated changelog, sandwiched between the hand-curated header/footer
-# below. Format is short SHA + commit subject only — no author name/email, no
-# full 40-char hashes.
+# below. Only what a user would notice makes it in: features, fixes, and skill
+# knowledge (docs(skills) ships to plugin users). ci/chore/test/refactor and
+# repo docs match no group, so GoReleaser drops them. Each line shows the
+# subject without its "type(scope):" prefix, the scope kept as a bold label.
+# A hand-written .github/release-notes/<tag>.md, if present, is added on top
+# by the release workflow.
 changelog:
   disable: false
   use: git
   sort: asc
-  abbrev: 7
-  format: "{{ .SHA }} {{ .Message }}"
+  format: >-
+    {{ $p := split .Message ": " }}{{ if gt (len $p) 1 }}{{ $h := index $p 0 }}{{ if contains $h "(" }}**{{ index (split (index (split $h "(") 1) ")") 0 }}:** {{ end }}{{ trimprefix .Message (print $h ": ") }}{{ else }}{{ .Message }}{{ end }}
   groups:
-    - title: Features
-      regexp: '^.*?feat(\(.+\))??!?:.+$'
+    - title: "✨ New"
+      regexp: '^feat(\(.+\))?!?:.+$'
       order: 0
-    - title: Fixes
-      regexp: '^.*?fix(\(.+\))??!?:.+$'
+    - title: "🐛 Fixed"
+      regexp: '^fix(\(.+\))?!?:.+$'
       order: 1
-    - title: Others
-      order: 999
+    - title: "📚 Skill knowledge"
+      regexp: '^docs\(skills\)!?:.+$'
+      order: 2
 
 release:
   # owner/repo are auto-detected from the git remote.
