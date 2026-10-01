@@ -29,11 +29,11 @@ https://github.com/user-attachments/assets/0d533897-fd35-4f0d-9774-948546c0af6b
 
 ```mermaid
 flowchart LR
-    S["Skills<br/>(Claude Code plugin)"] -. method + traps .-> A([Your AI agent])
+    S["Skills<br/>(Claude Code plugin)"] -. "how each craft works,<br/>where it fails silently" .-> A([Your AI agent])
     A <-->|MCP| T["t7kb<br/>one local binary"]
     T --> K[("Knowledge base<br/>search · get")]
     T --> G["Your GDTs<br/>find · read · check · edit"]
-    T --> B["BO3 mod tools<br/>build"]
+    T --> B["BO3 mod tools<br/>compile · light · link · run"]
 ```
 
 ## 📥 Install
