@@ -21,6 +21,26 @@ const RRFK = 60
 // Pool is the per-retriever candidate count fused before truncating to limit.
 const Pool = 50
 
+// Ranking weights, set against the judged queries of internal/cli
+// TestRetrievalQuality (docs/benchmarks.md has the runs):
+//   - titleWeight: a BM25 match in the title counts this much over one in the
+//     body (the summary half as much). Reference pages are short with precise
+//     titles ("PlayFXOnTag (GSC)", "Wallbuy 0 Fix") and lost to long threads and
+//     scripts that repeat the words; 5, 10 and 20 score the same.
+//   - reliabilityWeight: the fused score is multiplied by
+//     1 + reliabilityWeight*(reliability - 0.5), so an API page (0.85-0.95)
+//     edges out a Discord thread (0.25) on a near tie. 0.25 is the best of
+//     those tried; from 0.75, long stock scripts (0.95) that merely use the
+//     words crowd out the answers.
+//
+// Tried and rejected on the same queries: OR instead of AND terms, dropping
+// stopwords, joined compound terms, a per-source cap, and a third ranked list
+// of per-document title vectors — none beat these two.
+const (
+	titleWeight       = 10.0
+	reliabilityWeight = 0.25
+)
+
 // Store is a read-only handle to a t7kb.db.
 type Store struct {
 	db *sql.DB
@@ -66,8 +86,8 @@ func Open(path string) (*Store, error) {
 // Close releases the handle.
 func (s *Store) Close() error { return s.db.Close() }
 
-// SearchHybrid fuses BM25 and vector rankings with RRF, applies reliability as
-// a soft tiebreak, and returns the top `limit` hits. qvec may be nil/empty (or
+// SearchHybrid fuses BM25 and vector rankings with RRF, weighs the result by
+// reliability (reliabilityWeight), and returns the top `limit` hits. qvec may be nil/empty (or
 // a different dimension than the db) — then it's BM25-only.
 func (s *Store) SearchHybrid(ctx context.Context, query string, qvec []float32, limit int) ([]Hit, error) {
 	bm25, err := s.bm25Rank(ctx, query, Pool)
@@ -91,6 +111,9 @@ func (s *Store) SearchHybrid(ctx context.Context, query string, qvec []float32, 
 	rel, title, source, err := s.meta(ctx, docIDs)
 	if err != nil {
 		return nil, err
+	}
+	for d := range fused {
+		fused[d] *= 1 + reliabilityWeight*(rel[d]-0.5)
 	}
 	sortByFusedScore(docIDs, fused, rel)
 	if limit > 0 && len(docIDs) > limit {
@@ -167,9 +190,9 @@ func (s *Store) bm25Rank(ctx context.Context, query string, limit int) ([]rankIt
 		FROM docs_fts
 		JOIN documents d ON d.rowid = docs_fts.rowid
 		WHERE docs_fts MATCH ?
-		ORDER BY bm25(docs_fts)
+		ORDER BY bm25(docs_fts, 0.0, ?, ?, 1.0)
 		LIMIT ?`
-	rows, err := s.db.QueryContext(ctx, q, match, limit)
+	rows, err := s.db.QueryContext(ctx, q, match, titleWeight, titleWeight/2, limit)
 	if err != nil {
 		return nil, fmt.Errorf("bm25 search: %w", err)
 	}

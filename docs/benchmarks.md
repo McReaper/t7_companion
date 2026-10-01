@@ -52,14 +52,22 @@ Paging only costs answer quality when the passage the search matched sits past t
 T7KB_BENCH_DB=<t7kb.db> HF_HOME=<model cache> go test ./internal/cli -run TestRetrievalQuality -v
 ```
 
-| Metric (mean over 14 queries) | Baseline |
-|---|---:|
-| key@5 — a key document in the top 5 | 0.71 |
-| recall@10 — key + relevant documents in the top 10 | 0.64 |
-| MRR — 1 / rank of the first useful document | 0.87 |
-| nDCG@10 — graded ranking quality (key 2, relevant 1) | 0.58 |
+| Metric (mean over 14 queries) | v2.2 ranking | Title-weighted + reliability (current) |
+|---|---:|---:|
+| key@5 — a key document in the top 5 | 0.71 | **0.86** |
+| recall@10 — key + relevant documents in the top 10 | 0.66 | 0.68 |
+| MRR — 1 / rank of the first useful document | 1.00 | 1.00 |
+| nDCG@10 — graded ranking quality (key 2, relevant 1) | 0.69 | 0.72 |
 
-The first result is usually useful (MRR 0.87) but often a Discord thread rather than the best source: 4 queries have no key document in their top 5 — `clientfield register set lua` and `custom lua hud widget` come back 10/10 Discord with the API doc and the LUI tutorials absent, `PlayFXOnTag`'s API page is 6th, the wiki's "Wallbuy 0 Fix" 17th. Diagnostic queries whose best answers are Discord threads (`material surfacetype linker error`, the scriptparsetree linker error) already score well, and a ranking change must keep them there. The judgments are one maintainer's reading; extend the set when a real query goes wrong.
+(Scored on the pooled judgments, so both columns use the same set; before pooling the v2.2 ranking scored 0.71 / 0.64 / 0.87 / 0.58.)
+
+**What changed the ranking.** Diagnosing where each key document ranked showed two separate failures. BM25 required every query word (an AND, stopwords included): `sound alias plays silently` matched no document at all, `custom wallbuy shows cost 0` one; and on the vector side, reference pages ranked far down (the API page for `RegisterClientField` 45th–89th, the modme LUI tutorials 270th–587th) because a chunk of code no longer resembles the question. The fix that measured best is two weights in `internal/store`: a BM25 match in the **title counts 10×** one in the body (summary 5×) — reference pages are short with precise titles — and the fused score is scaled by **1 + 0.25 × (reliability − 0.5)**, so an API page edges out a Discord thread on a near tie. `PlayFXOnTag`'s API page and the wiki's "Wallbuy 0 Fix" move into the top 5; `SetHintString` and `GiveWeapon` go 0.65 → 0.77 and 0.66 → 0.80 in nDCG; the queries whose answers are Discord threads stay where they were. The one dip, `sound alias plays silently` (0.82 → 0.69), is the same ten documents reordered: two relevant forum threads now come before two key Discord ones.
+
+**Tried and rejected**, on the same queries: OR instead of AND terms (key@5 0.50 — long stock scripts that repeat the words fill BM25's pool), dropping stopwords, joined compound terms (`clientfield register` → `registerclientfield`), a per-source cap, a reliability weight of 0.75 or more (stock scripts crowd out the answers), and per-document title vectors as a third fused list — prototyped with the corpus's own model, they changed nothing over the two weights above, so no database change was needed for this.
+
+**Still failing**: `clientfield register set lua` and `custom lua hud widget` come back all Discord, with the API page and the LUI tutorials absent from the top 10. No ranking weight reaches them; a `source` filter on `search` would let an agent ask for the API or the wikis directly.
+
+The judgments were pooled: after each round of variants, the top 10 of the variants was judged too (56 documents added, as relevant only), so a ranking that surfaces relevant documents the baseline missed isn't scored as if it surfaced noise.
 
 ## Latency and memory
 

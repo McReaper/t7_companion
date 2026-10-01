@@ -1,89 +1,270 @@
 {
-  "about": "Judged queries for TestRetrievalQuality. key = the best sources for the question (the API doc, the reference tutorial, the thread that has the fix); relevant = useful but secondary. Judged by reading each candidate from three independent paths: the hybrid top 30, the BM25 top 15, and a title search over the non-Discord sources. Built against the v2.2 corpus (66,023 docs); a doc_id missing from the db fails the test, so a rebuilt corpus that renames documents shows up instead of silently scoring zero.",
+  "about": "Judged queries for TestRetrievalQuality. key = the best sources for the question (the API doc, the reference tutorial, the thread that has the fix); relevant = useful but secondary. Judged by reading each candidate from three independent paths, then pooled — the top 10 of each ranking variant tried was judged too, so a variant that surfaces relevant documents the baseline missed isn't scored as if it surfaced noise: the hybrid top 30, the BM25 top 15, and a title search over the non-Discord sources. Built against the v2.2 corpus (66,023 docs); a doc_id missing from the db fails the test, so a rebuilt corpus that renames documents shows up instead of silently scoring zero.",
   "queries": [
     {
       "query": "clientfield register set lua",
-      "key": ["gscode-api::api.gsc.registerclientfield", "gscode-api::api.csc.registerclientfield", "personal-notes::notes.clientfield"],
-      "relevant": ["source-scripts::t7src.gsc.scripts.shared.clientfield_shared", "source-scripts::t7src.csc.scripts.shared.clientfield_shared", "gscode-api::api.csc.setupclientfieldluicodecallbacks",
-        "discord-bo3modtools::lui_1364595090286444624", "discord-bo3modtools::lui_1153322802569560134", "discord-bo3modtools::lui_1081953499505492060", "discord-bo3modtools::lui_909041171702104085",
-        "discord-bo3modtools::scripting_1221606831466741822", "discord-bo3modtools::scripting_1159219500911165580", "discord-bo3modtools::lui_1219953237042401313", "discord-bo3modtools::lui_1364622195615076466",
-        "discord-bo3modtools::lui_391966779024474114"]
+      "key": [
+        "gscode-api::api.gsc.registerclientfield",
+        "gscode-api::api.csc.registerclientfield",
+        "personal-notes::notes.clientfield"
+      ],
+      "relevant": [
+        "source-scripts::t7src.gsc.scripts.shared.clientfield_shared",
+        "source-scripts::t7src.csc.scripts.shared.clientfield_shared",
+        "gscode-api::api.csc.setupclientfieldluicodecallbacks",
+        "discord-bo3modtools::lui_1364595090286444624",
+        "discord-bo3modtools::lui_1153322802569560134",
+        "discord-bo3modtools::lui_1081953499505492060",
+        "discord-bo3modtools::lui_909041171702104085",
+        "discord-bo3modtools::scripting_1221606831466741822",
+        "discord-bo3modtools::scripting_1159219500911165580",
+        "discord-bo3modtools::lui_1219953237042401313",
+        "discord-bo3modtools::lui_1364622195615076466",
+        "discord-bo3modtools::lui_391966779024474114",
+        "discord-bo3modtools::lui_910254042444361739",
+        "discord-bo3modtools::lui_910277421813628989",
+        "discord-bo3modtools::lui_1475157741155651778"
+      ]
     },
     {
       "query": "SetHintString on a trigger",
-      "key": ["gscode-api::api.gsc.sethintstring"],
-      "relevant": ["gscode-api::api.gsc.sethintstringforplayer", "forums-ugx::ugx-forums-scripting-16912", "wiki-t7::guides/how-to-use-localization.md"]
+      "key": [
+        "gscode-api::api.gsc.sethintstring"
+      ],
+      "relevant": [
+        "gscode-api::api.gsc.sethintstringforplayer",
+        "forums-ugx::ugx-forums-scripting-16912",
+        "wiki-t7::guides/how-to-use-localization.md",
+        "discord-bo3modtools::scripting_1282442784040681482",
+        "discord-bo3modtools::scripting_1397917923896590358",
+        "discord-bo3modtools::general_397162595645128704",
+        "discord-bo3modtools::scripting_237520086930423808",
+        "forums-modme::675",
+        "discord-bo3modtools::scripting_1248804065371095151",
+        "discord-bo3modtools::scripting_1347867744544096266",
+        "discord-bo3modtools::scripting_1142440711900369030"
+      ]
     },
     {
       "query": "play fx on a tag of a model",
-      "key": ["gscode-api::api.gsc.playfxontag", "gscode-api::api.csc.playfxontag"],
-      "relevant": ["forums-modme::3413", "forums-modme::1255", "forums-ugx::ugx-forums-scripting-15992"]
+      "key": [
+        "gscode-api::api.gsc.playfxontag",
+        "gscode-api::api.csc.playfxontag"
+      ],
+      "relevant": [
+        "forums-modme::3413",
+        "forums-modme::1255",
+        "forums-ugx::ugx-forums-scripting-15992",
+        "discord-bo3modtools::scripting_1179443174410825778",
+        "discord-bo3modtools::scripting_270028452340563968",
+        "discord-bo3modtools::scripting_1264806940228456539",
+        "discord-bo3modtools::scripting_1098746581957750834",
+        "discord-bo3modtools::scripting_244077856253149184",
+        "discord-bo3modtools::scripting_1386156018462883960"
+      ]
     },
     {
       "query": "give the player a weapon in gsc",
-      "key": ["gscode-api::api.gsc.giveweapon"],
-      "relevant": ["forums-modme::575", "forums-ugx::ugx-forums-scripting-12806", "forums-ugx::ugx-forums-scripting-13532", "forums-modme::3253"]
+      "key": [
+        "gscode-api::api.gsc.giveweapon"
+      ],
+      "relevant": [
+        "forums-modme::575",
+        "forums-ugx::ugx-forums-scripting-12806",
+        "forums-ugx::ugx-forums-scripting-13532",
+        "forums-modme::3253",
+        "discord-bo3modtools::scripting_1234732104537866270",
+        "discord-bo3modtools::scripting_1181243222882795570"
+      ]
     },
     {
       "query": "linker error could not find scriptparsetree",
-      "key": ["discord-bo3modtools::general_569997224864382991", "discord-bo3modtools::scripting_272876719432531970", "discord-bo3modtools::general_786894643757318164",
-        "forums-ugx::ugx-forums-help-desk-16466", "forums-modme::3088"],
-      "relevant": ["discord-bo3modtools::mapping_350523155254870018", "discord-bo3modtools::scripting_995327594717270056", "discord-bo3modtools::scripting_1221459146495361064",
-        "discord-bo3modtools::general_1465804582905970699", "discord-bo3modtools::general_1161064379970760744", "discord-bo3modtools::scripting_1272036622631829566",
-        "discord-bo3modtools::general_1033316316951613510", "discord-bo3modtools::scripting_1221302213784109136", "discord-bo3modtools::scripting_1014785723976646706"]
+      "key": [
+        "discord-bo3modtools::general_569997224864382991",
+        "discord-bo3modtools::scripting_272876719432531970",
+        "discord-bo3modtools::general_786894643757318164",
+        "forums-ugx::ugx-forums-help-desk-16466",
+        "forums-modme::3088"
+      ],
+      "relevant": [
+        "discord-bo3modtools::mapping_350523155254870018",
+        "discord-bo3modtools::scripting_995327594717270056",
+        "discord-bo3modtools::scripting_1221459146495361064",
+        "discord-bo3modtools::general_1465804582905970699",
+        "discord-bo3modtools::general_1161064379970760744",
+        "discord-bo3modtools::scripting_1272036622631829566",
+        "discord-bo3modtools::general_1033316316951613510",
+        "discord-bo3modtools::scripting_1221302213784109136",
+        "discord-bo3modtools::scripting_1014785723976646706",
+        "discord-bo3modtools::general_237719493894340609",
+        "discord-bo3modtools::forum_1096171240785461259",
+        "discord-bo3modtools::general_344539132183314433"
+      ]
     },
     {
       "query": "custom wallbuy shows cost 0",
-      "key": ["wiki-t7::guides/wallbuy-0-fix.md", "forums-modme::2741"],
-      "relevant": ["discord-bo3modtools::general_823897844669743104", "discord-bo3modtools::mapping_1235977092525461545", "discord-bo3modtools::mapping_991829291610423428",
-        "discord-bo3modtools::general_842505454575550466", "forums-modme::3270", "forums-modme::2704"]
+      "key": [
+        "wiki-t7::guides/wallbuy-0-fix.md",
+        "forums-modme::2741"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_823897844669743104",
+        "discord-bo3modtools::mapping_1235977092525461545",
+        "discord-bo3modtools::mapping_991829291610423428",
+        "discord-bo3modtools::general_842505454575550466",
+        "forums-modme::3270",
+        "forums-modme::2704",
+        "discord-bo3modtools::general_1126433583133884436",
+        "forums-modme::1792",
+        "discord-bo3modtools::general_438903187185991681"
+      ]
     },
     {
       "query": "how to add a perk machine",
-      "key": ["wiki-modme::black-ops-3-basics-setting-up-perk-machines", "forums-ugx::ugx-forums-scripting-14197", "video-youtube::Black Ops 3 Mod Tools tutorial Ep.6 Perk Machines"],
-      "relevant": ["source-scripts::t7src.gsc.scripts.zm._zm_perks", "wiki-modme::black-ops-3-guides-creating-a-custom-perk", "forums-modme::788"]
+      "key": [
+        "wiki-modme::black-ops-3-basics-setting-up-perk-machines",
+        "forums-ugx::ugx-forums-scripting-14197",
+        "video-youtube::Black Ops 3 Mod Tools tutorial Ep.6 Perk Machines"
+      ],
+      "relevant": [
+        "source-scripts::t7src.gsc.scripts.zm._zm_perks",
+        "wiki-modme::black-ops-3-guides-creating-a-custom-perk",
+        "forums-modme::788",
+        "video-youtube::BLACK OPS 3 MOD TOOLS - TUTORIAL 8 - HOW TO ADD SIMPLE GIANT STYLE RANDOM SPAWNING PERK MACHINES"
+      ]
     },
     {
       "query": "material surfacetype linker error",
-      "key": ["discord-bo3modtools::general_485421957303631872", "discord-bo3modtools::general_232201417073491968", "forums-modme::1085"],
-      "relevant": ["discord-bo3modtools::general_1135978715537494137", "discord-bo3modtools::general_945065090862944287", "discord-bo3modtools::general_1135978793488621578"]
+      "key": [
+        "discord-bo3modtools::general_485421957303631872",
+        "discord-bo3modtools::general_232201417073491968",
+        "forums-modme::1085"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_1135978715537494137",
+        "discord-bo3modtools::general_945065090862944287",
+        "discord-bo3modtools::general_1135978793488621578",
+        "discord-bo3modtools::general_1108461397119082597"
+      ]
     },
     {
       "query": "BSP leak sealing the map",
-      "key": ["forums-ugx::ugx-forums-mapping-14195", "forums-modme::2995", "discord-bo3modtools::mapping_234542119606419457"],
-      "relevant": ["discord-bo3modtools::general_234382454352248832", "discord-bo3modtools::general_322459957788278796", "discord-bo3modtools::mapping_531580348367110179",
-        "discord-bo3modtools::mapping_234386046123507712", "discord-bo3modtools::mapping_1496715438774681722", "discord-bo3modtools::mapping_236971502820392960",
-        "discord-bo3modtools::general_809871795141345372"]
+      "key": [
+        "forums-ugx::ugx-forums-mapping-14195",
+        "forums-modme::2995",
+        "discord-bo3modtools::mapping_234542119606419457"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_234382454352248832",
+        "discord-bo3modtools::general_322459957788278796",
+        "discord-bo3modtools::mapping_531580348367110179",
+        "discord-bo3modtools::mapping_234386046123507712",
+        "discord-bo3modtools::mapping_1496715438774681722",
+        "discord-bo3modtools::mapping_236971502820392960",
+        "discord-bo3modtools::general_809871795141345372",
+        "discord-bo3modtools::mapping_554925695374196737",
+        "discord-bo3modtools::general_1045545522632601650",
+        "discord-bo3modtools::mapping_915179675159003177",
+        "discord-bo3modtools::mapping_690672349996908544",
+        "discord-bo3modtools::general_1083636526602264636"
+      ]
     },
     {
       "query": "fog volume not working",
-      "key": ["discord-bo3modtools::mapping_493485785589350424", "discord-bo3modtools::general_719396062997118978"],
-      "relevant": ["discord-bo3modtools::general_235991469951811585", "discord-bo3modtools::general_235970665776152576", "discord-bo3modtools::general_272487303048593410",
-        "discord-bo3modtools::general_245165103832498176", "defs-bo3::entity.volume_worldfogmodifier"]
+      "key": [
+        "discord-bo3modtools::mapping_493485785589350424",
+        "discord-bo3modtools::general_719396062997118978"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_235991469951811585",
+        "discord-bo3modtools::general_235970665776152576",
+        "discord-bo3modtools::general_272487303048593410",
+        "discord-bo3modtools::general_245165103832498176",
+        "defs-bo3::entity.volume_worldfogmodifier",
+        "discord-bo3modtools::general_235991636604092416",
+        "discord-bo3modtools::mapping_493460118499885076",
+        "discord-bo3modtools::mapping_1305638880724389950",
+        "discord-bo3modtools::mapping_233389463169007616",
+        "discord-bo3modtools::mapping_493459756011356181",
+        "discord-bo3modtools::general_270958322927140864"
+      ]
     },
     {
       "query": "add a custom xmodel to the zone file",
-      "key": ["discord-bo3modtools::scripting_1205240852926963764", "discord-bo3modtools::general_231875085559005185"],
-      "relevant": ["discord-bo3modtools::general_1103525428393680976", "forums-modme::1428"]
+      "key": [
+        "discord-bo3modtools::scripting_1205240852926963764",
+        "discord-bo3modtools::general_231875085559005185"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_1103525428393680976",
+        "forums-modme::1428",
+        "discord-bo3modtools::general_992506467645132891",
+        "wiki-zeroy::zm-player-models-2"
+      ]
     },
     {
       "query": "sound alias plays silently",
-      "key": ["wiki-ugx::sounds-creating-modifying-soundaliases-and-converting-sounds", "discord-bo3modtools::scripting_1052298525305733130", "discord-bo3modtools::general_900821976325701674"],
-      "relevant": ["forums-modme::980", "forums-modme::1324", "discord-bo3modtools::general_232487645614178305", "discord-bo3modtools::general_449989871998730261",
-        "discord-bo3modtools::scripting_1222305884500132072", "wiki-ardivee::acoustix"]
+      "key": [
+        "wiki-ugx::sounds-creating-modifying-soundaliases-and-converting-sounds",
+        "discord-bo3modtools::scripting_1052298525305733130",
+        "discord-bo3modtools::general_900821976325701674"
+      ],
+      "relevant": [
+        "forums-modme::980",
+        "forums-modme::1324",
+        "discord-bo3modtools::general_232487645614178305",
+        "discord-bo3modtools::general_449989871998730261",
+        "discord-bo3modtools::scripting_1222305884500132072",
+        "wiki-ardivee::acoustix",
+        "forums-ugx::ugx-forums-modding-13549",
+        "forums-modme::1244",
+        "discord-bo3modtools::general_408334771450675200",
+        "discord-bo3modtools::general_611162364515188739"
+      ]
     },
     {
       "query": "custom lua hud widget",
-      "key": ["wiki-modme::black-ops-3-lua-lui-your-first-custom-control-widget", "wiki-modme::black-ops-3-lua-lui-your-first-menu-hud", "wiki-modme::black-ops-3-lua-lui-overriding-map-level-hud"],
-      "relevant": ["discord-bo3modtools::lui_847822550305865798", "discord-bo3modtools::lui_539006217524215808", "discord-bo3modtools::lui_744907858994528286",
-        "wiki-modme::black-ops-3-lua-lui-layout-and-margins", "wiki-modme::black-ops-3-lua-lui-stock-element-functions", "wiki-modme::black-ops-3-lua-lui-registering-events"]
+      "key": [
+        "wiki-modme::black-ops-3-lua-lui-your-first-custom-control-widget",
+        "wiki-modme::black-ops-3-lua-lui-your-first-menu-hud",
+        "wiki-modme::black-ops-3-lua-lui-overriding-map-level-hud"
+      ],
+      "relevant": [
+        "discord-bo3modtools::lui_847822550305865798",
+        "discord-bo3modtools::lui_539006217524215808",
+        "discord-bo3modtools::lui_744907858994528286",
+        "wiki-modme::black-ops-3-lua-lui-layout-and-margins",
+        "wiki-modme::black-ops-3-lua-lui-stock-element-functions",
+        "wiki-modme::black-ops-3-lua-lui-registering-events",
+        "discord-bo3modtools::lui_1127965159424532532",
+        "discord-bo3modtools::lui_666039295194431498",
+        "discord-bo3modtools::general_342289172821704704",
+        "discord-bo3modtools::lui_1109909513169031178",
+        "discord-bo3modtools::lui_825164369448796170",
+        "discord-bo3modtools::lui_1158934429322989579"
+      ]
     },
     {
       "query": "reflection probe lighting too dark",
-      "key": ["docs-bo3::bo3-docs-reflection-probes", "defs-bo3::entity.reflection_probe"],
-      "relevant": ["discord-bo3modtools::mapping_970900017575501855", "discord-bo3modtools::general_309911878597869569", "discord-bo3modtools::general_1208148463452160131",
-        "discord-bo3modtools::general_709903517711728660", "forums-ugx::ugx-forums-mapping-14063", "forums-modme::3169",
-        "video-youtube::Lighting Tutorial Part 4: Reflection Probes (Black Ops 3 Mod Tools)"]
+      "key": [
+        "docs-bo3::bo3-docs-reflection-probes",
+        "defs-bo3::entity.reflection_probe"
+      ],
+      "relevant": [
+        "discord-bo3modtools::mapping_970900017575501855",
+        "discord-bo3modtools::general_309911878597869569",
+        "discord-bo3modtools::general_1208148463452160131",
+        "discord-bo3modtools::general_709903517711728660",
+        "forums-ugx::ugx-forums-mapping-14063",
+        "forums-modme::3169",
+        "video-youtube::Lighting Tutorial Part 4: Reflection Probes (Black Ops 3 Mod Tools)",
+        "discord-bo3modtools::general_804771923568885770",
+        "discord-bo3modtools::general_413805973300576257",
+        "discord-bo3modtools::mapping_817224983980802058",
+        "discord-bo3modtools::general_1496951238082822294",
+        "discord-bo3modtools::mapping_386726313047621652",
+        "discord-bo3modtools::general_1120389510165975090"
+      ]
     }
   ]
 }
