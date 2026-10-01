@@ -96,6 +96,14 @@ func runBuild(cmd *cobra.Command, o *buildOpts, name string) error {
 	return finishBuild(stdout, o.jsonOut, rep)
 }
 
+// The stage runners, as variables so tests can drive runBuildReport's pipeline
+// without the mod tools.
+var (
+	stageRunner = runStage
+	lightRunner = runLight
+	gameRunner  = runGame
+)
+
 // runBuildReport runs the mod-tools pipeline and returns the per-stage report. A
 // non-nil error is only a preflight/validation failure (bad args, no tools path,
 // tools not found) before any stage ran — stage failures are carried in the report
@@ -156,7 +164,7 @@ func runBuildReport(o *buildOpts, name string, stdout io.Writer) (buildReport, e
 		if o.gdtRebuild {
 			gdtArg = "/rebuild" // recovery: /update does index GDTs edited outside APE (verified); this is for a db that lost everything
 		}
-		if !run(runStage("gdt", gdtdbDir, gdtdb, 10*time.Minute, o.verbose, stdout, gdtArg)) {
+		if !run(stageRunner("gdt", gdtdbDir, gdtdb, 10*time.Minute, o.verbose, stdout, gdtArg)) {
 			return rep, nil
 		}
 	}
@@ -174,7 +182,7 @@ func runBuildReport(o *buildOpts, name string, stdout io.Writer) (buildReport, e
 			}
 			args = append(args, "-loadFrom", mapSrc, d3dbsp)
 			start := time.Now()
-			sr := runStage("compile", bin, filepath.Join(bin, "cod2map64.exe"), 15*time.Minute, o.verbose, stdout, args...)
+			sr := stageRunner("compile", bin, filepath.Join(bin, "cod2map64.exe"), 15*time.Minute, o.verbose, stdout, args...)
 			// cod2map exits 0 even when it skips navmesh; trust the .d3dbsp mtime.
 			if sr.OK && !fileMTime(d3dbsp).After(start.Add(-2*time.Second)) {
 				sr.OK = false
@@ -191,7 +199,7 @@ func runBuildReport(o *buildOpts, name string, stdout io.Writer) (buildReport, e
 	if stages["light"] {
 		if o.isMod {
 			run(stageSkipped("light", "not applicable to a mod"))
-		} else if !run(runLight(bin, mapSrc, led, quality)) {
+		} else if !run(lightRunner(bin, mapSrc, led, quality)) {
 			return rep, nil
 		}
 	}
@@ -204,13 +212,13 @@ func runBuildReport(o *buildOpts, name string, stdout io.Writer) (buildReport, e
 		} else {
 			args = []string{"-language", o.language, "-modsource", name}
 		}
-		if !run(runStage("link", bin, linker, 20*time.Minute, o.verbose, stdout, args...)) {
+		if !run(stageRunner("link", bin, linker, 20*time.Minute, o.verbose, stdout, args...)) {
 			return rep, nil
 		}
 	}
 
 	if stages["run"] {
-		run(runGame(game, name, o.isMod))
+		run(gameRunner(game, name, o.isMod))
 	}
 
 	return rep, nil
