@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 )
@@ -105,44 +106,70 @@ type indexJob struct {
 // (bin/converter_gdt_dirs_0.txt), drops cached entries for GDTs that are gone,
 // and returns the GDTs whose size or mtime changed.
 func staleGDTs(root string, files map[string]*fileEntry) ([]indexJob, error) {
+	var mu sync.Mutex
 	var jobs []indexJob
 	seen := map[string]bool{}
-	visit := func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			if skipDirs[d.Name()] {
-				return filepath.SkipDir
-			}
-			return nil
-		}
+	var roots []string
+	for _, dir := range GDTDirs(root) {
+		roots = append(roots, filepath.Join(root, dir))
+	}
+	walkParallel(roots, func(p string, d fs.DirEntry) {
 		if !strings.EqualFold(filepath.Ext(p), ".gdt") {
-			return nil
+			return
 		}
 		info, err := d.Info()
 		if err != nil {
-			return nil
+			return
 		}
 		rel, _ := filepath.Rel(root, p)
 		rel = filepath.ToSlash(rel)
+		mu.Lock()
+		defer mu.Unlock()
 		seen[rel] = true
 		if fe, ok := files[rel]; !ok || fe.Mod != info.ModTime().UnixNano() || fe.Size != info.Size() {
 			jobs = append(jobs, indexJob{rel, info.ModTime().UnixNano(), info.Size()})
 		}
-		return nil
-	}
-	for _, dir := range GDTDirs(root) {
-		if err := filepath.WalkDir(filepath.Join(root, dir), visit); err != nil {
-			return nil, err
-		}
-	}
+	})
 	for rel := range files {
 		if !seen[rel] {
 			delete(files, rel)
 		}
 	}
 	return jobs, nil
+}
+
+// walkParallel calls visit for every file under the roots, reading directories
+// concurrently: model_export alone holds ~270k files in ~38k directories, and a
+// sequential walk spent seconds just listing them. Directories in skipDirs and
+// unreadable ones are skipped; symlinked directories aren't followed (as with
+// filepath.WalkDir). visit runs concurrently.
+func walkParallel(roots []string, visit func(path string, d fs.DirEntry)) {
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, 4*runtime.NumCPU()) // directories being read at once
+	var walk func(dir string)
+	walk = func(dir string) {
+		defer wg.Done()
+		slots <- struct{}{}
+		entries, err := os.ReadDir(dir)
+		<-slots
+		if err != nil {
+			return
+		}
+		for _, e := range entries {
+			p := filepath.Join(dir, e.Name())
+			if !e.IsDir() {
+				visit(p, e)
+			} else if !skipDirs[e.Name()] {
+				wg.Add(1)
+				go walk(p)
+			}
+		}
+	}
+	for _, r := range roots {
+		wg.Add(1)
+		go walk(r)
+	}
+	wg.Wait()
 }
 
 // scanHeaders reads only the asset header lines of a GDT (fast; no full parse).
