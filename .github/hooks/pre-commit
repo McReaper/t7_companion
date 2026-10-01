@@ -1,0 +1,29 @@
+#!/bin/sh
+# Lints the Go a commit touches, fast: gofmt on the staged .go files, then
+# golangci-lint (.golangci.yml: staticcheck, errcheck, complexity and size
+# limits) on just their packages — ~1-2 s with a warm cache. A commit with no
+# .go file costs nothing. Enable with: git config core.hooksPath .github/hooks
+# Skip once with: git commit --no-verify. CI (.github/workflows/ci.yml) is the
+# real gate; this catches the same findings before the push.
+
+files=$(git diff --cached --name-only --diff-filter=ACMR -- '*.go')
+[ -z "$files" ] && exit 0
+
+unformatted=$(gofmt -l $files)
+if [ -n "$unformatted" ]; then
+  echo "pre-commit: not gofmt-formatted (run: gofmt -w $(echo $unformatted)):" >&2
+  echo "$unformatted" >&2
+  exit 1
+fi
+
+if ! command -v golangci-lint >/dev/null 2>&1; then
+  echo "pre-commit: golangci-lint not found, skipping lint (install: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0)" >&2
+  exit 0
+fi
+
+# the packages (directories) of the staged files, each once
+pkgs=$(for f in $files; do echo "./$(dirname "$f")"; done | sort -u)
+if ! golangci-lint run $pkgs; then
+  echo "pre-commit: golangci-lint found issues above (it lints the working tree)." >&2
+  exit 1
+fi
