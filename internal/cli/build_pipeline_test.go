@@ -30,8 +30,9 @@ func (f *fakePipeline) install(t *testing.T) {
 	prevStage, prevLight, prevGame := stageRunner, lightRunner, gameRunner
 	t.Cleanup(func() { stageRunner, lightRunner, gameRunner = prevStage, prevLight, prevGame })
 	stageRunner = func(label, dir, exe string, _ time.Duration, _ bool, _ io.Writer, args ...string) stageResult {
+		args = append([]string(nil), args...)
 		for i, a := range args {
-			if filepath.IsAbs(a) {
+			if strings.HasPrefix(a, f.root) { // a path, not a flag: on Linux "/update" is absolute too
 				args[i] = rel(a)
 			}
 		}
