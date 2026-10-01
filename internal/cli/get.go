@@ -2,17 +2,16 @@ package cli
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
-
-	"github.com/McReaper/t7_companion/internal/store"
 )
 
 func newGetCmd() *cobra.Command {
-	return &cobra.Command{
+	var offset, maxChars int
+	var all bool
+	cmd := &cobra.Command{
 		Use:   "get <doc_id>",
-		Short: "Print a document's full body",
+		Short: "Print a document (long ones a page at a time, as the MCP get tool serves them)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			st, err := openStore()
@@ -28,17 +27,20 @@ func newGetCmd() *cobra.Command {
 			if doc == nil {
 				return fmt.Errorf("no such doc_id: %s", args[0])
 			}
-			printDoc(cmd.OutOrStdout(), doc)
-			return nil
+			size := pageSize(maxChars)
+			if all {
+				size = 0
+			}
+			page, err := renderDoc(doc, offset, size)
+			if err != nil {
+				return err
+			}
+			_, err = fmt.Fprint(cmd.OutOrStdout(), page)
+			return err
 		},
 	}
-}
-
-func printDoc(out io.Writer, d *store.Doc) {
-	fmt.Fprintf(out, "# %s\n\n", d.Title)
-	fmt.Fprintf(out, "doc_id: %s\nsource: %s  ·  reliability: %.2f\n", d.DocID, d.Source, d.Reliability)
-	if d.URL != "" {
-		fmt.Fprintf(out, "url: %s\n", d.URL)
-	}
-	fmt.Fprintf(out, "\n%s\n", d.Body)
+	cmd.Flags().IntVar(&offset, "offset", 0, "where to start in the body (from a previous page's truncation note)")
+	cmd.Flags().IntVar(&maxChars, "max-chars", defaultPageChars, fmt.Sprintf("page size in characters (at most %d)", maxPageChars))
+	cmd.Flags().BoolVar(&all, "all", false, "print the whole body, however long")
+	return cmd
 }

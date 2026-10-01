@@ -28,8 +28,8 @@ It builds each answer with the same functions the MCP handlers use and counts to
 |---|---|---:|---:|---:|---:|---:|
 | `search` | 10 results (default) | 16 | 725 | 791 | 842 | 2726 |
 | `search` | 5 results | 16 | 345 | 381 | 439 | 1331 |
-| `get` | top result | 16 | 664 | 3790 | 38278 | 2194 |
-| `get` | each of the top 3 | 48 | 493 | 5597 | 41308 | 1893 |
+| `get` | top result | 16 | 664 | 3447 | 5256 | 2194 |
+| `get` | each of the top 3 | 48 | 493 | 3944 | 5256 | 1893 |
 | `gdt_find` | a material | 1 | 52 | 52 | 52 | 159 |
 | `gdt_get` | a material (defaults hidden) | 1 | 219 | 219 | 219 | 660 |
 | `gdt_get` | a material, all=true | 1 | 240 | 240 | 240 | 742 |
@@ -40,7 +40,7 @@ It builds each answer with the same functions the MCP handlers use and counts to
 | `gdt_schema` | material + material_type lit | 1 | 1223 | 1223 | 1223 | 4670 |
 | `gdt_schema` | xmodel | 1 | 2446 | 2446 | 2446 | 9956 |
 
-`get` has no cap: corpus bodies have a median of 1.2k characters, but a p99 of 275k and a maximum of 98 MB (`source-workspace` indexes whole GDTs and scripts; 1,347 documents exceed 100k characters).
+`get` serves long bodies a page at a time (16,000 characters by default, `max_chars` up to 64,000, `offset` for the next part). Corpus bodies have a median of 1.2k characters but a p99 of 275k and a maximum of 98 MB (`source-workspace` indexes whole GDTs and scripts; 1,347 documents exceed 100k characters). Before paging, the same `get` rows had a p90 of 3,790 / 5,597 and a max of **38,278 / 41,308** tokens; the median is unchanged, since 90%+ of documents fit in one page. A full page of a GDT is ~5.3k tokens rather than ~4k: paths and numbers tokenize denser than prose.
 
 ## Latency and memory
 

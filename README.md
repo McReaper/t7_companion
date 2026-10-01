@@ -72,7 +72,7 @@ Then register `t7kb mcp` as a stdio server — **[docs/clients.md](docs/clients.
 
 ### A knowledge base it searches before answering
 
-Two MCP tools: `search` (hybrid keyword + semantic retrieval) and `get` (a full document by id). Every hit carries its **source, URL and a reliability score**, so the agent can weigh a Treyarch script above a Discord guess, cite what it used, and surface disagreements instead of blending them.
+Two MCP tools: `search` (hybrid keyword + semantic retrieval) and `get` (a document by id; long ones come a page at a time, so one whole-GDT hit can't flood the agent's context). Every hit carries its **source, URL and a reliability score**, so the agent can weigh a Treyarch script above a Discord guess, cite what it used, and surface disagreements instead of blending them.
 
 ### Skills that know where BO3 modding fails silently
 
@@ -118,7 +118,7 @@ The same binary works from a terminal:
 ```
 t7kb                         interactive browse: type a query, pick a hit, read it
 t7kb search <query>...       hybrid search  (--bm25 keyword-only · -n N results · --scores)
-t7kb get <doc_id>            print a full document
+t7kb get <doc_id>            print a document  (long ones paged: --offset · --max-chars · --all)
 t7kb build <name>            compile/light/link  (--stages · --light · --mod · --onlyents · --gdt-rebuild · --json)
 t7kb gdt find|get|schema|edit|check|refs   GDT lookup, schema, validated edits, diagnostics  (edit is a dry run unless --write)
 t7kb mcp                     run the stdio MCP server

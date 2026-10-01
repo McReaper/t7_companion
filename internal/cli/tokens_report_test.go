@@ -20,7 +20,7 @@ import (
 
 // TestTokenReport measures what each MCP tool's answer costs an agent, in
 // tokens, on the real corpus and install: the outputs are built by the same
-// functions the MCP handlers use (formatHits, formatDoc, the gdt ops + the
+// functions the MCP handlers use (formatHits, renderDoc, the gdt ops + the
 // compact JSON of jsonResult). Counts use o200k_base, an offline BPE tokenizer —
 // not Claude's own, which isn't public — so read them as relative: they are for
 // comparing formats and spotting regressions, not for billing. Opt-in:
@@ -98,10 +98,10 @@ func TestTokenReport(t *testing.T) {
 				continue
 			}
 			if i == 0 {
-				add("get|top result", formatDoc(d))
+				add("get|top result", getPage(t, d))
 			}
 			if i < 3 {
-				add("get|each of the top 3", formatDoc(d))
+				add("get|each of the top 3", getPage(t, d))
 			}
 		}
 	}
@@ -195,6 +195,16 @@ func gdtSamples(t *testing.T, root string, add func(key, s string)) {
 			run("gdt_refs|its color image", v, err)
 		}
 	}
+}
+
+// getPage is what the get tool returns for a doc: its first page.
+func getPage(t *testing.T, d *store.Doc) string {
+	t.Helper()
+	page, err := renderDoc(d, 0, pageSize(0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return page
 }
 
 func pct(xs []int, q float64) int { return xs[int(q*float64(len(xs)-1))] }

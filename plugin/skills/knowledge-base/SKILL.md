@@ -14,7 +14,7 @@ _If you're working under a BO3 mod-tools root (has `raw/`, `share_raw/`, `userma
 ## Query it well
 
 - **Search broad, then narrow.** Issue several short, differently-phrased `t7kb:search` queries (symptom-side, mechanism-side, exact-jargon-side). The full-text index is conjunctive, so a single phrasing misses the long tail.
-- **Read full bodies.** `t7kb:get` the top `doc_id`s — don't answer from snippets.
+- **Read full bodies.** `t7kb:get` the top `doc_id`s — don't answer from snippets. A long document (a whole script, GDT or transcript) comes a page at a time, ending with the `offset` for the next part: read on when the part you need isn't there yet, rather than paging through everything.
 - **Weigh reliability.** Each result carries a `reliability` score. On conflict, prefer higher-reliability sources and surface the disagreement when it matters.
 - **Cite.** When a claim comes from the corpus, name the `source` + `url`.
 

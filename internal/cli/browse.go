@@ -48,7 +48,8 @@ func runBrowse(cmd *cobra.Command, _ []string) error {
 				return err
 			}
 			if doc != nil {
-				printDoc(out, doc)
+				page, _ := renderDoc(doc, 0, 0) // a document the reader picked: the whole body
+				fmt.Fprint(out, page)
 			}
 		default:
 			qvec, err := emb.Embed(line)
