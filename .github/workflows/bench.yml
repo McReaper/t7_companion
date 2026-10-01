@@ -1,0 +1,36 @@
+name: bench
+
+# Synthetic benchmarks (no t7kb.db needed), run on demand so results can be
+# compared over time: Actions → bench → Run workflow. Results land in the job
+# summary and as an artifact. The token report needs the real corpus and runs
+# locally — see docs/benchmarks.md.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "0"
+      HF_HOME: ${{ github.workspace }}/.hf
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Cache the embedding model
+        uses: actions/cache@v6
+        with:
+          path: .hf
+          key: hf-all-MiniLM-L6-v2
+      - name: benchmarks
+        run: |
+          go test ./internal/store ./internal/embed -run '^$' -bench . -benchmem -count 5 | tee bench.txt
+          { echo '```'; grep -E '^(Benchmark|goos|goarch|cpu)' bench.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bench-${{ github.sha }}
+          path: bench.txt

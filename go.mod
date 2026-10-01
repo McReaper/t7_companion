@@ -6,11 +6,13 @@ require (
 	github.com/edgetools/go-sentex v0.1.0
 	github.com/mark3labs/mcp-go v0.55.1
 	github.com/spf13/cobra v1.10.2
+	github.com/tiktoken-go/tokenizer v0.7.0
 	golang.org/x/sys v0.44.0
 	modernc.org/sqlite v1.53.0
 )
 
 require (
+	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
