@@ -93,9 +93,11 @@ It returns a short per-stage report (status, duration, first actionable error) i
 | `mod` | Build `mods/<name>` instead of a usermap |
 | `light` | `low` / `medium` / `high` bake quality (default `medium`) |
 | `onlyents` | Fast entity-only compile — invalid after brush edits |
+| `launcher_dvars` | `run`: start the game with the dvars saved in the Launcher's Dvars dialog |
+| `dvars` | `run`: dvars to start the game with, e.g. `{"developer": "2", "logfile": "2"}` to get `console_mp.log` |
 
 > [!NOTE]
-> `build` is Windows only (the `gdt_*` tools just read and write text files); both need the BO3 Mod Tools installed (`TA_TOOLS_PATH`/`TA_GAME_PATH`, set by the Launcher on first run). `build` and `gdt_edit` are the only tools on the server that change anything on disk. For a debug run, launch the game with `+set developer 2 +set logfile 2` yourself — a headless run doesn't inherit the Launcher's dvars.
+> `build` is Windows only (the `gdt_*` tools just read and write text files); both need the BO3 Mod Tools installed (`TA_TOOLS_PATH`/`TA_GAME_PATH`, set by the Launcher on first run). `build` and `gdt_edit` are the only tools on the server that change anything on disk. The `run` stage starts the game on your map the way the Launcher's Run does; Steam must be running.
 
 ### GDT editing it can check
 

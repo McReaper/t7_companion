@@ -39,6 +39,10 @@ func buildToolDef() mcp.Tool {
 			mcp.Description("Skip the gdtdb /update pass before building (default false).")),
 		mcp.WithBoolean("gdt_rebuild",
 			mcp.Description("Run gdtdb /rebuild (~1.5 min) instead of /update. /update does pick up GDTs edited outside APE (it reports processed (N GDTs)); use this only if it reports 0 GDTs and the linker then can't find an edited asset (default false).")),
+		mcp.WithObject("dvars",
+			mcp.Description("run stage: dvars to start the game with, as {\"developer\": \"2\", \"logfile\": \"2\"} — logfile 2 writes console_mp.log, the way to read a script error. Overrides launcher_dvars.")),
+		mcp.WithBoolean("launcher_dvars",
+			mcp.Description("run stage: start the game with the dvars saved in the mod tools Launcher's Dvars dialog, as the Launcher does (default false).")),
 		mcp.WithString("tools_path",
 			mcp.Description("BO3 mod-tools root (default $TA_TOOLS_PATH).")),
 		mcp.WithString("game_path",
@@ -62,6 +66,11 @@ func buildToolHandler() server.ToolHandlerFunc {
 			language:   req.GetString("language", "english"),
 			skipGDT:    req.GetBool("skip_gdt", false),
 			gdtRebuild: req.GetBool("gdt_rebuild", false),
+
+			launcherDvars: req.GetBool("launcher_dvars", false),
+		}
+		if o.dvars, err = dvarPairs(req.GetArguments()["dvars"]); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
 		}
 		rep, err := runBuildReport(o, name, io.Discard)
 		if err != nil {

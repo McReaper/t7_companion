@@ -52,8 +52,8 @@ func (f *fakePipeline) install(t *testing.T) {
 		f.calls = append(f.calls, strings.Join([]string{"light", rel(bin), rel(mapSrc), rel(led), quality}, " "))
 		return stageResult{Name: "light", OK: f.fail != "light"}
 	}
-	gameRunner = func(game, name string, isMod bool) stageResult {
-		f.calls = append(f.calls, "run "+rel(game)+" "+name+map[bool]string{true: " mod", false: ""}[isMod])
+	gameRunner = func(game string, args []string) stageResult {
+		f.calls = append(f.calls, "run "+rel(game)+" "+strings.Join(args, " "))
 		return stageResult{Name: "run", OK: true}
 	}
 }
@@ -79,7 +79,7 @@ func TestRunBuildReportPipeline(t *testing.T) {
 				"compile bin cod2map64.exe -platform pc -navmesh -navvolume -loadFrom map_source/zm/zm_test.map share/raw/maps/zm/zm_test.d3dbsp",
 				"light bin map_source/zm/zm_test.map share/raw/maps/zm/zm_test.led high",
 				"link bin linker_modtools.exe -language english -modsource zm_test",
-				"run . zm_test",
+				"run . +set fs_game zm_test +devmap zm_test",
 			},
 			ok:    true,
 			notes: map[string]string{"compile": "wrote zm_test.d3dbsp"},
@@ -99,8 +99,8 @@ func TestRunBuildReportPipeline(t *testing.T) {
 		},
 		{
 			name:  "skip gdt, run only",
-			opts:  buildOpts{stages: "run", light: "medium", skipGDT: true},
-			calls: []string{"run . zm_test"},
+			opts:  buildOpts{stages: "run", light: "medium", skipGDT: true, dvars: []string{"developer=2", "logfile=2"}},
+			calls: []string{"run . +set developer 2 +set logfile 2 +set fs_game zm_test +devmap zm_test"},
 			ok:    true,
 		},
 		{
@@ -175,8 +175,54 @@ func TestRunBuildReportUsesTheGamePath(t *testing.T) {
 	if _, err := runBuildReport(&buildOpts{toolsPath: root, stages: "light,run", light: "medium", skipGDT: true}, "mp_test", io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	want := "light bin game/map_source/mp/mp_test.map game/share/raw/maps/mp/mp_test.led medium\nrun game mp_test"
+	want := "light bin game/map_source/mp/mp_test.map game/share/raw/maps/mp/mp_test.led medium\nrun game +set fs_game mp_test +devmap mp_test"
 	if got := strings.Join(f.calls, "\n"); got != want {
 		t.Errorf("the map source and game come from TA_GAME_PATH:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestGameEnvAttachesToSteam(t *testing.T) {
+	env := gameEnv([]string{"PATH=/bin", "SteamAppId=455130", "steamgameid=1", "HOME=/h"})
+	got := strings.Join(env, " ")
+	if got != "PATH=/bin HOME=/h SteamAppId=311210 SteamGameId=311210" {
+		t.Fatalf("the game gets BO3's app id, whatever the parent had (the mod tools are another app): %s", got)
+	}
+}
+
+func TestGameArgsMatchTheLauncher(t *testing.T) {
+	// what the stock modlauncher.exe passes, captured from the running game
+	if got := strings.Join(gameArgs("zm_init_sample_map", false), " "); got != "+set fs_game zm_init_sample_map +devmap zm_init_sample_map" {
+		t.Errorf("usermap: %s", got)
+	}
+	if got := strings.Join(gameArgs("my_mod", true), " "); got != "+set fs_game my_mod" {
+		t.Errorf("a mod is mounted, not devmap'd: %s", got)
+	}
+}
+
+func TestDvarsAsTheLauncherPassesThem(t *testing.T) {
+	// the Launcher's saved options, as readLauncherDvars returns them (checkboxes stored as true/false)
+	saved := []dvar{{"ai_disableSpawn", launcherValue("false")}, {"developer", "2"}, {"g_password", ""}, {"logfile", "2"},
+		{"scr_mod_enable_devblock", launcherValue("true")}, {"connect", ""}, {"set_gametype", ""}, {"splitscreen", launcherValue("true")}, {"splitscreen_playerCount", "2"}}
+	got := strings.Join(append(dvarArgs(saved), gameArgs("zm_init_sample_map", false)...), " ")
+	// the user's own Launcher run, captured from the console: empty ones left out, 0 kept
+	want := "+set ai_disableSpawn 0 +set developer 2 +set logfile 2 +set scr_mod_enable_devblock 1 +set splitscreen 1 +set splitscreen_playerCount 2 +set fs_game zm_init_sample_map +devmap zm_init_sample_map"
+	if got != want {
+		t.Fatalf("got  %s\nwant %s", got, want)
+	}
+
+	extra, err := parseDvars([]string{"Developer=1", "sv_cheats=1", "connect=127.0.0.1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	merged := strings.Join(dvarArgs(mergeDvars(saved[:2], extra)), " ")
+	if merged != "+set ai_disableSpawn 0 +set Developer 1 +set sv_cheats 1 +connect 127.0.0.1" {
+		t.Fatalf("an explicit dvar overrides a saved one in place, a new one goes last, connect is a command: %s", merged)
+	}
+	if _, err := parseDvars([]string{"novalue"}); err == nil {
+		t.Fatal("name=value is required")
+	}
+	pairs, err := dvarPairs(map[string]any{"logfile": float64(2), "developer": "2", "scr_mod_enable_devblock": true})
+	if err != nil || strings.Join(pairs, " ") != "developer=2 logfile=2 scr_mod_enable_devblock=1" {
+		t.Fatalf("MCP dvars: %v %v", pairs, err)
 	}
 }

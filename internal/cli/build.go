@@ -28,17 +28,19 @@ import (
 // exit code.
 
 type buildOpts struct {
-	toolsPath  string
-	gamePath   string
-	isMod      bool
-	stages     string
-	onlyEnts   bool
-	light      string
-	language   string
-	skipGDT    bool
-	gdtRebuild bool
-	jsonOut    bool
-	verbose    bool
+	toolsPath     string
+	gamePath      string
+	isMod         bool
+	stages        string
+	onlyEnts      bool
+	light         string
+	language      string
+	skipGDT       bool
+	gdtRebuild    bool
+	jsonOut       bool
+	verbose       bool
+	dvars         []string // run: name=value dvars to start the game with
+	launcherDvars bool     // run: also the Launcher's saved Dvar Options
 }
 
 type stageResult struct {
@@ -84,6 +86,8 @@ func newBuildCmd() *cobra.Command {
 	f.BoolVar(&o.gdtRebuild, "gdt-rebuild", false, "run gdtdb /rebuild instead of /update (only if /update reports 0 GDTs and the linker then misses an edited asset)")
 	f.BoolVar(&o.jsonOut, "json", false, "emit the report as JSON")
 	f.BoolVar(&o.verbose, "verbose", false, "stream each tool's full output as it runs")
+	f.StringArrayVar(&o.dvars, "dvar", nil, "run: start the game with this dvar, name=value (repeatable; e.g. developer=2, logfile=2)")
+	f.BoolVar(&o.launcherDvars, "launcher-dvars", false, "run: start the game with the dvars saved in the mod tools Launcher's Dvars dialog (--dvar overrides them)")
 	return cmd
 }
 
@@ -143,6 +147,7 @@ type buildPlan struct {
 	stages              map[string]bool
 	quality             string
 	mapSrc, d3dbsp, led string
+	dvars               []dvar // the game's dvars, for the run stage
 }
 
 func newBuildPlan(o *buildOpts, name string, stdout io.Writer) (*buildPlan, error) {
@@ -163,6 +168,9 @@ func newBuildPlan(o *buildOpts, name string, stdout io.Writer) (*buildPlan, erro
 		return nil, err
 	}
 	if p.quality, err = normalizeLight(o.light); err != nil {
+		return nil, err
+	}
+	if p.dvars, err = gameDvars(o); err != nil {
 		return nil, err
 	}
 	pp := name[:2]
@@ -242,7 +250,23 @@ func (p *buildPlan) gameStage() (stageResult, bool) {
 	if !p.stages["run"] {
 		return stageResult{}, false
 	}
-	return gameRunner(p.game, p.name, p.o.isMod), true
+	return gameRunner(p.game, append(dvarArgs(p.dvars), gameArgs(p.name, p.o.isMod)...)), true
+}
+
+// gameDvars are the dvars the run stage starts the game with: the Launcher's
+// saved ones if asked, overridden by the explicit ones.
+func gameDvars(o *buildOpts) ([]dvar, error) {
+	extra, err := parseDvars(o.dvars)
+	if err != nil {
+		return nil, err
+	}
+	var base []dvar
+	if o.launcherDvars {
+		if base, err = readLauncherDvars(); err != nil {
+			return nil, err
+		}
+	}
+	return mergeDvars(base, extra), nil
 }
 
 // runStage runs one tool to completion, capturing combined output, and returns a
@@ -313,20 +337,62 @@ func runLight(bin, mapSrc, led, quality string) stageResult {
 }
 
 // runGame launches the game and returns immediately (fire-and-forget).
-func runGame(game, name string, isMod bool) stageResult {
+// bo3AppID is Black Ops III's Steam app id.
+const bo3AppID = "311210"
+
+// gameStartup is how long the game must stay up for run to count as launched:
+// without Steam attached it shows "you must launch Steam" and exits at once.
+var gameStartup = 8 * time.Second
+
+func runGame(game string, args []string) stageResult {
 	exe := filepath.Join(game, "BlackOps3.exe")
-	var args []string
-	if isMod {
-		args = append(args, "+set", "fs_game", name)
-	}
-	args = append(args, "+devmap", name)
 	c := exec.Command(exe, args...)
 	c.Dir = game
+	c.Env = gameEnv(os.Environ())
 	if err := c.Start(); err != nil {
 		return stageResult{Name: "run", OK: false, Errors: []string{"could not launch game: " + err.Error()}}
 	}
-	go func() { _ = c.Wait() }()
-	return stageResult{Name: "run", OK: true, Note: "launched " + filepath.Base(exe)}
+	exited := make(chan error, 1)
+	go func() { exited <- c.Wait() }()
+	select {
+	case err := <-exited:
+		msg := "the game exited right after starting"
+		if err != nil {
+			msg += " (" + err.Error() + ")"
+		}
+		return stageResult{Name: "run", OK: false, Errors: []string{msg + " — is Steam running and signed in? A game it shows \"you must launch Steam\" in closes at once"}}
+	case <-time.After(gameStartup):
+		return stageResult{Name: "run", OK: true, Note: "launched " + filepath.Base(exe)}
+	}
+}
+
+// gameArgs are the Launcher's own run arguments (captured from the stock
+// modlauncher.exe starting the game): fs_game is the map's name for a usermap
+// too — without it the game never mounts usermaps/<map>/ and +devmap leaves it
+// on the main menu. A mod is mounted with fs_game and loaded from the menu, so it
+// gets no +devmap.
+func gameArgs(name string, isMod bool) []string {
+	args := []string{"+set", "fs_game", name}
+	if !isMod {
+		args = append(args, "+devmap", name)
+	}
+	return args
+}
+
+// gameEnv is the environment the game starts with: Steam starts the mod tools
+// Launcher with SteamAppId/SteamGameId set and the game inherits them; started
+// from anywhere else, BlackOps3.exe can't attach to the running Steam client and
+// refuses with "you must launch Steam to play the game" (verified on a real
+// install: the same command runs once SteamAppId=311210 is set).
+func gameEnv(env []string) []string {
+	out := make([]string, 0, len(env)+2)
+	for _, kv := range env {
+		k, _, _ := strings.Cut(kv, "=")
+		if !strings.EqualFold(k, "SteamAppId") && !strings.EqualFold(k, "SteamGameId") {
+			out = append(out, kv)
+		}
+	}
+	return append(out, "SteamAppId="+bo3AppID, "SteamGameId="+bo3AppID)
 }
 
 func finishBuild(out io.Writer, asJSON bool, rep buildReport) error {

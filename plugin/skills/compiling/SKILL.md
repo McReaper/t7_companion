@@ -75,7 +75,7 @@ t7kb build my_mod --mod --stages link        # a mod's zone
 t7kb build zm_mymap --onlyents --json        # fast entity-only compile, machine-readable report
 ```
 
-Flags: `--stages compile,light,link,run`, `--light low|medium|high`, `--onlyents`, `--mod`, `--tools-path`/`--game-path` (default `$TA_TOOLS_PATH`/`$TA_GAME_PATH`), `--verbose` to stream raw tool output. It exits non-zero and surfaces the parsed error (e.g. a linker `SCRIPT ERROR … line N`) when a stage fails — hand that to **t7kb:debugging**.
+Flags: `--stages compile,light,link,run`, `--light low|medium|high`, `--onlyents`, `--mod`, `--tools-path`/`--game-path` (default `$TA_TOOLS_PATH`/`$TA_GAME_PATH`), `--verbose` to stream raw tool output; for the run stage, `--launcher-dvars` and `--dvar name=value` (MCP `launcher_dvars`, `dvars`). The run stage starts the game as the Launcher's Run does — `+set fs_game <map> +devmap <map>` for a usermap, `+set fs_game <mod>` for a mod — and reports a failure if the game exits within a few seconds (Steam not running or not signed in). It exits non-zero and surfaces the parsed error (e.g. a linker `SCRIPT ERROR … line N`) when a stage fails — hand that to **t7kb:debugging**.
 
 ### Last resort: the raw Launcher binaries, only if `t7kb` itself isn't installed
 
