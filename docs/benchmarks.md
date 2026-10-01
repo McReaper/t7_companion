@@ -44,6 +44,23 @@ It builds each answer with the same functions the MCP handlers use and counts to
 
 Paging only costs answer quality when the passage the search matched sits past the first page: of the bench queries' 48 top-3 hits, 41 fit in one page, and of the 7 paged ones the snippet's passage was on page 1 for 4. With `find` set to a phrase from the snippet, it is in the page returned for all 7.
 
+## Retrieval quality
+
+`TestRetrievalQuality` scores search against 14 judged queries (`internal/cli/testdata/retrieval_eval.json`), one or more per skill domain. Each lists its **key** documents (the API doc, the reference tutorial, the thread with the fix) and **relevant** ones, judged by reading the candidates from three independent paths: the hybrid top 30, the BM25 top 15, and a title search over the non-Discord sources — so the judgments don't simply echo what search already returns. A judged doc_id the db lacks fails the test.
+
+```
+T7KB_BENCH_DB=<t7kb.db> HF_HOME=<model cache> go test ./internal/cli -run TestRetrievalQuality -v
+```
+
+| Metric (mean over 14 queries) | Baseline |
+|---|---:|
+| key@5 — a key document in the top 5 | 0.71 |
+| recall@10 — key + relevant documents in the top 10 | 0.64 |
+| MRR — 1 / rank of the first useful document | 0.87 |
+| nDCG@10 — graded ranking quality (key 2, relevant 1) | 0.58 |
+
+The first result is usually useful (MRR 0.87) but often a Discord thread rather than the best source: 4 queries have no key document in their top 5 — `clientfield register set lua` and `custom lua hud widget` come back 10/10 Discord with the API doc and the LUI tutorials absent, `PlayFXOnTag`'s API page is 6th, the wiki's "Wallbuy 0 Fix" 17th. Diagnostic queries whose best answers are Discord threads (`material surfacetype linker error`, the scriptparsetree linker error) already score well, and a ranking change must keep them there. The judgments are one maintainer's reading; extend the set when a real query goes wrong.
+
 ## Latency and memory
 
 | Benchmark | Result |
