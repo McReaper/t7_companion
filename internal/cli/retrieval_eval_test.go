@@ -66,31 +66,25 @@ func TestRetrievalQuality(t *testing.T) {
 	}
 	defer func() { _ = st.Close() }()
 
-	var sum evalScore
 	var report strings.Builder
-	fmt.Fprintf(&report, "\n%-46s key@5 rec@10  MRR  nDCG@10  top-10 sources\n", "query")
-	for _, q := range set.Queries {
-		v, err := emb.Embed(q.Query)
-		if err != nil {
-			t.Fatal(err)
-		}
-		hits, err := st.SearchHybrid(context.Background(), q.Query, v, 10)
-		if err != nil {
-			t.Fatal(err)
-		}
-		ids := make([]string, len(hits))
-		for i, h := range hits {
-			ids[i] = h.DocID
-		}
-		s := scoreRanking(ids, q)
-		sum.key5 += s.key5
-		sum.recall10 += s.recall10
-		sum.mrr += s.mrr
-		sum.ndcg10 += s.ndcg10
-		fmt.Fprintf(&report, "%-46.46s %5.0f %6.2f %4.2f %8.2f  %s\n", q.Query, s.key5, s.recall10, s.mrr, s.ndcg10, sourceMix(ids))
+	fmt.Fprintf(&report, "\nTUNING SET (the ranking weights were chosen on it)")
+	scoreSet(t, &report, emb, st, set.Queries)
+
+	// The held-out set: other themes and phrasings, judged blind; it checks
+	// that the weights generalise and is never used to pick them.
+	var holdout struct {
+		Queries []evalQuery `json:"queries"`
 	}
-	n := float64(len(set.Queries))
-	fmt.Fprintf(&report, "%-46s %5.2f %6.2f %4.2f %8.2f\n", fmt.Sprintf("MEAN over %d queries", len(set.Queries)), sum.key5/n, sum.recall10/n, sum.mrr/n, sum.ndcg10/n)
+	hb, err := os.ReadFile("testdata/retrieval_holdout.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(hb, &holdout); err != nil {
+		t.Fatal(err)
+	}
+	checkJudgedDocsExist(t, db, holdout.Queries)
+	fmt.Fprintf(&report, "\nHELD-OUT SET (other themes, judged blind)")
+	scoreSet(t, &report, emb, st, holdout.Queries)
 
 	// The source filter: an agent that knows the kind of answer it wants passes
 	// source, and a key document should then be in the top 5.
@@ -122,6 +116,35 @@ func TestRetrievalQuality(t *testing.T) {
 		}
 	}
 	t.Log(report.String())
+}
+
+// scoreSet searches each judged query, writes a line per query and the mean.
+func scoreSet(t *testing.T, report *strings.Builder, emb *embed.Embedder, st *store.Store, qs []evalQuery) {
+	t.Helper()
+	var sum evalScore
+	fmt.Fprintf(report, "\n%-46s key@5 rec@10  MRR  nDCG@10  top-10 sources\n", "query")
+	for _, q := range qs {
+		v, err := emb.Embed(q.Query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		hits, err := st.SearchHybrid(context.Background(), q.Query, v, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids := make([]string, len(hits))
+		for i, h := range hits {
+			ids[i] = h.DocID
+		}
+		s := scoreRanking(ids, q)
+		sum.key5 += s.key5
+		sum.recall10 += s.recall10
+		sum.mrr += s.mrr
+		sum.ndcg10 += s.ndcg10
+		fmt.Fprintf(report, "%-46.46s %5.0f %6.2f %4.2f %8.2f  %s\n", q.Query, s.key5, s.recall10, s.mrr, s.ndcg10, sourceMix(ids))
+	}
+	n := float64(len(qs))
+	fmt.Fprintf(report, "%-46s %5.2f %6.2f %4.2f %8.2f\n", fmt.Sprintf("MEAN over %d queries", len(qs)), sum.key5/n, sum.recall10/n, sum.mrr/n, sum.ndcg10/n)
 }
 
 // scoreRanking scores one ranked list of doc_ids against a judged query.

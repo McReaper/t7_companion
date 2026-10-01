@@ -1,0 +1,397 @@
+{
+  "about": "Held-out judged queries for TestRetrievalQuality: themes and phrasings the tuning set (retrieval_eval.json) doesn't cover, used only to check that ranking choices generalise — never to make them. Candidates came from both the v2.2 ranking and the title-weighted one (hybrid top 20, BM25 top 10 each) plus a title search over non-Discord sources, merged and judged blind: sorted by doc_id, without knowing which ranking proposed which. key = the direct answer, relevant = helps; reference pages no system found (SetLightingState, the modme camo-tables guide) were added by lookup so recall counts what both miss. Used once so far, on 2026-10-02, to reject the reliability weight shipped in 2.3.0 (it lost here while winning on tuning); a further ranking decision should be checked on a fresh blind set.",
+  "queries": [
+    {
+      "query": "black screen when loading the map after linking",
+      "key": [
+        "forums-modme::1768",
+        "forums-modme::1778",
+        "discord-bo3modtools::general_469778827963400193",
+        "discord-bo3modtools::general_272353167822290954",
+        "discord-bo3modtools::general_271798401706885124"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_239881120240500738",
+        "discord-bo3modtools::general_248255466629496834",
+        "discord-bo3modtools::general_272028344810340353",
+        "discord-bo3modtools::general_681962270540300451",
+        "discord-bo3modtools::general_341682130109202432",
+        "forums-modme::1261",
+        "forums-modme::3652",
+        "forums-ugx::ugx-forums-scripting-13858",
+        "forums-ugx::ugx-forums-scripting-17226",
+        "forums-modme::2763",
+        "forums-modme::2767",
+        "forums-ugx::ugx-forums-mapping-13551",
+        "forums-ugx::ugx-forums-modding-12765"
+      ]
+    },
+    {
+      "query": "camo for a custom weapon",
+      "key": [
+        "wiki-t7::guides/add-camo-table-to-custom-weapons.md",
+        "defs-bo3::asset.weaponcamotable",
+        "discord-bo3modtools::general_479742788460871692",
+        "wiki-modme::black-ops-3-guides-setting-up-camo-tables"
+      ],
+      "relevant": [
+        "defs-bo3::asset.weaponcamo",
+        "wiki-t7::information/camo-index.md",
+        "discord-bo3modtools::general_1127701645552275456",
+        "discord-bo3modtools::general_1187733885719674931",
+        "discord-bo3modtools::general_1187792879129722951",
+        "discord-bo3modtools::general_1274730634438512772",
+        "discord-bo3modtools::general_1274731831438213120",
+        "discord-bo3modtools::general_234619877900550154",
+        "discord-bo3modtools::general_264953612214468608",
+        "discord-bo3modtools::general_266909222611058698",
+        "discord-bo3modtools::general_292327910159679490",
+        "discord-bo3modtools::general_585442897009180692",
+        "discord-bo3modtools::general_615661452363038740",
+        "discord-bo3modtools::general_969891743480815617",
+        "discord-bo3modtools::mapping_466745242301759508",
+        "discord-bo3modtools::scripting_965268633511166012",
+        "discord-bo3modtools::showcase_236044327522926592"
+      ]
+    },
+    {
+      "query": "change a lightstate from script",
+      "key": [
+        "forums-ugx::ugx-forums-scripting-13922",
+        "discord-bo3modtools::scripting_971180380357025792",
+        "discord-bo3modtools::general_1138244072943915159",
+        "gscode-api::api.gsc.setlightingstate"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_1263183712175128686",
+        "discord-bo3modtools::general_235217684910964736",
+        "discord-bo3modtools::general_235472837987663872",
+        "discord-bo3modtools::general_235894510041694208",
+        "discord-bo3modtools::general_235898927885451265",
+        "discord-bo3modtools::mapping_241646838640279552",
+        "discord-bo3modtools::mapping_445196371180519424",
+        "discord-bo3modtools::mapping_913716604162945024",
+        "discord-bo3modtools::mapping_928624498117345290",
+        "discord-bo3modtools::scripting_267508101207425025",
+        "discord-bo3modtools::scripting_971195301320851519",
+        "forums-ugx::ugx-forums-mapping-13041",
+        "forums-ugx::ugx-forums-mapping-13672"
+      ]
+    },
+    {
+      "query": "change the player character model in a usermap",
+      "key": [
+        "forums-modme::2584",
+        "forums-modme::2736",
+        "discord-bo3modtools::general_356151035447738369",
+        "discord-bo3modtools::general_1187261217476194374"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_1011702634723418122",
+        "discord-bo3modtools::general_1012318571239575642",
+        "discord-bo3modtools::general_236248411958018048",
+        "discord-bo3modtools::general_469656067723362345",
+        "discord-bo3modtools::general_953344022737457172",
+        "discord-bo3modtools::general_960348390418423838",
+        "discord-bo3modtools::mapping_478318291190939648",
+        "discord-bo3modtools::mapping_622992168197554217",
+        "discord-bo3modtools::scripting_1213235434998464582",
+        "discord-bo3modtools::scripting_1378383488947978272",
+        "forums-modme::1452",
+        "forums-modme::1629",
+        "forums-modme::3454",
+        "forums-ugx::ugx-forums-mapping-14224",
+        "source-scripts::t7src.csc.scripts.shared._character_customization",
+        "source-workspace::workspace.usermaps.zm.playermodels.test.zone.source.zm.playersmodels.zpkg"
+      ]
+    },
+    {
+      "query": "custom powerup drop",
+      "key": [
+        "wiki-t7::guides/how-to-add-static-powerup.md",
+        "source-scripts::t7src.gsc.scripts.zm._zm_powerups",
+        "discord-bo3modtools::scripting_1235706721951813693"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_1215289670271762433",
+        "discord-bo3modtools::general_275014841398329344",
+        "discord-bo3modtools::general_620573642446733312",
+        "discord-bo3modtools::scripting_1015420941121114142",
+        "discord-bo3modtools::scripting_1243152380082655254",
+        "discord-bo3modtools::scripting_1255773641258565703",
+        "discord-bo3modtools::scripting_975747321713295390",
+        "forums-modme::1011",
+        "forums-modme::1042",
+        "source-scripts::t7src.gsc.scripts.zm._zm_powerup_fire_sale",
+        "source-scripts::t7src.gsc.scripts.zm._zm_powerup_insta_kill",
+        "source-scripts::t7src.gsc.scripts.zm._zm_powerup_nuke"
+      ]
+    },
+    {
+      "query": "devgui give points and weapons",
+      "key": [
+        "source-scripts::t7src.gsc.scripts.zm._zm_devgui",
+        "discord-bo3modtools::general_401939794868961281",
+        "discord-bo3modtools::general_359868494625505283"
+      ],
+      "relevant": [
+        "gscode-api::api.gsc.execdevgui",
+        "wiki-t7::information/list-of-dvars.md",
+        "discord-bo3modtools::general_663461670282199040"
+      ]
+    },
+    {
+      "query": "door that opens a new zone with a flag",
+      "key": [
+        "discord-bo3modtools::general_236485432328585216",
+        "discord-bo3modtools::general_265571348980563969",
+        "source-scripts::t7src.gsc.scripts.zm._zm_zonemgr",
+        "video-youtube::Tutorial 9 - Buyable Door - Linked to Zones"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_1252591343738421280",
+        "discord-bo3modtools::general_233297420945981441",
+        "discord-bo3modtools::general_265570389067956244",
+        "discord-bo3modtools::general_356993755313864706",
+        "discord-bo3modtools::general_947623409490231357",
+        "discord-bo3modtools::mapping_1060648570597949520",
+        "discord-bo3modtools::mapping_689695104943783947",
+        "forums-modme::1374",
+        "forums-ugx::ugx-forums-scripting-14730",
+        "video-youtube::Black Ops 3 Mod Tools tutorial Ep.11 Zones",
+        "video-youtube::Black Ops 3 Mod Tools | Tutorial 9 - Doors and Debris",
+        "video-youtube::😀 Zone Like Treyarch! Best Method for All Map Designs: Call of Duty: Black Ops 3: Mod Tools"
+      ]
+    },
+    {
+      "query": "easter egg song shootable teddy bears",
+      "key": [
+        "forums-modme::1746",
+        "video-youtube::Black Ops 3 Mod Tools | Tutorial Part 20 - Adding Music Easter Eggs",
+        "video-youtube::Black Ops 3 Mod Tools - Easter Egg Music"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_1273454219676090469",
+        "discord-bo3modtools::general_234087043767074818",
+        "discord-bo3modtools::general_238161721892667392",
+        "discord-bo3modtools::scripting_1386040652508172369",
+        "forums-modme::3116",
+        "forums-modme::860",
+        "forums-ugx::ugx-forums-help-desk-24689",
+        "forums-ugx::ugx-forums-scripting-13225",
+        "forums-ugx::ugx-forums-scripting-14144",
+        "source-scripts::t7src.gsc.scripts.zm.zm_island_side_ee_song",
+        "source-workspace::workspace.usermaps.zm.test.scripts.zm.zm.teddy.easter.egg.csc",
+        "source-workspace::workspace.usermaps.zm.test.scripts.zm.zm.teddy.easter.egg.gsc"
+      ]
+    },
+    {
+      "query": "exploder not playing its fx",
+      "key": [
+        "wiki-zeroy::zm-exploders",
+        "video-youtube::Black Ops 3 Mod Tools - Exploders (Turning On & Off Lights/FX via Script)",
+        "source-scripts::t7src.gsc.scripts.shared.exploder_shared"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_1234009051411517470",
+        "discord-bo3modtools::mapping_1207378073461334036",
+        "discord-bo3modtools::mapping_1217310462530556014",
+        "discord-bo3modtools::scripting_1147546624269221909",
+        "discord-bo3modtools::scripting_1404839115098292367",
+        "discord-bo3modtools::scripting_965397624712736808",
+        "discord-bo3modtools::scripting_966382137903308870",
+        "gscode-api::api.csc.playradiantexploder",
+        "gscode-api::api.gsc.activateclientradiantexploder",
+        "source-scripts::t7src.csc.scripts.shared.exploder_shared"
+      ]
+    },
+    {
+      "query": "how to change zombie health and speed per round",
+      "key": [
+        "wiki-t7::guides/change-zombie-variables.md",
+        "discord-bo3modtools::general_557032243483246604",
+        "forums-ugx::ugx-forums-scripting-13335",
+        "discord-bo3modtools::scripting_1208835000842199140"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_1329638906127323158",
+        "discord-bo3modtools::general_407662360644550656",
+        "discord-bo3modtools::general_594202514447138821",
+        "discord-bo3modtools::general_919888144554410014",
+        "discord-bo3modtools::scripting_1045202842480295996",
+        "discord-bo3modtools::scripting_1048095913756872774",
+        "discord-bo3modtools::scripting_1114304750188507186",
+        "forums-modme::1161",
+        "forums-modme::731",
+        "forums-ugx::ugx-forums-scripting-15682"
+      ]
+    },
+    {
+      "query": "localized string shows the reference name instead of text",
+      "key": [
+        "wiki-t7::guides/how-to-use-localization.md",
+        "wiki-modme::black-ops-3-basics-adding-the-missing-localized-strings",
+        "discord-bo3modtools::lui_955027711691214928",
+        "discord-bo3modtools::general_361547451817263116"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_1121134509572751380",
+        "discord-bo3modtools::scripting_1011689009438789802",
+        "discord-bo3modtools::scripting_1206714336026959944",
+        "discord-bo3modtools::scripting_1293715466577248267",
+        "discord-bo3modtools::scripting_1324519739074154527",
+        "discord-bo3modtools::scripting_979757618073591818",
+        "gscode-api::api.csc.makelocalizedstring",
+        "gscode-api::api.gsc.makelocalizedstring",
+        "wiki-ardivee::localization"
+      ]
+    },
+    {
+      "query": "mystery box custom weapon list",
+      "key": [
+        "wiki-modme::black-ops-3-basics-setting-up-mystery-box-weapons",
+        "video-youtube::Black Ops 3 Mod Tools | Tutorial Part 26 - Custom Weapons in Mystery Box",
+        "forums-modme::1841",
+        "forums-ugx::ugx-forums-scripting-12921",
+        "forums-ugx::ugx-forums-scripting-13153"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_1157848343196733540",
+        "discord-bo3modtools::general_1157880450350587955",
+        "discord-bo3modtools::general_1237745653124436019",
+        "discord-bo3modtools::general_232641921997078528",
+        "discord-bo3modtools::general_279219456104857601",
+        "discord-bo3modtools::scripting_1058989877103955999",
+        "forums-modme::783",
+        "forums-ugx::ugx-forums-modding-13356",
+        "forums-ugx::ugx-forums-scripting-12866",
+        "source-scripts::t7src.gsc.scripts.zm._zm_magicbox",
+        "video-youtube::Black Ops 3 Mod Tools - Customise Box Weapons"
+      ]
+    },
+    {
+      "query": "power switch turns on perks and doors",
+      "key": [
+        "forums-ugx::ugx-forums-mapping-13739",
+        "source-scripts::t7src.gsc.scripts.zm._zm_power",
+        "video-youtube::Black Ops 3 Mod Tools - Power Doors",
+        "video-youtube::BO3 Mod Tools [Tut] #11: Power lights!"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_1179134725114310726",
+        "discord-bo3modtools::general_231854107487371264",
+        "discord-bo3modtools::general_506129076348518431",
+        "discord-bo3modtools::general_583409783286136895",
+        "discord-bo3modtools::general_927642837166731264",
+        "discord-bo3modtools::general_927644609910280243",
+        "discord-bo3modtools::mapping_243479777057439745",
+        "discord-bo3modtools::scripting_279970555355070465",
+        "forums-modme::789",
+        "video-youtube::Tutorial Perk Lights Set them ON"
+      ]
+    },
+    {
+      "query": "publish a map to the steam workshop",
+      "key": [
+        "discord-bo3modtools::general_234903461227921408",
+        "forums-ugx::ugx-forums-help-desk-15090",
+        "video-youtube::Preview Image, Loading Screens, & Steam Workshop Page (BO3 Mod Tools 2022)",
+        "discord-bo3modtools::general_352400433634869259"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_1124074332751147018",
+        "discord-bo3modtools::general_1492882038238482584",
+        "discord-bo3modtools::general_240232557000523776",
+        "discord-bo3modtools::general_240251043445735455",
+        "discord-bo3modtools::general_240516138172284930",
+        "discord-bo3modtools::general_324373242112507915",
+        "discord-bo3modtools::general_371693131193909250",
+        "discord-bo3modtools::general_731149140645380168",
+        "discord-bo3modtools::mapping_1390401235244421181",
+        "discord-bo3modtools::mapping_233392653113360386",
+        "discord-bo3modtools::mapping_932054917194068029",
+        "forums-modme::1804",
+        "forums-modme::1938",
+        "forums-modme::2040",
+        "forums-modme::2045",
+        "forums-modme::3204",
+        "forums-modme::3213",
+        "forums-modme::3331",
+        "forums-ugx::ugx-forums-mapping-13175",
+        "forums-ugx::ugx-forums-mapping-13587",
+        "forums-ugx::ugx-forums-modding-12887",
+        "forums-ugx::ugx-forums-modding-13228",
+        "forums-ugx::ugx-forums-scripting-13522"
+      ]
+    },
+    {
+      "query": "water volume swimming",
+      "key": [
+        "forums-ugx::ugx-forums-mapping-14129",
+        "discord-bo3modtools::general_522213301828976650",
+        "discord-bo3modtools::general_665910556666101781"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_387479800945836042",
+        "discord-bo3modtools::general_522279345914380289",
+        "discord-bo3modtools::mapping_321075222323265536",
+        "discord-bo3modtools::mapping_937440198302765086",
+        "discord-bo3modtools::mapping_972893968696221726",
+        "discord-bo3modtools::mapping_986428640059342848",
+        "forums-ugx::ugx-forums-mapping-14533"
+      ]
+    },
+    {
+      "query": "zombie barrier boards not rebuilding",
+      "key": [
+        "discord-bo3modtools::mapping_364501880858214409",
+        "discord-bo3modtools::general_243573914108690433"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_297769491448725504",
+        "discord-bo3modtools::general_842089311175311390",
+        "discord-bo3modtools::general_885118002331275325",
+        "discord-bo3modtools::mapping_1167347390177615882",
+        "discord-bo3modtools::mapping_234822014114856960",
+        "discord-bo3modtools::mapping_261217718223503370",
+        "discord-bo3modtools::mapping_311630821167726592",
+        "discord-bo3modtools::scripting_1075670062733742150"
+      ]
+    },
+    {
+      "query": "zombies need a traversal to jump down a ledge",
+      "key": [
+        "discord-bo3modtools::mapping_236232093636493312",
+        "forums-modme::1819",
+        "video-youtube::Tutorial 5 - Black Ops 3 - Zombies - how to get your zombies to Jump up or Down over an object",
+        "discord-bo3modtools::general_569125816701681701"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_264119544438587393",
+        "discord-bo3modtools::general_275681326458208266",
+        "discord-bo3modtools::general_350846628992778242",
+        "discord-bo3modtools::general_861128395823120395",
+        "discord-bo3modtools::mapping_1043737766313328760",
+        "discord-bo3modtools::mapping_1131100031336857652",
+        "discord-bo3modtools::mapping_1273435210125410436",
+        "discord-bo3modtools::mapping_1282645076324909128",
+        "discord-bo3modtools::mapping_1336361245032317069",
+        "discord-bo3modtools::mapping_1346405031628247123",
+        "discord-bo3modtools::mapping_364604029885612034",
+        "discord-bo3modtools::mapping_926933220803633182",
+        "discord-bo3modtools::mapping_939584292940558346",
+        "video-youtube::Traversals and Source Files to help you guys out"
+      ]
+    },
+    {
+      "query": "zombies only spawn after power is on",
+      "key": [
+        "discord-bo3modtools::mapping_812093134477328394"
+      ],
+      "relevant": [
+        "discord-bo3modtools::general_430340484792320000",
+        "source-scripts::t7src.gsc.scripts.zm._zm_spawner"
+      ]
+    }
+  ]
+}

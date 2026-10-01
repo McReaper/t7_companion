@@ -52,18 +52,27 @@ Paging only costs answer quality when the passage the search matched sits past t
 T7KB_BENCH_DB=<t7kb.db> HF_HOME=<model cache> go test ./internal/cli -run TestRetrievalQuality -v
 ```
 
-| Metric (mean over 14 queries) | v2.2 ranking | Title-weighted + reliability (current) |
-|---|---:|---:|
-| key@5 — a key document in the top 5 | 0.71 | **0.86** |
-| recall@10 — key + relevant documents in the top 10 | 0.66 | 0.68 |
-| MRR — 1 / rank of the first useful document | 1.00 | 1.00 |
-| nDCG@10 — graded ranking quality (key 2, relevant 1) | 0.69 | 0.72 |
+Two judged sets, scored by the same test:
 
-(Scored on the pooled judgments, so both columns use the same set; before pooling the v2.2 ranking scored 0.71 / 0.64 / 0.87 / 0.58.)
+- **tuning** (`retrieval_eval.json`, 14 queries) — the ranking weights were chosen on it;
+- **held-out** (`retrieval_holdout.json`, 18 queries) — other themes and phrasings (round health, mystery box, doors and zones, power, barriers, workshop, powerups, traversals, localization, player models, exploders, devgui, water, camos, easter-egg songs, lightstates, a black screen on load), candidates pooled from both rankings and judged blind (sorted by doc_id, without knowing which ranking proposed which). It checks that a choice generalises.
 
-**What changed the ranking.** Diagnosing where each key document ranked showed two separate failures. BM25 required every query word (an AND, stopwords included): `sound alias plays silently` matched no document at all, `custom wallbuy shows cost 0` one; and on the vector side, reference pages ranked far down (the API page for `RegisterClientField` 45th–89th, the modme LUI tutorials 270th–587th) because a chunk of code no longer resembles the question. The fix that measured best is two weights in `internal/store`: a BM25 match in the **title counts 10×** one in the body (summary 5×) — reference pages are short with precise titles — and the fused score is scaled by **1 + 0.25 × (reliability − 0.5)**, so an API page edges out a Discord thread on a near tie. `PlayFXOnTag`'s API page and the wiki's "Wallbuy 0 Fix" move into the top 5; `SetHintString` and `GiveWeapon` go 0.65 → 0.77 and 0.66 → 0.80 in nDCG; the queries whose answers are Discord threads stay where they were. The one dip, `sound alias plays silently` (0.82 → 0.69), is the same ten documents reordered: two relevant forum threads now come before two key Discord ones.
+| key@5 / recall@10 / MRR / nDCG@10 | tuning | held-out |
+|---|---|---|
+| v2.2 ranking | 0.71 / 0.66 / 1.00 / 0.69 | 0.83 / 0.44 / 0.82 / 0.50 |
+| + title ×10 (**current**) | 0.79 / 0.67 / 1.00 / 0.70 | 0.83 / 0.43 / 0.82 / 0.50 |
+| + reliability weight 0.25 alone | 0.86 / 0.68 / 1.00 / 0.72 | 0.78 / 0.39 / 0.79 / 0.47 |
+| title ×10 + reliability 0.25 (shipped in 2.3.0) | 0.86 / 0.68 / 1.00 / 0.72 | 0.78 / 0.39 / 0.79 / 0.47 |
 
-**Tried and rejected**, on the same queries: OR instead of AND terms (key@5 0.50 — long stock scripts that repeat the words fill BM25's pool), dropping stopwords, joined compound terms (`clientfield register` → `registerclientfield`), a per-source cap, a reliability weight of 0.75 or more (stock scripts crowd out the answers), and per-document title vectors as a third fused list — prototyped with the corpus's own model, they changed nothing over the two weights above, so no database change was needed for this.
+(Tuning scores use the pooled judgments; before pooling the v2.2 ranking scored 0.71 / 0.64 / 0.87 / 0.58.)
+
+**What the held-out set changed.** 2.3.0 shipped a title weight and a reliability weight because together they lifted tuning key@5 from 0.71 to 0.86. On the held-out set that combination loses (0.83 → 0.78): nearly all the tuning gain came from the reliability weight, which favours API pages and Treyarch's scripts — right for the tuning set's "what's the API for…" questions, wrong for easter-egg songs, water, localization or devgui, where the best answers are community threads it pushed down. The title weight alone leaves the held-out set where it was and still brings `PlayFXOnTag`'s API page into the tuning top 5, so it stays; reliability is back to a tiebreak. **The held-out set was used once, to make this call**: a later ranking decision needs a fresh blind set.
+
+**Why the title weight.** Diagnosing where each tuning key document ranked showed two failures: BM25 required every query word (an AND, stopwords included — `sound alias plays silently` matched no document), and on the vector side reference pages ranked far down (the API page for `RegisterClientField` 45th–89th, the modme LUI tutorials 270th–587th) because a chunk of code no longer resembles the question. Reference pages are short with precise titles; a title match counts 10× a body one (summary 5×), and 5, 10 and 20 score the same.
+
+**Tried and rejected** on the tuning set: OR instead of AND terms (key@5 0.50 — long stock scripts that repeat the words fill BM25's pool), dropping stopwords, joined compound terms (`clientfield register` → `registerclientfield`), a per-source cap, and per-document title vectors as a third fused list (prototyped with the corpus's own model; no gain, so no database change).
+
+The tuning judgments were pooled: after each round of variants, their top 10 was judged too (56 documents added, as relevant only), so a ranking that surfaces relevant documents the baseline missed isn't scored as if it surfaced noise.
 
 **Still failing unfiltered**: `clientfield register set lua` and `custom lua hud widget` come back all Discord, with the API page and the LUI tutorials absent from the top 10 — no ranking weight reaches them. The `source` filter does: the eval's `filtered` checks (an agent passing the kind of answer it wants) put a key document at rank 3 for both (`source: api`, `source: wiki`), and at rank 1 for `PlayFXOnTag` (`api`) and the wallbuy fix (`wiki,forums`). The test fails if one drops out of the top 5; the knowledge-base skill and AGENTS.md tell the agent when to pass it.
 
