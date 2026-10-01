@@ -38,6 +38,28 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Optional hand-written highlights: if .github/release-notes/<tag>.md exists
+      # at the tag, it goes on top of the generated changelog. Without one the
+      # release keeps GoReleaser's notes as they are. Re-runs don't add it twice.
+      - name: Add the hand-written highlights, if any
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          notes=".github/release-notes/$GITHUB_REF_NAME.md"
+          if [ ! -f "$notes" ]; then
+            echo "no $notes — keeping the generated notes"
+            exit 0
+          fi
+          body="$(gh release view "$GITHUB_REF_NAME" --json body --jq .body)"
+          if grep -qxF "$(head -n1 "$notes")" <<<"$body"; then
+            echo "highlights already in the release notes"
+            exit 0
+          fi
+          # Split around the generated heading rather than ${body/…/…}: in bash 5.2
+          # an "&" in the replacement would expand to the matched text.
+          printf '%s%s\n\n## All changes%s\n' "${body%%## Changelog*}" "$(cat "$notes")" "${body#*## Changelog}" > "$RUNNER_TEMP/notes.md"
+          gh release edit "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"
+
       # t7kb.db.zip is built upstream and too large for GoReleaser, so each release
       # would otherwise ship without it. Carry the newest one forward from the most
       # recent earlier release that has it. Idempotent: a release that already has
