@@ -29,13 +29,11 @@ https://github.com/user-attachments/assets/0d533897-fd35-4f0d-9774-948546c0af6b
 
 ```mermaid
 flowchart LR
-    S["Skills · Claude Code plugin<br/>method + known traps"] -. guide .-> A
-    A([AI agent]) -- "search · get · build" --> B["t7kb · MCP server"]
-    B -- "BM25 + vector" --> C[("t7kb.db")]
-    C -- hits --> B
-    B -- "drives headlessly" --> T["BO3 mod tools<br/>gdtdb · cod2map · light · linker"]
-    T -- "tool output" --> B
-    B -- "cited results · per-stage build report" --> A
+    S["Skills<br/>(Claude Code plugin)"] -. method + traps .-> A([Your AI agent])
+    A <-->|MCP| T["t7kb<br/>one local binary"]
+    T --> K[("Knowledge base<br/>search · get")]
+    T --> G["Your GDTs<br/>find · read · check · edit"]
+    T --> B["BO3 mod tools<br/>build"]
 ```
 
 ## 📥 Install
@@ -101,7 +99,15 @@ It returns a short per-stage report (status, duration, first actionable error) i
 
 ### GDT editing it can check
 
-APE's asset databases are plain-text GDTs, and the `gdt_*` MCP tools let the agent work on them directly — with the install's own rules as the schema. `gdt_schema` reads what APE declares for an asset type from its `deffiles/*.awi` (field kinds, ranges, choices, defaults) and, for a material, which texture slots and category its techset really has. `gdt_find` / `gdt_get` locate an asset across every GDT the tools index and show its fields, inherited ones included. `gdt_edit` creates or changes an asset — copying a donor with its LOD paths cleared, escaping paths, refusing stock GDTs and duplicate names, and catching out-of-range values, unknown choices, a `materialType` that doesn't match `materialCategory`, or an image with the wrong semantic — **as a dry run unless told to write**. It takes several assets at once (written all-or-nothing) and turns a texture into an image asset, taking the semantic from the material slot it fills. `gdt_check` diagnoses a whole GDT before you build — references to missing or wrong-typed assets, exports and textures missing on disk, duplicates — and `gdt_refs` lists everything that uses an asset before you rename it. Then `build` indexes and links it.
+APE's asset databases are plain-text GDTs, and the `gdt_*` MCP tools let the agent read and write them using the install's own rules as the schema: the `deffiles/*.awi` scripts that build APE's pages, and the techsets behind each material type.
+
+- **`gdt_find` / `gdt_get`**: find an asset in any GDT the tools index and read its fields, inherited ones included.
+- **`gdt_schema`**: what APE declares for an asset type, and for a material, the texture slots its type really reads.
+- **`gdt_edit`**: create or change assets, one or a batch, **as a dry run unless told to write**. It refuses stock GDTs and duplicate names, turns a texture into an image asset, and catches out-of-range values, unknown dropdown choices, a surface type left on `<error>`, a material type and category that disagree, or an image with the wrong semantic. It also writes what APE writes when a field changes (a gloss preset's range, an effect image's alpha settings).
+- **`gdt_check`**: diagnose a whole GDT before you build: missing or wrong-typed references, exports and textures missing on disk, duplicates, LODs that would never be drawn.
+- **`gdt_refs`**: everything that uses an asset, before you rename or delete it.
+
+Then `build` indexes and links it.
 
 ## ⌨️ CLI
 
@@ -121,7 +127,11 @@ t7kb update-check            is a newer release out?
 
 ## 🔄 Updating
 
-`t7kb update-check` (also run by `/t7kb:setup`) tells you whether a newer release exists — it only runs when you ask and never downloads anything itself. Re-run the installer with `--force` / `-Force` to update the binary and database, and update the plugin through Claude Code's `/plugin` menu; plugin and binary versions move together, one per release.
+**Claude Code:** update the plugin (`/plugin marketplace update t7-reapy`, then update `t7kb` in the `/plugin` menu), then run `/t7kb:setup`: it checks for a newer release and offers to update the binary and database.
+
+**Other clients:** `t7kb update-check` tells you whether a newer release exists (it only runs when you ask and never downloads anything itself); re-run the installer with `--force` / `-Force` to update.
+
+Plugin and binary versions move together, one per release.
 
 ## 🤝 Contributing
 
