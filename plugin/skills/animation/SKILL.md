@@ -82,6 +82,8 @@ Create a new `xanim` asset (don't derive from a stock one) and set:
 - **Use Bones** → checked for everything except viewmodels.
 - **Looping** → checked only for looping anims (idle/slide/sprint loops).
 
+With the MCP tools, `t7kb:gdt_edit` creates it: asset type `xanim`, and in `set` the GDT keys behind those APE labels — `filename` (Anim File), `model` (Model File), `type`, `useBones`, `looping` (verified in `deffiles/xanim.awi`; `t7kb:gdt_schema` lists the rest). `t7kb:gdt_check` then confirms the Anim File exists under `xanim_export/`, which catches the path-root mistake above. It doesn't check that `model` is set: do that yourself.
+
 Then add its line to the map/mod **`.zone`** (`xanim,<name>`), plus any model/scriptbundle it depends on, and **Link** (this is a script/asset change — no map recompile needed unless geometry changed). See **t7kb:compiling**.
 
 **An anim you play by string through an animtree has to be declared in three places, and each omission fails at a different stage** — which is why fixing one and re-linking looks like the fix didn't work:

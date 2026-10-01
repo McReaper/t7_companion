@@ -2,7 +2,7 @@
 
 > Drop this file at the root of your BO3 mod-tools install (the folder holding `usermaps/`, `mods/`, `share/`) — one copy there covers every map and mod underneath, and a per-project `AGENTS.md` still layers on top. Any AGENTS.md-aware agent (Claude Code via a `CLAUDE.md` that imports it, Codex, OpenCode, recent Cursor) reads it and will use the knowledge base below. Editors that use their own rules file instead (Copilot, Windsurf, Cline, Kiro) — paste this content there; see the t7kb README. Edit freely for your project.
 
-This is a Black Ops III (Treyarch mod tools) modding workspace. You have a local knowledge base of the BO3 modding community available through the **t7kb** MCP server — tools `search` (hybrid keyword + semantic) and `get` (full document by `doc_id`). It covers community wikis, forums, Discord, decompiled engine scripts, YouTube tutorials, and the mod-tools schema files.
+This is a Black Ops III (Treyarch mod tools) modding workspace. The **t7kb** MCP server gives you three things: a local knowledge base of the BO3 modding community (`search`, hybrid keyword + semantic, and `get`, a full document by `doc_id`), covering community wikis, forums, Discord, decompiled engine scripts, YouTube tutorials and the mod-tools schema files; the `gdt_*` tools, to read, check and edit this install's GDTs; and `build`, to compile, light and link a map or mod without the Launcher.
 
 _If the `t7kb` tools aren't available, the knowledge base isn't installed yet — see the t7kb README to install it and register the MCP server._
 
@@ -16,6 +16,12 @@ For any non-trivial BO3 modding question — GSC/CSC scripting, Radiant mapping,
 - **Read full bodies.** `get` the top `doc_id`s — don't answer from snippets.
 - **Weigh reliability.** Each result carries a `reliability` score. On conflict, prefer higher-reliability sources, and surface the disagreement when it matters.
 - **Cite.** When a claim comes from the kb, name the `source` + `url` so the user can verify.
+
+## Use the GDT and build tools instead of editing and building by hand
+
+- **Edit GDTs through `gdt_edit`, not as text.** It validates against the install's own `.awi` schema and material techsets, refuses stock GDTs, and is a **dry run unless you pass `write`**: show the user the changes and issues, then write. `gdt_get` / `gdt_find` read an asset, `gdt_schema` lists what an asset type (or a material type's texture slots) accepts, `gdt_refs` lists what uses an asset before you rename or delete it.
+- **`gdt_check` a GDT before building it.** It reports what would otherwise surface one link error at a time: missing or wrong-typed references, exports and textures missing on disk, duplicates, a surface type left on `<error>`.
+- **Build with `build`, then read its report.** It runs gdtdb → cod2map → light → linker and returns each stage's status and first actionable error; `stages: link` alone is enough after a script or asset change. The linker exits non-zero on mere warnings, so a `link` stage can report failure on a fast file that built fine: the verdict is `zone_source/all/assetinfo/<map>.errorlog` (and `<map>.csv`), not the exit code. `build` and `gdt_edit` are the only tools that change files.
 
 ## Craft essentials (BO3)
 

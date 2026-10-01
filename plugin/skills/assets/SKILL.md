@@ -100,7 +100,7 @@ Porting a model's *materials* is where a rip stops looking like the original. Th
 - **`lit_advanced_fullspec` silently refuses to expose `colorMap`** if `aoMap` and `glossMap` are missing — which a rip never has. Error reads `material '<name>' using technique '...' doesn't expose a 'colorMap' texture`. Drop to `lit`.
 - **The `colorMap` slot needs `coreSemantic` `sRGB3chAlpha`.** Switching a diffuse to `sRGB3ch` to dodge a packed alpha breaks the binding entirely, with the same "doesn't expose a colorMap" error.
 - **`baseImage` is relative to the install root**, so it includes the `texture_assets\\` prefix — not relative to `texture_assets/` itself.
-- **Old-title `SurfaceType` values don't transliterate.** `PAINTED_METAL` → `paintedmetal` (no underscore), and `default` → `<none>`, else the linker aborts with `surfaceTypeName 'default' not in surfaceTypeParms array`.
+- **Old-title `SurfaceType` values don't transliterate.** `PAINTED_METAL` → `paintedmetal` (no underscore), and `default` → `<none>`, else the linker aborts with `surfaceTypeName 'default' not in surfaceTypeParms array`. `t7kb:gdt_edit` and `t7kb:gdt_check` reject a value that isn't in APE's list and warn on one left on `<error>`, APE's default, which stops the linker the same way once the material reaches collision.
 
 ## Emissive, double-sided and packed alpha each look like a different bug
 

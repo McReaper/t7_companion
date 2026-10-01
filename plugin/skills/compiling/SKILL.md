@@ -50,7 +50,7 @@ The stages are decoupled on purpose; the slow full build is only for the first p
 - **Entity-only change** (moved/added spawners, script_structs, KVPs — no brush edits) → the map compiler's **`-onlyents`** fast path re-exports just entities. It's invalid the moment any *brush* geometry changed (throws a brush-count mismatch) — that forces a **Full Compile**.
 - **Geometry change** (brushes/patches) → **Full Compile** (+ Light if it affects lighting) → Link.
 - **Lighting-only change** → **Light** → Link; no recompile.
-- **Asset edit** (GDT/model/material) → save + let GdtDB index → **Link**.
+- **Asset edit** (GDT/model/material) → save + let GdtDB index → **Link**. Run `t7kb:gdt_check` on the GDT first: it reports the missing references, missing source files and duplicates the linker would otherwise hand you one per run (**t7kb:assets**).
 
 When a build hangs or fails, isolate by running one stage at a time and read that stage's output — don't re-run the whole pipeline blind. Capture the exact message and take it to **t7kb:debugging**.
 
