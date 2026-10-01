@@ -207,6 +207,14 @@ func (w *Workspace) applyEdit(f *File, req EditRequest) (*EditResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	if fx := w.apeEffects(typ, req.Set); len(fx) > 0 { // what APE writes when those fields change
+		for k, v := range fx {
+			a.Set(k, Quote(v))
+		}
+		if typ, fields, err = w.Resolved(f, a); err != nil {
+			return nil, err
+		}
+	}
 	res.Type = typ
 	res.Issues = append(res.Issues, w.validate(f, typ, fields, keys)...)
 	for _, fr := range w.FileRefs(typ, fields) {
