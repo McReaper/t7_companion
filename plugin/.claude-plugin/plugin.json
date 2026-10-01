@@ -1,7 +1,7 @@
 {
   "name": "t7kb",
   "description": "Local Black Ops 3 modding knowledge base via MCP. Run /t7kb:setup once to download the tool + database and register the MCP server.",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "author": { "name": "McReaper", "url": "https://github.com/McReaper" },
   "homepage": "https://github.com/McReaper/t7_companion",
   "repository": "https://github.com/McReaper/t7_companion",

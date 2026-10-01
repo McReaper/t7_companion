@@ -45,7 +45,7 @@ archives:
       - models/**/* # the bundled embedding model (offline)
 
 # Auto-generated changelog, sandwiched between the hand-curated header/footer
-# below. Only what a user would notice makes it in: features, fixes, and skill
+# below. Only what a user would notice makes it in: features, fixes, speed-ups (perf) and skill
 # knowledge (docs(skills) ships to plugin users). ci/chore/test/refactor and
 # repo docs match no group, so GoReleaser drops them. Each line shows the
 # subject without its "type(scope):" prefix, the scope kept as a bold label.
@@ -64,9 +64,12 @@ changelog:
     - title: "🐛 Fixed"
       regexp: '^fix(\(.+\))?!?:.+$'
       order: 1
+    - title: "⚡ Faster"
+      regexp: '^perf(\(.+\))?!?:.+$'
+      order: 2
     - title: "📚 Skill knowledge"
       regexp: '^docs\(skills\)!?:.+$'
-      order: 2
+      order: 3
 
 release:
   # owner/repo are auto-detected from the git remote.
