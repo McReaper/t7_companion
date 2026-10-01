@@ -161,12 +161,16 @@ func TestGlossPresetWritesItsRange(t *testing.T) {
 		t.Errorf("wood writes glossRangeMax 5 like APE: %q", v)
 	}
 
-	w.Edit(EditRequest{File: "source_data/mine.gdt", Asset: "mine_base", Set: map[string]string{"glossSurfaceType": "<full>", "glossRangeMax": "9"}})
+	if _, err := w.Edit(EditRequest{File: "source_data/mine.gdt", Asset: "mine_base", Set: map[string]string{"glossSurfaceType": "<full>", "glossRangeMax": "9"}}); err != nil {
+		t.Fatal(err)
+	}
 	_, a, _ = w.loadAsset("mine_base", "material")
 	if v, _ := a.Get("glossRangeMax"); Unquote(v) != "9" {
 		t.Errorf("a range the request sets wins over the preset: %q", v)
 	}
-	w.Edit(EditRequest{File: "source_data/mine.gdt", Asset: "mine_base", Set: map[string]string{"glossSurfaceType": "<custom>"}})
+	if _, err := w.Edit(EditRequest{File: "source_data/mine.gdt", Asset: "mine_base", Set: map[string]string{"glossSurfaceType": "<custom>"}}); err != nil {
+		t.Fatal(err)
+	}
 	_, a, _ = w.loadAsset("mine_base", "material")
 	if v, _ := a.Get("glossRangeMax"); Unquote(v) != "9" {
 		t.Errorf("<custom> leaves the range alone: %q", v)

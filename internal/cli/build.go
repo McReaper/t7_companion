@@ -109,119 +109,140 @@ var (
 // tools not found) before any stage ran — stage failures are carried in the report
 // (rep.OK / rep.FailedStage). stdout receives per-tool output only when o.verbose.
 func runBuildReport(o *buildOpts, name string, stdout io.Writer) (buildReport, error) {
-	if len(name) < 2 {
-		return buildReport{}, fmt.Errorf("map/mod name %q is too short", name)
-	}
-
-	tools := firstNonEmpty(o.toolsPath, os.Getenv("TA_TOOLS_PATH"))
-	tools = strings.TrimRight(tools, `\/`)
-	if tools == "" {
-		return buildReport{}, fmt.Errorf("no mod-tools path: pass --tools-path or set TA_TOOLS_PATH")
-	}
-	game := firstNonEmpty(o.gamePath, os.Getenv("TA_GAME_PATH"), tools)
-	game = strings.TrimRight(game, `\/`)
-
-	bin := filepath.Join(tools, "bin")
-	if _, err := os.Stat(filepath.Join(bin, "linker_modtools.exe")); err != nil {
-		return buildReport{}, fmt.Errorf("mod tools not found at %s — build needs a Windows BO3 mod-tools install", bin)
-	}
-
-	stages, err := parseStages(o.stages)
+	p, err := newBuildPlan(o, name, stdout)
 	if err != nil {
 		return buildReport{}, err
 	}
-	quality, err := normalizeLight(o.light)
-	if err != nil {
-		return buildReport{}, err
-	}
-
-	pp := name[:2]
-	mapSrc := filepath.Join(game, "map_source", pp, name+".map")
-	d3dbsp := filepath.Join(game, "share", "raw", "maps", pp, name+".d3dbsp")
-	led := filepath.Join(game, "share", "raw", "maps", pp, name+".led")
-
 	rep := buildReport{Target: name, Kind: "usermap", OK: true}
 	if o.isMod {
 		rep.Kind = "mod"
 	}
-
-	run := func(sr stageResult) bool {
+	// In pipeline order; each returns false when it doesn't apply. The build stops
+	// at the first stage that fails.
+	for _, stage := range []func() (stageResult, bool){p.gdtStage, p.compileStage, p.lightStage, p.linkStage, p.gameStage} {
+		sr, applies := stage()
+		if !applies {
+			continue
+		}
 		rep.Stages = append(rep.Stages, sr)
 		if !sr.OK {
-			rep.OK = false
-			rep.FailedStage = sr.Name
-		}
-		return sr.OK
-	}
-
-	// gdtdb /update first (the Launcher does this before every build group).
-	if !o.skipGDT && (stages["compile"] || stages["light"] || stages["link"]) {
-		gdtdbDir := filepath.Join(tools, "gdtdb")
-		gdtdb := filepath.Join(gdtdbDir, "gdtdb.exe")
-		// Run gdtdb from its OWN directory, like the stock Launcher: it ties recorded asset paths to
-		// its cwd, so a different cwd makes a Launcher-built db flag every asset as a phantom duplicate.
-		gdtArg := "/update"
-		if o.gdtRebuild {
-			gdtArg = "/rebuild" // recovery: /update does index GDTs edited outside APE (verified); this is for a db that lost everything
-		}
-		if !run(stageRunner("gdt", gdtdbDir, gdtdb, 10*time.Minute, o.verbose, stdout, gdtArg)) {
-			return rep, nil
+			rep.OK, rep.FailedStage = false, sr.Name
+			break
 		}
 	}
-
-	// Compile and light only apply to maps.
-	if stages["compile"] {
-		if o.isMod {
-			run(stageSkipped("compile", "not applicable to a mod"))
-		} else {
-			args := []string{"-platform", "pc"}
-			if o.onlyEnts {
-				args = append(args, "-onlyents")
-			} else {
-				args = append(args, "-navmesh", "-navvolume")
-			}
-			args = append(args, "-loadFrom", mapSrc, d3dbsp)
-			start := time.Now()
-			sr := stageRunner("compile", bin, filepath.Join(bin, "cod2map64.exe"), 15*time.Minute, o.verbose, stdout, args...)
-			// cod2map exits 0 even when it skips navmesh; trust the .d3dbsp mtime.
-			if sr.OK && !fileMTime(d3dbsp).After(start.Add(-2*time.Second)) {
-				sr.OK = false
-				sr.Errors = append(sr.Errors, "cod2map reported success but "+filepath.Base(d3dbsp)+" was not written")
-			} else if sr.OK {
-				sr.Note = "wrote " + filepath.Base(d3dbsp)
-			}
-			if !run(sr) {
-				return rep, nil
-			}
-		}
-	}
-
-	if stages["light"] {
-		if o.isMod {
-			run(stageSkipped("light", "not applicable to a mod"))
-		} else if !run(lightRunner(bin, mapSrc, led, quality)) {
-			return rep, nil
-		}
-	}
-
-	if stages["link"] {
-		linker := filepath.Join(bin, "linker_modtools.exe")
-		var args []string
-		if o.isMod {
-			args = []string{"-language", o.language, "-fs_game", name, "-modsource", name}
-		} else {
-			args = []string{"-language", o.language, "-modsource", name}
-		}
-		if !run(stageRunner("link", bin, linker, 20*time.Minute, o.verbose, stdout, args...)) {
-			return rep, nil
-		}
-	}
-
-	if stages["run"] {
-		run(gameRunner(game, name, o.isMod))
-	}
-
 	return rep, nil
+}
+
+// buildPlan is a validated build: where the tools and game are, which stages
+// run, and the map's source and outputs.
+type buildPlan struct {
+	o                   *buildOpts
+	name                string
+	stdout              io.Writer
+	tools, game, bin    string
+	stages              map[string]bool
+	quality             string
+	mapSrc, d3dbsp, led string
+}
+
+func newBuildPlan(o *buildOpts, name string, stdout io.Writer) (*buildPlan, error) {
+	if len(name) < 2 {
+		return nil, fmt.Errorf("map/mod name %q is too short", name)
+	}
+	tools := strings.TrimRight(firstNonEmpty(o.toolsPath, os.Getenv("TA_TOOLS_PATH")), `\/`)
+	if tools == "" {
+		return nil, fmt.Errorf("no mod-tools path: pass --tools-path or set TA_TOOLS_PATH")
+	}
+	p := &buildPlan{o: o, name: name, stdout: stdout, tools: tools, bin: filepath.Join(tools, "bin")}
+	p.game = strings.TrimRight(firstNonEmpty(o.gamePath, os.Getenv("TA_GAME_PATH"), tools), `\/`)
+	if _, err := os.Stat(filepath.Join(p.bin, "linker_modtools.exe")); err != nil {
+		return nil, fmt.Errorf("mod tools not found at %s — build needs a Windows BO3 mod-tools install", p.bin)
+	}
+	var err error
+	if p.stages, err = parseStages(o.stages); err != nil {
+		return nil, err
+	}
+	if p.quality, err = normalizeLight(o.light); err != nil {
+		return nil, err
+	}
+	pp := name[:2]
+	p.mapSrc = filepath.Join(p.game, "map_source", pp, name+".map")
+	p.d3dbsp = filepath.Join(p.game, "share", "raw", "maps", pp, name+".d3dbsp")
+	p.led = filepath.Join(p.game, "share", "raw", "maps", pp, name+".led")
+	return p, nil
+}
+
+// gdtStage runs gdtdb /update first, as the Launcher does before every build group.
+func (p *buildPlan) gdtStage() (stageResult, bool) {
+	usesAssets := p.stages["compile"] || p.stages["light"] || p.stages["link"]
+	if p.o.skipGDT || !usesAssets {
+		return stageResult{}, false
+	}
+	// Run gdtdb from its OWN directory, like the stock Launcher: it ties recorded asset paths to
+	// its cwd, so a different cwd makes a Launcher-built db flag every asset as a phantom duplicate.
+	gdtdbDir := filepath.Join(p.tools, "gdtdb")
+	arg := "/update"
+	if p.o.gdtRebuild {
+		arg = "/rebuild" // recovery: /update does index GDTs edited outside APE (verified); this is for a db that lost everything
+	}
+	return stageRunner("gdt", gdtdbDir, filepath.Join(gdtdbDir, "gdtdb.exe"), 10*time.Minute, p.o.verbose, p.stdout, arg), true
+}
+
+// compileStage runs cod2map (maps only).
+func (p *buildPlan) compileStage() (stageResult, bool) {
+	if !p.stages["compile"] {
+		return stageResult{}, false
+	}
+	if p.o.isMod {
+		return stageSkipped("compile", "not applicable to a mod"), true
+	}
+	args := []string{"-platform", "pc", "-navmesh", "-navvolume"}
+	if p.o.onlyEnts {
+		args = []string{"-platform", "pc", "-onlyents"}
+	}
+	args = append(args, "-loadFrom", p.mapSrc, p.d3dbsp)
+	start := time.Now()
+	sr := stageRunner("compile", p.bin, filepath.Join(p.bin, "cod2map64.exe"), 15*time.Minute, p.o.verbose, p.stdout, args...)
+	switch {
+	case !sr.OK:
+	case !fileMTime(p.d3dbsp).After(start.Add(-2 * time.Second)): // cod2map exits 0 even when it skips navmesh; trust the .d3dbsp mtime
+		sr.OK = false
+		sr.Errors = append(sr.Errors, "cod2map reported success but "+filepath.Base(p.d3dbsp)+" was not written")
+	default:
+		sr.Note = "wrote " + filepath.Base(p.d3dbsp)
+	}
+	return sr, true
+}
+
+// lightStage bakes the lighting (maps only).
+func (p *buildPlan) lightStage() (stageResult, bool) {
+	if !p.stages["light"] {
+		return stageResult{}, false
+	}
+	if p.o.isMod {
+		return stageSkipped("light", "not applicable to a mod"), true
+	}
+	return lightRunner(p.bin, p.mapSrc, p.led, p.quality), true
+}
+
+// linkStage links the fast files.
+func (p *buildPlan) linkStage() (stageResult, bool) {
+	if !p.stages["link"] {
+		return stageResult{}, false
+	}
+	args := []string{"-language", p.o.language, "-modsource", p.name}
+	if p.o.isMod {
+		args = []string{"-language", p.o.language, "-fs_game", p.name, "-modsource", p.name}
+	}
+	return stageRunner("link", p.bin, filepath.Join(p.bin, "linker_modtools.exe"), 20*time.Minute, p.o.verbose, p.stdout, args...), true
+}
+
+// gameStage starts the game on the build.
+func (p *buildPlan) gameStage() (stageResult, bool) {
+	if !p.stages["run"] {
+		return stageResult{}, false
+	}
+	return gameRunner(p.game, p.name, p.o.isMod), true
 }
 
 // runStage runs one tool to completion, capturing combined output, and returns a

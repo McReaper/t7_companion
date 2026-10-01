@@ -189,21 +189,12 @@ func lex(src []byte) ([]token, error) {
 		case strings.IndexByte("{}()[]", c) >= 0:
 			toks = append(toks, token{kind: c, text: string(c), line: line, off: i})
 		case c == '"':
-			start, l0, o0 := i+1, line, i
-			i++
-			for i < len(src) && src[i] != '"' {
-				if src[i] == '\\' && i+1 < len(src) {
-					i++ // keep the escape pair verbatim
-				}
-				if src[i] == '\n' {
-					line++
-				}
-				i++
+			t, end, nl, err := lexString(src, i, line)
+			if err != nil {
+				return nil, err
 			}
-			if i >= len(src) {
-				return nil, fmt.Errorf("line %d: unterminated string", l0)
-			}
-			toks = append(toks, token{kind: '"', text: string(src[start:i]), line: l0, off: o0})
+			toks = append(toks, t)
+			i, line = end, line+nl
 		default:
 			return nil, fmt.Errorf("line %d: unexpected character %q", line, c)
 		}
@@ -211,120 +202,170 @@ func lex(src []byte) ([]token, error) {
 	return toks, nil
 }
 
+// lexString reads the string opening at src[i] (on line). It returns the token,
+// the index of its closing quote and how many newlines it spans. Escape pairs
+// are kept verbatim.
+func lexString(src []byte, i, line int) (token, int, int, error) {
+	start, nl := i+1, 0
+	for i++; i < len(src) && src[i] != '"'; i++ {
+		if src[i] == '\\' && i+1 < len(src) {
+			i++
+		}
+		if src[i] == '\n' {
+			nl++
+		}
+	}
+	if i >= len(src) {
+		return token{}, 0, 0, fmt.Errorf("line %d: unterminated string", line)
+	}
+	return token{kind: '"', text: string(src[start:i]), line: line, off: start - 1}, i, nl, nil
+}
+
+// parser walks the tokens of one GDT.
+type parser struct {
+	src  []byte
+	toks []token
+	p    int
+}
+
+func (ps *parser) expect(k byte) (token, error) {
+	if ps.p >= len(ps.toks) {
+		return token{}, fmt.Errorf("unexpected end of file, expected %q", k)
+	}
+	t := ps.toks[ps.p]
+	if t.kind != k {
+		return t, fmt.Errorf("line %d: expected %q, got %q", t.line, k, t.text)
+	}
+	ps.p++
+	return t, nil
+}
+
+func (ps *parser) peek() (token, bool) {
+	if ps.p >= len(ps.toks) {
+		return token{}, false
+	}
+	return ps.toks[ps.p], true
+}
+
+// lineStart is the offset of the start of the line holding off.
+func (ps *parser) lineStart(off int) int {
+	for off > 0 && ps.src[off-1] != '\n' {
+		off--
+	}
+	return off
+}
+
+// lineEnd is the offset just past the end of the line holding off.
+func (ps *parser) lineEnd(off int) int {
+	for off < len(ps.src) && ps.src[off] != '\n' {
+		off++
+	}
+	if off < len(ps.src) {
+		off++
+	}
+	return off
+}
+
 // Parse parses GDT source.
 func Parse(src []byte) (*File, error) {
 	f := &File{CRLF: bytes.Contains(src, []byte("\r\n")), raw: src}
-	lineStart := func(off int) int {
-		for off > 0 && src[off-1] != '\n' {
-			off--
-		}
-		return off
-	}
-	lineEnd := func(off int) int {
-		for off < len(src) && src[off] != '\n' {
-			off++
-		}
-		if off < len(src) {
-			off++
-		}
-		return off
-	}
 	toks, err := lex(src)
 	if err != nil {
 		return nil, err
-	}
-	p := 0
-	expect := func(k byte) (token, error) {
-		if p >= len(toks) {
-			return token{}, fmt.Errorf("unexpected end of file, expected %q", k)
-		}
-		t := toks[p]
-		if t.kind != k {
-			return t, fmt.Errorf("line %d: expected %q, got %q", t.line, k, t.text)
-		}
-		p++
-		return t, nil
 	}
 	if len(toks) == 0 {
 		f.raw = nil // empty or comment-only: render a fresh file
 		return f, nil
 	}
-	open, err := expect('{')
+	ps := &parser{src: src, toks: toks}
+	open, err := ps.expect('{')
 	if err != nil {
 		return nil, err
 	}
-	for p < len(toks) && toks[p].kind != '}' {
-		nameTok, err := expect('"')
+	for t, ok := ps.peek(); ok && t.kind != '}'; t, ok = ps.peek() {
+		a, err := ps.asset()
 		if err != nil {
 			return nil, err
 		}
-		a := &Asset{Name: nameTok.text, Line: nameTok.line, start: lineStart(nameTok.off)}
-		if p >= len(toks) {
-			return nil, fmt.Errorf("line %d: asset %q has no type", nameTok.line, a.Name)
-		}
-		switch toks[p].kind {
-		case '(':
-			p++
-			t, err := expect('"')
-			if err != nil {
-				return nil, err
-			}
-			a.Type = strings.TrimSuffix(t.text, ".gdf")
-			if _, err := expect(')'); err != nil {
-				return nil, err
-			}
-		case '[':
-			p++
-			t, err := expect('"')
-			if err != nil {
-				return nil, err
-			}
-			a.Parent = t.text
-			if _, err := expect(']'); err != nil {
-				return nil, err
-			}
-		default:
-			return nil, fmt.Errorf("line %d: asset %q: expected ( type ) or [ parent ]", toks[p].line, a.Name)
-		}
-		if _, err := expect('{'); err != nil {
-			return nil, err
-		}
-		for p < len(toks) && toks[p].kind == '"' {
-			k := toks[p]
-			p++
-			v, err := expect('"')
-			if err != nil {
-				return nil, fmt.Errorf("asset %q key %q: %w", a.Name, k.text, err)
-			}
-			a.Fields = append(a.Fields, Field{Key: k.text, Value: v.text})
-		}
-		closeTok, err := expect('}')
-		if err != nil {
-			return nil, fmt.Errorf("asset %q: %w", a.Name, err)
-		}
-		a.end = lineEnd(closeTok.off)
 		f.Assets = append(f.Assets, a)
 	}
-	last, err := expect('}')
+	last, err := ps.expect('}')
 	if err != nil {
 		return nil, err
 	}
-	f.closeOff = lineStart(last.off)
-	// Surgical writes splice whole lines. If an asset shares a line with a brace
-	// or another asset (a one-line or minified GDT), fall back to rendering the
-	// whole file in APE's layout rather than splicing overlapping spans.
-	pos := lineEnd(open.off)
-	for _, a := range f.Assets {
-		if a.start < pos || a.end > f.closeOff {
-			f.raw = nil
-			break
-		}
-		pos = a.end
-	}
-	if f.closeOff < pos { // "{}" or "{ … }" on one line: nowhere to insert between the braces
+	f.closeOff = ps.lineStart(last.off)
+	if !ps.spliceable(f, open) {
 		f.raw = nil
 	}
 	return f, nil
+}
+
+// asset parses `"name" ( "type.gdf" ) { … }` or `"name" [ "parent" ] { … }`.
+func (ps *parser) asset() (*Asset, error) {
+	nameTok, err := ps.expect('"')
+	if err != nil {
+		return nil, err
+	}
+	a := &Asset{Name: nameTok.text, Line: nameTok.line, start: ps.lineStart(nameTok.off)}
+	if err := ps.header(a, nameTok.line); err != nil {
+		return nil, err
+	}
+	if _, err := ps.expect('{'); err != nil {
+		return nil, err
+	}
+	for t, ok := ps.peek(); ok && t.kind == '"'; t, ok = ps.peek() {
+		ps.p++
+		v, err := ps.expect('"')
+		if err != nil {
+			return nil, fmt.Errorf("asset %q key %q: %w", a.Name, t.text, err)
+		}
+		a.Fields = append(a.Fields, Field{Key: t.text, Value: v.text})
+	}
+	closeTok, err := ps.expect('}')
+	if err != nil {
+		return nil, fmt.Errorf("asset %q: %w", a.Name, err)
+	}
+	a.end = ps.lineEnd(closeTok.off)
+	return a, nil
+}
+
+// header parses the ( type ) or [ parent ] after an asset's name.
+func (ps *parser) header(a *Asset, line int) error {
+	t, ok := ps.peek()
+	if !ok {
+		return fmt.Errorf("line %d: asset %q has no type", line, a.Name)
+	}
+	closer := map[byte]byte{'(': ')', '[': ']'}[t.kind]
+	if closer == 0 {
+		return fmt.Errorf("line %d: asset %q: expected ( type ) or [ parent ]", t.line, a.Name)
+	}
+	ps.p++
+	v, err := ps.expect('"')
+	if err != nil {
+		return err
+	}
+	if closer == ')' {
+		a.Type = strings.TrimSuffix(v.text, ".gdf")
+	} else {
+		a.Parent = v.text
+	}
+	_, err = ps.expect(closer)
+	return err
+}
+
+// spliceable reports whether surgical writes can splice f's assets as whole
+// lines. If an asset shares a line with a brace or another asset (a one-line or
+// minified GDT), the whole file is rendered in APE's layout instead of splicing
+// overlapping spans.
+func (ps *parser) spliceable(f *File, open token) bool {
+	pos := ps.lineEnd(open.off)
+	for _, a := range f.Assets {
+		if a.start < pos || a.end > f.closeOff {
+			return false
+		}
+		pos = a.end
+	}
+	return f.closeOff >= pos // "{}" or "{ … }" on one line: nowhere to insert between the braces
 }
 
 // Bytes renders the file. A parsed file keeps its source byte for byte: only

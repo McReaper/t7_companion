@@ -18,7 +18,7 @@ func TestUpdateCheck(t *testing.T) {
 			t.Error("GitHub rejects API calls without a User-Agent")
 		}
 		w.WriteHeader(status)
-		w.Write([]byte(`{"tag_name":"` + tag + `","html_url":"https://example.invalid/r"}`))
+		_, _ = w.Write([]byte(`{"tag_name":"` + tag + `","html_url":"https://example.invalid/r"}`))
 	}))
 	defer srv.Close()
 	oldURL, oldVersion := releaseAPIURL, version

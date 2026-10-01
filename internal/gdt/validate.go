@@ -56,68 +56,13 @@ func (w *Workspace) validate(local *File, typ string, fields []Field, keys []str
 		val[f.Key] = Unquote(f.Value)
 	}
 	for _, k := range keys {
-		v := val[k]
 		e := sc.Lookup(k)
 		if e == nil {
 			out = append(out, Issue{"warning", k, fmt.Sprintf("not declared in %s.awi — APE won't show it; check the spelling", typ), codeUndeclared})
 			continue
 		}
-		if v == "" || e.Varies {
-			continue // empty = the default; a Varies field's kind depends on script state
-		}
-		switch e.Kind {
-		case "Float", "Int":
-			n, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
-			if err != nil {
-				out = append(out, Issue{"error", k, fmt.Sprintf("%q is not a number", v), ""})
-				break
-			}
-			if e.Kind == "Int" && n != float64(int64(n)) {
-				out = append(out, Issue{"error", k, fmt.Sprintf("%q is not an integer", v), ""})
-			}
-			if e.Min != nil && e.Max != nil && *e.Min < *e.Max && (n < *e.Min || n > *e.Max) {
-				// a warning: the .awi range is the slider's, and stock GDTs go past it (and link)
-				out = append(out, Issue{"warning", k, fmt.Sprintf("%v is outside APE's slider range %v..%v", n, *e.Min, *e.Max), ""})
-			}
-		case "Color", "Vector":
-			parts := strings.Fields(v)
-			want := len(strings.Fields(e.Default))
-			bad := want > 0 && len(parts) != want
-			for _, p := range parts {
-				if _, err := strconv.ParseFloat(p, 64); err != nil {
-					bad = true
-				}
-			}
-			if bad {
-				n := want
-				if n == 0 {
-					n = 3
-				}
-				out = append(out, Issue{"error", k, fmt.Sprintf("%q: expected %d space-separated numbers (e.g. %q)", v, n, strings.TrimSpace(strings.Repeat("1 ", n))), ""})
-			}
-		case "CheckBox":
-			// converter-written GDTs also store "True"/"False", which link
-			if v != "0" && v != "1" && !strings.EqualFold(v, "true") && !strings.EqualFold(v, "false") {
-				out = append(out, Issue{"error", k, fmt.Sprintf("checkbox wants 0 or 1, got %q", v), ""})
-			}
-		case "Combo":
-			// "<none>*": converter-written GDTs keep the .awi's default marker on the value;
-			// APE compares choices case-insensitively ("stand" for "Stand"). A value
-			// stock GDTs use links, even when the .awi has since dropped it ("legacy
-			// support" filter names, "<legacy>" gloss).
-			if len(e.Options) > 1 && !e.Editable && !e.openOptions && !optionMatch(e.Options, strings.TrimSuffix(v, "*")) &&
-				!w.stockUses(typ, k, strings.TrimSuffix(v, "*")) {
-				out = append(out, Issue{"error", k, fmt.Sprintf("%q is not one of: %s", v, strings.Join(e.Options, " | ")), ""})
-			}
-		case "AssetCombo":
-			if strings.HasPrefix(v, "$") { // $white_diffuse etc. are engine built-ins
-				break
-			}
-			if local == nil || local.Find(v) == nil {
-				if locs, err := w.Find(v); err == nil && len(locs) == 0 {
-					out = append(out, Issue{"warning", k, fmt.Sprintf("no %s asset named %q in any GDT (fine if it ships in a stock fastfile)", e.AssetType, v), codeNoAsset})
-				}
-			}
+		if v := val[k]; v != "" && !e.Varies { // empty = the default; a Varies field's kind depends on script state
+			out = append(out, w.fieldIssues(local, typ, k, v, e)...)
 		}
 	}
 	only := map[string]bool{}
@@ -136,6 +81,82 @@ func (w *Workspace) validate(local *File, typ string, fields []Field, keys []str
 	return out
 }
 
+// fieldIssues checks one non-empty value against its declaration.
+func (w *Workspace) fieldIssues(local *File, typ, k, v string, e *Entry) []Issue {
+	switch e.Kind {
+	case "Float", "Int":
+		return numberIssues(k, v, e)
+	case "Color", "Vector":
+		return vectorIssues(k, v, e)
+	case "CheckBox":
+		// converter-written GDTs also store "True"/"False", which link
+		if v != "0" && v != "1" && !strings.EqualFold(v, "true") && !strings.EqualFold(v, "false") {
+			return []Issue{{"error", k, fmt.Sprintf("checkbox wants 0 or 1, got %q", v), ""}}
+		}
+	case "Combo":
+		// "<none>*": converter-written GDTs keep the .awi's default marker on the value;
+		// APE compares choices case-insensitively ("stand" for "Stand"). A value
+		// stock GDTs use links, even when the .awi has since dropped it ("legacy
+		// support" filter names, "<legacy>" gloss).
+		bare := strings.TrimSuffix(v, "*")
+		if e.checkable() && !optionMatch(e.Options, bare) && !w.stockUses(typ, k, bare) {
+			return []Issue{{"error", k, fmt.Sprintf("%q is not one of: %s", v, strings.Join(e.Options, " | ")), ""}}
+		}
+	case "AssetCombo":
+		return w.assetComboIssues(local, k, v, e)
+	}
+	return nil
+}
+
+// checkable reports whether a combo's options are a closed list to check against.
+func (e *Entry) checkable() bool { return len(e.Options) > 1 && !e.Editable && !e.openOptions }
+
+func numberIssues(k, v string, e *Entry) []Issue {
+	n, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+	if err != nil {
+		return []Issue{{"error", k, fmt.Sprintf("%q is not a number", v), ""}}
+	}
+	var out []Issue
+	if e.Kind == "Int" && n != float64(int64(n)) {
+		out = append(out, Issue{"error", k, fmt.Sprintf("%q is not an integer", v), ""})
+	}
+	if e.Min != nil && e.Max != nil && *e.Min < *e.Max && (n < *e.Min || n > *e.Max) {
+		// a warning: the .awi range is the slider's, and stock GDTs go past it (and link)
+		out = append(out, Issue{"warning", k, fmt.Sprintf("%v is outside APE's slider range %v..%v", n, *e.Min, *e.Max), ""})
+	}
+	return out
+}
+
+func vectorIssues(k, v string, e *Entry) []Issue {
+	parts := strings.Fields(v)
+	want := len(strings.Fields(e.Default))
+	bad := want > 0 && len(parts) != want
+	for _, p := range parts {
+		if _, err := strconv.ParseFloat(p, 64); err != nil {
+			bad = true
+		}
+	}
+	if !bad {
+		return nil
+	}
+	if want == 0 {
+		want = 3
+	}
+	return []Issue{{"error", k, fmt.Sprintf("%q: expected %d space-separated numbers (e.g. %q)", v, want, strings.TrimSpace(strings.Repeat("1 ", want))), ""}}
+}
+
+// assetComboIssues: the named asset should exist — in local (the file being
+// edited, maybe unsaved) or the index.
+func (w *Workspace) assetComboIssues(local *File, k, v string, e *Entry) []Issue {
+	if strings.HasPrefix(v, "$") || (local != nil && local.Find(v) != nil) { // $white_diffuse etc. are engine built-ins
+		return nil
+	}
+	if locs, err := w.Find(v); err == nil && len(locs) == 0 {
+		return []Issue{{"warning", k, fmt.Sprintf("no %s asset named %q in any GDT (fine if it ships in a stock fastfile)", e.AssetType, v), codeNoAsset}}
+	}
+	return nil
+}
+
 // surfaceTypeSet warns about a material with no surface type. "<error>" is the
 // .awi's first surfaceType, so APE's default. Every stock material sets one; the
 // linker stops on a material reaching collision without: `Material '…' - doesn't
@@ -143,7 +164,8 @@ func (w *Workspace) validate(local *File, typ string, fields []Field, keys []str
 // "<error>" and link (they never reach collision).
 func surfaceTypeSet(val map[string]string, only map[string]bool) []Issue {
 	st := val["surfaceType"]
-	if !(only["surfaceType"] || only["materialType"]) || (st != "" && !strings.EqualFold(st, "<error>")) {
+	touched := only["surfaceType"] || only["materialType"]
+	if !touched || (st != "" && !strings.EqualFold(st, "<error>")) {
 		return nil
 	}
 	return []Issue{{"warning", "surfaceType", "no surface type (\"<error>\", APE's default) — if the material reaches collision the linker stops: " +
@@ -215,28 +237,34 @@ func (w *Workspace) validateMaterial(local *File, val map[string]string, only ma
 		}
 	}
 	for _, s := range ts.Textures {
-		img := val[s.Field]
-		if img == "" || s.Semantic == "" || !only[s.Field] {
-			continue
-		}
-		var ia *Asset
-		if local != nil {
-			for _, c := range local.FindAll(img) {
-				if c.Type == "image" {
-					ia = c
-				}
-			}
-		}
-		if ia == nil {
-			_, ia, _ = w.loadAsset(img, "image")
-		}
-		if ia != nil {
-			if sem, ok := ia.Get("semantic"); ok && sem != "" && !strings.EqualFold(Unquote(sem), s.Semantic) {
-				out = append(out, Issue{"warning", s.Field, fmt.Sprintf("image %q has semantic %q but slot %s expects %q (APE: type mismatch)", img, Unquote(sem), s.Name, s.Semantic), ""})
-			}
+		if img := val[s.Field]; img != "" && s.Semantic != "" && only[s.Field] {
+			out = append(out, w.semanticIssues(local, img, s)...)
 		}
 	}
 	return out
+}
+
+// semanticIssues: the image in a texture slot should have the semantic the slot
+// reads. It is looked up in local (maybe unsaved) before the index.
+func (w *Workspace) semanticIssues(local *File, img string, s TexSlot) []Issue {
+	var ia *Asset
+	if local != nil {
+		for _, c := range local.FindAll(img) {
+			if c.Type == "image" {
+				ia = c
+			}
+		}
+	}
+	if ia == nil {
+		_, ia, _ = w.loadAsset(img, "image")
+	}
+	if ia == nil {
+		return nil
+	}
+	if sem, ok := ia.Get("semantic"); ok && sem != "" && !strings.EqualFold(Unquote(sem), s.Semantic) {
+		return []Issue{{"warning", s.Field, fmt.Sprintf("image %q has semantic %q but slot %s expects %q (APE: type mismatch)", img, Unquote(sem), s.Name, s.Semantic), ""}}
+	}
+	return nil
 }
 
 // optionMatch accepts a combo value by label or, for "Label{value}" options
