@@ -59,7 +59,12 @@ func TestCalibrate(t *testing.T) {
 	for k := range tally {
 		keys = append(keys, k)
 	}
-	sort.Slice(keys, func(i, j int) bool { return tally[keys[i]] > tally[keys[j]] })
+	sort.Slice(keys, func(i, j int) bool { // by count, then by kind: a stable report to diff
+		if tally[keys[i]] != tally[keys[j]] {
+			return tally[keys[i]] > tally[keys[j]]
+		}
+		return keys[i] < keys[j]
+	})
 	fh, _ := os.Create(out)
 	defer fh.Close()
 	errs, warns := 0, 0

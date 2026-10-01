@@ -33,11 +33,11 @@ Targets **Go 1.25** (`go.mod`). The machine's default `go` may be older; `GOTOOL
 - Build: `go build -o t7kb.exe ./cmd/t7kb`
 - Cross-compile (what CI ships): `CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build ./cmd/t7kb`
 - Vet: `go vet ./...`
-- Lint: `gofmt -l cmd internal` (must print nothing) and `go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 ./...` (the release matching Go 1.25; v0.8 needs 1.26)
+- Lint: `gofmt -l cmd internal` (must print nothing) and `golangci-lint run ./...` (v2.14; `.golangci.yml`). Beyond the standard set (staticcheck, errcheck, govet, …) it enforces limits set from the code's own shape (average cyclomatic complexity 6.6): cyclomatic ≤ 20, cognitive ≤ 30, a function ≤ 80 lines / 60 statements, a file ≤ 500 code lines, and nestif. Tests are exempt from the size/complexity limits. When a function trips one, split it by what it does (one check, one stage, one subcommand) rather than raising the limit or adding a `//nolint`.
 - Test: `go test ./...`
 - Single test: `go test ./internal/store -run TestHybridSearch -v`
 
-CI (`.github/workflows/ci.yml`) runs all of the above on every PR touching Go: gofmt, vet, staticcheck, build, a cross-compile of both release targets with `CGO_ENABLED=0`, and the tests (the embedding model is cached between runs for `TestHybridSearch`). `skills.yml` validates the plugin skills separately.
+CI (`.github/workflows/ci.yml`) runs all of the above on every PR touching Go: gofmt, vet, golangci-lint, build, a cross-compile of both release targets with `CGO_ENABLED=0`, and the tests (the embedding model is cached between runs for `TestHybridSearch`). `skills.yml` validates the plugin skills separately.
 
 Any hybrid search (and `TestHybridSearch`) loads the embedding model via go-sentex. By default the model is looked up in a `models/` dir **beside the binary** (the release bundle); for dev, set `HF_HOME` to your global HuggingFace cache or it downloads ~87 MB on first use. `search --bm25` skips the embedder.
 

@@ -1,0 +1,56 @@
+# golangci-lint v2 — run: golangci-lint run ./...
+# Thresholds were set from the code as it stood (average cyclomatic complexity
+# 6.6) so that they flag the genuinely tangled functions, not ordinary ones.
+version: "2"
+
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - gocyclo
+    - gocognit
+    - funlen
+    - nestif
+    - revive
+  settings:
+    errcheck:
+      # deliberate ignores: printing to stdout, closing read-only handles,
+      # removing a temp file on an error path that already returns an error.
+      # A written file's Close is checked where it matters (db.go, gdt Save).
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (*os.File).Close
+        - (io.Closer).Close
+        - (io.ReadCloser).Close
+        - (*archive/zip.ReadCloser).Close
+        - (*database/sql.Rows).Close
+        - (*database/sql.DB).Close
+        - (*github.com/McReaper/t7_companion/internal/store.Store).Close
+        - os.Remove
+    gocyclo:
+      min-complexity: 20
+    gocognit:
+      min-complexity: 30
+    funlen:
+      lines: 80
+      statements: 60 # statements, not just lines: a declarative table (MCP tool defs) is long but simple
+      ignore-comments: true
+    nestif:
+      min-complexity: 6
+    revive:
+      rules:
+        - name: file-length-limit
+          arguments:
+            - max: 500
+              skipComments: true
+              skipBlankLines: true
+  exclusions:
+    rules:
+      # table-driven tests are long by nature
+      - path: _test\.go
+        linters: [funlen, gocognit, gocyclo, nestif]
+
+formatters:
+  enable:
+    - gofmt

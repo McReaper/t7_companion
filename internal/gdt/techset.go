@@ -130,93 +130,115 @@ func (t *Techsets) resolve(materialType string) (*Techset, error) {
 		return nil, fmt.Errorf("no techsetdef for material type %q", materialType)
 	}
 	ts := &Techset{MaterialType: materialType, File: t.byName[materialType]}
-	seenFile := map[string]bool{}
-	seenDecl := map[string]bool{}
-	seenSrc := map[string]bool{}
-	var walk func(path string, top bool) error
-	walk = func(path string, top bool) error {
-		if seenFile[path] {
-			return nil
-		}
-		seenFile[path] = true
-		b, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		src := stripComments(string(b))
-		if top {
-			if g := globalsRE.FindStringSubmatch(src); g != nil {
-				for _, kv := range kvRE.FindAllStringSubmatch(g[1], -1) {
-					switch kv[1] {
-					case "category":
-						ts.Category = kv[2]
-					case "renderFlags":
-						ts.RenderFlags = kv[2]
-					}
-				}
-			}
-		}
-		for _, m := range declRE.FindAllStringSubmatchIndex(src, -1) {
-			kind, name := src[m[2]:m[3]], src[m[4]:m[5]]
-			body := blockAfter(src, m[1])
-			if seenDecl[kind+":"+name] {
-				continue
-			}
-			seenDecl[kind+":"+name] = true
-			refs := fieldRE.FindAllStringSubmatch(body, -1)
-			if kind == "Texture" {
-				slot := TexSlot{Name: name}
-				for _, r := range refs {
-					if slot.Field == "" {
-						slot.Field, slot.DefaultImage = r[1], r[2]
-					}
-				}
-				for _, kv := range kvRE.FindAllStringSubmatch(body, -1) {
-					switch kv[1] {
-					case "semantic":
-						slot.Semantic = kv[2]
-					case "usage":
-						slot.Usage = kv[2]
-					}
-				}
-				if slot.Field != "" {
-					ts.Textures = append(ts.Textures, slot)
-				}
-				continue
-			}
-			p := Param{Kind: kind, Name: name}
-			for _, r := range refs {
-				p.Fields = append(p.Fields, r[1])
-			}
-			if len(p.Fields) > 0 {
-				ts.Params = append(ts.Params, p)
-			}
-		}
-		for _, s := range sourceRE.FindAllStringSubmatch(src, -1) {
-			if !seenSrc[s[1]] {
-				seenSrc[s[1]] = true
-				ts.Sources = append(ts.Sources, s[1])
-			}
-		}
-		for _, inc := range includeRE.FindAllStringSubmatch(src, -1) {
-			p, ok := t.includePath(path, inc[1])
-			if !ok {
-				continue
-			}
-			if !top || p != path {
-				ts.Includes = append(ts.Includes, inc[1])
-			}
-			if err := walk(p, false); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	if err := walk(ts.File, true); err != nil {
+	wk := &techsetWalk{t: t, ts: ts, seenFile: map[string]bool{}, seenDecl: map[string]bool{}, seenSrc: map[string]bool{}}
+	if err := wk.walk(ts.File, true); err != nil {
 		return nil, err
 	}
 	sort.Strings(ts.Sources)
 	return ts, nil
+}
+
+// techsetWalk follows a techsetdef and its #includes into one Techset. A
+// declaration seen first wins (the including file overrides its includes).
+type techsetWalk struct {
+	t                           *Techsets
+	ts                          *Techset
+	seenFile, seenDecl, seenSrc map[string]bool
+}
+
+func (wk *techsetWalk) walk(path string, top bool) error {
+	if wk.seenFile[path] {
+		return nil
+	}
+	wk.seenFile[path] = true
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	src := stripComments(string(b))
+	if top {
+		readGlobals(wk.ts, src)
+	}
+	wk.addDecls(src)
+	for _, s := range sourceRE.FindAllStringSubmatch(src, -1) {
+		if !wk.seenSrc[s[1]] {
+			wk.seenSrc[s[1]] = true
+			wk.ts.Sources = append(wk.ts.Sources, s[1])
+		}
+	}
+	for _, inc := range includeRE.FindAllStringSubmatch(src, -1) {
+		p, ok := wk.t.includePath(path, inc[1])
+		if !ok {
+			continue
+		}
+		if !top || p != path {
+			wk.ts.Includes = append(wk.ts.Includes, inc[1])
+		}
+		if err := wk.walk(p, false); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// readGlobals takes the category and render flags from the Globals() block.
+func readGlobals(ts *Techset, src string) {
+	g := globalsRE.FindStringSubmatch(src)
+	if g == nil {
+		return
+	}
+	for _, kv := range kvRE.FindAllStringSubmatch(g[1], -1) {
+		switch kv[1] {
+		case "category":
+			ts.Category = kv[2]
+		case "renderFlags":
+			ts.RenderFlags = kv[2]
+		}
+	}
+}
+
+// addDecls adds the texture slots and parameters declared in src.
+func (wk *techsetWalk) addDecls(src string) {
+	for _, m := range declRE.FindAllStringSubmatchIndex(src, -1) {
+		kind, name := src[m[2]:m[3]], src[m[4]:m[5]]
+		body := blockAfter(src, m[1])
+		if wk.seenDecl[kind+":"+name] {
+			continue
+		}
+		wk.seenDecl[kind+":"+name] = true
+		refs := fieldRE.FindAllStringSubmatch(body, -1)
+		if kind == "Texture" {
+			if slot := texSlot(name, refs, body); slot.Field != "" {
+				wk.ts.Textures = append(wk.ts.Textures, slot)
+			}
+			continue
+		}
+		p := Param{Kind: kind, Name: name}
+		for _, r := range refs {
+			p.Fields = append(p.Fields, r[1])
+		}
+		if len(p.Fields) > 0 {
+			wk.ts.Params = append(wk.ts.Params, p)
+		}
+	}
+}
+
+// texSlot reads a Texture( "name" ) block: the first <field, default> it reads,
+// and its semantic and usage.
+func texSlot(name string, refs [][]string, body string) TexSlot {
+	slot := TexSlot{Name: name}
+	if len(refs) > 0 {
+		slot.Field, slot.DefaultImage = refs[0][1], refs[0][2]
+	}
+	for _, kv := range kvRE.FindAllStringSubmatch(body, -1) {
+		switch kv[1] {
+		case "semantic":
+			slot.Semantic = kv[2]
+		case "usage":
+			slot.Usage = kv[2]
+		}
+	}
+	return slot
 }
 
 // includePath resolves an #include: include/ first, then the including dir, then any match.

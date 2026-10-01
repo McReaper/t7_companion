@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
 	"sync"
 )
@@ -62,19 +61,51 @@ func indexPath(root string) string {
 // loadIndex reads the cached index, walks the tree for GDTs, re-reads only the
 // changed ones, and saves the result.
 func loadIndex(root string) (*index, error) {
-	idx := &index{files: map[string]*fileEntry{}}
 	cache := indexPath(root)
+	idx := &index{files: readIndexCache(cache, root)}
+	jobs, err := staleGDTs(root, idx.files)
+	if err != nil {
+		return nil, err
+	}
+	if len(jobs) > 0 {
+		var mu sync.Mutex
+		parallel(jobs, func(j indexJob) {
+			assets := scanHeaders(filepath.Join(root, filepath.FromSlash(j.rel)), j.rel)
+			mu.Lock()
+			idx.files[j.rel] = &fileEntry{Mod: j.mod, Size: j.size, Assets: assets}
+			mu.Unlock()
+		})
+		if b, err := json.Marshal(indexDisk{Version: indexVersion, Root: root, Files: idx.files}); err == nil {
+			_ = os.MkdirAll(filepath.Dir(cache), 0o755)
+			_ = os.WriteFile(cache, b, 0o644)
+		}
+	}
+	idx.rebuildNames()
+	return idx, nil
+}
+
+// readIndexCache returns the cached entries for root, or an empty map when the
+// cache is missing, stale in format, or for another root.
+func readIndexCache(cache, root string) map[string]*fileEntry {
 	var disk indexDisk
 	if b, err := os.ReadFile(cache); err == nil && json.Unmarshal(b, &disk) == nil &&
 		disk.Version == indexVersion && strings.EqualFold(disk.Root, root) && disk.Files != nil {
-		idx.files = disk.Files
+		return disk.Files
 	}
+	return map[string]*fileEntry{}
+}
 
-	type job struct {
-		rel       string
-		mod, size int64
-	}
-	var jobs []job
+// indexJob is a GDT to (re)scan: new, or changed since it was cached.
+type indexJob struct {
+	rel       string
+	mod, size int64
+}
+
+// staleGDTs walks exactly the directories gdtdb scans for APE
+// (bin/converter_gdt_dirs_0.txt), drops cached entries for GDTs that are gone,
+// and returns the GDTs whose size or mtime changed.
+func staleGDTs(root string, files map[string]*fileEntry) ([]indexJob, error) {
+	var jobs []indexJob
 	seen := map[string]bool{}
 	visit := func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -96,52 +127,22 @@ func loadIndex(root string) (*index, error) {
 		rel, _ := filepath.Rel(root, p)
 		rel = filepath.ToSlash(rel)
 		seen[rel] = true
-		if fe, ok := idx.files[rel]; ok && fe.Mod == info.ModTime().UnixNano() && fe.Size == info.Size() {
-			return nil
+		if fe, ok := files[rel]; !ok || fe.Mod != info.ModTime().UnixNano() || fe.Size != info.Size() {
+			jobs = append(jobs, indexJob{rel, info.ModTime().UnixNano(), info.Size()})
 		}
-		jobs = append(jobs, job{rel, info.ModTime().UnixNano(), info.Size()})
 		return nil
 	}
-	// Scan exactly the directories gdtdb scans for APE (bin/converter_gdt_dirs_0.txt).
 	for _, dir := range GDTDirs(root) {
 		if err := filepath.WalkDir(filepath.Join(root, dir), visit); err != nil {
 			return nil, err
 		}
 	}
-	for rel := range idx.files {
+	for rel := range files {
 		if !seen[rel] {
-			delete(idx.files, rel)
+			delete(files, rel)
 		}
 	}
-
-	if len(jobs) > 0 {
-		var mu sync.Mutex
-		ch := make(chan job)
-		var wg sync.WaitGroup
-		for i := 0; i < runtime.NumCPU(); i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for j := range ch {
-					assets := scanHeaders(filepath.Join(root, filepath.FromSlash(j.rel)), j.rel)
-					mu.Lock()
-					idx.files[j.rel] = &fileEntry{Mod: j.mod, Size: j.size, Assets: assets}
-					mu.Unlock()
-				}
-			}()
-		}
-		for _, j := range jobs {
-			ch <- j
-		}
-		close(ch)
-		wg.Wait()
-		if b, err := json.Marshal(indexDisk{Version: indexVersion, Root: root, Files: idx.files}); err == nil {
-			_ = os.MkdirAll(filepath.Dir(cache), 0o755)
-			_ = os.WriteFile(cache, b, 0o644)
-		}
-	}
-	idx.rebuildNames()
-	return idx, nil
+	return jobs, nil
 }
 
 // scanHeaders reads only the asset header lines of a GDT (fast; no full parse).
