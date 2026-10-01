@@ -28,6 +28,11 @@ func searchToolDef() mcp.Tool {
 		mcp.WithString("query", mcp.Required(),
 			mcp.Description("Natural-language question or keywords.")),
 		mcp.WithNumber("limit", mcp.Description("Maximum number of results (default 10).")),
+		mcp.WithString("source", mcp.Description("Only search these sources, comma-separated: a group — "+
+			"api (the GSC/CSC function reference), scripts (Treyarch's shipped scripts and data), docs (official docs, asset and "+
+			"entity schemas), wiki, forums, discord, video, workspace (files of a mod-tools install) — or a source name from a result. "+
+			"Use it when you know the kind of answer: a function's exact signature (api), how stock code does it (scripts), "+
+			"a tutorial (wiki,forums). Default: everything.")),
 	)
 }
 
@@ -38,12 +43,22 @@ func searchToolHandler(st *store.Store, emb *embed.Embedder) server.ToolHandlerF
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 		limit := req.GetInt("limit", 10)
+		var names []string
+		for _, n := range strings.Split(req.GetString("source", ""), ",") {
+			if n = strings.TrimSpace(n); n != "" {
+				names = append(names, n)
+			}
+		}
+		only, err := st.ResolveSources(ctx, names)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
 
 		qvec, err := emb.Embed(query)
 		if err != nil {
 			return mcp.NewToolResultErrorFromErr("embed query", err), nil
 		}
-		hits, err := st.SearchHybrid(ctx, query, qvec, limit)
+		hits, err := st.SearchHybrid(ctx, query, qvec, limit, only...)
 		if err != nil {
 			return mcp.NewToolResultErrorFromErr("search", err), nil
 		}

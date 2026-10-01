@@ -157,7 +157,7 @@ func BenchmarkBM25Rank(b *testing.B) {
 			ctx := context.Background()
 			b.ReportAllocs()
 			for b.Loop() {
-				if _, err := st.bm25Rank(ctx, "zombie spawner perk", Pool); err != nil {
+				if _, err := st.bm25Rank(ctx, "zombie spawner perk", Pool, nil); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -173,7 +173,7 @@ func BenchmarkVectorRank(b *testing.B) {
 			ctx := context.Background()
 			b.ReportAllocs()
 			for b.Loop() {
-				if _, err := st.vectorRank(ctx, c.qvec, Pool); err != nil {
+				if _, err := st.vectorRank(ctx, c.qvec, Pool, nil); err != nil {
 					b.Fatal(err)
 				}
 			}

@@ -41,7 +41,11 @@ func TestRetrievalQuality(t *testing.T) {
 		t.Skip("set T7KB_BENCH_DB to a t7kb.db (and HF_HOME to the model cache)")
 	}
 	var set struct {
-		Queries []evalQuery `json:"queries"`
+		Queries  []evalQuery `json:"queries"`
+		Filtered []struct {
+			evalQuery
+			Source string `json:"source"`
+		} `json:"filtered"`
 	}
 	b, err := os.ReadFile("testdata/retrieval_eval.json")
 	if err != nil {
@@ -87,6 +91,36 @@ func TestRetrievalQuality(t *testing.T) {
 	}
 	n := float64(len(set.Queries))
 	fmt.Fprintf(&report, "%-46s %5.2f %6.2f %4.2f %8.2f\n", fmt.Sprintf("MEAN over %d queries", len(set.Queries)), sum.key5/n, sum.recall10/n, sum.mrr/n, sum.ndcg10/n)
+
+	// The source filter: an agent that knows the kind of answer it wants passes
+	// source, and a key document should then be in the top 5.
+	fmt.Fprintf(&report, "\nwith the source filter an agent would pass:\n")
+	for _, f := range set.Filtered {
+		only, err := st.ResolveSources(context.Background(), strings.Split(f.Source, ","))
+		if err != nil {
+			t.Fatal(err)
+		}
+		v, err := emb.Embed(f.Query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		hits, err := st.SearchHybrid(context.Background(), f.Query, v, 10, only...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rank := 0
+		for i, h := range hits {
+			for _, k := range f.Key {
+				if h.DocID == k && rank == 0 {
+					rank = i + 1
+				}
+			}
+		}
+		fmt.Fprintf(&report, "  %-40.40s source=%-12s first key at rank %d\n", f.Query, f.Source, rank)
+		if rank == 0 || rank > 5 {
+			t.Errorf("%q with source %s: no key document in the top 5", f.Query, f.Source)
+		}
+	}
 	t.Log(report.String())
 }
 

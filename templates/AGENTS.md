@@ -13,6 +13,7 @@ For any non-trivial BO3 modding question — GSC/CSC scripting, Radiant mapping,
 ## Query it well
 
 - **Search broad, then narrow.** Issue several short, differently-phrased `search` queries (symptom-side, mechanism-side, exact-jargon-side). The full-text index is conjunctive, so one phrasing misses the long tail.
+- **Narrow by source when you know the kind of answer.** `source` takes a group — `api` (a function's exact signature and parameters), `scripts` (how Treyarch's own code does it), `docs` (official docs, asset and entity schemas), `wiki` and `forums` (tutorials), `discord`, `video` — or several (`wiki,forums`). Unfiltered, Discord threads (70% of the corpus) can fill the whole top 10: `clientfield register set lua` returns no API page until `source: api`, where `RegisterClientField` is third. Search unfiltered first for a symptom or an error message, where the threads are often the answer.
 - **Read full bodies.** `get` the top `doc_id`s — don't answer from snippets. A long document (a whole script, GDT or transcript) comes a page at a time, ending with the `offset` for the next part. To reach the passage the search matched, pass `find` with a phrase from its snippet: the page then starts at it, wherever it sits — rather than paging through everything.
 - **Weigh reliability.** Each result carries a `reliability` score. On conflict, prefer higher-reliability sources, and surface the disagreement when it matters.
 - **Cite.** When a claim comes from the kb, name the `source` + `url` so the user can verify.

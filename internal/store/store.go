@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 
 	_ "modernc.org/sqlite" // pure-Go SQLite driver (no cgo); FTS5 compiled in
 )
@@ -44,6 +45,10 @@ const (
 // Store is a read-only handle to a t7kb.db.
 type Store struct {
 	db *sql.DB
+
+	srcOnce sync.Once // sources(): the distinct sources, read once
+	srcList []string
+	srcErr  error
 }
 
 // Hit is one fused search result.
@@ -89,12 +94,17 @@ func (s *Store) Close() error { return s.db.Close() }
 // SearchHybrid fuses BM25 and vector rankings with RRF, weighs the result by
 // reliability (reliabilityWeight), and returns the top `limit` hits. qvec may be nil/empty (or
 // a different dimension than the db) — then it's BM25-only.
-func (s *Store) SearchHybrid(ctx context.Context, query string, qvec []float32, limit int) ([]Hit, error) {
-	bm25, err := s.bm25Rank(ctx, query, Pool)
+//
+// sources, if given, restricts the search to those sources (exact names, see
+// ResolveSources): both retrievers then rank within them, rather than the top
+// of the whole corpus being filtered afterwards.
+func (s *Store) SearchHybrid(ctx context.Context, query string, qvec []float32, limit int, sources ...string) ([]Hit, error) {
+	only := sourceSet(sources)
+	bm25, err := s.bm25Rank(ctx, query, Pool, only)
 	if err != nil {
 		return nil, err
 	}
-	vec, err := s.vectorRank(ctx, qvec, Pool)
+	vec, err := s.vectorRank(ctx, qvec, Pool, only)
 	if err != nil {
 		return nil, err
 	}
@@ -180,19 +190,30 @@ func ftsQuery(q string) string {
 }
 
 // bm25Rank returns up to limit doc_ids ranked by FTS5 BM25, with a snippet.
-func (s *Store) bm25Rank(ctx context.Context, query string, limit int) ([]rankItem, error) {
+func (s *Store) bm25Rank(ctx context.Context, query string, limit int, only map[string]bool) ([]rankItem, error) {
 	match := ftsQuery(query)
 	if match == "" {
 		return nil, nil
 	}
-	const q = `
+	args := []any{match}
+	filter := ""
+	if len(only) > 0 {
+		marks := make([]string, 0, len(only))
+		for src := range only {
+			marks = append(marks, "?")
+			args = append(args, src)
+		}
+		filter = "AND d.source IN (" + strings.Join(marks, ",") + ")"
+	}
+	q := `
 		SELECT d.doc_id, snippet(docs_fts, 3, '', '', ' … ', 12) AS snip
 		FROM docs_fts
 		JOIN documents d ON d.rowid = docs_fts.rowid
-		WHERE docs_fts MATCH ?
+		WHERE docs_fts MATCH ? ` + filter + `
 		ORDER BY bm25(docs_fts, 0.0, ?, ?, 1.0)
 		LIMIT ?`
-	rows, err := s.db.QueryContext(ctx, q, match, titleWeight, titleWeight/2, limit)
+	args = append(args, titleWeight, titleWeight/2, limit)
+	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("bm25 search: %w", err)
 	}
@@ -222,7 +243,7 @@ type scoredDoc struct {
 // since vectors are L2-normalized) against qvec and keeping the best chunk per
 // doc. Chunks whose dimension differs from qvec are skipped — so the tool
 // degrades to BM25-only against a db embedded with a different model.
-func (s *Store) vectorRank(ctx context.Context, qvec []float32, limit int) ([]rankItem, error) {
+func (s *Store) vectorRank(ctx context.Context, qvec []float32, limit int, only map[string]bool) ([]rankItem, error) {
 	if len(qvec) == 0 {
 		return nil, nil
 	}
@@ -239,6 +260,9 @@ func (s *Store) vectorRank(ctx context.Context, qvec []float32, limit int) ([]ra
 		var blob []byte
 		if err := rows.Scan(&docID, &chunkText, &blob); err != nil {
 			return nil, err
+		}
+		if len(only) > 0 && !only[sourceOf(docID)] {
+			continue
 		}
 		v := decodeVec(blob)
 		if len(v) != len(qvec) {

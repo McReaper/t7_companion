@@ -65,7 +65,7 @@ T7KB_BENCH_DB=<t7kb.db> HF_HOME=<model cache> go test ./internal/cli -run TestRe
 
 **Tried and rejected**, on the same queries: OR instead of AND terms (key@5 0.50 — long stock scripts that repeat the words fill BM25's pool), dropping stopwords, joined compound terms (`clientfield register` → `registerclientfield`), a per-source cap, a reliability weight of 0.75 or more (stock scripts crowd out the answers), and per-document title vectors as a third fused list — prototyped with the corpus's own model, they changed nothing over the two weights above, so no database change was needed for this.
 
-**Still failing**: `clientfield register set lua` and `custom lua hud widget` come back all Discord, with the API page and the LUI tutorials absent from the top 10. No ranking weight reaches them; a `source` filter on `search` would let an agent ask for the API or the wikis directly.
+**Still failing unfiltered**: `clientfield register set lua` and `custom lua hud widget` come back all Discord, with the API page and the LUI tutorials absent from the top 10 — no ranking weight reaches them. The `source` filter does: the eval's `filtered` checks (an agent passing the kind of answer it wants) put a key document at rank 3 for both (`source: api`, `source: wiki`), and at rank 1 for `PlayFXOnTag` (`api`) and the wallbuy fix (`wiki,forums`). The test fails if one drops out of the top 5; the knowledge-base skill and AGENTS.md tell the agent when to pass it.
 
 The judgments were pooled: after each round of variants, the top 10 of the variants was judged too (56 documents added, as relevant only), so a ranking that surfaces relevant documents the baseline missed isn't scored as if it surfaced noise.
 

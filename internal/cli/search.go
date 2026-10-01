@@ -13,30 +13,36 @@ import (
 
 func newSearchCmd() *cobra.Command {
 	var (
-		num    int
-		bm25   bool
-		scores bool
+		num     int
+		bm25    bool
+		scores  bool
+		sources []string
 	)
 	cmd := &cobra.Command{
 		Use:   "search <query>...",
 		Short: "Hybrid (BM25 + vector) search",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runSearch(cmd, strings.Join(args, " "), num, bm25, scores)
+			return runSearch(cmd, strings.Join(args, " "), num, bm25, scores, sources)
 		},
 	}
 	cmd.Flags().IntVarP(&num, "num", "n", 10, "number of results")
 	cmd.Flags().BoolVar(&bm25, "bm25", false, "keyword-only (skip vector embedding)")
 	cmd.Flags().BoolVar(&scores, "scores", false, "show fused RRF score + reliability per hit")
+	cmd.Flags().StringSliceVar(&sources, "source", nil, "only these sources: a group ("+strings.Join(store.SourceGroups(), ", ")+") or a source name; comma-separated or repeated")
 	return cmd
 }
 
-func runSearch(cmd *cobra.Command, query string, num int, bm25, scores bool) error {
+func runSearch(cmd *cobra.Command, query string, num int, bm25, scores bool, sources []string) error {
 	st, err := openStore()
 	if err != nil {
 		return err
 	}
 	defer st.Close()
+	only, err := st.ResolveSources(cmd.Context(), sources)
+	if err != nil {
+		return err
+	}
 
 	var qvec []float32
 	if !bm25 {
@@ -45,7 +51,7 @@ func runSearch(cmd *cobra.Command, query string, num int, bm25, scores bool) err
 		}
 	}
 
-	hits, err := st.SearchHybrid(cmd.Context(), query, qvec, num)
+	hits, err := st.SearchHybrid(cmd.Context(), query, qvec, num, only...)
 	if err != nil {
 		return err
 	}

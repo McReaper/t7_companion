@@ -1,5 +1,5 @@
 {
-  "about": "Judged queries for TestRetrievalQuality. key = the best sources for the question (the API doc, the reference tutorial, the thread that has the fix); relevant = useful but secondary. Judged by reading each candidate from three independent paths, then pooled — the top 10 of each ranking variant tried was judged too, so a variant that surfaces relevant documents the baseline missed isn't scored as if it surfaced noise: the hybrid top 30, the BM25 top 15, and a title search over the non-Discord sources. Built against the v2.2 corpus (66,023 docs); a doc_id missing from the db fails the test, so a rebuilt corpus that renames documents shows up instead of silently scoring zero.",
+  "about": "Judged queries for TestRetrievalQuality. key = the best sources for the question (the API doc, the reference tutorial, the thread that has the fix); relevant = useful but secondary. Judged by reading each candidate from three independent paths, then pooled — the top 10 of each ranking variant tried was judged too, so a variant that surfaces relevant documents the baseline missed isn't scored as if it surfaced noise: the hybrid top 30, the BM25 top 15, and a title search over the non-Discord sources. Built against the v2.2 corpus (66,023 docs); a doc_id missing from the db fails the test, so a rebuilt corpus that renames documents shows up instead of silently scoring zero. The 'filtered' entries check the source filter: an agent that knows the kind of answer it wants (the API reference, a tutorial) passes source, and a key document should then lead.",
   "queries": [
     {
       "query": "clientfield register set lua",
@@ -264,6 +264,41 @@
         "discord-bo3modtools::general_1496951238082822294",
         "discord-bo3modtools::mapping_386726313047621652",
         "discord-bo3modtools::general_1120389510165975090"
+      ]
+    }
+  ],
+  "filtered": [
+    {
+      "query": "clientfield register set lua",
+      "source": "api",
+      "key": [
+        "gscode-api::api.gsc.registerclientfield",
+        "gscode-api::api.csc.registerclientfield"
+      ]
+    },
+    {
+      "query": "custom lua hud widget",
+      "source": "wiki",
+      "key": [
+        "wiki-modme::black-ops-3-lua-lui-your-first-custom-control-widget",
+        "wiki-modme::black-ops-3-lua-lui-your-first-menu-hud",
+        "wiki-modme::black-ops-3-lua-lui-overriding-map-level-hud"
+      ]
+    },
+    {
+      "query": "play fx on a tag of a model",
+      "source": "api",
+      "key": [
+        "gscode-api::api.gsc.playfxontag",
+        "gscode-api::api.csc.playfxontag"
+      ]
+    },
+    {
+      "query": "custom wallbuy shows cost 0",
+      "source": "wiki,forums",
+      "key": [
+        "wiki-t7::guides/wallbuy-0-fix.md",
+        "forums-modme::2741"
       ]
     }
   ]
