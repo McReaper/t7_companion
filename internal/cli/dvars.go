@@ -12,9 +12,6 @@ import (
 // the stock modlauncher.exe). The two that are console commands rather than
 // dvars are passed as `+<name> <value>`.
 
-// launcherDvars are the Launcher's Dvar Options, in the order it passes them.
-var launcherDvars = []string{"ai_disableSpawn", "developer", "g_password", "logfile", "scr_mod_enable_devblock", "connect", "set_gametype", "splitscreen", "splitscreen_playerCount"}
-
 // dvarCommands are run as `+<name> <value>`, not `+set <name> <value>`.
 var dvarCommands = map[string]bool{"connect": true, "set_gametype": true}
 

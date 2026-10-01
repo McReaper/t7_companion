@@ -9,6 +9,9 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
+// launcherDvars are the Launcher's Dvar Options, in the order it passes them.
+var launcherDvars = []string{"ai_disableSpawn", "developer", "g_password", "logfile", "scr_mod_enable_devblock", "connect", "set_gametype", "splitscreen", "splitscreen_playerCount"}
+
 // readLauncherDvars reads the Launcher's saved Dvar Options
 // (HKCU\Software\Treyarch\ModLauncher, dvar_<name>), in its order.
 func readLauncherDvars() ([]dvar, error) {
