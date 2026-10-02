@@ -15,7 +15,7 @@ Contents:
 
 ## A closed node cycle hangs the server
 
-**Verified the hard way in a real session.** Making the last `info_vehicle_node` `target` the first one — the obvious way to loop a route — produces a black screen at load and `Com_ERROR: EXE_ERR_SERVER_TIMEOUT`, with **no script output at all** in `console_mp.log`. With `SPLINE_NODE` set it is reliably fatal.
+(Verified on a real build.) Making the last `info_vehicle_node` `target` the first one — the obvious way to loop a route — produces a black screen at load and `Com_ERROR: EXE_ERR_SERVER_TIMEOUT`, with **no script output at all** in `console_mp.log`; with `SPLINE_NODE` set it is reliably fatal.
 
 So a BO3 vehicle path must be an **open chain**. To loop a route, keep the chain open and catch the engine's own path-end notify (`vehicle_shared.gsc`):
 
@@ -33,22 +33,22 @@ while ( true )
 }
 ```
 
-**Close the lap in space, not in the chain.** Put the end node **exactly on the start node**, arriving on the start's own heading: `AttachPath` snaps the vehicle onto the spline, so re-attaching where the vehicle already stands is a zero-distance snap. **Verified:** a terminus 480 units from the start teleported the bus at every lap; the same route with a sixth node coincident with `bus_start` reads 0 units and runs seamlessly.
+**Close the lap in space, not in the chain.** Put the end node **exactly on the start node**, arriving on the start's own heading: `AttachPath` snaps the vehicle onto the spline, so re-attaching where the vehicle already stands is a zero-distance snap. A terminus 480 units from the start teleports the bus at every lap; a final node coincident with `bus_start` is a 0-unit snap (verified).
 
-**Keep every later leg off the spawn point.** An earlier version of this file recommended running the final leg *through* the start and ending it past it — a square from `(0 -652)` whose last node sat at `(0 -796)`. That puts the vehicle's spawn ON the last leg, and the next session found the vehicle starting 90° off, turned onto that leg's heading; the snap disappeared once no later leg touched the spawn. It also left the overshoot inside the look-ahead window (parent skill), so the two causes were tangled — but the end-on-the-start layout above has neither problem.
+**Keep every later leg off the spawn point.** Don't run the final leg *through* the start and end it past it: the spawn then sits ON the last leg and the vehicle starts 90° off, turned onto that leg's heading; the overshoot also lands inside the look-ahead window (parent skill). The end-on-the-start layout has neither problem.
 
 Two more things that bite while building the route:
 
 - **An end node on the vehicle's *spawn* position is degenerate**: `reached_end_node` fires at load, the loop restarts forever, and the vehicle only pivots without travelling.
 - **`wait 0` does not yield a frame in GSC.** A dwell of zero in that loop spins without releasing the VM and freezes the game. Use `WAIT_SERVER_FRAME` (`shared.gsh`) unconditionally, then any real dwell on top. BO2's per-node loop uses `waittillframeend` for the same reason.
 
-`SPLINE_NODE` `1` smooths the corners and is safe on every node of an **open** chain — this port runs that way. It is not required, though: Treyarch's `template.map` sets it on 8 of its 102 vehicle nodes. Spline plus a *closed* chain is the fatal combination, not spline itself.
+`SPLINE_NODE` `1` smooths the corners and is safe on every node of an **open** chain. It is not required, though: Treyarch's `template.map` sets it on 8 of its 102 vehicle nodes. Spline plus a *closed* chain is the fatal combination, not spline itself.
 
 BO2 could afford a cyclic route because its `follow_path()` waits on `reached_node` **per node** and simply never exits while `nextpoint` stays defined — don't port that shape to BO3.
 
 ## A node's `speed` reads back in inches per second
 
-The KVP is authored in **mph** (`bin/t7.def.json`), and `SetSpeed` takes mph — but `n_node.speed` read from script comes back already converted to **inches per second**. **Measured:** a node at `speed 19` logged `334`, which is 19 × 17.6. Passing it straight to `SetSpeed` asks for 334 mph, and only a `SetVehMaxSpeed` cap stops the vehicle bolting. Convert with the shipped constant, `MPH_TO_INCHES_PER_SEC` (`shared.gsh`, which `_amws.gsc` uses for the same conversion):
+The KVP is authored in **mph** (`bin/t7.def.json`), and `SetSpeed` takes mph — but `n_node.speed` read from script comes back already converted to **inches per second**. A node at `speed 19` logs `334`, which is 19 × 17.6 (measured). Passing it straight to `SetSpeed` asks for 334 mph, and only a `SetVehMaxSpeed` cap stops the vehicle bolting. Convert with the shipped constant, `MPH_TO_INCHES_PER_SEC` (`shared.gsh`, which `_amws.gsc` uses for the same conversion):
 
 ```gsc
 n_mph = n_node.speed / MPH_TO_INCHES_PER_SEC;
@@ -60,7 +60,7 @@ No shipped script reads `.speed` off a vehicle node at all, so guard it with `is
 
 `vehicle_shared::paths()` implements stop-and-go natively off node KVPs — `script_wait` (`pause_path()` then a timed wait), `script_waittill`, `script_flag_wait`, `script_notify` (notifies the vehicle **and** `level`), and `script_noteworthy` `"brake"`/`"resumespeed"`. None of it runs for a map-placed zombies vehicle: `paths()` is threaded by `get_on_path()`, which `vehicle::init()` calls, and `vehicle::init` is called only from MP (`_globallogic_vehicle.gsc`) and gadget scripts. Author `script_wait` on a node in a zombies map and nothing happens.
 
-The Origins tank shows the zombies shape: `attachpath` + `startpath` and **its own** `follow_path()`, which walks the chain on `waittill("reached_node", node)` and dispatches the node's KVPs itself. Do the same — a stop is then a `script_noteworthy` you test for, a `SetSpeed(0, …)`, a dwell, and a `SetSpeed` back up. Resist calling `get_on_path()` yourself to get the stock handling: it threads `paths()` onto a vehicle `init()` never prepared, which is a crash risk (inference — not tried). **Measured, too:** `isphysicsvehicle` is false on a map-placed `type "4 wheel"` bus, so the `SetBrake` that `get_on_path` issues for physics vehicles would not apply anyway.
+The Origins tank shows the zombies shape: `attachpath` + `startpath` and **its own** `follow_path()`, which walks the chain on `waittill("reached_node", node)` and dispatches the node's KVPs itself. Do the same — a stop is then a `script_noteworthy` you test for, a `SetSpeed(0, …)`, a dwell, and a `SetSpeed` back up. Resist calling `get_on_path()` yourself to get the stock handling: it threads `paths()` onto a vehicle `init()` never prepared, which is a crash risk (inference — not tried). Also `isphysicsvehicle` is false on a map-placed `type "4 wheel"` bus, so the `SetBrake` that `get_on_path` issues for physics vehicles would not apply anyway.
 
 ## Two stock vehicle defaults that fight a platform
 
@@ -88,7 +88,7 @@ To size one to a real bus, duplicate a GDT entry and swap its `CollisionMap` for
 
 ## Getting a use prompt to actually appear
 
-All three points below are **measured**, on top of shaping the trigger volumes themselves (parent skill).
+All three points below are measured; shaping the trigger volumes themselves is in the parent skill.
 
 - `SetInvisibleToAll()` does **not** come back with a later `SetVisibleToAll()` — once hidden it stays hidden.
 - `TriggerEnable` does **not** re-evaluate the prompt of a player already standing inside the volume, so the hint only returns after leaving and re-entering.
@@ -102,7 +102,7 @@ For the *parked* case, the Origins tank does connect the ground navmesh to a mov
 
 ## When an anim's destination isn't a tag
 
-The parent skill covers the normal case — an anim that ends on a tag, where `GetStartOrigin`/`GetStartAngles` hand you the boarding spot directly. A port whose joints sit outside the vehicle (BO2's window anims are anchored on the window plane) has no tag to land on, so the destination has to be derived instead: read the travel with `GetMoveDelta( anim, 0, 1, self )` and project it on the parent's frame **at the moment of the move**, after `StopAnimScripted`. Deriving it this way beats measuring a constant per animation, because a re-export then carries its own arrival with it.
+The parent skill covers an anim that ends on a tag (`GetStartOrigin`/`GetStartAngles` give the boarding spot). A port whose joints sit outside the vehicle (BO2's window anims are anchored on the window plane) has no tag to land on, so the destination has to be derived instead: read the travel with `GetMoveDelta( anim, 0, 1, self )` and project it on the parent's frame **at the moment of the move**, after `StopAnimScripted`. Deriving it beats measuring a constant per animation, since a re-export carries its own arrival.
 
 ## One use trigger at a time
 
@@ -110,7 +110,7 @@ The parent skill covers the normal case — an anim that ends on a tag, where `G
 
 So shape the volumes so they never touch — Radiant's job, not a radius guessed in script — the way BO2's bus rebuild trigger does: **placed in the map**, wired with `enablelinkto()` / `linkto( bus )` with no tag or offset (preserving the mapper's transform) / `setmovingplatformenabled( 1 )`.
 
-Getting the prompt to actually appear is its own trap: `SetInvisibleToAll()` and `TriggerEnable` don't behave the way their names suggest for a player already standing inside the volume. The full three-part mechanism, plus how stock signals "nothing left to repair," is in `references/route-loops-and-assets.md`.
+Why the prompt may not appear (`SetInvisibleToAll()`, `TriggerEnable`) is in the section above.
 
 ## Traversals can't move
 

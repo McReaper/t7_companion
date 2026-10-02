@@ -4,7 +4,7 @@ Referenced from `plugin/skills/anim-retarget/SKILL.md`. Read that file first —
 
 A **viewhands** rig is arms-only — no `j_mainroot`, no spine, no legs — so **HumanIK cannot characterise it at all**: Lock only enables once the required biped bones are filled, and they never will be. Drive it with direct constraints instead.
 
-> **Read the numbers in this section as one worked example, not as constants.** Everything below was measured on a single port: MW3 `berlin_sgt_down_recovery_vm` → `c_zom_der_dempsey_viewhands` (110 bones). The *techniques* transfer to any title pair; the specific angles, offsets and bone counts do not. Reproduce each **measurement** on your own rig pair rather than reusing the value.
+> **The numbers here are one worked example, not constants** (verified on one port): MW3 `berlin_sgt_down_recovery_vm` → `c_zom_der_dempsey_viewhands` (110 bones). The techniques transfer; the angles, offsets and bone counts do not — re-measure on your rig pair.
 
 **`-mo` on every constraint, and co-locate the rigs first.** The two rigs' bind axes differ by **40° (pinky) to 174° (right metacarpals), median 54°** — a plain `orientConstraint` copies the *absolute* source axis and twists every joint at rest, so `-mo` (offset captured in bind) is mandatory, not optional. And co-locate before constraining: MW3 is rooted at `tag_origin` with `tag_view` at Z=152.4 while the **BO3 root IS `tag_view`** at 0. Constrain across that gap and `-mo` bakes a ~150-unit offset into the constraint; every rotation of the source then swings the target through a huge arc and the arms fly off sideways. After co-locating, `tag_view`/`tag_ads`/`tag_cambone`/`tag_camera` match to 0.00.
 
@@ -16,7 +16,7 @@ A **viewhands** rig is arms-only — no `j_mainroot`, no spine, no legs — so *
 | shoulders | `pointConstraint -mo` + `orientConstraint -mo` | MW3 drives the arms by **translating the shoulders** (140–164 units); a pointConstraint offset is not rotated by the source, so no lever arm |
 | everything else | `orientConstraint -mo` | positions below the root must come from the target's own bone lengths |
 
-Measure rather than assume: in this clip `tag_torso`'s translation amplitude was **0.00** — the `parentConstraint` it looked like it needed was pure noise.
+In this clip `tag_torso`'s translation amplitude was **0.00**, so a `parentConstraint` there is noise.
 
 **Finger names lie.** MW3 → BO3 is an index shift plus a rename, and the two rigs share enough short names that a by-name mapping *looks* correct while silently moving every phalanx one joint down the chain:
 
@@ -36,7 +36,7 @@ Because the offset is *constant*, push it down into the arms with no change to t
 
 ## Dead ends — measured, do not repeat
 
-All of these looked reasonable and each made the in-game result worse:
+Each of these made the in-game result worse:
 
 | attempt | result |
 |---|---|
@@ -45,7 +45,7 @@ All of these looked reasonable and each made the in-game result worse:
 | …and pin torso to camera | arms gone entirely |
 | rebase by a constant `inv(camera @ frame 0)` | view detaches from the body |
 
-The lesson: the world placement was never the problem, and neither was the camera. Fix the **constant torso rotation** and leave the tag chain otherwise alone.
+The world placement and the camera were never the problem. Fix the **constant torso rotation** and leave the tag chain otherwise alone.
 
 ## Arms longer than BO3, the wrist-twist chain, fingers left curled — three post-bake fixes
 

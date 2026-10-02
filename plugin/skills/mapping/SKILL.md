@@ -23,7 +23,7 @@ Terrain/detail work uses **patches**, not brushes — drag one out, pick a row×
 
 ## Prefabs: rotate the prefab, not the brush
 
-**Rotating a raw brush and then prefabbing it can distort its scale** — verified, recurring report. The fix: prefab the brush *before* rotating, then rotate the placed prefab instance. Don't re-prefab an already-rotated brush model expecting it to normalize. Prefabs also nest (a complex build can be prefabs several layers deep) — expect to unpack/re-save when you need to edit something buried inside one.
+**Rotating a raw brush and then prefabbing it can distort its scale** (verified; recurring report). The fix: prefab the brush *before* rotating, then rotate the placed prefab instance. Don't re-prefab an already-rotated brush model expecting it to normalize. Prefabs also nest (a complex build can be prefabs several layers deep) — expect to unpack/re-save when you need to edit something buried inside one.
 
 ## Collision: clip brushes are the default, not the only option
 
@@ -31,7 +31,7 @@ Models have **no collision by default**, but they aren't limited to it — an xm
 
 **`dyn_model` entities are the exception — don't clip them at all.** A `dyn_model`'s collision and physics response come from the model + its `physpreset`, not from brushes placed around it; wrapping one in a clip brush is fighting the entity type, not supporting it.
 
-**Clip textures aren't one-size-fits-all** — `clip`/`clip_full` (everything), `clip_player`, `weaponClip`/`clip_weapon` (bullets only, no player), `clip_missile`, `clip_ai`, `clip_vehicle`, and `clip_nosight` (blocks movement, not AI sightlines) each gate a different actor/projectile class — pick the one that matches what you're actually trying to block, not just `clip` by habit. A common stair/ramp trick: `Make Weapon Clip` on the visible geometry (keeps bullet collision, drops player collision) paired with a smooth `clip_player` ramp underneath, so players glide up the stairs' silhouette instead of catching on each step. Don't confuse clip with **caulk**: caulk is a *non-drawing* face, not a non-colliding one — a caulked brush still blocks the player (community-confirmed; a caulk doorway with colliding patches blocked the player until the patches were set to weapon clip). Use caulk to cut rendering, clip to shape collision, and neither as a stand-in for the other.
+**Clip textures aren't one-size-fits-all** — `clip`/`clip_full` (everything), `clip_player`, `weaponClip`/`clip_weapon` (bullets only, no player), `clip_missile`, `clip_ai`, `clip_vehicle`, and `clip_nosight` (blocks movement, not AI sightlines) each gate a different actor/projectile class — pick the one that matches what you're actually trying to block, not just `clip` by habit. A common stair/ramp trick: `Make Weapon Clip` on the visible geometry (keeps bullet collision, drops player collision) paired with a smooth `clip_player` ramp underneath, so players glide up the stairs' silhouette instead of catching on each step. Don't confuse clip with **caulk**: caulk is a *non-drawing* face, not a non-colliding one — a caulked brush still blocks the player (community-confirmed: a caulk doorway with colliding patches blocked the player until the patches were weapon clip). Use caulk to cut rendering, clip to shape collision, and neither as a stand-in for the other.
 
 ## Zones: sealing the level isn't just BSP leaks
 

@@ -9,7 +9,7 @@ One-time setup: download the t7kb tool + database, then register it as an MCP se
 
 ## 1. Run the installer — it's idempotent, don't force a redownload
 
-Detect the OS and run the matching command. It downloads the binary, the embedding model, and the ~0.9 GB database archive into one folder, and prints the install path. Both installers are idempotent: if a binary + database are already present at the target path, they skip the download instead of re-fetching ~0.9 GB — so it's safe to run this even if the user already installed manually or in a prior session.
+Detect the OS and run the matching command. It downloads the binary, the embedding model, and the ~0.9 GB database archive into one folder, and prints the install path. Both installers are idempotent: if a binary + database are already present at the target path, they skip the download — safe to run even after a manual or earlier install.
 
 If a binary already exists at the target path (the case the idempotency check would otherwise just skip), run `<path>/t7kb update-check` (`.exe` on Windows) first — it's a lightweight, on-demand-only network check (no automatic/background calls anywhere else in `t7kb`), and reports one of three things:
 
@@ -45,7 +45,7 @@ Example paths: `~/.t7kb/t7kb` (Linux/macOS, expand `~` to the real home) or `C:\
 
 On Windows this command still runs through a POSIX-style shell (the Bash tool is git-bash), which treats an unquoted backslash as an escape character and silently drops it before a non-special letter — `C:\Users\<you>\AppData\Local\t7kb\t7kb.exe` becomes `C:Users<you>AppDataLocalt7kbt7kb.exe`, a path that can't spawn. Double-quoting the argument (as above) prevents this.
 
-**Validate the registration before moving on:** run `claude mcp list` and confirm the `t7kb` entry shows the full path with backslashes intact (Windows) or the full absolute path (Linux/macOS). If a path was registered before this fix, or the server ever fails to connect, this is the first thing to check — re-run the `claude mcp add` command above with the quoted path to fix it.
+**Validate the registration before moving on:** run `claude mcp list` and confirm the `t7kb` entry shows the full path with backslashes intact (Windows) or the full absolute path (Linux/macOS). If the server fails to connect, check this first — re-run the `claude mcp add` command above with the quoted path to fix it.
 
 ## 3. Offer the workspace primer — and record the root t7kb:knowledge-base depends on
 
@@ -60,7 +60,7 @@ curl -fsSL https://raw.githubusercontent.com/McReaper/t7_companion/main/template
 irm https://raw.githubusercontent.com/McReaper/t7_companion/main/templates/AGENTS.md -OutFile "<root>\AGENTS.md"
 ```
 
-You just walked up to `<root>` *because* it's the raw mod-tools install — the same ground truth `t7kb:knowledge-base`'s "verify against ground truth" section tells the agent to search for on every question. Save that discovery so nobody has to repeat it: append a short, project-specific section to the fetched `AGENTS.md` (this is appending a fact after the canonical fetch, not hand-copying the primer itself, so it doesn't fight the single-source-of-truth rule):
+`<root>` is the raw mod-tools install — the ground truth `t7kb:knowledge-base`'s "verify against ground truth" section has the agent search for. Record it so nobody repeats the search: append a short, project-specific section to the fetched `AGENTS.md` (this is appending a fact after the canonical fetch, not hand-copying the primer itself, so it doesn't fight the single-source-of-truth rule):
 
 ```markdown
 

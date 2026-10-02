@@ -5,7 +5,7 @@ description: How to improve the t7kb plugin's skills and send the change upstrea
 
 # Contributing to the t7kb skills
 
-A skill here is **not documentation** — the corpus already is the documentation, and an agent can `t7kb:search` it. A skill is what retrieval can't give you: the **method** for a craft, plus the **silent-failure traps** that were only ever discovered by losing an afternoon to them. So the most valuable contributions come from real sessions — the moment a skill's advice failed, or a fix finally worked after an hour of the wrong theory. Every rule below follows from that.
+A skill here is **not documentation** — the corpus already is the documentation, and an agent can `t7kb:search` it. A skill is what retrieval can't give you: the **method** for a craft, plus the **silent-failure traps** that nothing in the corpus flags. So the most valuable contributions come from real sessions — a skill's advice that failed, or a fix that took the wrong theory to find. Every rule below follows from that.
 
 ## When to offer a contribution — and when not to
 
@@ -50,7 +50,7 @@ There are already 14 domain skills (plus `setup` and `contribute`) over one fair
 - **Silent-failure traps of its own.** If the answers are all "look up the right name", that's a `t7kb:search`, not a skill.
 - **A description no sibling already catches.** Write the description *first*, as a test: if you can't state the boundary in one "Distinct from …" clause, it belongs inside the sibling.
 
-When you do split, both sides get a "Distinct from" clause — boundaries are stated from both directions. (Audio and zombies game mechanics were both assessed against this and stayed inside `atmosphere` and `scripting`.)
+When you do split, both sides get a "Distinct from" clause — boundaries are stated from both directions.
 
 ## Where the file goes
 
@@ -82,7 +82,7 @@ How to <do the craft> — <sub-topics in real BO3 jargon>. Use when <symptom-sid
 - **Open with the thesis, not a definition** — one sentence naming what the craft *actually is*, phrased as the correction to the wrong mental model. Then the standing pointers: exact tokens in **t7kb** (`t7kb:search` then `t7kb:get`), and the siblings that own the neighbouring stages.
 - **Make every `##` heading the conclusion, not the topic**: `## Prefabs: rotate the prefab, not the brush`, not `## Prefabs`. It's what lets an agent skim-and-act.
 - **Each trap states symptom → cause → fix → why.** The *why* lets the model generalise to the variant you didn't write about. Explain the mechanism instead of shouting — reaching for ALL-CAPS `MUST` usually means a missing reason.
-- **Mark how a fact was learned** — "verified on a real build", "verified in the install", "community, t7kb 0.25". It tells the next editor what they may rewrite.
+- **Tag a fact's provenance in a few words** — "verified on a real build", "verified in the install", "community, t7kb 0.25" — but never narrate how it was found; the discovery story goes in the commit message / PR body. The tag tells the next editor what they may rewrite.
 - **Mechanics:** backtick every shipped token; bold the load-bearing claim and sibling names (**t7kb:debugging**); fully-qualified MCP tools (`t7kb:search`, `t7kb:get`, `t7kb:build`); close a domain skill with `## Don't invent`; **never hard-wrap** — one line per paragraph or list item.
 
 ## Ground every BO3 claim
@@ -101,7 +101,7 @@ A wrong skill is worse than a missing one — it's confidently wrong at the top 
 2. **`.claude-plugin/marketplace.json`** — the plugin description enumerates the domains; add it there.
 3. **Leave `README.md` alone** — its diagram deliberately lists no skill names.
 4. **`CLAUDE.md`** — only if the change alters how a contributor works on the repo.
-5. **The skill that owns a workflow, whenever the tool surface changes** — in the same commit. This has bitten: the `build` MCP tool once shipped without `compiling` learning about it, and agents kept shelling out.
+5. **The skill that owns a workflow, whenever the tool surface changes** — in the same commit, or agents keep using the old route (a new MCP tool the owning skill doesn't mention goes unused).
 6. **Commit** as `feat(skills):` for a new skill, `docs(skills):` for an edit. The manifest version is bumped at release, not per edit.
 
 ## Test the trigger, not just the prose

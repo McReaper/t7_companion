@@ -20,11 +20,11 @@ In **Launcher → dvars** (or `+set …` on the command line), set:
 
 Reproduce, then read the **S.R.E. (script runtime error)** — the console prints the error plus a **call stack** naming the file for each frame. Cheats/dev need the map launched via `devmap` or a loaded mod (`sv_cheats`).
 
-- **`assert`, `assertmsg` and `/# … #/` dev blocks need `scr_mod_enable_devblock 1`** — not `developer`. `GSC_Language.pdf`: *"Assert – Only tested when devblocks are enabled"*; the Launcher's tooltip: *"Developer blocks are executed in mods"* — and on a **usermap** it has been tried and doesn't take (maintainer-verified; t7kb has nothing either way). So on a usermap, `assert`s and `/# #/` blocks effectively never run: an assert that never fires says nothing about whether its code path ran — instrument with `IPrintLnBold` or a `#define`-gated print instead, or build as a mod.
+- **`assert`, `assertmsg` and `/# … #/` dev blocks need `scr_mod_enable_devblock 1`** — not `developer`. `GSC_Language.pdf`: *"Assert – Only tested when devblocks are enabled"*; the Launcher's tooltip: *"Developer blocks are executed in mods"* — and on a **usermap** it doesn't take (maintainer-verified). So on a usermap, `assert`s and `/# #/` blocks effectively never run: an assert that never fires says nothing about whether its code path ran — instrument with `IPrintLnBold` or a `#define`-gated print instead, or build as a mod.
 - **These dvars reach a run only if something passes them.** The Launcher's Dvars dialog applies to *its* Run; a raw `BlackOps3.exe +devmap` line passes none of them, so it has no `logfile` and writes no new log. `t7kb:build`'s run stage passes them when asked: `launcher_dvars: true` reuses the ones saved in the Launcher's dialog, and `dvars: {"developer": "2", "logfile": "2"}` sets them directly (CLI `--launcher-dvars`, `--dvar logfile=2`). For a debug run, ask for `developer 2` and `logfile 2` (plus `scr_mod_enable_devblock 1` if you need asserts). By hand, it's `+set developer 2 +set logfile 2` before `+set fs_game <map> +devmap <map>`.
 - **Check the Launcher's persisted dvars when AI never spawns.** `ai_disableSpawn` is one of them and easy to leave on; the log then floods with `SpawnFromSpawner( <unnamed> ) spawn prevented by ai_disableSpawn or g_spawnai.`
 
-Turn this on **before** theorizing — guessing at a hidden error just burns build cycles; get the real message and call stack first.
+Turn this on **before** theorizing: get the real message and call stack first.
 
 ## Read `console_mp.log` yourself
 
@@ -32,12 +32,10 @@ Turn this on **before** theorizing — guessing at a hidden error just burns bui
 
 It lands at the **`fs_game` root**: a **mod** run → `mods/<modname>/console_mp.log`; a **usermap** (no `fs_game`) → the **game root** `<bo3_root>/console_mp.log` (*not* `usermaps/<map>/`). Don't assume which — a mod run whose `fs_game` folder is missing falls back to the root, and stale copies from earlier sessions sit in both places. **Glob `<bo3_root>/console_mp.log` plus `<bo3_root>/mods/*/console_mp.log` and take the newest by mtime.**
 
-**Do not assume the file is one session — or even from this run.** Two failure modes, both reading a past run as the current one:
+**The file may hold several sessions, or be from a previous run.** Both make you read a past run as the current one:
 
-- **Several sessions in one file.** A fresh game launch rewrites the log (one `logfile opened on <date>` header at the top), but every map reload inside the same game process (`devmap` again, `map_restart`) appends another session below it — so the first match you grep is the *oldest*, very likely from before the fix you are testing. (Verified on real logs: one header, six `Game Initialization` blocks.) `log_append` makes it accumulate across launches too.
+- **Several sessions in one file.** A fresh game launch rewrites the log (one `logfile opened on <date>` header at the top), but every map reload inside the same game process (`devmap` again, `map_restart`) appends another session below it — so the first match you grep is the *oldest*, very likely from before the fix you are testing. (verified on real logs) `log_append` makes it accumulate across launches too.
 - **A file from a previous process.** If the run you just did never opened a log — `logfile` wasn't set, which is the default for a **headless** launch that passes no dvars (above) — the file on disk is the last run's, untouched. Compare the `logfile opened on` header and the file's mtime with when you launched before reading anything.
-
-Diagnosing several rounds in a row against a stale block is the single easiest way to burn an afternoon "fixing" things that were never broken.
 
 Always cut to the last session first:
 
@@ -46,7 +44,7 @@ start=$(grep -n "Game Initialization" console_mp.log | tail -1 | cut -d: -f1)
 tail -n +$start console_mp.log | grep -c "your error"
 ```
 
-The tell that you've been reading the wrong window: **an occurrence count that grows run over run** (2 → 4 → 10 → 14) while the timestamps of the first hit never change. A per-session count is what matters; a cumulative one means you're re-reading history.
+The tell that you're reading the wrong window: **an occurrence count that grows run over run** while the first hit's timestamp never changes. Count per session; a cumulative count is history.
 
 Lines are prefixed with an engine timestamp + subsystem tag (`[<ms>][<SUBSYSTEM>]`). What to grep:
 
@@ -69,7 +67,7 @@ When the whole stack is stock (`_zm_behavior.gsc` twice and nothing else), you h
 
 ## Overriding *any* stock asset from a *usermap* — the assetlist CSVs
 
-The received wisdom that "a usermap can't override stock content, only a mod can" is **wrong**, and the rule is not about scripts. **The linker skips any asset an upstream zone already contributes** — your zone inherits them through its `>class,…` / `>group,…` header — so your copy is silently ignored no matter how correctly you zone it. Building as a mod does not help: same class, same skip.
+"A usermap can't override stock content, only a mod can" is **wrong**, and it isn't only about scripts. **The linker skips any asset an upstream zone already contributes** — your zone inherits them through its `>class,…` / `>group,…` header — so your copy is silently ignored no matter how correctly you zone it. Building as a mod does not help: same class, same skip.
 
 **Comment the stock entry out of the assetlist CSV that contributes it**, under `zone_source/all/assetlist/`:
 
@@ -78,25 +76,25 @@ The received wisdom that "a usermap can't override stock content, only a mod can
 //rawfile,animtrees/generic.atr                    core_common.csv
 ```
 
-Then your zoned copy takes its place. **Any asset type, and the file is whichever list names it** — `zm_patch.csv`, `core_common.csv`, `zm_common.csv`, `zm_levelcommon.csv`. Don't assume `zm_patch.csv`: `grep -rn "<asset path>" zone_source/` and comment the line you actually find. Shipped installs already ship several lines commented this way (`_zm_ai_dogs`, `_zm_pack_a_punch`, `_zm_weapons`), which is the confirmation the mechanism is intended. These are shared, install-wide files — back them up (or keep them in git), because the change affects every map built from that tree until undone.
+Then your zoned copy takes its place. **Any asset type, and the file is whichever list names it** — `zm_patch.csv`, `core_common.csv`, `zm_common.csv`, `zm_levelcommon.csv`. Don't assume `zm_patch.csv`: `grep -rn "<asset path>" zone_source/` and comment the line you actually find. Shipped installs already comment several lines this way (`_zm_ai_dogs`, `_zm_pack_a_punch`, `_zm_weapons`), so the mechanism is intended. These are shared, install-wide files — back them up (or keep them in git), because the change affects every map built from that tree until undone.
 
 **Diagnose it by size, not by theory.** When an edit to a shared raw file seems to have no effect, append a few KB of junk to it, relink, and compare the `.ff` size before and after:
 
 - **delta 0** → the linker is not packing your file at all; you need the CSV line commented (above).
 - **delta > 0** → it *is* in the build, and your bug is elsewhere.
 
-That one measurement replaces a long chain of plausible guesses, and it works for any raw asset — animtrees, animtables, behavior trees, scripts.
+The measurement works for any raw asset — animtrees, animtables, behavior trees, scripts.
 
 ## Instrument rather than theorise
 
-When an error's call stack is stock and unhelpful, the fastest route to the answer is almost never more reasoning about which branch "must" be at fault. Take the file over (above) and **mark every candidate site**, then let the log say which one runs:
+When an error's call stack is stock and unhelpful, don't reason about which branch "must" be at fault. Take the file over (above) and **mark every candidate site**, then let the log say which one runs:
 
 ```gsc
 IPrintLnBold("^3SG#7 L547");
 self SetGoal( goalPos );
 ```
 
-One run, and the last tag before the error is the line. This costs ten minutes and ends the guessing; a chain of plausible-but-unverified hypotheses costs hours and, worse, produces "fixes" to things that were never broken — two of which can silently cancel each other out and make a correct fix look like a failure.
+One run, and the last tag before the error is the line. Unverified hypotheses produce "fixes" to things that were never broken, and two such fixes can silently cancel each other out and make a correct fix look like a failure.
 
 **Read the assert text.** Treyarch's asserts routinely carry the failing value: `assert fail: bus_window` names the exact string that didn't resolve, which is the whole diagnosis. If an assert *should* be firing and isn't in your log, check `scr_mod_enable_devblock` and whether you are reading the wrong session (both above) before concluding the code path wasn't reached.
 
@@ -106,7 +104,7 @@ One run, and the last tag before the error is the line. This costs ten minutes a
 - **Linker / build** — builds, but a reference doesn't resolve: `Error linking script "scripts/…"` / `Could not find scriptparsetree "scripts/…"` = the script (or asset) is **not in the `.zone`**, or the path is wrong. Add it / fix the path.
 - **Unresolved external** — a called function the linker can't find: a missing `#using` for its namespace, a typo, or the defining script isn't zoned. A build-time link failure, **not** a runtime bug.
 - **Runtime** — builds and loads, then errors mid-game (often only under `developer 2`): a bad `self`/`level` assumption, an undefined value (guard with `isdefined`), or a thread on a dead entity (missing `endon`).
-- **Load dies on `Com_ERROR: Server Disconnected - Clientfield Mismatch.`** (`Check host TTY output for client & server clientfield registration details`) — it names no field. Relaunch with `+set com_clientfieldsdebug 1` and find `Clientfield mismatches :` in the console: each line reads `<SIDE> '<pool>' set does not contain field '<name>'`, and **the named side is the one missing the registration**. Causes, most common first: a `#using` in the map's `.gsc` with no matching `#using` of that feature's `.csc` half (the self-registration runs on one side only); the same field registered with different bits/type/version on the two sides; a stale copied `zm_usermap.gsc`/`.csc` after a mod-tools update; a `clientuimodel` only Lua reads, which still needs its CSC `register` (stock `_load.csc` does it with an `undefined` callback). (Corpus, several independent sources. One wiki copy of the error list inverts the side — trust the console line.)
+- **Load dies on `Com_ERROR: Server Disconnected - Clientfield Mismatch.`** (`Check host TTY output for client & server clientfield registration details`) — it names no field. Relaunch with `+set com_clientfieldsdebug 1` and find `Clientfield mismatches :` in the console: each line reads `<SIDE> '<pool>' set does not contain field '<name>'`, and **the named side is the one missing the registration**. Causes, most common first: a `#using` in the map's `.gsc` with no matching `#using` of that feature's `.csc` half (the self-registration runs on one side only); the same field registered with different bits/type/version on the two sides; a stale copied `zm_usermap.gsc`/`.csc` after a mod-tools update; a `clientuimodel` only Lua reads, which still needs its CSC `register` (stock `_load.csc` does it with an `undefined` callback). (community, several sources; one wiki copy of the error list inverts the side — trust the console line.)
 - **Black screen at load, nothing logged** — usually a loop that can iterate without a `wait`/`waittill`, starving the scheduler (**t7kb:scripting**), or a vehicle-path/animtree load death (**t7kb:moving-platforms**).
 
 ## Method

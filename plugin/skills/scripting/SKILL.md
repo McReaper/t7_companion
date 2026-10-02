@@ -20,7 +20,7 @@ Top of file, in order: `#using` each script you call into (grouped: stdlib, feat
 
 `scripts/shared/` is a deep stdlib (`util::`, `array::`, `math::`, `clientfield::`, `flag::`, `spawner::`, `zm_utility::`) — run `t7kb:search` for a helper before writing one. But predicates carry surprises:
 
-- **`util::use_button_held()` returns false the first time it is asked**, whoever asks: that first call is what *starts* its tracking thread (`self thread button_held_think( BUTTON_USE )`), then it returns a slot the thread hasn't filled yet. A hold-to-repeat loop that tests it once before iterating never repeats — it looks exactly like the player not holding the button. Stock gets away with it because its unitriggers poll the helper from the moment the prompt appears. For a one-shot question use `player UseButtonPressed()`. (**Measured.**)
+- **`util::use_button_held()` returns false the first time it is asked**, whoever asks: that first call is what *starts* its tracking thread (`self thread button_held_think( BUTTON_USE )`), then it returns a slot the thread hasn't filled yet. A hold-to-repeat loop that tests it once before iterating never repeats — it looks exactly like the player not holding the button. Stock's unitriggers poll it from the moment the prompt appears, so they don't notice. For a one-shot question use `player UseButtonPressed()`. (Measured.)
 - **A raw `level waittill("my_flag")` also wakes on `flag::clear`** — clear sends the same notify (`flag_shared.gsc:166-170`) — and a `waittill` begun after the notify already fired never returns, because notifies aren't latched. Use `flag::wait_till`, which loops on `get()`; `flag::init` before you wait on or set a flag. (`flagsys::` is a separate namespace.)
 
 ## Extending stock behavior: hook first, override when blocked
@@ -55,7 +55,7 @@ Map-placed entities and structs already exist when either phase runs — but the
 
 - **A `script_struct` is not an entity.** `GetEnt` returns `undefined` and `GetEntArray` an empty array for it, so a `foreach` over the result silently does nothing. Entities: `GetEntArray("my_trigger", "targetname")` (the key argument is required). Structs: `struct::get_array("my_struct", "targetname")`.
 - **`struct::get`/`get_array` only index nine keys** — `target`, `targetname`, `script_noteworthy`, `script_linkname`, `script_label`, `classname`, `script_unitrigger_type`, `scriptbundlename`, `prefabname` (decompiled `struct.gsc`, t7kb 0.95 — the install's `codescripts/struct.gsc` is a stub). `struct::get_array("2", "script_int")` returns `[]` with no error. Fetch by an indexed key, then filter or `array::sort_by_script_int`. With several matches `struct::get` asserts and returns `undefined` when devblocks run, and otherwise silently returns the first — use `get_array` if duplicates are possible.
-- **A custom KVP you typed in Radiant arrives `undefined`.** Only keys declared in `radiant/keys.txt` reach script — the entity is found and its stock keys read fine, which is what makes it baffling (`target2`/`target3` aren't declared either). Use a generic stock key (`script_int`, `script_float`, `script_string`, `script_vector`), or zone your own copy of `keys.txt` and comment `rawfile,radiant/keys.txt` out of `core_common.csv` — grep for the line, don't trust a remembered line number. (**Verified in the install**; two independent community reports.)
+- **A custom KVP you typed in Radiant arrives `undefined`.** Only keys declared in `radiant/keys.txt` reach script — the entity is found and its stock keys read fine (`target2`/`target3` aren't declared either). Use a generic stock key (`script_int`, `script_float`, `script_string`, `script_vector`), or zone your own copy of `keys.txt` and comment `rawfile,radiant/keys.txt` out of `core_common.csv` — grep for the line, don't trust a remembered line number. (**Verified in the install**; two independent community reports.)
 
 ## Threading & scope discipline
 
@@ -87,7 +87,7 @@ On a `script_model`, **`AnimScripted` is the primitive** (it needs `UseAnimTree(
 
 ## Code style & conventions
 
-Match these exactly — and when **editing an existing file, don't infer style from it**: the stock scripts and usermap templates use tabs and `( padded )` calls, and mirroring them is the single most common way these rules get ignored. The first two are the most-violated.
+Match these exactly — and when **editing an existing file, don't infer style from it**: stock scripts and usermap templates use tabs and `( padded )` calls.
 
 - **4 spaces, never tabs.**
 - **Always braces.** Never `if (x) doThing();` — write `if (x) { doThing(); }` with the body on its own line(s). Same for loops.

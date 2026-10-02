@@ -28,9 +28,9 @@ ENDMARKER
 | `room_of_thanks.str` | `PLAY` | `&"ROOM_OF_THANKS_PLAY"` |
 | `meteor.str` | `ACTIVATE` | `&"METEOR_ACTIVATE"` |
 
-Get it wrong and **the game draws the raw reference name where the words should be** — no link error, empty `.errorlog`, nothing naming the culprit. That silent fallback makes the name the first thing to check on any prompt showing gibberish, ahead of the zone file and ahead of the precache.
+Get it wrong and **the game draws the raw reference name where the words should be** — no link error, empty `.errorlog`, nothing naming the culprit. So the name is the first thing to check on any prompt showing gibberish, ahead of the zone file and the precache.
 
-It also means the `REFERENCE` should stay **short**, because the filename already namespaces it: `zm_michael_teddy.str` wants `REFERENCE PICKUP`, giving `ZM_MICHAEL_TEDDY_PICKUP`. Writing `REFERENCE TEDDY_HUNT_PICKUP` there yields `ZM_MICHAEL_TEDDY_TEDDY_HUNT_PICKUP`, which is what a doubled-looking name in a log is telling you.
+It also means the `REFERENCE` should stay **short**, because the filename already namespaces it: `zm_michael_teddy.str` wants `REFERENCE PICKUP`, giving `ZM_MICHAEL_TEDDY_PICKUP`. Writing `REFERENCE TEDDY_HUNT_PICKUP` there yields `ZM_MICHAEL_TEDDY_TEDDY_HUNT_PICKUP`, the doubled-looking name seen in a log.
 
 Keep the resolved name in the feature's `.gsh` as a `*_LOCALIZED` constant so it is written once, and use it macro-style in both places — the `&MACRO` form compiles:
 
@@ -47,7 +47,7 @@ A trigger's hint reaches the client as a **precached trigger-string index**, whi
 
 **A hint with arguments is precached once per distinct value, and the value is a quoted string.** `&&1`, `&&2`, … in the text are filled in order by `SetHintString`'s extra arguments, and Treyarch's `zm_giant.gsc` precaches each combination it uses: `#precache("triggerstring", "ZOMBIE_PERK_QUICKREVIVE", "500");` then the same with `"1500"`. Pass the cost as `"500"`, not `500` — a precache takes strings, and an unquoted int crashes (community guide, t7kb 0.70).
 
-**Why localize at all, beyond translation: every distinct final string takes a configstring slot.** `SetHintString(&"REF", n)` with a precached ref reuses one entry; concatenating a changing value into a literal (`"Cost: " + n`) mints a new one each update until the fixed-size table overflows (community reports; one of them a stock patch). Keep dynamic parts in `&&1` arguments. The `triggerstring` table has its own ceiling too — `Exceeded '250' items for type 'triggerstring'` (community). (`_zm_utility.gsc`'s un-precached `&"ZOMBIE_NAVCARD_PICKUP"` is a BO2-era leftover — don't read it as proof the precache is optional.)
+**Why localize at all, beyond translation: every distinct final string takes a configstring slot.** `SetHintString(&"REF", n)` with a precached ref reuses one entry; concatenating a changing value into a literal (`"Cost: " + n`) mints a new one each update until the fixed-size table overflows (community reports; one of them a stock patch). Keep dynamic parts in `&&1` arguments. The `triggerstring` table has its own ceiling too — `Exceeded '250' items for type 'triggerstring'` (community). (`_zm_utility.gsc`'s un-precached `&"ZOMBIE_NAVCARD_PICKUP"` is a BO2-era leftover, not proof the precache is optional.)
 
 ## Each language is a separate file and a separate linker pass
 
@@ -60,21 +60,21 @@ share/raw/french/localizedstrings/zm_michael_teddy.str    → LANG_FRENCH  "..."
 
 Write them UTF-8; accented text (`Arrêter`) is stored as UTF-8. A language you don't actually translate can reuse the English text by writing `#same` in its entry (community guide, t7kb 0.70).
 
-**Localized audio is the same idea on the sound side:** the per-language WAVs go under `soundloc_assets/<lang>/`, not `sound_assets/`, and a file present in both makes snd_convert fail with `File is both localized and not localized.` (**verified** in `snd_convert.exe`; that every shipped locale folder must exist is community-reported). Aliases themselves are **t7kb:atmosphere**'s.
+**Localized audio is the same idea on the sound side:** the per-language WAVs go under `soundloc_assets/<lang>/`, not `sound_assets/`, and a file present in both makes snd_convert fail with `File is both localized and not localized.` (verified in `snd_convert.exe`; that every shipped locale folder must exist is community-reported). Aliases themselves are **t7kb:atmosphere**'s.
 
 One linker pass covers one language: it writes the language-neutral `<map>.ff` **and** that language's `<lang>_<map>.ff`, leaving every other language's fastfile at its previous content. So a map translated into French after an English-only build keeps serving stale French text until you link with `-language french` too — link once per language you ship. See **t7kb:compiling** for the pass itself and the rest of what it rewrites.
 
 ## A `localize,` line is optional for strings GSC uses — and required for strings only Lua or a HUD asks for
 
-**The linker pulls in a `.str` because compiled script references one of its strings**, not because it sits in the folder. Verified on a real build: a map with no `localize,` line in its `.zone` or `.zpkg`s got its `zm_michael_teddy.str` into `<map>.deps` — while the other `.str` files in the same `localizedstrings/` folder were **not** pulled in, and the linker appended `localize,zm_michael_teddy` to the generated loc zone itself. So for a hint or HUD string your GSC passes, a missing `localize,` line is not the failing link; check the name first.
+**The linker pulls in a `.str` because compiled script references one of its strings**, not because it sits in the folder. A map with no `localize,` line in its `.zone` or `.zpkg`s gets the referenced `zm_michael_teddy.str` into `<map>.deps` while the other `.str` files in the same `localizedstrings/` folder are **not** pulled in; the linker appends `localize,zm_michael_teddy` to the generated loc zone itself (verified on a real build). So for a hint or HUD string your GSC passes, a missing `localize,` line is not the failing link; check the name first.
 
-The corollary is the real trap: **a string no compiled GSC references is never found that way.** Text asked for only by Lua (`Engine.Localize("…")`), by a stock HUD widget you loaded, or by an asset prints its raw reference — `ZOMBIE_ROCKET_HINT`, `ZM_CASTLE_TRAM_TOKEN_POWERUP` — with a clean link and an empty `.errorlog`. For those, `localize,<file>` **is** the fix; for a stock ref, author a `.str` whose filename reproduces its prefix (`zm_castle.str` with `REFERENCE TRAM_TOKEN_POWERUP`). (Two independent community fixes, t7kb 0.70, match the mechanism.)
+The corollary is the real trap: **a string no compiled GSC references is never found that way.** Text asked for only by Lua (`Engine.Localize("…")`), by a stock HUD widget you loaded, or by an asset prints its raw reference — `ZOMBIE_ROCKET_HINT`, `ZM_CASTLE_TRAM_TOKEN_POWERUP` — with a clean link and an empty `.errorlog`. For those, `localize,<file>` **is** the fix; for a stock ref, author a `.str` whose filename reproduces its prefix (`zm_castle.str` with `REFERENCE TRAM_TOKEN_POWERUP`). (community, t7kb 0.70)
 
 `linkerflag,noloc` is the opposite lever: it skips generating the per-language loc files (`en_`, `fr_`, …) entirely, saving a fastfile slot when nothing in the map or mod is localized. Don't reach for it if you rely on localized strings anywhere. Notifies are unaffected either way.
 
 ## Diagnosing a string that won't resolve
 
-Work in this order — it is cheapest-first, and the first check catches most of them:
+Work in this cheapest-first order:
 
 1. **Name.** Does `<FILENAME>_<REFERENCE>` match the string GSC passes, character for character? Fix here before touching anything else.
 2. **Precache.** For a trigger hint, is `#precache("triggerstring", "<NAME>")` present in the calling script?

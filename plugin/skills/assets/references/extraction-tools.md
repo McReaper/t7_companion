@@ -1,6 +1,6 @@
 # Extraction and conversion tools, by role
 
-Referenced from `plugin/skills/assets/SKILL.md` — read that file first. This is the tool landscape behind its one-paragraph summary. It churns: the tool that was standard a few years ago is usually superseded now, so treat names as roles and verify the current build in t7kb or the tool's own docs.
+Referenced from `plugin/skills/assets/SKILL.md` — read that file first. This is the tool landscape behind its one-paragraph summary.
 
 ## Contents
 
@@ -10,7 +10,7 @@ Referenced from `plugin/skills/assets/SKILL.md` — read that file first. This i
 - Whole-map geometry
 - Iterating faster / keeping GDTs clean
 
-Pick by two axes: the **source game** (which tool can even read it) and the **output you need** (raw model / `_bin` / GDT). This landscape churns — the tool that was standard a few years ago is usually superseded now, so treat names below as roles and verify the current build.
+Pick by two axes: the **source game** (which tool can read it) and the **output you need** (raw model / `_bin` / GDT). The landscape churns — treat names as roles and verify the current build.
 
 **Rippers — source game → raw model/anim/image (Cast, SEModel, SEAnim, `.MA`, `.xmodel_export`):**
 - **Saluki** — the current default; a Rust rewrite that succeeds Greyhound and reads every PC CoD from CoD1 through the latest. Exports models/textures/anims/sounds as Cast/SEModel. On BO3, treat it as the *extract* step and build the GDT afterwards in APE (or MakeCents/Spiki).
@@ -41,4 +41,4 @@ Pick by two axes: the **source game** (which tool can even read it) and the **ou
 - **Harmony** (Scobalula; the repo/folder may read "Harmonix") — edits sound aliases live from CSV, the audio counterpart to NevisX; the bulk of audio work lives in **t7kb:atmosphere**.
 - **CoDCharacterTools** (KingslayerKyle, Maya) — automates porting a playable character rig from another CoD to T7.
 
-Look up exact tool versions, flags, and export settings in t7kb or the tool's own docs — this list is a starting point that goes stale.
+Look up tool versions, flags and export settings in t7kb or the tool's own docs.

@@ -12,4 +12,4 @@ Driving CoDMayaTools from a script skips the export **button**, which is where s
 
 Set the frame range and FPS by editing the window's fields directly (`<win>_FrameStartField`, `_FrameEndField`, `_FPSField`, `_qualityField`) — `ExportXAnim` reads them, not the playback range.
 
-**`exportxbin.exe` breaks down in bulk.** A folder argument prints `No files processed` despite the tool's own help offering folders, and passing ~90 files in one call **segfaults partway** (48 converted, then a crash — with no non-zero exit to warn you). Convert **one file per invocation** in a loop and count the outputs; that is reliable.
+**`exportxbin.exe` breaks down in bulk.** A folder argument prints `No files processed` despite the tool's help, and ~90 files in one call **segfaults partway** with no non-zero exit. Convert **one file per invocation** in a loop and count the outputs.

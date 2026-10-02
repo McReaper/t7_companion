@@ -9,7 +9,7 @@ description: How to work with LUI (Black Ops 3's HUD/menu system) and its embedd
 
 ## Prerequisite: L3akMod
 
-**Stock BO3 mod tools cannot compile or load custom LUI at all** — this support comes from a community patch, **L3akMod**. Nothing else in this skill works without it installed first. Install: requires the VC++ 2013 *and* 2015 x64 redistributables, then it's a single-file swap — replace `<bo3_root>/bin/libtiff64r.dll` with L3akMod's version. Credit "The D3V Team" (DTZxPorter, SE2Dev, Nukem) if you redistribute it. Check for this before debugging *anything* that looks like "my custom Lua just doesn't load."
+**Stock BO3 mod tools cannot compile or load custom LUI at all** — this support comes from a community patch, **L3akMod**. Nothing else here works without it. Install: requires the VC++ 2013 *and* 2015 x64 redistributables, then it's a single-file swap — replace `<bo3_root>/bin/libtiff64r.dll` with L3akMod's version. Credit "The D3V Team" (DTZxPorter, SE2Dev, Nukem) if you redistribute it. Check it first for any "my custom Lua doesn't load".
 
 ## Lua-in-BO3 basics (differ from vanilla Lua)
 
@@ -19,7 +19,7 @@ description: How to work with LUI (Black Ops 3's HUD/menu system) and its embedd
 
 ## Creating and registering a menu/HUD: worked example
 
-A menu is a function registered under `LUI.createMenu.<Name>`; `CoD.Menu.NewForUIEditor("<Name>")` allocates the base element you attach controls to. This is the real entry point for "make a new HUD," not just editing an existing one — the shape below (register → allocate → anchor fullscreen → add a control → clean up on close) is the same shape every custom HUD uses:
+A menu is a function registered under `LUI.createMenu.<Name>`; `CoD.Menu.NewForUIEditor("<Name>")` allocates the base element you attach controls to. This is the entry point for a new HUD; every custom HUD has this shape (register → allocate → anchor fullscreen → add a control → clean up on close):
 
 ```lua
 function LUI.createMenu.T7Hud_zm_factory(Instance)
@@ -47,23 +47,23 @@ function LUI.createMenu.T7Hud_zm_factory(Instance)
 end
 ```
 
-Naming the file `t7hud_zm_factory.lua` and zoning it as `rawfile,ui/uieditor/menus/hud/t7hud_zm_factory.lua` overrides the stock Zombies HUD **for a mod**. For a map, see the rename + `LuiLoad` technique below — reusing the stock filename directly is exactly what a map's zone won't allow.
+Naming the file `t7hud_zm_factory.lua` and zoning it as `rawfile,ui/uieditor/menus/hud/t7hud_zm_factory.lua` overrides the stock Zombies HUD **for a mod**. A map's zone won't allow reusing the stock filename; see the rename + `LuiLoad` technique below.
 
 ## Overriding a stock HUD: the map/mod split matters
 
 **For a map, you cannot override a LUI file at the zone level** — two zoned files can't share the same path, unlike GSC overrides. The real technique: keep the root function named `LUI.createMenu.T7Hud_zm_factory`, but save the file under a *different* name (e.g. `t7hud_zm_custom.lua`), zone that name, then call `LuiLoad("ui.uieditor.menus.hud.t7hud_zm_custom")` from CSC's `main()` **before** `zm_usermap::main()` — by the time `main()` runs the stock HUD is already loaded, so `LuiLoad`-ing your file re-defines the function and Lua's last-loaded-wins semantics make yours win. **Mods don't have this restriction** — a mod can override the stock file directly at the same path, as in the worked example above.
 
-**Overriding is last-loaded-wins, not a hook system**, either way: unlike GSC (function pointers, spawn functions, callbacks — see t7kb:scripting), Lua globals are simply whichever definition loaded last. There's no IoC seam to reach for first — this is the normal way, not a last resort.
+**Overriding is last-loaded-wins, not a hook system**: unlike GSC (see t7kb:scripting), Lua globals are whichever definition loaded last.
 
 **Overriding `t7hud_zm_factory` doesn't reach every stock map** — each map opens its own HUD menu (`t7hud_zm` for Shadows of Evil, `t7hud_zm_dlc5` for Kino/Moon, `t7hud_zm_tomb` for Origins, …), so a mod's factory override does nothing there (community list, t7kb 0.70). Look up the map's own HUD name first.
 
 **A stock DLC HUD loaded into a usermap draws blank widgets.** `LuiLoad("ui.uieditor.menus.hud.t7hud_zm_castle")` + `CreateLUIMenu`/`OpenLUIMenu` loads the menu, but its `uie_t7_*_dlc` images and its strings aren't in a usermap's fastfile: zone each image with `image,<name>` and its strings with `localize,` (**t7kb:localization**). It draws on top of the factory HUD, so overlapping factory images must be overridden with transparent ones (community, t7kb 0.70).
 
-**Overriding a stock *widget* (not a menu) has extra traps.** To replace e.g. `CoD.cursorhint_image`, `LuiLoad` a renamed file that (1) `require`s the stock widget **with the exact case its parent uses** (`require("ui.uieditor.widgets.MPHudWidgets.cursorhint_image")`, capital `MPHudWidgets`) so both share one module-cache entry — a case mismatch makes the parent `require` reload the stock and clobber your global — then (2) redefines `CoD.<widget> = InheritFrom(...)`. Two more gotchas that cost real time: a **parent widget reaches into its child element's fields by name** — ZMCursorHint's `cursorHintImage` subscriptions call `cursorhintimage0.c1x1 / .x1x4 / .c1x2 :setImage(...)`, so a rewrite missing those exact child names throws *"Failed to notify model subscription: attempt to index a nil value"* every notify. And **`setImage` on the stock element never sticks** — its own model subscription overwrites it next frame; to force a custom image, recreate the expected children and override *their* `setImage` to ignore the pushed value (`icon.setImage = function(e) LUI.UIImage.setImage(e, RegisterImage("my_img")) end`). Study the stock widget (decompile it) before rewriting — you must reproduce the exact child names and `clipsPerState` the parent expects.
+**Overriding a stock *widget* (not a menu) has extra traps.** To replace e.g. `CoD.cursorhint_image`, `LuiLoad` a renamed file that (1) `require`s the stock widget **with the exact case its parent uses** (`require("ui.uieditor.widgets.MPHudWidgets.cursorhint_image")`, capital `MPHudWidgets`) so both share one module-cache entry — a case mismatch makes the parent `require` reload the stock and clobber your global — then (2) redefines `CoD.<widget> = InheritFrom(...)`. Two more traps: a **parent widget reaches into its child element's fields by name** — ZMCursorHint's `cursorHintImage` subscriptions call `cursorhintimage0.c1x1 / .x1x4 / .c1x2 :setImage(...)`, so a rewrite missing those exact child names throws *"Failed to notify model subscription: attempt to index a nil value"* every notify. And **`setImage` on the stock element never sticks** — its own model subscription overwrites it next frame; to force a custom image, recreate the expected children and override *their* `setImage` to ignore the pushed value (`icon.setImage = function(e) LUI.UIImage.setImage(e, RegisterImage("my_img")) end`). Decompile the stock widget first: reproduce the exact child names and `clipsPerState` the parent expects.
 
 ## The `Engine` namespace: LUI's bridge to the game
 
-`Engine.<Name>(...)` calls reach outside the UI tree — this is not the complete surface, just the commonly useful part; run `t7kb:search` for anything not listed here.
+`Engine.<Name>(...)` calls reach outside the UI tree; this is only the commonly useful part — `t7kb:search` the rest.
 
 | Category | Functions |
 |---|---|
@@ -104,13 +104,13 @@ Every element positions itself with `setLeftRight(isLeft, isRight, marginLeft, m
 
 ## Events: `registerEventHandler` and function overrides
 
-Two distinct patterns, don't conflate them:
+Two distinct patterns:
 - **Element events** (button clicks, image-stream-ready, menu-loaded): `Elem:registerEventHandler("<event_name>", handlerFn)`. Each element type raises its own events — a `UIButton` raises `hover`/`leave`/`click`/`mousedown`/`mouseup`; check the stock element you're extending for which ones it actually fires before assuming a generic one exists.
-- **Hooking a stock function** (most commonly `close`, for teardown): `LUI.OverrideFunction_CallOriginalSecond(target, "funcName", yourFn)` runs your function *after* the original; `OverrideFunction_CallOriginalFirst` runs it *before*. This is how the worked example above cleans up `Hud.TestText` when the HUD closes — skipping it is the classic "menu leaks elements after repeated open/close" bug.
+- **Hooking a stock function** (most commonly `close`, for teardown): `LUI.OverrideFunction_CallOriginalSecond(target, "funcName", yourFn)` runs your function *after* the original; `OverrideFunction_CallOriginalFirst` runs it *before*. The worked example uses it to clean up `Hud.TestText`; skipping it leaks elements across open/close.
 
 ## Building a reusable widget
 
-Package child elements behind one constructor rather than composing raw elements inline every time — this is how stock HUDs stay manageable (ammo, score, and perks are each their own widget):
+Package child elements behind one constructor (stock HUDs do: ammo, score and perks are each a widget):
 
 ```lua
 CoD.TestControl = InheritFrom(LUI.UIElement)
@@ -142,7 +142,7 @@ Lua files ship as raw source or precompiled:
 
 ## The GSC/CSC ↔ Lua bridge: this skill owns only the Lua half
 
-Two distinct channels, don't mix them up:
+Two distinct channels:
 - **Server/client state → Lua (clientfields).** `clientfield::register` both sides in `init`, then `set` server-side — that GSC/CSC half is **t7kb:scripting**'s, not covered again here. On the Lua side, a widget subscribes (`subscribeToGlobalModel`) and reads the value (`Engine.GetModelValue`) — the half this skill actually owns. This is how HUD elements reflect server-driven state (health, notifications, custom UI models via `clientfield::set_player_uimodel`).
 - **Lua button press → your Lua handler.** Register directly on the button's own `click` event: `MyButton:registerEventHandler("click", OnClick)` (see Events above). There's no separate GSC-side "menu response" channel to wire up for a plain button press — the handler runs in Lua; call back into GSC/CSC only if the click needs to change gameplay state, via whatever mechanism that system already exposes (a dvar, an `Engine.Exec`'d command, etc.).
 - **A custom perk never shows a HUD icon even when its GSC and CSC are right.** The stock perk container iterates a **hard-coded** key→image table and subscribes only to `hudItems.perks.<key>` for those keys, so a perk that isn't in it never draws and nothing errors. Override the container with the table extended — the factory and Shadows of Evil bases use different file, table and image names (community, t7kb 0.70; the stock container ships compiled).
@@ -153,8 +153,8 @@ Two distinct channels, don't mix them up:
 
 - Import via **APE**, untick **Streamable** (UI assets shouldn't stream), zone it with `image,<name>`, then reference it in Lua with `RegisterImage("<name>")` and `element:setImage(...)`. Changing the image's `semantic` re-ticks Streamable, in APE and in `t7kb:gdt_edit` alike (`image.awi` sets it for every semantic but `effectMap`), so set `streamable` to `0` after the semantic, or in the same `gdt_edit` request.
 - **Loading/preview images** for a map are just files, not APE assets: drop `loadingscreen.png` and `previewimage.png` directly into `usermaps/<mapname>/zone/`.
-- **A load/intro video fails with no error unless every rule holds**: named `zm_<map>_load`, in `usermaps/<map>/zone/video/`, an MKV with **no audio track** (any audio stream and it won't play), and it plays in **solo only**. Newer HandBrake builds produce files that crash BO3 (1.0.3 is the reported safe one). Sound comes only from a cinematic alias `bik_zm_<map>_load` (`CIN_C_MOD` template) in a companion mod. (Two independent community guides, t7kb 0.70.)
-- **Custom fonts** override named stock TTFs — `default.ttf` (general menu text), `escom.ttf`/`FoundryGridnik-Medium.ttf`/`FoundryGridnik-Bold.ttf` (menu text), `RefrigeratorDeluxe-Regular.ttf` (scoreboard, weapon name, hintstrings), `wearetrippinshort.ttf` (score points, ammo) — per three community wikis that disagree slightly, so check in game — by dropping your replacement into a `fonts` folder and zoning `ttf,fonts/<name>.ttf`. **Must be a real TTF, not OTF** — an OTF causes heavy in-game lag rather than an obvious error. A **map**'s font override never reaches the main menu; only a mod's does.
+- **A load/intro video fails with no error unless every rule holds**: named `zm_<map>_load`, in `usermaps/<map>/zone/video/`, an MKV with **no audio track** (any audio stream and it won't play), and it plays in **solo only**. Newer HandBrake builds produce files that crash BO3 (1.0.3 is the reported safe one). Sound comes only from a cinematic alias `bik_zm_<map>_load` (`CIN_C_MOD` template) in a companion mod. (Two community guides, t7kb 0.70.)
+- **Custom fonts** override named stock TTFs — `default.ttf` (general menu text), `escom.ttf`/`FoundryGridnik-Medium.ttf`/`FoundryGridnik-Bold.ttf` (menu text), `RefrigeratorDeluxe-Regular.ttf` (scoreboard, weapon name, hintstrings), `wearetrippinshort.ttf` (score points, ammo) — per three community wikis that disagree slightly (check in game) — by dropping your replacement into a `fonts` folder and zoning `ttf,fonts/<name>.ttf`. **Must be a real TTF, not OTF** — an OTF causes heavy in-game lag rather than an obvious error. A **map**'s font override never reaches the main menu; only a mod's does.
 - Font/UI errors or "no UI at all" are usually a **path or linking problem**: wrong font path relative to the raw/usermap root, a widget created but never added/linked to its parent, or a Lua file that's zoned but never actually `require`d/loaded (or `LuiLoad`ed, for a map). Bisect by commenting out custom Lua files and re-enabling one at a time rather than guessing.
 
 ## Hintstring color: `^1`–`^9` inline, Lua only past the palette
@@ -164,12 +164,11 @@ Two distinct channels, don't mix them up:
 
 ## Tools & examples
 
-- **L3akMod** (see prerequisite above) is what makes custom LUI compile/load at all.
 - **T7Overcharged** turns opaque LUI errors into readable **stack traces** (and stops them freezing the game) — near-essential for debugging a widget rewrite, where the vanilla console only shows an error code. Use the **`Scroptss/T7Overcharged`** fork: it updates the memory offsets for the current BO3 exe; the 2022 original (JariKCoding) and 2023 (JxstNoTex) builds **crash instantly** on a patched game. Install: DLL → `usermaps/<map>/zone/` (runtime file, re-copy if the linker cleans `zone/`), its two lua → `ui/util/` zoned as `rawfile`, `dvar_hash_list.txt` → BO3 root, then `require("ui.util.T7Overcharged")` + `InitializeT7Overcharged({mapname=..., filespath=[[.\usermaps\<map>\]], workshopid="0"})` in a LuiLoad-ed file. It only reports errors as `<filehash>:<line>: (*stripped)` (shipped LUI has debug names stripped), so you still map the hash back to a file yourself.
-- **Zorteok** (also D3V Team) is a Lua disassembler — reads compiled `.luac` back to readable Lua, drag-and-drop, BO2/3/4 support. Use it to study a stock or dumped widget before overriding it. (Greyhound is the model/asset ripper — see t7kb:assets — not a Lua tool; don't reach for it here.)
+- **Zorteok** (also D3V Team) is a Lua disassembler — reads compiled `.luac` back to readable Lua, drag-and-drop, BO2/3/4 support. Use it to study a stock or dumped widget before overriding it.
 - Two full open-source HUD bases exist as learning references: `t7hud_zm_factory` and `t7hud_mp`, released by the D3V Team, plus the `T7Hud_template.lua` in the ZM Basic/Advanced Level Radiant templates — those two templates are **community** (MidgetBlaster's T7 asset pack), not Treyarch's; the stock ZM Mod Level template has no Lua — retrieve one from t7kb rather than starting a HUD from a blank file.
 - Anything pulled via a decompiler (Zorteok or otherwise) is decompiled source like any other in this corpus: **paraphrase, never quote verbatim**, and don't ship someone else's undisclosed HUD/menu work without permission.
 
 ## Don't invent
 
-LUI/Lua API names (`Engine.*`, `CoD.Menu.*`, stock widget classes) are shipped tokens — confirm exact names against the raw mod-tools install before stating them as fact. If neither t7kb nor the raw install supports a specific API call or zoning directive, don't assert it exists.
+LUI/Lua API names (`Engine.*`, `CoD.Menu.*`, stock widget classes) are shipped tokens — confirm them against the raw mod-tools install. If neither t7kb nor the install supports an API call or zoning directive, don't assert it exists.

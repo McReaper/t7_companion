@@ -102,9 +102,9 @@ Both tiers above already run these exact command lines for you, gotchas and all 
 
 Notes: `-language english` is the minimum (Treyarch's launcher repeats `-language <lang>` per language for an all-languages build); the linker prints an `L3akMod` banner then the zone's link log; a failing stage names itself in its output — feed that to **t7kb:debugging**. Run only the stages whose input changed (see *Iterate fast*): a script-only change is `gdtdb /update` → `linker … -modsource` and nothing else.
 
-**Shell gotchas (verified on a real headless build):**
+**Shell gotchas (verified on a real headless build)**
 
-- **Run these from PowerShell or `cmd`, not git-bash/MSYS.** MSYS rewrites the `/update` and `+low`/`+medium` arguments into filesystem paths (silently breaks `gdtdb` and the light step) *and* mis-reports a native exe's exit code — a clean `exit 0` came back as `127`. In PowerShell read the true code from `$LASTEXITCODE`.
+- **Run these from PowerShell or `cmd`, not git-bash/MSYS.** MSYS rewrites the `/update` and `+low`/`+medium` arguments into filesystem paths (silently breaks `gdtdb` and the light step) *and* mis-reports a native exe's exit code — a clean `exit 0` can come back as `127`. In PowerShell read the true code from `$LASTEXITCODE`.
 - **Run `cod2map64` with the working directory set to `bin/`.** It loads `default_navmesh_settings.json` from the current directory; launched from elsewhere it aborts navmesh with `ERROR: Unable to load navigation mesh generation settings` (the geometry `.d3dbsp` still writes, but you get no navmesh — AI won't path).
 - **Run `gdtdb` with the working directory set to its own `gdtdb/` folder**, as the Launcher does. It records asset paths relative to its cwd, so run from anywhere else against a Launcher-built database it flags **every asset as a duplicate** — which reads as a corrupted GDT set rather than a wrong folder.
 - **The light step detaches.** `radiant_modtools.exe -ledSilent` is a GUI-subsystem exe: it returns immediately with no captured stdout and no usable exit code, then bakes in the background. Wait for it by polling for the output `.led` (or for the process to exit), not on a synchronous return.
@@ -114,7 +114,7 @@ Confirm any flag not shown here against the raw install / t7kb before relying on
 
 ## The linker exits non-zero on warnings — read the errorlog, not the exit code
 
-**Measured on a real build.** A link whose only complaint was `^3Found 1 bad bulletmeshes, dumped to …_bulletreport.csv`, and which printed `done: 0m7.08s` for every zone, still returned **1000**. The Fast File was correct and current. Anything that gates on the exit code — including `t7kb build`/`t7kb:build`, either of which then reports `ok: false` with `exit status 1000` and no message — will call that build failed, and you can lose real time "fixing" a build that already works.
+A link whose only complaint is `^3Found 1 bad bulletmeshes, dumped to …_bulletreport.csv`, and which prints `done: 0m7.08s` for every zone, still returns **1000** while the Fast File is correct and current (verified on a real build). Anything that gates on the exit code — including `t7kb build`/`t7kb:build`, which then report `ok: false` with `exit status 1000` and no message — calls that build failed, so don't "fix" a build that already works.
 
 The `^3` prefix is a colour code marking the line as a warning. A genuine failure names the asset and does **not** print `done:`.
 
