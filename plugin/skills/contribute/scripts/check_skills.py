@@ -23,7 +23,7 @@ NAME_MAX = 64
 DESC_MAX = 1024          # characters, not bytes: descriptions are full of em-dashes
 BODY_MAX_LINES = 500
 # House aims (contribute/SKILL.md): past these the skill wants a references/ split.
-BODY_AIM_WORDS = 3000
+BODY_AIM_WORDS = 2800   # a warning before .github/scripts/check_markdown.py's hard 3,000-word limit
 DESC_SMELL = 1005        # optimised to the ceiling rather than to the reader
 REF_TOC_LINES = 100      # reference files longer than this need a table of contents
 

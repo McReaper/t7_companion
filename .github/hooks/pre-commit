@@ -1,10 +1,32 @@
 #!/bin/sh
-# Lints the Go a commit touches, fast: gofmt on the staged .go files, then
-# golangci-lint (.golangci.yml: staticcheck, errcheck, complexity and size
-# limits) on just their packages — ~1-2 s with a warm cache. A commit with no
-# .go file costs nothing. Enable with: git config core.hooksPath .github/hooks
-# Skip once with: git commit --no-verify. CI (.github/workflows/ci.yml) is the
-# real gate; this catches the same findings before the push.
+# Fast checks on what a commit touches. Enable with:
+#   git config core.hooksPath .github/hooks
+# Skip once with: git commit --no-verify. CI is the real gate; this catches the
+# same findings before the push.
+#
+# 1. Staged markdown: word budgets per kind of file (.github/scripts/check_markdown.py).
+# 2. Staged Go: gofmt, then golangci-lint (.golangci.yml) on just their packages,
+#    ~1-2 s with a warm cache.
+# A commit with neither costs nothing.
+
+md=$(git diff --cached --name-only --diff-filter=ACMR -- '*.md')
+if [ -n "$md" ]; then
+  # the first interpreter that actually runs: on Windows, "python3" can be the
+  # Microsoft Store alias, which only prints an install hint and fails
+  py=""
+  for c in python3 python py; do
+    if command -v "$c" >/dev/null 2>&1 && "$c" -c "" >/dev/null 2>&1; then
+      py=$c
+      break
+    fi
+  done
+  if [ -z "$py" ]; then
+    echo "pre-commit: python not found, skipping the markdown budget check" >&2
+  elif ! "$py" .github/scripts/check_markdown.py $md; then
+    echo "pre-commit: a markdown file is over its word budget (see above)." >&2
+    exit 1
+  fi
+fi
 
 files=$(git diff --cached --name-only --diff-filter=ACMR -- '*.go')
 [ -z "$files" ] && exit 0

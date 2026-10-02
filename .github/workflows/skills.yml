@@ -1,19 +1,24 @@
 name: skills
 
-# Validates the plugin's skills on every PR that touches them — the same checks
-# contributors run locally with plugin/skills/contribute/scripts/check_skills.py.
+# Validates the plugin's skills and the repo's markdown on every PR that touches
+# them: check_skills.py (skill format) and .github/scripts/check_markdown.py
+# (word budgets per kind of file) — the same checks the pre-commit hook runs.
 on:
   pull_request:
     paths:
       - "plugin/**"
       - "templates/**"
       - ".claude-plugin/**"
+      - "**.md"
+      - ".github/scripts/**"
   push:
     branches: [main]
     paths:
       - "plugin/**"
       - "templates/**"
       - ".claude-plugin/**"
+      - "**.md"
+      - ".github/scripts/**"
 
 permissions:
   contents: read
@@ -28,6 +33,8 @@ jobs:
           python-version: "3.12"
       - name: Validate skills
         run: python plugin/skills/contribute/scripts/check_skills.py
+      - name: Markdown word budgets
+        run: python .github/scripts/check_markdown.py
       - name: Validate JSON manifests
         run: |
           python -m json.tool .claude-plugin/marketplace.json > /dev/null

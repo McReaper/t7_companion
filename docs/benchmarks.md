@@ -1,6 +1,6 @@
 # Benchmarks
 
-What a call to `t7kb` costs: time and memory for the retrieval path, and **tokens** for every MCP tool's answer, since that is what an agent actually pays for. Baseline taken on 2026-10-01 (v2.2.2), Windows, 16 threads, NVMe, real `t7kb.db` (66,023 documents, ~350k chunks) and a full BO3 mod-tools install.
+What a call to `t7kb` costs: time and memory for the retrieval path, and **tokens** for every MCP tool's answer, since that is what an agent actually pays for. Baseline: v2.2.2, Windows, 16 threads, NVMe, real `t7kb.db` (66,023 documents, ~350k chunks) and a full BO3 mod-tools install.
 
 ## How to run
 
@@ -40,13 +40,13 @@ It builds each answer with the same functions the MCP handlers use and counts to
 | `gdt_schema` | material + material_type lit | 1 | 1223 | 1223 | 1223 | 4670 |
 | `gdt_schema` | xmodel | 1 | 2446 | 2446 | 2446 | 9956 |
 
-`get` serves long bodies a page at a time (16,000 characters by default, `max_chars` up to 64,000, `offset` for the next part). Corpus bodies have a median of 1.2k characters but a p99 of 275k and a maximum of 98 MB (`source-workspace` indexes whole GDTs and scripts; 1,347 documents exceed 100k characters). Before paging, the same `get` rows had a p90 of 3,790 / 5,597 and a max of **38,278 / 41,308** tokens; the median is unchanged, since 90%+ of documents fit in one page. A full page of a GDT is ~5.3k tokens rather than ~4k: paths and numbers tokenize denser than prose.
+`get` serves long bodies a page at a time (16,000 characters by default, `max_chars` up to 64,000, `offset` for the next part). Corpus bodies: median 1.2k characters, p99 275k, maximum 98 MB (`source-workspace` indexes whole GDTs and scripts). Over 90% of documents fit in one page. A full page of a GDT is ~5.3k tokens rather than ~4k: paths and numbers tokenize denser than prose.
 
-Paging only costs answer quality when the passage the search matched sits past the first page: of the bench queries' 48 top-3 hits, 41 fit in one page, and of the 7 paged ones the snippet's passage was on page 1 for 4. With `find` set to a phrase from the snippet, it is in the page returned for all 7.
+Paging costs answer quality only when the matched passage sits past the first page: of the bench queries' 48 top-3 hits, 41 fit in one page, and of the 7 paged ones the snippet's passage was on page 1 for 4. With `find` set to a phrase from the snippet, it is in the page returned for all 7.
 
 ## Retrieval quality
 
-`TestRetrievalQuality` scores search against 14 judged queries (`internal/cli/testdata/retrieval_eval.json`), one or more per skill domain. Each lists its **key** documents (the API doc, the reference tutorial, the thread with the fix) and **relevant** ones, judged by reading the candidates from three independent paths: the hybrid top 30, the BM25 top 15, and a title search over the non-Discord sources — so the judgments don't simply echo what search already returns. A judged doc_id the db lacks fails the test.
+`TestRetrievalQuality` scores search against 14 judged queries (`internal/cli/testdata/retrieval_eval.json`), one or more per skill domain. Each lists its **key** documents (the API doc, the reference tutorial, the thread with the fix) and **relevant** ones, judged by reading the candidates from three independent paths: the hybrid top 30, the BM25 top 15, and a title search over the non-Discord sources. A judged doc_id the db lacks fails the test.
 
 ```
 T7KB_BENCH_DB=<t7kb.db> HF_HOME=<model cache> go test ./internal/cli -run TestRetrievalQuality -v
@@ -55,7 +55,7 @@ T7KB_BENCH_DB=<t7kb.db> HF_HOME=<model cache> go test ./internal/cli -run TestRe
 Two judged sets, scored by the same test:
 
 - **tuning** (`retrieval_eval.json`, 14 queries) — the ranking weights were chosen on it;
-- **held-out** (`retrieval_holdout.json`, 18 queries) — other themes and phrasings (round health, mystery box, doors and zones, power, barriers, workshop, powerups, traversals, localization, player models, exploders, devgui, water, camos, easter-egg songs, lightstates, a black screen on load), candidates pooled from both rankings and judged blind (sorted by doc_id, without knowing which ranking proposed which). It checks that a choice generalises.
+- **held-out** (`retrieval_holdout.json`, 18 queries) — other themes and phrasings, candidates pooled from both rankings and judged blind (sorted by doc_id, without knowing which ranking proposed which). It checks that a choice generalises.
 
 | key@5 / recall@10 / MRR / nDCG@10 | tuning | held-out |
 |---|---|---|
@@ -64,19 +64,15 @@ Two judged sets, scored by the same test:
 | + reliability weight 0.25 alone | 0.86 / 0.68 / 1.00 / 0.72 | 0.78 / 0.39 / 0.79 / 0.47 |
 | title ×10 + reliability 0.25 (shipped in 2.3.0) | 0.86 / 0.68 / 1.00 / 0.72 | 0.78 / 0.39 / 0.79 / 0.47 |
 
-(Tuning scores use the pooled judgments; before pooling the v2.2 ranking scored 0.71 / 0.64 / 0.87 / 0.58.)
+**Decision.** The title weight and a reliability weight together lift tuning key@5 from 0.71 to 0.86 but lose on the held-out set (0.83 → 0.78). Nearly all the tuning gain is the reliability weight, which favours API pages and Treyarch's scripts — right for the tuning set's "what's the API for…" questions, wrong for easter-egg songs, water, localization or devgui, where the best answers are community threads it pushed down. The title weight alone leaves the held-out set where it was and still brings `PlayFXOnTag`'s API page into the tuning top 5, so it stays; reliability is back to a tiebreak. **The held-out set has been used once, for this decision**: a later ranking decision needs a fresh blind set.
 
-**What the held-out set changed.** 2.3.0 shipped a title weight and a reliability weight because together they lifted tuning key@5 from 0.71 to 0.86. On the held-out set that combination loses (0.83 → 0.78): nearly all the tuning gain came from the reliability weight, which favours API pages and Treyarch's scripts — right for the tuning set's "what's the API for…" questions, wrong for easter-egg songs, water, localization or devgui, where the best answers are community threads it pushed down. The title weight alone leaves the held-out set where it was and still brings `PlayFXOnTag`'s API page into the tuning top 5, so it stays; reliability is back to a tiebreak. **The held-out set was used once, to make this call**: a later ranking decision needs a fresh blind set.
+**Why the title weight.** Two failures on tuning key documents: BM25 required every query word (an AND, stopwords included — `sound alias plays silently` matched no document), and on the vector side reference pages ranked far down (the API page for `RegisterClientField` 45th–89th, the modme LUI tutorials 270th–587th) because a chunk of code no longer resembles the question. Reference pages are short with precise titles, so a title match counts 10× a body one (summary 5×); 5, 10 and 20 score the same.
 
-**Why the title weight.** Diagnosing where each tuning key document ranked showed two failures: BM25 required every query word (an AND, stopwords included — `sound alias plays silently` matched no document), and on the vector side reference pages ranked far down (the API page for `RegisterClientField` 45th–89th, the modme LUI tutorials 270th–587th) because a chunk of code no longer resembles the question. Reference pages are short with precise titles; a title match counts 10× a body one (summary 5×), and 5, 10 and 20 score the same.
+**Tried and rejected** on the tuning set: OR instead of AND terms (key@5 0.50 — long stock scripts that repeat the words fill BM25's pool), dropping stopwords, joined compound terms (`clientfield register` → `registerclientfield`), a per-source cap, and per-document title vectors as a third fused list (no gain, so no database change).
 
-**Tried and rejected** on the tuning set: OR instead of AND terms (key@5 0.50 — long stock scripts that repeat the words fill BM25's pool), dropping stopwords, joined compound terms (`clientfield register` → `registerclientfield`), a per-source cap, and per-document title vectors as a third fused list (prototyped with the corpus's own model; no gain, so no database change).
+The tuning judgments are pooled: the top 10 of each ranking variant was judged too (as relevant only), so a ranking that surfaces relevant documents the baseline missed isn't scored as noise.
 
-The tuning judgments were pooled: after each round of variants, their top 10 was judged too (56 documents added, as relevant only), so a ranking that surfaces relevant documents the baseline missed isn't scored as if it surfaced noise.
-
-**Still failing unfiltered**: `clientfield register set lua` and `custom lua hud widget` come back all Discord, with the API page and the LUI tutorials absent from the top 10 — no ranking weight reaches them. The `source` filter does: the eval's `filtered` checks (an agent passing the kind of answer it wants) put a key document at rank 3 for both (`source: api`, `source: wiki`), and at rank 1 for `PlayFXOnTag` (`api`) and the wallbuy fix (`wiki,forums`). The test fails if one drops out of the top 5; the knowledge-base skill and AGENTS.md tell the agent when to pass it.
-
-The judgments were pooled: after each round of variants, the top 10 of the variants was judged too (56 documents added, as relevant only), so a ranking that surfaces relevant documents the baseline missed isn't scored as if it surfaced noise.
+**Still failing unfiltered**: `clientfield register set lua` and `custom lua hud widget` come back all Discord, with the API page and the LUI tutorials absent from the top 10 — no ranking weight reaches them. The `source` filter does: the eval's `filtered` checks (an agent passing the kind of answer it wants) put a key document at rank 3 for both (`source: api`, `source: wiki`), and at rank 1 for `PlayFXOnTag` (`api`) and the wallbuy fix (`wiki,forums`). The test fails if one drops out of the top 5.
 
 ## Latency and memory
 
