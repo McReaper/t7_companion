@@ -25,6 +25,8 @@ ROOT = Path(__file__).resolve().parents[2]
 BUDGETS: list[tuple[str, int | None]] = [
     ("plugin/evals/*/prompt.md", None),          # test fixtures
     ("plugin/evals/*/graders/*.md", None),
+    ("plugin/evals-holdout/*/prompt.md", None),
+    ("plugin/evals-holdout/*/graders/*.md", None),
     ("README.md", 700),                          # the human front door
     (".claude/CLAUDE.md", 3500),                 # loaded into every contributor session
     ("templates/AGENTS.md", 1200),               # loaded into every user's agent
