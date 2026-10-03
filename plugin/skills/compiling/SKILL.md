@@ -148,7 +148,7 @@ The `^3` prefix is a colour code marking the line as a warning. A genuine failur
 So verify at the artefacts rather than the return value, all under `<map>/zone_source/all/assetinfo/`:
 
 - **`<map>.errorlog`** — the authoritative verdict. It holds the literal `return <code>` line plus the message that produced it.
-- **`<map>.csv`** — the built assetlist. Grep it for the asset you just added; that is how you prove a new xanim/model actually got packed, rather than inferring it from a green build.
+- **`<map>.csv`** — the built assetlist: every packed asset, its size, and the chain of parents that pulled it in up to the zone line. `t7kb:zone_explain` reads it for one asset (packed or not, and through which line); `t7kb:zone_contents` for what a zone line pulls in, or which lines make the fastfile big. Without MCP, grep it. That is how you prove a new xanim/model actually got packed, rather than inferring it from a green build; both tools say when sources changed since the link, so relink first if they do.
 - **`<map>_bulletreport.csv`** — names the bad bulletmesh, if you'd rather clear the warning than keep explaining it.
 
 Plus the `.ff` mtime. A non-zero exit with a fresh `.ff`, a `done:` per zone, and your asset in the CSV is a **successful build**.

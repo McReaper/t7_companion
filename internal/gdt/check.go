@@ -111,6 +111,29 @@ type CheckResult struct {
 // Check runs every diagnostic over a GDT (or one asset in it): schema values,
 // material/techset rules, typed references (exists, right type), source files on
 // disk, parent chain, and duplicate definitions across the workspace.
+//
+// What it calls an error follows one rule: anything Treyarch's own stock GDTs do
+// while still linking is not an error (TestCalibrate tallies issues over a whole
+// install; diff its report before and after changing a rule). The rules:
+//
+//   - names are per type (an image and a material may share one) — only two
+//     definitions of the same resolved type are Duplicate '<type>' asset
+//     (Workspace.FindTyped/Duplicates; a derived asset takes its parent's type)
+//   - a runtime-built field name matches on all its literal parts ("autogenLod" + i vs
+//     "autogenLod" + i + "Percent")
+//   - a field redeclared in another script branch with another kind or target is
+//     Varies and not type-checked
+//   - field names and combo values match case-insensitively, Label{value} options by
+//     either part, and the .awi default marker ("<none>*"), True/False checkboxes and
+//     empty values count as the default
+//   - .awi min/max are slider bounds (outside = warning)
+//   - a combo value any stock GDT uses for that field is accepted even when the .awi
+//     dropped it (stockUses, scanned lazily once per type, combo fields only)
+//   - AddEntry_Texture is a source path, not an asset reference
+//   - a target-type mismatch is an error only for image/material/xmodel/xanim
+//   - a missing file is an error only for xmodel LODs, xanim exports and image
+//     textures (FX/surface-FX/collision paths ship compiled)
+//   - stale texture slots a techset doesn't read are skipped
 func (w *Workspace) Check(file, asset string) (*CheckResult, error) {
 	f, err := w.Load(file)
 	if err != nil {

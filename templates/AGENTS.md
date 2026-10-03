@@ -2,7 +2,7 @@
 
 > Drop this file at the root of your BO3 mod-tools install (the folder holding `usermaps/`, `mods/`, `share/`) — one copy covers every map and mod underneath, and a per-project `AGENTS.md` layers on top. AGENTS.md-aware agents (Claude Code via a `CLAUDE.md` that imports it, Codex, OpenCode, recent Cursor) read it. Editors with their own rules file (Copilot, Windsurf, Cline, Kiro): paste this there; see the t7kb README. Edit freely.
 
-This is a Black Ops III (Treyarch mod tools) modding workspace. The **t7kb** MCP server gives you: a local knowledge base of the BO3 modding community (`search`, hybrid keyword + semantic; `get`, a full document by `doc_id`) covering wikis, forums, Discord, decompiled engine scripts, YouTube tutorials and the mod-tools schema files; the `gdt_*` tools, to read, check and edit this install's GDTs; and `build`, to compile, light and link a map or mod without the Launcher.
+This is a Black Ops III (Treyarch mod tools) modding workspace. The **t7kb** MCP server gives you: a local knowledge base of the BO3 modding community (`search`, hybrid keyword + semantic; `get`, a full document by `doc_id`) covering wikis, forums, Discord, decompiled engine scripts, YouTube tutorials and the mod-tools schema files; the `gdt_*` tools, to read, check and edit this install's GDTs; `build`, to compile, light and link a map or mod without the Launcher; and `zone_explain`/`zone_contents`, for what the last link packed and which zone line pulled each asset in.
 
 _If the `t7kb` tools aren't available, it isn't installed yet — see the t7kb README._
 

@@ -34,6 +34,7 @@ func toolsets(st *store.Store, emb *embed.Embedder) []toolset {
 		kbToolset(st, emb),
 		buildToolset(),
 		gdtToolset(),
+		zoneToolset(),
 	}
 }
 

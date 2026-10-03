@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	"github.com/McReaper/t7_companion/internal/embed"
 	"github.com/McReaper/t7_companion/internal/gdt"
 	"github.com/McReaper/t7_companion/internal/store"
+	"github.com/McReaper/t7_companion/internal/zone"
 )
 
 // TestTokenReport measures what each MCP tool's answer costs an agent, in
@@ -108,6 +110,7 @@ func TestTokenReport(t *testing.T) {
 
 	if root := os.Getenv("TA_TOOLS_PATH"); root != "" {
 		gdtSamples(t, root, add)
+		zoneSamples(t, root, add)
 	}
 
 	rows := make([]tokenRow, 0, len(samples))
@@ -208,3 +211,52 @@ func getPage(t *testing.T, d *store.Doc) string {
 }
 
 func pct(xs []int, q float64) int { return xs[int(q*float64(len(xs)-1))] }
+
+// zoneSamples measures the zone_* tools on the first linked map of the install:
+// the asset with the longest chain, the whole zone by line, and its heaviest line.
+func zoneSamples(t *testing.T, root string, add func(key, s string)) {
+	t.Helper()
+	maps, _ := filepath.Glob(filepath.Join(root, "usermaps", "*", "zone_source", "all", "assetinfo"))
+	sort.Strings(maps)
+	for _, dir := range maps {
+		name := filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(dir))))
+		r, err := zone.Load(dir, name)
+		if err != nil || len(r.Assets) == 0 {
+			continue
+		}
+		deepest := r.Assets[0]
+		for _, p := range r.Assets {
+			if len(p.Chain) > len(deepest.Chain) {
+				deepest = p
+			}
+		}
+		run := func(key string, v any, err error) {
+			if err != nil {
+				t.Logf("%s: %v", key, err)
+				return
+			}
+			add(key, mcpJSON(t, v))
+		}
+		v, err := zoneExplain(root, name, deepest.Name, deepest.Type)
+		run("zone_explain|the asset with the longest chain", v, err)
+		all, err := zoneContents(root, name, "")
+		run("zone_contents|every line of the zone", all, err)
+		if err == nil && len(all.Lines) > 0 {
+			heavy, err := zoneContents(root, name, all.Lines[0].Line)
+			run("zone_contents|its heaviest line", heavy, err)
+		}
+		return
+	}
+}
+
+// mcpJSON is what jsonResult sends for v.
+func mcpJSON(t *testing.T, v any) string {
+	t.Helper()
+	var b bytes.Buffer
+	e := json.NewEncoder(&b)
+	e.SetEscapeHTML(false)
+	if err := e.Encode(v); err != nil {
+		t.Fatal(err)
+	}
+	return b.String()
+}

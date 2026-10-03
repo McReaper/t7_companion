@@ -22,7 +22,7 @@ It builds each answer with the same functions the MCP handlers use and counts to
 
 ## Tokens per tool answer
 
-16 queries phrased the way a modder asks (`benchQueries` in `internal/cli/tokens_report_test.go`); the `gdt_*` rows use one real material, its image and its GDT.
+16 queries phrased the way a modder asks (`benchQueries` in `internal/cli/tokens_report_test.go`); the `gdt_*` rows use one real material, its image and its GDT; the `zone_*` rows the first linked map of the install (12k packed assets).
 
 | Tool | Call | Samples | Tokens p50 | p90 | max | Bytes p50 |
 |---|---|---:|---:|---:|---:|---:|
@@ -39,6 +39,9 @@ It builds each answer with the same functions the MCP handlers use and counts to
 | `gdt_schema` | material (names only) | 1 | 2894 | 2894 | 2894 | 11408 |
 | `gdt_schema` | material + material_type lit | 1 | 1223 | 1223 | 1223 | 4670 |
 | `gdt_schema` | xmodel | 1 | 2446 | 2446 | 2446 | 9956 |
+| `zone_explain` | the asset with the longest chain | 1 | 283 | 283 | 283 | 899 |
+| `zone_contents` | every line of the zone | 1 | 1243 | 1243 | 1243 | 4019 |
+| `zone_contents` | its heaviest line | 1 | 972 | 972 | 972 | 3071 |
 
 `get` serves long bodies a page at a time (16,000 characters by default, `max_chars` up to 64,000, `offset` for the next part). Corpus bodies: median 1.2k characters, p99 275k, maximum 98 MB (`source-workspace` indexes whole GDTs and scripts). Over 90% of documents fit in one page. A full page of a GDT is ~5.3k tokens rather than ~4k: paths and numbers tokenize denser than prose.
 

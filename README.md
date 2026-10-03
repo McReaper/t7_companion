@@ -47,7 +47,7 @@ flowchart LR
 /t7kb:setup
 ```
 
-Pick the **User** scope when asked: a project-scope install doesn't load in subfolders such as `usermaps/<map>`.
+Pick the **User** scope: a project-scope install doesn't load in `usermaps/<map>`.
 
 `/t7kb:setup` downloads `t7kb` and its database, registers the MCP server, and offers to drop an `AGENTS.md` primer at your BO3 mod-tools root.
 
@@ -66,10 +66,11 @@ The database is a ~0.9 GB download that unpacks to ~3.5 GB on first run.
 
 ## ✨ What your agent gets
 
-- **A knowledge base it searches before answering** — wikis, forums, Discord, Treyarch's scripts, tutorials and the mod-tools schemas. Every hit carries its source, URL and reliability, so the agent can cite it and weigh a Treyarch script above a Discord guess.
-- **Skills for each craft** — scripting, mapping, compiling, assets, animation, zombies AI, HUD, FX, atmosphere and more: the method, and the traps that cost an afternoon (the callback that never fires, the wallbuy that shows *Cost: 0*). Claude Code only.
+- **A knowledge base it searches before answering** — wikis, forums, Discord, Treyarch's scripts, tutorials and the mod-tools schemas. Every hit carries its source and reliability, so the agent can weigh a Treyarch script above a Discord guess.
+- **Skills for each craft** — scripting, mapping, compiling, assets, animation, zombies AI, HUD, FX, atmosphere…: the method and its silent traps (the callback that never fires, the wallbuy that shows *Cost: 0*). Claude Code only.
 - **GDT tools** — find, read, check and edit APE's GDTs against the install's own schema, as a dry run unless told to write. `gdt_check` catches broken references, missing files and duplicates before the linker does.
-- **A headless build** — compile, light, link and launch your map, with a short report and the first real error instead of hundreds of lines: *"Relink zm_mymap"*, *"Full compile of zm_mymap, then tell me what failed"*. Windows only.
+- **What the build packed** — why an asset is in your fastfile, and what each zone line brings in and weighs, from the linker's own report.
+- **A headless build** — compile, light, link and launch your map, with a short report and the first real error instead of hundreds of lines: *"Relink zm_mymap"*. Windows only.
 
 ## ⌨️ CLI
 
@@ -81,17 +82,18 @@ t7kb search <query>...       search  (--source api,wiki… · -n N · --bm25)
 t7kb get <doc_id>            read a document  (--find · --offset · --all)
 t7kb build <name>            compile/light/link/run  (--stages · --mod · --json)
 t7kb gdt <command>           find | get | schema | edit | check | refs
+t7kb zone <command>          explain | contents
 t7kb mcp                     run the MCP server
 t7kb update-check            is a newer release out? is the plugin behind?
 ```
 
 ## 🔄 Updating
 
-`t7kb update-check` says whether the binary or the Claude Code plugin is behind, with the commands to update each. The plugin doesn't update itself unless you enable auto-update in `/plugin`. To refresh the binary, run `/t7kb:setup` in Claude Code, or re-run the installer with `--force` / `-Force`.
+`t7kb update-check` says whether the binary or the Claude Code plugin is behind, with the commands to update each. Enable auto-update in `/plugin` to keep the plugin current. To refresh the binary, run `/t7kb:setup` in Claude Code, or re-run the installer with `--force` / `-Force`.
 
 ## 🤝 Contributing
 
-Found a trap a skill doesn't mention, or one that's wrong? Tell your agent in Claude Code: the `contribute` skill writes the fix and, with your go-ahead, opens a pull request. By hand, start from [the authoring guide](plugin/skills/contribute/SKILL.md).
+Found a trap a skill doesn't mention, or one that's wrong? Tell your agent: the `contribute` skill writes the fix and, with your go-ahead, opens a pull request. By hand, start from [the authoring guide](plugin/skills/contribute/SKILL.md).
 
 ## 📄 License
 
