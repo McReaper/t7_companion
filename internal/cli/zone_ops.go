@@ -34,6 +34,7 @@ type packedOut struct {
 	Resident   int64    `json:"resident"`
 	Streamed   int64    `json:"streamed,omitempty"`
 	PulledInBy []string `json:"pulled_in_by"`
+	Stock      string   `json:"stock,omitempty"`
 }
 
 type zoneExplainResult struct {
@@ -70,24 +71,62 @@ type zoneContentsResult struct {
 	More     int            `json:"more,omitempty"`
 }
 
+// zoneCtx is a map's last linker report, opened under a mod-tools root.
+type zoneCtx struct {
+	root, toolsPath, name string
+	report                *zone.Report
+	status                zoneStatus
+}
+
 // openZone loads a map's (or mod's) last linker report and checks it is current.
-func openZone(toolsPath, name string) (*zone.Report, zoneStatus, error) {
+func openZone(toolsPath, name string) (*zoneCtx, error) {
 	root := strings.TrimRight(firstNonEmpty(toolsPath, os.Getenv("TA_TOOLS_PATH")), `\/`)
 	if root == "" {
-		return nil, zoneStatus{}, fmt.Errorf("no mod-tools path: pass tools_path / --tools-path or set TA_TOOLS_PATH")
+		return nil, fmt.Errorf("no mod-tools path: pass tools_path / --tools-path or set TA_TOOLS_PATH")
 	}
 	if name == "" {
-		return nil, zoneStatus{}, fmt.Errorf("name the map or mod, e.g. zm_mymap")
+		return nil, fmt.Errorf("name the map or mod, e.g. zm_mymap")
 	}
 	dir, err := zone.ReportDir(root, name)
 	if err != nil {
-		return nil, zoneStatus{}, err
+		return nil, err
 	}
 	r, err := zone.Load(dir, name)
 	if err != nil {
-		return nil, zoneStatus{}, err
+		return nil, err
 	}
-	return r, reportStatus(root, toolsPath, r), nil
+	return &zoneCtx{root: root, toolsPath: toolsPath, name: name, report: r, status: reportStatus(root, toolsPath, r)}, nil
+}
+
+// ignoreLists loads the stock assetlists the map's >class chain marks `ignore`:
+// for their active entries the linker packs only a reference to the shipped
+// asset. (Its ignore_missing_shipped lists are packed in full, so they don't
+// shadow anything.)
+func (z *zoneCtx) ignoreLists() (zone.Assetlists, zone.Inherited, error) {
+	zf, err := zone.ZoneFile(z.root, z.name)
+	if err != nil {
+		return nil, zone.Inherited{}, err
+	}
+	inh, err := zone.Inherit(z.root, zf)
+	if err != nil {
+		return nil, inh, err
+	}
+	lists, err := zone.LoadAssetlists(z.root, inh.Ignore)
+	return lists, inh, err
+}
+
+// stockNote says what an asset's stock assetlist entry means for the build.
+func stockNote(entries []zone.ListEntry) string {
+	for _, e := range entries {
+		if e.Active {
+			return fmt.Sprintf("only a reference to the shipped stock asset is packed (%s:%d is active): a version "+
+				"of your own in a GDT or file would not be used; comment that line out with // to ship it", e.File(), e.Line)
+		}
+	}
+	if len(entries) > 0 {
+		return fmt.Sprintf("%s:%d is commented out, so this build packs its own version", entries[0].File(), entries[0].Line)
+	}
+	return ""
 }
 
 // reportStatus compares the report with the sources: the files the link read
@@ -149,13 +188,14 @@ func newerThanLink(w *gdt.Workspace, l gdt.Location, r *zone.Report) bool {
 // zoneExplain says why an asset is in the build: the chain of parents that pulled
 // it in, up to the zone line — or that the last link didn't pack it.
 func zoneExplain(toolsPath, name, asset, typ string) (*zoneExplainResult, error) {
-	r, st, err := openZone(toolsPath, name)
+	z, err := openZone(toolsPath, name)
 	if err != nil {
 		return nil, err
 	}
-	res := &zoneExplainResult{Map: name, zoneStatus: st}
-	for _, p := range r.Find(asset, typ) {
-		out := packedOut{Asset: p.String(), Resident: p.Resident, Streamed: p.Streamed}
+	lists, _, _ := z.ignoreLists() // a map without a readable zone file still gets its chains
+	res := &zoneExplainResult{Map: name, zoneStatus: z.status}
+	for _, p := range z.report.Find(asset, typ) {
+		out := packedOut{Asset: p.String(), Resident: p.Resident, Streamed: p.Streamed, Stock: stockNote(lists.Lookup(p.Ref))}
 		for _, c := range p.Chain {
 			out.PulledInBy = append(out.PulledInBy, c.String())
 		}
@@ -163,7 +203,7 @@ func zoneExplain(toolsPath, name, asset, typ string) (*zoneExplainResult, error)
 	}
 	if len(res.Packed) == 0 {
 		res.NotPacked = fmt.Sprintf("%s is not in %s's last link: nothing zoned references it, or the link failed before packing it", asset, name)
-		res.Similar = similarNames(r, asset)
+		res.Similar = similarNames(z.report, asset)
 	}
 	return res, nil
 }
@@ -189,11 +229,12 @@ func similarNames(r *zone.Report, q string) []string {
 // zoneContents says what a zone line pulls into the build, or, with no line,
 // how much each line of the zone weighs.
 func zoneContents(toolsPath, name, line string) (*zoneContentsResult, error) {
-	r, st, err := openZone(toolsPath, name)
+	z, err := openZone(toolsPath, name)
 	if err != nil {
 		return nil, err
 	}
-	res := &zoneContentsResult{Map: name, zoneStatus: st}
+	r := z.report
+	res := &zoneContentsResult{Map: name, zoneStatus: z.status}
 	if line == "" {
 		res.Assets, res.Resident, res.Streamed = totals(r.Assets)
 		res.Lines, res.More = lineSummary(r.Assets)

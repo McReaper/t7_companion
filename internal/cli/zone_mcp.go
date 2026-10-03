@@ -12,7 +12,7 @@ import (
 func zoneToolset() toolset {
 	tp := mcp.WithString("tools_path", mcp.Description("BO3 mod-tools root (default $TA_TOOLS_PATH)."))
 	name := mcp.WithString("name", mcp.Required(), mcp.Description("Map or mod name, e.g. \"zm_mymap\"."))
-	return toolset{name: "zone", tools: []server.ServerTool{zoneExplainTool(name, tp), zoneContentsTool(name, tp)}}
+	return toolset{name: "zone", tools: []server.ServerTool{zoneExplainTool(name, tp), zoneContentsTool(name, tp), zoneCheckTool(name, tp)}}
 }
 
 func zoneExplainTool(name, tp mcp.ToolOption) server.ServerTool {
@@ -37,5 +37,17 @@ func zoneContentsTool(name, tp mcp.ToolOption) server.ServerTool {
 		mcp.WithString("line", mcp.Description("A zone line (\"weapon,t8_knife_zm\"), an asset name, or an included .zpkg name.")), tp),
 		Handler: jsonHandler(func(_ context.Context, r mcp.CallToolRequest) (any, error) {
 			return zoneContents(r.GetString("tools_path", ""), r.GetString("name", ""), r.GetString("line", ""))
+		})}
+}
+
+func zoneCheckTool(name, tp mcp.ToolOption) server.ServerTool {
+	return server.ServerTool{Tool: mcp.NewTool("zone_check",
+		mcp.WithDescription("Find your versions of stock assets that the build won't use: a stock script or asset you "+
+			"copied and zoned, or defined in your own GDT, that a stock assetlist inherited through the map's >class still "+
+			"lists, so the linker packs only a reference to the shipped one. Gives the assetlist line to comment out. "+
+			"Works before the first link; after a link it also checks every GDT asset the build drew on."),
+		name, tp),
+		Handler: jsonHandler(func(_ context.Context, r mcp.CallToolRequest) (any, error) {
+			return zoneCheck(r.GetString("tools_path", ""), r.GetString("name", ""))
 		})}
 }

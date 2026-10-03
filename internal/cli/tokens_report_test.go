@@ -245,6 +245,8 @@ func zoneSamples(t *testing.T, root string, add func(key, s string)) {
 			heavy, err := zoneContents(root, name, all.Lines[0].Line)
 			run("zone_contents|its heaviest line", heavy, err)
 		}
+		chk, err := zoneCheck(root, name)
+		run("zone_check|the map", chk, err)
 		return
 	}
 }

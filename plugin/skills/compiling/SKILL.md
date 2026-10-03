@@ -44,7 +44,7 @@ Which assets go into the Fast File is entirely the **`.zone`** (`zone_source/*.z
 
 ## Overriding a stock asset: comment its assetlist line, from a usermap or a mod
 
-"A usermap can't override stock content, only a mod can" is **wrong**, and it isn't only about scripts. **The linker skips any asset an upstream zone already contributes** — your zone inherits them through its `>class,…` / `>group,…` header — so your copy is silently ignored no matter how correctly you zone it. Building as a mod does not help: same class, same skip.
+"A usermap can't override stock content, only a mod can" is **wrong**, and it isn't only about scripts. **For any asset an inherited `ignore` list names, the linker packs only a reference to the shipped one** (a few dozen bytes, nothing streamed) — your zone inherits those lists through its `>class,…` header — so your copy is silently ignored no matter how correctly you zone it (verified in the linker's report). Building as a mod does not help: same class, same skip.
 
 **Comment the stock entry out of the assetlist CSV that contributes it**, under `zone_source/all/assetlist/`:
 
@@ -53,14 +53,14 @@ Which assets go into the Fast File is entirely the **`.zone`** (`zone_source/*.z
 //rawfile,animtrees/generic.atr                    core_common.csv
 ```
 
-Then your zoned copy takes its place. **Any asset type, and the file is whichever list names it** — `zm_patch.csv`, `core_common.csv`, `zm_common.csv`, `zm_levelcommon.csv`. Don't assume `zm_patch.csv`: `grep -rn "<asset path>" zone_source/` and comment the line you actually find. Shipped installs already comment several lines this way (`_zm_ai_dogs`, `_zm_pack_a_punch`, `_zm_weapons`), so the mechanism is intended. These are shared, install-wide files — back them up (or keep them in git), because the change affects every map built from that tree until undone.
+Then your zoned copy takes its place. **Any asset type, and the file is whichever `ignore` list names it** — for a usermap (`zm_mod_level`) the `core_*` lists, `zm_common.csv` and `zm_patch.csv`. `zm_levelcommon.csv` is inherited as `ignore_missing_shipped` instead, whose assets are packed in full, so it never needs commenting (verified in the linker's report). **`t7kb:zone_check` finds the line for you**: for a stock script or asset you zoned, before the first link, and after a link for every GDT asset of yours the build replaced with stock. Without MCP, `grep -rn "<asset path>" zone_source/all/assetlist/` and comment the line you actually find. Shipped installs already comment several lines this way (`_zm_ai_dogs`, `_zm_pack_a_punch`, `_zm_weapons`), so the mechanism is intended. These are shared, install-wide files — back them up (or keep them in git), because the change affects every map built from that tree until undone.
 
 Two traps make the edit silently do nothing:
 
 - **Edit the BO3 root's `zone_source/all/assetlist/`, never the map's.** `usermaps/<map>/zone_source/all/assetlist/<map>.csv` is the linker's output, rewritten on every link (verified in the install).
 - **Comment with `//`**, as every commented line in the shipped lists does; `#` does not comment a line (community).
 
-**Diagnose it by size, not by theory.** When an edit to a shared raw file seems to have no effect, append a few KB of junk to it, relink, and compare the `.ff` size before and after:
+**Diagnose from the link, not by theory.** `t7kb:zone_explain` on the asset says, from the last link's report, whether only a reference to the shipped asset was packed and which assetlist line caused it. Without MCP, measure: append a few KB of junk to the file, relink, and compare the `.ff` size before and after:
 
 - **delta 0** → the linker is not packing your file at all; you need the CSV line commented (above).
 - **delta > 0** → it *is* in the build, and your bug is elsewhere.

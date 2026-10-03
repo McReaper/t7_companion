@@ -32,7 +32,12 @@ func newZoneCmd() *cobra.Command {
 			}
 			return printIndented(c.OutOrStdout())(zoneContents(toolsPath, a[0], line))
 		}}
-	root.AddCommand(explain, contents)
+	check := &cobra.Command{Use: "check <map>", Short: "Find your versions of stock assets that the build won't use",
+		Args: cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, a []string) error {
+			return printIndented(c.OutOrStdout())(zoneCheck(toolsPath, a[0]))
+		}}
+	root.AddCommand(explain, contents, check)
 	return root
 }
 

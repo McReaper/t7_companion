@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"os"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -32,6 +34,31 @@ func TestToolsetsHaveUniqueDescribedToolsWithCLICommands(t *testing.T) {
 			cmd, rest, err := root.Find(args)
 			if err != nil || cmd == root || len(rest) != 0 {
 				t.Errorf("tool %q has no matching CLI command `t7kb %s`", name, strings.Join(args, " "))
+			}
+		}
+	}
+}
+
+// Skills name MCP tools as t7kb:<tool>, and check_skills.py accepts only the
+// names in its TOOL_NAMES: it must list every registered tool, or a skill that
+// names a new tool fails validation.
+func TestSkillValidatorKnowsEveryTool(t *testing.T) {
+	src, err := os.ReadFile("../../plugin/skills/contribute/scripts/check_skills.py")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := regexp.MustCompile(`(?m)^TOOL_NAMES = \{([^}]*)\}`).FindSubmatch(src)
+	if m == nil {
+		t.Fatal("TOOL_NAMES not found in check_skills.py")
+	}
+	known := map[string]bool{}
+	for _, q := range regexp.MustCompile(`"([^"]+)"`).FindAllSubmatch(m[1], -1) {
+		known[string(q[1])] = true
+	}
+	for _, ts := range toolsets(nil, nil) {
+		for _, tool := range ts.tools {
+			if !known[tool.Tool.Name] {
+				t.Errorf("check_skills.py's TOOL_NAMES lacks %q", tool.Tool.Name)
 			}
 		}
 	}
