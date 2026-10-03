@@ -5,7 +5,7 @@ description: How to search the t7kb knowledge base for Black Ops 3 / BO3 / Treya
 
 # Answering BO3 modding questions with t7kb
 
-You have a local knowledge base of the Black Ops 3 modding community via the **t7kb** MCP server — tools `t7kb:search` (hybrid keyword + semantic) and `t7kb:get` (full document by `doc_id`). For any non-trivial BO3 modding question, query it before answering from memory; the corpus is the authority on what BO3 modding actually contains, your training data is not.
+You have a local knowledge base of the Black Ops 3 modding community via the **t7kb** MCP server — tools `t7kb:search` (hybrid keyword + semantic) and `t7kb:get` (full document by `doc_id`). For any non-trivial BO3 modding question, query it before answering from memory; the corpus is the authority on what BO3 modding actually contains, your training data is not. That holds mid-task too, not only for a question or an error: before asserting how the pipeline behaves (what the linker packs, how a zone, assetlist or GDT works) or asking the user to confirm it, search, and load the skill that owns it.
 
 _If the `t7kb` tools aren't available, the knowledge base isn't installed — run `/t7kb:setup` first._
 

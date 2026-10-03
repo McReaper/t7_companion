@@ -8,7 +8,7 @@ _If the `t7kb` tools aren't available, it isn't installed yet — see the t7kb R
 
 ## Use t7kb for BO3 questions
 
-For any non-trivial BO3 modding question — GSC/CSC, Radiant mapping, zombies, assets, FX, audio, lighting, compile/linker errors — query t7kb **before** answering from memory. The corpus is the authority on what BO3 modding contains; your training data is not.
+For any non-trivial BO3 modding question — GSC/CSC, Radiant mapping, zombies, assets, FX, audio, lighting, compile/linker errors — query t7kb **before** answering from memory. The corpus is the authority on what BO3 modding contains; your training data is not. This holds mid-task too, not only for a question or an error: before you assert how the pipeline behaves (what the linker packs, how a zone, assetlist or GDT works) or ask the user to confirm it, search t7kb and load the skill that owns it.
 
 ## Query it well
 
@@ -29,7 +29,7 @@ For any non-trivial BO3 modding question — GSC/CSC, Radiant mapping, zombies, 
 Verify specifics in t7kb, but default to these:
 
 - **Reuse the shared stdlib.** `scripts/shared/` has helpers (`util`, `array`, `math`, `clientfield`, `flag`, `spawner`, …); check t7kb for an existing function before writing one. (**t7kb:scripting**.)
-- **Hook before you override; never edit stock scripts in place.** Stock systems expose seams (spawn functions, `level.*` function pointers, callbacks). To replace a stock script, copy it into your map/mod and comment its line out of the assetlist CSV that contributes it, in usermaps and mods alike. Load **t7kb:scripting** and **t7kb:debugging** for the method.
+- **Hook before you override; never edit stock scripts in place.** Stock systems expose seams (spawn functions, `level.*` function pointers, callbacks). To replace a stock script, copy it into your map/mod and comment its line out of the assetlist CSV that contributes it, in usermaps and mods alike. Load **t7kb:scripting** and **t7kb:compiling** for the method.
 - **Thread long logic and guard it with `endon`.** Un-threaded long `wait` loops freeze the game / drop connections; persistent threads need `self endon("death")` or `level endon("end_game")`. Mind `self` vs `level` scope. (**t7kb:scripting**.)
 - **Errors: make them visible first.** In Launcher → dvars set `developer 2` and `logfile 1`, reproduce, and read the exact message before theorizing. Then load **t7kb:debugging** (compile vs linker vs unresolved-external vs runtime, line numbers, the S.R.E. call stack, the dvar/devgui toolkit) rather than diagnosing from here.
 - **Read the log file, don't ask for a screenshot.** `logfile` writes the game console to **`console_mp.log`** at the `fs_game` root: `mods/<modname>/console_mp.log` for a mod, the **BO3 root** for a usermap (check both, take the newest). Map reloads in one process append sessions to the same file, so cut to the last `Game Initialization` before grepping. A run that never set `logfile` (any headless launch) leaves the *previous* run's file untouched, so check the `logfile opened on` header and the mtime. Grep for `script error` / `Call stack` / `Could not find`. A hard crash with no error: `crashes.log` at the BO3 root.

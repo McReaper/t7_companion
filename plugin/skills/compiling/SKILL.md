@@ -1,6 +1,6 @@
 ---
 name: compiling
-description: How to build a Black Ops 3 map or mod — the Mod Tools Launcher pipeline (Compile, Light/LEDs, Link the Fast Files, Run), what each mod-tools binary does, the TA_* environment, the `zm_`/`mp_` name prefix, converting GDT/assets before linking, usermap-vs-mod builds, which stage to re-run, and driving the build headlessly — the `t7kb:build` MCP tool first, `t7kb build`/raw binaries as fallbacks. Use when building, compiling, linking or lighting a map or mod, driving the Launcher's binaries from the command line, deciding what to rebuild, or judging whether a build succeeded — the linker returns non-zero on warnings too (`exit status 1000`, `Found 1 bad bulletmeshes`, `ok` false on a Fast File that is perfectly current), and the verdict lives in `zone_source/all/assetinfo/` (the map's `.errorlog` and `.csv`). Distinct from t7kb:debugging (reading the resulting errors) and t7kb:mapping (the geometry behind compile failures).
+description: How to build a Black Ops 3 map or mod — the Mod Tools Launcher pipeline (Compile, Light/LEDs, Link, Run), each mod-tools binary, the TA_* environment, the `zm_`/`mp_` prefix, converting GDT/assets before linking, usermap-vs-mod builds, overriding a stock asset or script by commenting its line out of `zone_source/all/assetlist/*.csv` (`zm_patch`, `zm_levelcommon`), which stage to re-run, headless builds via the `t7kb:build` MCP tool. Use when building, compiling, linking or lighting a map or mod, driving the binaries from the command line, when an edited or replaced stock asset is ignored and the original still ships, or judging whether a build succeeded — the linker returns non-zero on warnings too (`exit status 1000`, `Found 1 bad bulletmeshes`, `ok` false on a current Fast File), and the verdict lives in `zone_source/all/assetinfo/` (the map's `.errorlog` and `.csv`). Distinct from t7kb:debugging (reading the resulting errors) and t7kb:mapping (the geometry behind compile failures).
 ---
 
 # Building & compiling BO3 maps and mods
@@ -37,10 +37,35 @@ Order per iteration: **save GDT → (GdtDB indexes) → Compile/Light as needed 
 
 Where the build lands and what can be overridden depends on the target (this mirrors the scripting/entry-file split — see **t7kb:scripting**):
 
-- **Usermap** — built under `usermaps/<map>/`; the map's own zone. Scripts your map zones report real `file '…' line N`; only frames inside Treyarch's shipped scripts show `missing line information`. Overriding a stock script — or any stock asset — works from a usermap too, through the assetlist CSVs rather than by switching to a mod (**t7kb:debugging** owns both).
+- **Usermap** — built under `usermaps/<map>/`; the map's own zone. Scripts your map zones report real `file '…' line N`; only frames inside Treyarch's shipped scripts show `missing line information`. Overriding a stock script — or any stock asset — works from a usermap too, through the assetlist CSVs rather than by switching to a mod (below).
 - **Mod** — built under `mods/<modname>/`; also carries line info for stock frames, which is the one debugging reason to build as a mod. It does **not** override more than a usermap can: the linker skips an upstream-contributed asset for both targets alike.
 
 Which assets go into the Fast File is entirely the **`.zone`** (`zone_source/*.zone`) — adding a script/model/sound means adding its line there, then re-linking. Look the exact `.zone` entry syntax up in t7kb.
+
+## Overriding a stock asset: comment its assetlist line, from a usermap or a mod
+
+"A usermap can't override stock content, only a mod can" is **wrong**, and it isn't only about scripts. **The linker skips any asset an upstream zone already contributes** — your zone inherits them through its `>class,…` / `>group,…` header — so your copy is silently ignored no matter how correctly you zone it. Building as a mod does not help: same class, same skip.
+
+**Comment the stock entry out of the assetlist CSV that contributes it**, under `zone_source/all/assetlist/`:
+
+```
+//scriptparsetree,scripts/zm/_zm_behavior.gsc      zm_patch.csv
+//rawfile,animtrees/generic.atr                    core_common.csv
+```
+
+Then your zoned copy takes its place. **Any asset type, and the file is whichever list names it** — `zm_patch.csv`, `core_common.csv`, `zm_common.csv`, `zm_levelcommon.csv`. Don't assume `zm_patch.csv`: `grep -rn "<asset path>" zone_source/` and comment the line you actually find. Shipped installs already comment several lines this way (`_zm_ai_dogs`, `_zm_pack_a_punch`, `_zm_weapons`), so the mechanism is intended. These are shared, install-wide files — back them up (or keep them in git), because the change affects every map built from that tree until undone.
+
+Two traps make the edit silently do nothing:
+
+- **Edit the BO3 root's `zone_source/all/assetlist/`, never the map's.** `usermaps/<map>/zone_source/all/assetlist/<map>.csv` is the linker's output, rewritten on every link (verified in the install).
+- **Comment with `//`**, as every commented line in the shipped lists does; `#` does not comment a line (community).
+
+**Diagnose it by size, not by theory.** When an edit to a shared raw file seems to have no effect, append a few KB of junk to it, relink, and compare the `.ff` size before and after:
+
+- **delta 0** → the linker is not packing your file at all; you need the CSV line commented (above).
+- **delta > 0** → it *is* in the build, and your bug is elsewhere.
+
+The measurement works for any raw asset — animtrees, animtables, behavior trees, scripts.
 
 ## Iterate fast — rebuild only what changed
 

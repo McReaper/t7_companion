@@ -65,25 +65,9 @@ When the whole stack is stock (`_zm_behavior.gsc` twice and nothing else), you h
 - **Build/run as a mod** — carries per-line debug info for stock frames too.
 - **Take the stock script over into your map** (next section). Your copy is your script, so it reports lines — and you can instrument it, which is usually worth more than the line number alone.
 
-## Overriding *any* stock asset from a *usermap* — the assetlist CSVs
+## An edit to a stock asset has no effect: the linker packs the stock one
 
-"A usermap can't override stock content, only a mod can" is **wrong**, and it isn't only about scripts. **The linker skips any asset an upstream zone already contributes** — your zone inherits them through its `>class,…` / `>group,…` header — so your copy is silently ignored no matter how correctly you zone it. Building as a mod does not help: same class, same skip.
-
-**Comment the stock entry out of the assetlist CSV that contributes it**, under `zone_source/all/assetlist/`:
-
-```
-//scriptparsetree,scripts/zm/_zm_behavior.gsc      zm_patch.csv
-//rawfile,animtrees/generic.atr                    core_common.csv
-```
-
-Then your zoned copy takes its place. **Any asset type, and the file is whichever list names it** — `zm_patch.csv`, `core_common.csv`, `zm_common.csv`, `zm_levelcommon.csv`. Don't assume `zm_patch.csv`: `grep -rn "<asset path>" zone_source/` and comment the line you actually find. Shipped installs already comment several lines this way (`_zm_ai_dogs`, `_zm_pack_a_punch`, `_zm_weapons`), so the mechanism is intended. These are shared, install-wide files — back them up (or keep them in git), because the change affects every map built from that tree until undone.
-
-**Diagnose it by size, not by theory.** When an edit to a shared raw file seems to have no effect, append a few KB of junk to it, relink, and compare the `.ff` size before and after:
-
-- **delta 0** → the linker is not packing your file at all; you need the CSV line commented (above).
-- **delta > 0** → it *is* in the build, and your bug is elsewhere.
-
-The measurement works for any raw asset — animtrees, animtables, behavior trees, scripts.
+When your copy of a stock script, anim, model, FX or rawfile is zoned and built but the game still runs the original, an upstream zone's assetlist contributes it and the linker skips yours. **t7kb:compiling** owns the override (commenting the assetlist CSV line) and the `.ff`-size test that proves which one ships.
 
 ## Instrument rather than theorise
 
