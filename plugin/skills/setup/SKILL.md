@@ -83,6 +83,23 @@ Dropping both once at the BO3 root means every session opened anywhere under it 
 
 If `CLAUDE.md` already exists at the root, don't overwrite it — offer to add the `@AGENTS.md` import line to it instead (with confirmation), or just tell the user they can add it themselves. Skip the primer/path-recording entirely if no BO3-root markers are found — don't write these into unrelated repos.
 
+### Offer to keep that root in git
+
+Modding edits **shared, install-wide files** — an assetlist line commented out to override a stock asset, a GDT `gdt_edit` rewrites, files a community pack drops into `source_data/` or `deffiles/` — and Steam's "verify files" and APE saves overwrite files silently. A git history of the install root makes each change reviewable and revertible, and lets you read `git log`/`git diff` to see what changed since the last good build. `gdt_edit` keeps only one `.bak`.
+
+- **The root is not a git repository** (`git -C "<root>" rev-parse` fails): explain that, and offer to set it up. **Never run `git init` without the user's yes.** With it: `git init` at the root, then fetch the default ignore and LFS rules beside it (skip a file that already exists), then suggest committing in steps — the install is ~10 GB — starting with `zone_source/all/assetlist/`, `deffiles/`, `source_data/`, `share/raw/`, `usermaps/` and `mods/`.
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/McReaper/t7_companion/main/templates/bo3.gitignore -o "<root>/.gitignore"
+  curl -fsSL https://raw.githubusercontent.com/McReaper/t7_companion/main/templates/bo3.gitattributes -o "<root>/.gitattributes"
+  ```
+  ```powershell
+  irm https://raw.githubusercontent.com/McReaper/t7_companion/main/templates/bo3.gitignore -OutFile "<root>\.gitignore"
+  irm https://raw.githubusercontent.com/McReaper/t7_companion/main/templates/bo3.gitattributes -OutFile "<root>\.gitattributes"
+  ```
+  The ignore file keeps out what the tools regenerate and large stock art; the user adds their own art with `git add -f`, which the attributes send to Git LFS (`git lfs install` once).
+- **It is a repository with no `.gitignore`**: offer the same two files.
+- **It already has one**: leave it alone.
+
 ## 4. Confirm — never claim success if a step failed
 
 Tell the user setup is done and that the `t7kb:search` and `t7kb:get` MCP tools become available in the **next session** (or after `/reload-plugins`). The 3.5 GB database unpacks itself automatically the first time the server runs.

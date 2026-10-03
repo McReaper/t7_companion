@@ -49,7 +49,7 @@ flowchart LR
 
 Pick the **User** scope: a project-scope install doesn't load in `usermaps/<map>`.
 
-`/t7kb:setup` downloads `t7kb` and its database, registers the MCP server, and offers to drop an `AGENTS.md` primer at your BO3 mod-tools root.
+`/t7kb:setup` downloads `t7kb` and its database, registers the MCP server, and offers an `AGENTS.md` primer and git tracking for your BO3 mod-tools root.
 
 ### Other MCP clients (Codex, OpenCode, Cursor, Copilot…)
 
@@ -62,7 +62,7 @@ irm https://raw.githubusercontent.com/McReaper/t7_companion/main/install/install
 
 Then register `t7kb mcp` as a stdio server ([per-client config](docs/clients.md)) and drop [`templates/AGENTS.md`](templates/AGENTS.md) at your BO3 mod-tools root — it carries the skills' core guidance for agents without them. Or paste this README to your agent and let it do all of that.
 
-The database is a ~0.9 GB download that unpacks to ~3.5 GB on first run.
+The database: a ~0.9 GB download, ~3.5 GB once unpacked.
 
 ## ✨ What your agent gets
 

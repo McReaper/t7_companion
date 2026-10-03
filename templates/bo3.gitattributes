@@ -1,0 +1,32 @@
+# .gitattributes for a Black Ops III mod-tools root, companion to .gitignore.
+#
+# These types are ignored by the .gitignore (stock art and exports are huge and
+# shipped with the tools). When you `git add -f` your OWN files of these types,
+# Git LFS stores them instead of the repository history. Run `git lfs install`
+# once per machine.
+
+# Source art
+*.tif filter=lfs diff=lfs merge=lfs -text
+*.tiff filter=lfs diff=lfs merge=lfs -text
+*.tga filter=lfs diff=lfs merge=lfs -text
+*.png filter=lfs diff=lfs merge=lfs -text
+*.psd filter=lfs diff=lfs merge=lfs -text
+*.xcf filter=lfs diff=lfs merge=lfs -text
+*.exr filter=lfs diff=lfs merge=lfs -text
+*.gif filter=lfs diff=lfs merge=lfs -text
+
+# Audio and video
+*.wav filter=lfs diff=lfs merge=lfs -text
+*.mkv filter=lfs diff=lfs merge=lfs -text
+
+# Model and animation exports (often the only copy of a port's work)
+*.xmodel_export filter=lfs diff=lfs merge=lfs -text
+*.xmodel_bin filter=lfs diff=lfs merge=lfs -text
+*.xanim_export filter=lfs diff=lfs merge=lfs -text
+*.xanim_bin filter=lfs diff=lfs merge=lfs -text
+*.xcam_export filter=lfs diff=lfs merge=lfs -text
+*.cast filter=lfs diff=lfs merge=lfs -text
+
+# Fonts
+*.otf filter=lfs diff=lfs merge=lfs -text
+*.ttf filter=lfs diff=lfs merge=lfs -text
