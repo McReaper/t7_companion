@@ -33,7 +33,8 @@ It builds each answer with the same functions the MCP handlers use and counts to
 | `gdt_find` | a material | 1 | 52 | 52 | 52 | 159 |
 | `gdt_get` | a material (defaults hidden) | 1 | 219 | 219 | 219 | 660 |
 | `gdt_get` | a material, all=true | 1 | 240 | 240 | 240 | 742 |
-| `gdt_refs` | its color image | 1 | 102 | 102 | 102 | 352 |
+| `gdt_refs` | its color image | 1 | 102 | 102 | 102 | 338 |
+| `gdt_refs` | the material (GDT fields and LOD files) | 1 | 245 | 245 | 245 | 786 |
 | `gdt_check` | one asset | 1 | 38 | 38 | 38 | 124 |
 | `gdt_check` | the whole GDT | 1 | 2005 | 2005 | 2005 | 6878 |
 | `gdt_schema` | material (names only) | 1 | 2894 | 2894 | 2894 | 11408 |

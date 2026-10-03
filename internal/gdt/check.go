@@ -298,7 +298,7 @@ func (w *Workspace) ReferencedBy(name string) ([]RefHit, []string, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	needle := []byte(`"` + Quote(name) + `"`)
+	needle := []byte(Quote(name)) // unquoted: list fields (skinOverride) hold several names in one value
 	var mu sync.Mutex
 	var out []RefHit
 	var bad []string
@@ -328,7 +328,8 @@ func (w *Workspace) ReferencedBy(name string) ([]RefHit, []string, error) {
 	return out, bad, nil
 }
 
-// refsIn lists the assets of f that derive from name or have a field equal to it.
+// refsIn lists the assets of f that derive from name or have a field naming it:
+// the whole value, or one entry of a list value (an xmodel's skinOverride).
 func refsIn(f *File, rel, name string) []RefHit {
 	var hits []RefHit
 	for _, a := range f.Assets {
@@ -337,10 +338,28 @@ func refsIn(f *File, rel, name string) []RefHit {
 		}
 		for _, fl := range a.Fields {
 			// no self-skip: a material "clip" whose colorMap is the image "clip" is a real reference
-			if Unquote(fl.Value) == name {
+			if v := Unquote(fl.Value); v == name || listHas(v, name) {
 				hits = append(hits, RefHit{File: rel, Line: a.Line, Asset: a.Name, Type: a.Type, Field: fl.Key})
 			}
 		}
 	}
 	return hits
+}
+
+// listSep separates the lines of a GDT list value: the escape text \r\n, not a
+// line break (`"skinOverride" "mtl_a mtl_b\r\n"`).
+const listSep = `\r\n`
+
+// listHas reports whether a list value — lines separated by listSep, each
+// holding space-separated names — has name as one entry.
+func listHas(v, name string) bool {
+	if !strings.Contains(v, listSep) {
+		return false
+	}
+	for _, e := range strings.Fields(strings.ReplaceAll(v, listSep, " ")) {
+		if e == name {
+			return true
+		}
+	}
+	return false
 }

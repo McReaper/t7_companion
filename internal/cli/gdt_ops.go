@@ -352,8 +352,13 @@ func gdtRefs(w *gdt.Workspace, name string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	models, err := w.ModelUses(name)
+	if err != nil {
+		return nil, err
+	}
+	hits = mergeHits(append(hits, models...))
 	out := map[string]any{"asset": name, "referenced_by": hits, "count": len(hits),
-		"note": "GDT fields and derived assets only — material names baked into .xmodel_bin exports and zone/script mentions are not searched"}
+		"note": "GDT fields, derived assets, and the materials inside xmodel LOD files; zone and script mentions are not searched"}
 	if len(unreadable) > 0 {
 		out["unreadable_gdts"] = unreadable // not searched: a reference there would be missed
 	}
@@ -362,6 +367,38 @@ func gdtRefs(w *gdt.Workspace, name string) (any, error) {
 		out["truncated"] = fmt.Sprintf("showing %d of %d", refsLimit, len(hits))
 	}
 	return out, nil
+}
+
+// mergeHits folds the hits on one asset into one, its fields joined: an xmodel
+// can name a material in skinOverride, in APE's materials copy, and in each LOD
+// file. Sorted by file and line, so a cap keeps a stable prefix.
+func mergeHits(hits []gdt.RefHit) []gdt.RefHit {
+	type key struct {
+		file  string
+		line  int
+		asset string
+	}
+	by := map[key]int{}
+	var out []gdt.RefHit
+	for _, h := range hits {
+		k := key{h.File, h.Line, h.Asset}
+		if i, ok := by[k]; ok {
+			out[i].Field += ", " + h.Field
+			if out[i].Type == "" {
+				out[i].Type = h.Type
+			}
+			continue
+		}
+		by[k] = len(out)
+		out = append(out, h)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].File != out[j].File {
+			return out[i].File < out[j].File
+		}
+		return out[i].Line < out[j].Line
+	})
+	return out
 }
 
 // refsLimit caps gdt_refs' list: a stock image can be used by hundreds of materials.

@@ -16,6 +16,7 @@ func gdtToolset() toolset {
 	return toolset{name: "gdt", tools: gdtToolDefs(), warm: func() {
 		if w, err := workspace(""); err == nil {
 			w.Warm()
+			w.WarmModels()
 		}
 	}}
 }
@@ -129,7 +130,8 @@ func gdtCheckTool(tp mcp.ToolOption) server.ServerTool {
 func gdtRefsTool(tp mcp.ToolOption) server.ServerTool {
 	return server.ServerTool{Tool: mcp.NewTool("gdt_refs",
 		mcp.WithDescription("Find every asset, in every GDT, that references an asset by name — through a field (a material's "+
-			"image, an xmodel's material override, …) or as a derived asset's parent. Check this before renaming or deleting an asset."),
+			"image, an entry of an xmodel's skinOverride, …), as a derived asset's parent, or — for a material — inside an "+
+			"xmodel's LOD or collision file. Check this before renaming or deleting an asset."),
 		mcp.WithString("name", mcp.Required(), mcp.Description("Asset name.")), tp),
 		Handler: gdtHandler(func(w *gdt.Workspace, r mcp.CallToolRequest) (any, error) {
 			return gdtRefs(w, r.GetString("name", ""))

@@ -192,6 +192,8 @@ func gdtSamples(t *testing.T, root string, add func(key, s string)) {
 		v, err = gdtCheck(w, locs[0].File, mat)
 		run("gdt_check|one asset", v, err)
 	}
+	v, err = gdtRefs(w, mat)
+	run("gdt_refs|the material (GDT fields and LOD files)", v, err)
 	if view, err := gdtGet(w, mat, "", "", false); err == nil {
 		if img := view.(gdtAssetView).Own["colorMap"]; img != "" {
 			v, err = gdtRefs(w, img)

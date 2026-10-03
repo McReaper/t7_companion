@@ -33,6 +33,8 @@ type Workspace struct {
 	parsed   map[string]parsedFile // abs path -> last parse, for read-only Load
 
 	writeMu sync.Map // lower-cased abs path -> *sync.Mutex: one writer per GDT
+
+	models modelMats // xmodel LOD files and their materials, for ModelUses
 }
 
 // lockFile serialises writes to one GDT within this process.
