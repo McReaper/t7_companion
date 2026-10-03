@@ -87,6 +87,8 @@ Every stage is a **console binary**; the Launcher GUI only chains them. An agent
 
 If this skill fired over MCP, the `t7kb` server is very likely already registered — it's the same server that exposes `t7kb:search`/`t7kb:get` — so call the `build` tool directly instead of shelling out. Its parameters (from the tool's own schema): `name` (required, e.g. `"zm_mymap"`), `stages` (comma list `compile,light,link,run`, default `"compile,light,link"`; pass `"link"` alone for a script-only change), `mod` (bool, target is `mods/<name>` instead of a usermap; default `false`), `light` (`low`|`medium`|`high`, default `"medium"`), `onlyents` (bool, fast entity-only compile; default `false`), `language` (default `"english"`), `skip_gdt` (bool, skip the `gdtdb /update` pass; default `false`), `gdt_rebuild` (bool, run `gdtdb /rebuild` instead — the recovery when a GDT change leaves every asset missing; default `false`), `tools_path`/`game_path` (default `$TA_TOOLS_PATH`/`$TA_GAME_PATH`). It returns the same compact per-stage JSON report as `t7kb build --json` below, first-actionable-error included — and it inherits the same `ok: false`-on-a-warning trap, see the exit-code section further down.
 
+If the `t7kb` server has `search`/`get` but no `build` tool, its binary predates it (it ships from 1.5.0): tell the user and offer `/t7kb:setup` to update it, then fall back to the shell tier below meanwhile.
+
 **It runs synchronously and can take minutes (link) to 20–30 minutes (a full compile+light)** — set a long client-side timeout; a long wait is normal, not a hang.
 
 ### `t7kb build` — the shell fallback, when no MCP server is registered
