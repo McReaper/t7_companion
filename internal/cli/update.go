@@ -54,7 +54,9 @@ func runUpdateCheck(cmd *cobra.Command) error {
 			"(a new release may bundle an updated database, uploaded separately). The installer\n"+
 			"doesn't touch the Claude Code plugin; it is checked below.\n")
 	}
-	reportStalePlugins(out, stalePlugins(latest), rel.TagName)
+	keep, extra := keptInstalls(t7kbInstalls())
+	reportExtraScopes(out, extra)
+	reportStalePlugins(out, stale(keep, latest), rel.TagName)
 	return nil
 }
 

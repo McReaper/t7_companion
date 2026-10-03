@@ -27,10 +27,10 @@ var listPlugins = func() ([]byte, error) {
 	return exec.CommandContext(ctx, "claude", "plugin", "list", "--json").Output()
 }
 
-// stalePlugins returns the t7kb plugin installs whose version isn't latest.
+// t7kbInstalls returns every install of the t7kb plugin, one per scope.
 // Without Claude Code (or with an output it can't read) it returns nothing:
 // the plugin check is a bonus on top of the binary check, never a failure.
-func stalePlugins(latest string) []pluginInstall {
+func t7kbInstalls() []pluginInstall {
 	raw, err := listPlugins()
 	if err != nil {
 		return nil
@@ -39,13 +39,62 @@ func stalePlugins(latest string) []pluginInstall {
 	if json.Unmarshal(raw, &all) != nil {
 		return nil
 	}
-	var stale []pluginInstall
+	var mine []pluginInstall
 	for _, p := range all {
-		if strings.HasPrefix(p.ID, "t7kb@") && strings.TrimPrefix(p.Version, "v") != latest {
-			stale = append(stale, p)
+		if strings.HasPrefix(p.ID, "t7kb@") {
+			mine = append(mine, p)
 		}
 	}
-	return stale
+	return mine
+}
+
+// keptInstalls splits installs into the one(s) to keep and the extra scopes
+// to remove: a user-scope install covers every project, so beside one, a
+// project or local install only doubles what has to be kept up to date.
+func keptInstalls(installs []pluginInstall) (keep, extra []pluginInstall) {
+	if !slices.ContainsFunc(installs, func(p pluginInstall) bool { return p.Scope == "user" }) {
+		return installs, nil
+	}
+	for _, p := range installs {
+		if p.Scope == "user" {
+			keep = append(keep, p)
+		} else {
+			extra = append(extra, p)
+		}
+	}
+	return keep, extra
+}
+
+// stale returns the installs whose version isn't latest.
+func stale(installs []pluginInstall, latest string) []pluginInstall {
+	var out []pluginInstall
+	for _, p := range installs {
+		if strings.TrimPrefix(p.Version, "v") != latest {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// runFrom is the hint for a command that acts on a project's own settings.
+func runFrom(p pluginInstall) string {
+	if p.ProjectPath == "" {
+		return ""
+	}
+	return "   (run from " + p.ProjectPath + ")"
+}
+
+// reportExtraScopes prints the commands that remove the project/local
+// installs a user-scope install already covers.
+func reportExtraScopes(out io.Writer, extra []pluginInstall) {
+	if len(extra) == 0 {
+		return
+	}
+	fmt.Fprintln(out, "\nThe t7kb plugin is also installed per project; your user-scope install already covers")
+	fmt.Fprintln(out, "every project, so keep that one and remove the others:")
+	for _, p := range extra {
+		fmt.Fprintf(out, "  claude plugin uninstall %s --scope %s%s\n", p.ID, p.Scope, runFrom(p))
+	}
 }
 
 // reportStalePlugins prints, for each outdated install, the commands that
@@ -72,11 +121,7 @@ func reportStalePlugins(out io.Writer, stale []pluginInstall, tag string) {
 		fmt.Fprintf(out, "  claude plugin marketplace update %s\n", m)
 	}
 	for _, p := range stale {
-		cmd := fmt.Sprintf("claude plugin update %s --scope %s", p.ID, p.Scope)
-		if p.ProjectPath != "" {
-			cmd += "   (run from " + p.ProjectPath + ")"
-		}
-		fmt.Fprintf(out, "  %s\n", cmd)
+		fmt.Fprintf(out, "  claude plugin update %s --scope %s%s\n", p.ID, p.Scope, runFrom(p))
 	}
 	fmt.Fprintln(out, "then restart Claude Code. To stop this recurring, enable auto-update for the marketplace in /plugin.")
 }

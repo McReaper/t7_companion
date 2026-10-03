@@ -84,21 +84,28 @@ func TestUpdateCheckPlugins(t *testing.T) {
 	out := run()
 	for _, want := range []string{
 		"Up to date (v2.3.0)",
-		"t7kb@t7-reapy 1.8.0 (project scope, project D:/BO3)",
+		// beside a user-scope install, the project and local ones are removed, not updated
+		"claude plugin uninstall t7kb@t7-reapy --scope project   (run from D:/BO3)",
+		"claude plugin uninstall t7kb@t7-reapy --scope local   (run from D:/BO3)",
 		"t7kb@t7-reapy 1.8.0 (user scope)",
 		"claude plugin marketplace update t7-reapy\n",
-		"claude plugin update t7kb@t7-reapy --scope project   (run from D:/BO3)",
 		"claude plugin update t7kb@t7-reapy --scope user\n",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in:\n%s", want, out)
 		}
 	}
-	if strings.Contains(out, "--scope local") || strings.Contains(out, "other@") {
-		t.Errorf("an up-to-date install or another plugin must not be listed:\n%s", out)
+	if strings.Contains(out, "update t7kb@t7-reapy --scope project") || strings.Contains(out, "other@") {
+		t.Errorf("a scope to remove must not be updated, another plugin not listed:\n%s", out)
 	}
-	if strings.Count(out, "marketplace update") != 1 {
-		t.Errorf("one marketplace update per marketplace:\n%s", out)
+
+	// no user-scope install: the project one is the install, so it is updated
+	listPlugins = func() ([]byte, error) {
+		return []byte(`[{"id":"t7kb@t7-reapy","version":"2.2.0","scope":"project","projectPath":"D:/BO3"}]`), nil
+	}
+	out = run()
+	if !strings.Contains(out, "claude plugin update t7kb@t7-reapy --scope project   (run from D:/BO3)") || strings.Contains(out, "uninstall") {
+		t.Errorf("a lone project install is updated, not removed:\n%s", out)
 	}
 
 	listPlugins = func() ([]byte, error) { return nil, exec.ErrNotFound }

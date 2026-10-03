@@ -47,6 +47,8 @@ flowchart LR
 /t7kb:setup
 ```
 
+Pick the **User** scope when asked: a project-scope install doesn't load in subfolders such as `usermaps/<map>`.
+
 `/t7kb:setup` downloads `t7kb` and its database, registers the MCP server, and offers to drop an `AGENTS.md` primer at your BO3 mod-tools root.
 
 ### Other MCP clients (Codex, OpenCode, Cursor, Copilot…)
@@ -85,7 +87,7 @@ t7kb update-check            is a newer release out? is the plugin behind?
 
 ## 🔄 Updating
 
-Run `t7kb update-check`: it says whether the binary is behind and lists every plugin install (per scope) that is, with the commands to update it. A third-party marketplace doesn't auto-update unless you enable it in `/plugin`, so an old install keeps its old skills. In Claude Code, then run `/t7kb:setup` to refresh the binary; elsewhere, re-run the installer with `--force` / `-Force`.
+`t7kb update-check` says whether the binary or the Claude Code plugin is behind, with the commands to update each. The plugin doesn't update itself unless you enable auto-update in `/plugin`. To refresh the binary, run `/t7kb:setup` in Claude Code, or re-run the installer with `--force` / `-Force`.
 
 ## 🤝 Contributing
 
