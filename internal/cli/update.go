@@ -22,9 +22,10 @@ func newUpdateCheckCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "update-check",
 		Short: "Check GitHub for a newer t7kb release",
-		Long: "Reports whether a newer t7kb release exists; it never downloads anything itself.\n" +
-			"Re-run the installer with -Force/--force to actually update (see the README or the\n" +
-			"setup skill) — this command only checks.",
+		Long: "Reports whether a newer t7kb release exists, and which installs of the t7kb Claude Code\n" +
+			"plugin (per scope, via `claude plugin list`) are behind it, with the commands to update\n" +
+			"them. It never downloads or updates anything itself: re-run the installer with\n" +
+			"-Force/--force for the binary (see the README or the setup skill).",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runUpdateCheck(cmd)
@@ -50,11 +51,10 @@ func runUpdateCheck(cmd *cobra.Command) error {
 	default:
 		fmt.Fprintf(out, "Update available: %s -> %s\n%s\n\n", Version(), rel.TagName, rel.HTMLURL)
 		fmt.Fprintf(out, "Re-run the installer with -Force/--force to fetch the new binary + database\n"+
-			"(a new release may bundle an updated database, uploaded separately). This release's\n"+
-			"plugin manifest version also matches the tag, so a matching Claude Code plugin/skills\n"+
-			"update is available too — that's a separate update through Claude Code's own plugin\n"+
-			"flow, not something -Force touches.\n")
+			"(a new release may bundle an updated database, uploaded separately). The installer\n"+
+			"doesn't touch the Claude Code plugin; it is checked below.\n")
 	}
+	reportStalePlugins(out, stalePlugins(latest), rel.TagName)
 	return nil
 }
 

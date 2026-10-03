@@ -80,12 +80,12 @@ t7kb get <doc_id>            read a document  (--find · --offset · --all)
 t7kb build <name>            compile/light/link/run  (--stages · --mod · --json)
 t7kb gdt <command>           find | get | schema | edit | check | refs
 t7kb mcp                     run the MCP server
-t7kb update-check            is a newer release out?
+t7kb update-check            is a newer release out? is the plugin behind?
 ```
 
 ## 🔄 Updating
 
-In Claude Code, update the plugin from the `/plugin` menu, then run `/t7kb:setup`. Elsewhere, re-run the installer with `--force` / `-Force`.
+Run `t7kb update-check`: it says whether the binary is behind and lists every plugin install (per scope) that is, with the commands to update it. A third-party marketplace doesn't auto-update unless you enable it in `/plugin`, so an old install keeps its old skills. In Claude Code, then run `/t7kb:setup` to refresh the binary; elsewhere, re-run the installer with `--force` / `-Force`.
 
 ## 🤝 Contributing
 
