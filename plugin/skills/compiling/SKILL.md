@@ -141,9 +141,9 @@ Confirm any flag not shown here against the raw install / t7kb before relying on
 
 ## The linker exits non-zero on warnings — read the errorlog, not the exit code
 
-A link whose only complaint is `^3Found 1 bad bulletmeshes, dumped to …_bulletreport.csv`, and which prints `done: 0m7.08s` for every zone, still returns **1000** while the Fast File is correct and current (verified on a real build). Anything that gates on the exit code — including `t7kb build`/`t7kb:build`, which then report `ok: false` with `exit status 1000` and no message — calls that build failed, so don't "fix" a build that already works.
+A link whose only complaint is `^3Found 1 bad bulletmeshes, dumped to …_bulletreport.csv`, and which prints `done: 0m7.08s` for every zone, still returns **1000** while the Fast File is correct and current (verified on a real build). Anything that gates on the exit code calls that build failed, so don't "fix" a build that already works. `t7kb:build`/`t7kb build` read the map's `.errorlog` in that case and report the link OK, with the warning as a note, when it has no error line (older versions reported `ok: false`, `exit status 1000`).
 
-The `^3` prefix is a colour code marking the line as a warning. A genuine failure names the asset and does **not** print `done:`.
+The `^3` prefix is a colour code marking the line as a warning; an error is a `^1` line (`^1ERROR: xmodel 'x' is missing`), with a larger return code (`return 1001000`), and does **not** print `done:` (verified on a real link).
 
 So verify at the artefacts rather than the return value, all under `<map>/zone_source/all/assetinfo/`:
 

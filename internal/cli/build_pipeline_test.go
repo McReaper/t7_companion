@@ -70,6 +70,7 @@ func TestRunBuildReportPipeline(t *testing.T) {
 		ok     bool
 		failed string
 		notes  map[string]string // stage -> note or first error it must contain
+		zones  []string          // a mod's zone files to lay out under mods/zm_test/zone_source
 	}{
 		{
 			name: "usermap, every stage",
@@ -91,11 +92,20 @@ func TestRunBuildReportPipeline(t *testing.T) {
 			ok:    true,
 		},
 		{
-			name:  "mod: no compile or light, linked with -fs_game",
+			name:  "mod: no compile or light, each zone linked with -fs_game",
 			opts:  buildOpts{stages: "compile,light,link", light: "medium", language: "french", isMod: true},
-			calls: []string{"gdt gdtdb gdtdb.exe /update", "link bin linker_modtools.exe -language french -fs_game zm_test -modsource zm_test"},
+			zones: []string{"zm_mod", "core_mod"},
+			calls: []string{"gdt gdtdb gdtdb.exe /update",
+				"link bin linker_modtools.exe -language french -fs_game zm_test -modsource core_mod",
+				"link bin linker_modtools.exe -language french -fs_game zm_test -modsource zm_mod"},
 			ok:    true,
-			notes: map[string]string{"compile": "not applicable to a mod", "light": "not applicable to a mod"},
+			notes: map[string]string{"compile": "not applicable to a mod", "light": "not applicable to a mod", "link": "linked core_mod, zm_mod"},
+		},
+		{
+			name:   "mod with no zone file: nothing to link",
+			opts:   buildOpts{stages: "link", light: "medium", isMod: true, skipGDT: true},
+			failed: "link",
+			notes:  map[string]string{"link": "no core_mod, mp_mod, cp_mod or zm_mod .zone"},
 		},
 		{
 			name:  "skip gdt, run only",
@@ -129,6 +139,15 @@ func TestRunBuildReportPipeline(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			root := fakeTools(t)
+			for _, z := range tc.zones {
+				zf := filepath.Join(root, "mods", "zm_test", "zone_source", z+".zone")
+				if err := os.MkdirAll(filepath.Dir(zf), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(zf, nil, 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
 			f := &fakePipeline{root: root, fail: tc.fail, noBSP: tc.noBSP}
 			f.install(t)
 			opts := tc.opts
@@ -224,5 +243,38 @@ func TestDvarsAsTheLauncherPassesThem(t *testing.T) {
 	pairs, err := dvarPairs(map[string]any{"logfile": float64(2), "developer": "2", "scr_mod_enable_devblock": true})
 	if err != nil || strings.Join(pairs, " ") != "developer=2 logfile=2 scr_mod_enable_devblock=1" {
 		t.Fatalf("MCP dvars: %v %v", pairs, err)
+	}
+}
+
+// The linker exits non-zero on warnings too: its errorlog tells them apart,
+// ^3 for a warning, ^1 for an error (lines as a real link writes them).
+func TestWarningsOnly(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, body string, age time.Duration) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		at := time.Now().Add(-age)
+		if err := os.Chtimes(p, at, at); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	start := time.Now()
+	warn := write("warn.errorlog", "return 1000\r\n^3Found 5 bad bulletmeshes, dumped to x_bulletreport.csv file.\r\n", 0)
+	if note, ok := warningsOnly(warn, start); !ok || !strings.Contains(note, "Found 5 bad bulletmeshes") {
+		t.Errorf("warnings only: %q %v", note, ok)
+	}
+	bad := write("bad.errorlog", "return 1001000\r\n^1ERROR: xmodel 'x' is missing\r\n  xmodel:x\r\n^3Found 5 bad bulletmeshes\r\n", 0)
+	if _, ok := warningsOnly(bad, start); ok {
+		t.Error("a ^1 line is an error")
+	}
+	old := write("old.errorlog", "return 1000\r\n^3a warning\r\n", time.Hour)
+	if _, ok := warningsOnly(old, start); ok {
+		t.Error("an errorlog older than this link is not its verdict")
+	}
+	if _, ok := warningsOnly(filepath.Join(dir, "none.errorlog"), start); ok {
+		t.Error("no errorlog, no verdict")
 	}
 }
