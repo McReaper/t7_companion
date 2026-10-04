@@ -111,6 +111,11 @@ func TestTokenReport(t *testing.T) {
 	if root := os.Getenv("TA_TOOLS_PATH"); root != "" {
 		gdtSamples(t, root, add)
 		zoneSamples(t, root, add)
+		for _, tpl := range []string{"ZM Mod Level", "ZM Advanced Level"} { // dry runs: nothing is written
+			if v, err := createOp(root, "zm_token_report_sample", tpl, nil, false); err == nil {
+				add("create|dry run, "+tpl, mcpJSON(t, v))
+			}
+		}
 	}
 
 	rows := make([]tokenRow, 0, len(samples))

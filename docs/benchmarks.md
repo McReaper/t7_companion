@@ -44,6 +44,8 @@ It builds each answer with the same functions the MCP handlers use and counts to
 | `zone_contents` | every line of the zone | 1 | 1243 | 1243 | 1243 | 4019 |
 | `zone_contents` | its heaviest line | 1 | 972 | 972 | 972 | 3071 |
 | `zone_check` | the map | 1 | 1879 | 1879 | 1879 | 6392 |
+| `create` | dry run, ZM Advanced Level | 1 | 873 | 873 | 873 | 3017 |
+| `create` | dry run, ZM Mod Level | 1 | 228 | 228 | 228 | 907 |
 
 `get` serves long bodies a page at a time (16,000 characters by default, `max_chars` up to 64,000, `offset` for the next part). Corpus bodies: median 1.2k characters, p99 275k, maximum 98 MB (`source-workspace` indexes whole GDTs and scripts). Over 90% of documents fit in one page. A full page of a GDT is ~5.3k tokens rather than ~4k: paths and numbers tokenize denser than prose.
 

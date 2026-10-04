@@ -42,7 +42,7 @@ func newRootCmd() *cobra.Command {
 	}
 	root.PersistentFlags().StringVar(&dbFlag, "db", "",
 		"path to t7kb.db (default: $T7KB_DB, then beside the binary, then ./t7kb.db)")
-	root.AddCommand(newSearchCmd(), newGetCmd(), newMCPCmd(), newEmbedCmd(), newUpdateCheckCmd(), newBuildCmd(), newGDTCmd(), newZoneCmd())
+	root.AddCommand(newSearchCmd(), newGetCmd(), newMCPCmd(), newEmbedCmd(), newUpdateCheckCmd(), newBuildCmd(), newGDTCmd(), newZoneCmd(), newCreateCmd())
 	return root
 }
 

@@ -33,7 +33,7 @@ flowchart LR
     A <-->|MCP| T["t7kb<br/>one local binary"]
     T --> K[("Knowledge base<br/>search · get")]
     T --> G["Your GDTs<br/>find · read · check · edit"]
-    T --> B["BO3 mod tools<br/>compile · light · link · run"]
+    T --> B["BO3 mod tools<br/>create · build · run"]
 ```
 
 ## 📥 Install
@@ -66,20 +66,21 @@ The database: a ~0.9 GB download, ~3.5 GB once unpacked.
 
 ## ✨ What your agent gets
 
-- **A knowledge base it searches before answering** — wikis, forums, Discord, Treyarch's scripts, tutorials and the mod-tools schemas. Every hit carries its source and reliability, so the agent can weigh a Treyarch script above a Discord guess.
+- **A knowledge base it searches before answering** — wikis, forums, Discord, Treyarch's scripts, tutorials and the mod-tools schemas. Every hit carries its source and reliability, so a Treyarch script outweighs a Discord guess.
 - **Skills for each craft** — scripting, mapping, compiling, assets, animation, zombies AI, HUD, FX, atmosphere…: the method and its silent traps (the callback that never fires, the wallbuy that shows *Cost: 0*). Claude Code only.
 - **GDT tools** — find, read, check and edit APE's GDTs against the install's own schema, as a dry run unless told to write. `gdt_check` catches broken references, missing files and duplicates before the linker does.
 - **What the build packed** — why an asset is in your fastfile, what each zone line weighs, and which of your stock overrides won't ship.
-- **A headless build** — compile, light, link and launch your map, with a short report and the first real error instead of hundreds of lines: *"Relink zm_mymap"*. Windows only.
+- **A headless build** — create, compile, light, link and launch your map, with a short report and the first real error instead of hundreds of lines: *"Relink zm_mymap"*. Windows only.
 
 ## ⌨️ CLI
 
-The same binary works from a terminal:
+From a terminal:
 
 ```
 t7kb                         browse: type a query, pick a hit, read it
 t7kb search <query>...       search  (--source api,wiki… · -n N · --bm25)
 t7kb get <doc_id>            read a document  (--find · --offset · --all)
+t7kb create <name>           new map or mod from a template  (--write)
 t7kb build <name>            compile/light/link/run  (--stages · --mod · --json)
 t7kb gdt <command>           find | get | schema | edit | check | refs
 t7kb zone <command>          explain | contents | check

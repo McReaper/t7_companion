@@ -1,11 +1,15 @@
 ---
 name: mapping
-description: How to build Black Ops 3 maps in Radiant — grid/brushwork discipline, structural vs detail brushes, sealing against BSP leaks (`.lin` leakfile, sky brush box), CSG/patches for terrain and curves, prefab-then-rotate ordering, zombies zones (`info_volume` coverage, respawn points, door/debris clips), and clip textures (`clip_player`, `weaponClip`, `clip_nosight`) vs caulk and a `dyn_model`'s collmap/physpreset. Use when a compile hits `WROTE BSP LEAKFILE`, `MAX_MAP_TRIANGLES`, a hang on "coalescing coincident windings" or an `-onlyents` brush-count mismatch; a prefab distorts after rotating the source brush; a player dies just standing still; power-ups never drop in an area or land out of reach; zombies won't path through an opened door; or the assert `You must specify a script noteworthy with the zone name`. Distinct from t7kb:compiling (running the build) and t7kb:zombies-ai (spawners, navmesh) — this is the geometry and placement behind those failures.
+description: How to build Black Ops 3 maps in Radiant — grid/brushwork discipline, structural vs detail brushes, sealing against BSP leaks (`.lin` leakfile, sky brush box), CSG/patches for terrain, prefab-then-rotate ordering, zombies zones (`info_volume` coverage, respawn points, door/debris clips), and clip textures (`clip_player`, `weaponClip`, `clip_nosight`) vs caulk and a `dyn_model`'s collmap/physpreset. Use when creating a new map (`t7kb:create`), when a compile hits `WROTE BSP LEAKFILE`, `MAX_MAP_TRIANGLES`, a hang on "coalescing coincident windings" or an `-onlyents` brush-count mismatch; a prefab distorts after rotating the source brush; a player dies just standing still; power-ups never drop in an area or land out of reach; zombies won't path through an opened door; or the assert `You must specify a script noteworthy with the zone name`. Distinct from t7kb:compiling (running the build) and t7kb:zombies-ai (spawners, navmesh) — this is the geometry behind those failures.
 ---
 
 # Building BO3 maps in Radiant
 
 Radiant is brush/patch geometry, not code — the craft here is grid discipline, sealing the level, and knowing which compile error points at which kind of geometry mistake. Look up exact texture names, dvars, and specific error strings in **t7kb** (`t7kb:search` then `t7kb:get`); this skill is the method and the recurring gotchas around it.
+
+## Start a new map from a template, not from an empty `.map`
+
+A usermap is more than its `.map`: the build also needs the map's `.zone`, scripts and sound config. The Launcher's File > New copies `rex/templates/<template>` onto the install — `map_source/zm/<name>.map` plus `usermaps/<name>/` (`scripts/`, `zone_source/<name>.zone`, `sound/zoneconfig/<name>.szc`, loading and preview images) — renaming `template` everywhere and giving every Radiant `guid` a fresh one (verified in the install's templates). **`t7kb:create` does the same from the agent**: a dry run first, and it never overwrites a file. The name must start with `zm_` or `mp_`, matching the template. `ZM Mod Level` is the plain one; `ZM Basic Level` and `ZM Advanced Level` add a starter HUD, a weapons table and, under `share/raw/sound/`, sound aliases that are shared across maps. Then open the `.map` in Radiant, and build with **t7kb:compiling**.
 
 ## Grid discipline and brush basics
 
