@@ -52,7 +52,10 @@ type Plan struct {
 	Template  string   `json:"template"`
 	Files     []File   `json:"files"`
 	Conflicts []string `json:"conflicts,omitempty"` // destinations that already exist
-	root      string
+	// Assetlists are stock assetlists the template has its own copy of: only its
+	// overrides are applied (see assetlistDir).
+	Assetlists []AssetlistEdit `json:"assetlist_edits,omitempty"`
+	root       string
 }
 
 // Templates lists the templates under rex/templates.
@@ -106,8 +109,17 @@ func NewPlan(root, name, template string, zones []string) (*Plan, error) {
 		if !keep(rel) {
 			return nil
 		}
+		dest := filepath.Join(root, filepath.FromSlash(rel))
+		_, statErr := os.Stat(dest)
+		if strings.HasPrefix(rel, assetlistDir) && statErr == nil {
+			e, err := planAssetlist(path, dest, rel)
+			if err == nil && len(e.CommentOut) > 0 {
+				p.Assetlists = append(p.Assetlists, *e)
+			}
+			return err
+		}
 		p.Files = append(p.Files, File{Path: rel, source: path})
-		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel))); err == nil {
+		if statErr == nil {
 			p.Conflicts = append(p.Conflicts, rel)
 		}
 		return nil
@@ -176,18 +188,33 @@ func (p *Plan) Write() error {
 	}
 	newDirs := p.missingDirs()
 	var written []string
+	var restores []func()
+	undo := func() {
+		for _, r := range restores {
+			r()
+		}
+		for _, w := range written {
+			_ = os.Remove(w)
+		}
+		for _, d := range newDirs { // deepest first; os.Remove leaves a directory that isn't empty
+			_ = os.Remove(d)
+		}
+	}
 	for _, f := range p.Files {
 		dst := filepath.Join(p.root, filepath.FromSlash(f.Path))
 		if err := p.writeOne(f.source, dst); err != nil {
-			for _, w := range written {
-				_ = os.Remove(w)
-			}
-			for _, d := range newDirs { // deepest first; os.Remove leaves a directory that isn't empty
-				_ = os.Remove(d)
-			}
+			undo()
 			return fmt.Errorf("%s: %w (nothing kept)", f.Path, err)
 		}
 		written = append(written, dst)
+	}
+	for _, e := range p.Assetlists {
+		restore, err := applyAssetlist(filepath.Join(p.root, filepath.FromSlash(e.File)), e)
+		if err != nil {
+			undo()
+			return fmt.Errorf("%s: %w (nothing kept)", e.File, err)
+		}
+		restores = append(restores, restore)
 	}
 	return nil
 }

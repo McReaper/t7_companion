@@ -154,3 +154,43 @@ func TestCreateRollsBack(t *testing.T) {
 		t.Error("the file that was in the way must be left alone")
 	}
 }
+
+// A template's copy of a stock assetlist is merged, not copied: its overrides
+// are commented out in the install's list, which keeps its own.
+func TestCreateMergesAssetlists(t *testing.T) {
+	root := fakeRoot(t)
+	write := func(rel, body string) {
+		p := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	adv := "rex/templates/ZM Advanced Level/"
+	write(adv+"usermaps/template/zone_source/template.zone", ">class,zm_mod_level\r\n")
+	// the template overrides model_a and keeps model_b; the user overrode model_b
+	write(adv+"zone_source/all/assetlist/core_common.csv", "//xmodel,model_a\r\nxmodel,model_b\r\nimage,img_c\r\n")
+	write("zone_source/all/assetlist/core_common.csv", "xmodel,model_a\r\n// xmodel,model_b\r\nimage,img_c\r\nimage,only_here\r\n")
+
+	p, err := NewPlan(root, "zm_adv", "ZM Advanced Level", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Conflicts) != 0 || len(p.Assetlists) != 1 || strings.Join(p.Assetlists[0].CommentOut, ",") != "xmodel,model_a" {
+		t.Fatalf("plan: conflicts %v, edits %+v", p.Conflicts, p.Assetlists)
+	}
+	for _, f := range p.Files {
+		if strings.HasPrefix(f.Path, "zone_source/") {
+			t.Errorf("the stock list must not be copied: %s", f.Path)
+		}
+	}
+	if err := p.Write(); err != nil {
+		t.Fatal(err)
+	}
+	got := string(read(t, root, "zone_source/all/assetlist/core_common.csv"))
+	if want := "//xmodel,model_a\r\n// xmodel,model_b\r\nimage,img_c\r\nimage,only_here\r\n"; got != want {
+		t.Errorf("merged list:\n%q\nwant\n%q", got, want)
+	}
+}
