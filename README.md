@@ -62,11 +62,11 @@ irm https://raw.githubusercontent.com/McReaper/t7_companion/main/install/install
 
 Then register `t7kb mcp` as a stdio server ([per-client config](docs/clients.md)) and drop [`templates/AGENTS.md`](templates/AGENTS.md) at your BO3 mod-tools root — it carries the skills' core guidance for agents without them. Or paste this README to your agent and let it do all of that.
 
-The database: a ~0.9 GB download, ~3.5 GB once unpacked.
+The database: a ~0.9 GB download, unpacked to ~3.5 GB on first run.
 
 ## ✨ What your agent gets
 
-- **A knowledge base it searches before answering** — wikis, forums, Discord, Treyarch's scripts, tutorials and the mod-tools schemas. Every hit carries its source and reliability, so a Treyarch script outweighs a Discord guess.
+- **A knowledge base it searches before answering** — wikis, forums, Discord, Treyarch's scripts, tutorials and the mod-tools schemas. Every hit carries its source, URL and reliability, so the agent can cite it and weigh a Treyarch script above a Discord guess.
 - **Skills for each craft** — scripting, mapping, compiling, assets, animation, zombies AI, HUD, FX, atmosphere…: the method and its silent traps (the callback that never fires, the wallbuy that shows *Cost: 0*). Claude Code only.
 - **GDT tools** — find, read, check and edit APE's GDTs against the install's own schema, as a dry run unless told to write. `gdt_check` catches broken references, missing files and duplicates before the linker does.
 - **What the build packed** — why an asset is in your fastfile, what each zone line weighs, and which of your stock overrides won't ship.
@@ -94,7 +94,7 @@ t7kb update-check            is a newer release out? is the plugin behind?
 
 ## 🤝 Contributing
 
-Found a trap a skill doesn't mention, or one that's wrong? Tell your agent: the `contribute` skill writes the fix and, with your go-ahead, opens a pull request. By hand, start from [the authoring guide](plugin/skills/contribute/SKILL.md).
+Found a trap a skill doesn't mention, or one that's wrong? Tell your agent in Claude Code: the `contribute` skill writes the fix and, with your go-ahead, opens a pull request. By hand, start from [the authoring guide](plugin/skills/contribute/SKILL.md).
 
 ## 📄 License
 
