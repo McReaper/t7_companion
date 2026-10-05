@@ -30,6 +30,7 @@ type Entry struct {
 	Hidden    bool     `json:"hidden,omitempty"`        // declared with .Show( false ) somewhere
 	RelPath   string   `json:"relative_path,omitempty"` // Path entries: directory the value is relative to
 	Varies    bool     `json:"varies,omitempty"`        // declared again with another kind or target (script branches): not type-checked
+	Count     string   `json:"count_field,omitempty"`   // an item list's entries (bodyType01…): the field counting the ones in use
 
 	// a Combo whose options (in this or another declaration) aren't static: any
 	// value may be valid, so none is checked
@@ -154,49 +155,80 @@ func LoadSchema(deffiles, assetType string) (*Schema, error) {
 	vars := parseAwiVars(code)
 	s.glossPresets = glossPresets(code)
 	for _, m := range addEntryRE.FindAllStringSubmatchIndex(code, -1) {
-		kind := code[m[2]:m[3]]
-		args, end := balanced(code, m[1]-1)
-		if end < 0 || uiOnly[kind] {
-			continue
-		}
-		parts := splitArgs(args)
-		if len(parts) == 0 {
-			continue
-		}
-		// VectorN / multi-field controls declare one field per leading string literal:
-		// AddEntry_Vector2( "glossRangeMin", "glossRangeMax", … )
-		nNames := 1
-		if strings.HasPrefix(kind, "Vector") && len(kind) > len("Vector") {
-			for nNames < len(parts) {
-				if _, _, ok := entryName(parts[nNames]); !ok {
-					break
-				}
-				nNames++
-			}
-		}
-		chain := chainAfter(code, end)
-		for i := 0; i < nNames; i++ {
-			name, re, ok := entryName(parts[i])
-			if !ok {
-				continue // name is a variable — nothing static to learn
-			}
-			d := &Entry{Name: name, Pattern: re != nil, Kind: kind, re: re}
-			if nNames == 1 {
-				fillArgs(d, kind, parts[1:], vars)
-			} else {
-				d.Kind = "Float" // one component of a multi-field control
-			}
-			fillChain(d, chain)
-			if e := s.Entries[name]; e != nil {
-				e.merge(d)
-				continue
-			}
-			s.Entries[name] = d
-			s.order = append(s.order, name)
-		}
+		s.declare(code, m, vars)
+	}
+	for _, d := range itemLists(code) {
+		s.add(d)
 	}
 	s.index() // before the schema is shared: Lookup must not build it concurrently
 	return s, nil
+}
+
+// declare reads one AddEntry_<kind>( … ) call, at m in code.
+func (s *Schema) declare(code string, m []int, vars *awiVars) {
+	kind := code[m[2]:m[3]]
+	args, end := balanced(code, m[1]-1)
+	if end < 0 || uiOnly[kind] {
+		return
+	}
+	parts := splitArgs(args)
+	if len(parts) == 0 {
+		return
+	}
+	// VectorN / multi-field controls declare one field per leading string literal:
+	// AddEntry_Vector2( "glossRangeMin", "glossRangeMax", … )
+	nNames := 1
+	if strings.HasPrefix(kind, "Vector") && len(kind) > len("Vector") {
+		for nNames < len(parts) {
+			if _, _, ok := entryName(parts[nNames]); !ok {
+				break
+			}
+			nNames++
+		}
+	}
+	chain := chainAfter(code, end)
+	for i := 0; i < nNames; i++ {
+		name, re, ok := entryName(parts[i])
+		if !ok {
+			continue // name is a variable — nothing static to learn
+		}
+		d := &Entry{Name: name, Pattern: re != nil, Kind: kind, re: re}
+		if nNames == 1 {
+			fillArgs(d, kind, parts[1:], vars)
+		} else {
+			d.Kind = "Float" // one component of a multi-field control
+		}
+		fillChain(d, chain)
+		s.add(d)
+	}
+}
+
+// add declares an entry, merged into an earlier declaration of the same name.
+func (s *Schema) add(d *Entry) {
+	if e := s.Entries[d.Name]; e != nil {
+		e.merge(d)
+		return
+	}
+	s.Entries[d.Name] = d
+	s.order = append(s.order, d.Name)
+}
+
+var itemListRE = regexp.MustCompile(`GenerateItemList\(\s*Asset\s*,\s*"([^"]+)"\s*,\s*"[^"]*"\s*,\s*"([^"]+)"`)
+
+// itemLists declares the fields of each GenerateItemList( Asset, "<type>",
+// "<title>", "<prefix>", max ) call (asset_list_helper.h), whose own
+// declarations use variables: the items <prefix>01, <prefix>02… referencing a
+// <type> each, and <prefix>Count, how many are in use.
+func itemLists(code string) []*Entry {
+	var out []*Entry
+	for _, m := range itemListRE.FindAllStringSubmatch(code, -1) {
+		typ, prefix := m[1], m[2]
+		out = append(out,
+			&Entry{Name: prefix + "*", Pattern: true, Kind: "AssetCombo", AssetType: typ, Count: prefix + "Count",
+				re: regexp.MustCompile(`(?i)^` + regexp.QuoteMeta(prefix) + `\d+$`)},
+			&Entry{Name: prefix + "Count", Kind: "Int", Hidden: true})
+	}
+	return out
 }
 
 var awiIncludeRE = regexp.MustCompile(`(?m)^\s*#include\s+"([^"]+)"`)

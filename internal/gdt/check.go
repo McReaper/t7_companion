@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -39,7 +40,8 @@ var fileFields = map[string]map[string]string{
 // precisely enough for a type mismatch to be an error.
 var coreTypes = map[string]bool{"image": true, "material": true, "xmodel": true, "xanim": true}
 
-// Refs returns the typed asset references among an asset's effective fields.
+// Refs returns the typed asset references among an asset's effective fields,
+// engine built-ins ($white_diffuse…) included: the linker packs those too.
 func (w *Workspace) Refs(typ string, fields []Field) []Ref {
 	sc, err := w.Schema(typ)
 	if err != nil {
@@ -48,7 +50,7 @@ func (w *Workspace) Refs(typ string, fields []Field) []Ref {
 	var out []Ref
 	for _, f := range fields {
 		v := Unquote(f.Value)
-		if v == "" || strings.HasPrefix(v, "$") { // $white_diffuse etc. are engine built-ins
+		if v == "" {
 			continue
 		}
 		e := sc.Lookup(f.Key)
@@ -57,11 +59,30 @@ func (w *Workspace) Refs(typ string, fields []Field) []Ref {
 		}
 		// Texture entries are not references: image.awi uses them for the source
 		// file (baseImage) and composite channel names — FileRefs covers baseImage.
-		if e.Kind == "AssetCombo" && e.AssetType != "" && !e.Varies {
+		if e.Kind == "AssetCombo" && e.AssetType != "" && !e.Varies && inUse(e, f.Key, fields) {
 			out = append(out, Ref{Field: f.Key, Target: v, Type: e.AssetType})
 		}
 	}
 	return out
+}
+
+// inUse: an item list's entry counts only up to the list's count (APE keeps
+// removed items' values in hidden fields, which nothing reads).
+func inUse(e *Entry, key string, fields []Field) bool {
+	if e.Count == "" {
+		return true
+	}
+	n, err := strconv.Atoi(strings.TrimLeft(key[len(strings.TrimRight(key, "0123456789")):], "0"))
+	if err != nil {
+		return false
+	}
+	for _, f := range fields {
+		if strings.EqualFold(f.Key, e.Count) {
+			count, err := strconv.Atoi(strings.TrimSpace(Unquote(f.Value)))
+			return err == nil && n <= count
+		}
+	}
+	return false
 }
 
 // FileRefs returns the source-file references among an asset's fields, with
@@ -179,6 +200,9 @@ func (w *Workspace) checkAsset(f *File, a *Asset) AssetReport {
 	rep.Issues = append(rep.Issues, w.duplicateIssues(a.Name, typ)...)
 	rep.Issues = append(rep.Issues, w.schemaIssues(f, typ, fields)...)
 	for _, r := range w.Refs(typ, fields) {
+		if strings.HasPrefix(r.Target, "$") { // an engine built-in: no GDT defines it
+			continue
+		}
 		rep.Issues = append(rep.Issues, w.refIssues(r)...)
 	}
 	rep.Issues = append(rep.Issues, w.fileIssues(typ, fields)...)
