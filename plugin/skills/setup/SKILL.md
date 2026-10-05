@@ -47,6 +47,12 @@ Example paths: `~/.t7kb/t7kb` (Linux/macOS, expand `~` to the real home) or `C:\
 
 On Windows this command still runs through a POSIX-style shell (the Bash tool is git-bash), which treats an unquoted backslash as an escape character and silently drops it before a non-special letter — `C:\Users\<you>\AppData\Local\t7kb\t7kb.exe` becomes `C:Users<you>AppDataLocalt7kbt7kb.exe`, a path that can't spawn. Double-quoting the argument (as above) prevents this.
 
+**Memory:** the server keeps the knowledge base's vectors in memory, about 570 MB, so a search answers in ~0.1 s instead of ~2 s. On a machine short of memory (8 GB, with the game and the mod tools open), or if the user asks for it, register it with that turned off — searches then read the vectors from the database:
+
+```bash
+claude mcp add t7kb -e T7KB_VECTOR_INDEX=0 -- "/absolute/path/to/t7kb" mcp
+```
+
 **Validate the registration before moving on:** run `claude mcp list` and confirm the `t7kb` entry shows the full path with backslashes intact (Windows) or the full absolute path (Linux/macOS). If the server fails to connect, check this first — re-run the `claude mcp add` command above with the quoted path to fix it.
 
 ## 3. Offer the workspace primer — and record the root t7kb:knowledge-base depends on

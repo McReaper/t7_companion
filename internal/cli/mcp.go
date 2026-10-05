@@ -1,6 +1,9 @@
 package cli
 
 import (
+	"os"
+	"strings"
+
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
 
@@ -47,7 +50,9 @@ func runMCP() error {
 		return err
 	}
 	defer st.Close()
-	st.EnableVectorIndex() // a long-lived server: search memory, not ~380k rows per query
+	if vectorIndexWanted() {
+		st.EnableVectorIndex() // a long-lived server: search memory, not ~380k rows per query
+	}
 
 	emb, err := embed.New()
 	if err != nil {
@@ -69,4 +74,15 @@ func newMCPServer(st *store.Store, emb *embed.Embedder, warm bool) *server.MCPSe
 		}
 	}
 	return s
+}
+
+// vectorIndexWanted: the MCP server keeps the vectors in memory (~570 MB) unless
+// T7KB_VECTOR_INDEX is 0, false or off — for a machine short of memory, where
+// each search then reads them from the database (~2 s).
+func vectorIndexWanted() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("T7KB_VECTOR_INDEX"))) {
+	case "0", "false", "off", "no":
+		return false
+	}
+	return true
 }
