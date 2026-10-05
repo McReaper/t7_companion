@@ -1,22 +1,3 @@
-// Package gdt reads, validates and writes Black Ops 3 GDT files — the text
-// databases APE edits — using the mod tools' own schema sources: the deffiles
-// (*.awi) that build APE's property pages, and the techsetdefs that decide which
-// fields a material type actually exposes.
-//
-// A GDT is a single brace block of assets:
-//
-//	{
-//		"name" ( "type.gdf" )      // a full asset
-//		{
-//			"key" "value"
-//		}
-//		"child" [ "parent" ]         // a derived asset: only overrides are listed
-//		{
-//		}
-//	}
-//
-// Values are stored exactly as written (backslashes already doubled); use Unquote
-// and Quote to move between the file form and the real string.
 package gdt
 
 import (
