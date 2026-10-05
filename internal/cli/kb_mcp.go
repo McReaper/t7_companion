@@ -17,7 +17,7 @@ func kbToolset(st *store.Store, emb *embed.Embedder) toolset {
 	return toolset{name: "kb", tools: []server.ServerTool{
 		{Tool: searchToolDef(), Handler: searchToolHandler(st, emb)},
 		{Tool: getToolDef(), Handler: getToolHandler(st)},
-	}}
+	}, warm: st.WarmVectors}
 }
 
 func searchToolDef() mcp.Tool {

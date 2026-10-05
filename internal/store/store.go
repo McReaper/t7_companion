@@ -42,6 +42,10 @@ type Store struct {
 	srcOnce sync.Once // sources(): the distinct sources, read once
 	srcList []string
 	srcErr  error
+
+	vecOn   bool      // EnableVectorIndex: score an in-memory copy of the vectors
+	vecOnce sync.Once // vectorIndex(): loaded once
+	vecIx   *vecIndex
 }
 
 // Hit is one fused search result.
@@ -242,6 +246,15 @@ type scoredDoc struct {
 func (s *Store) vectorRank(ctx context.Context, qvec []float32, limit int, only map[string]bool) ([]rankItem, error) {
 	if len(qvec) == 0 {
 		return nil, nil
+	}
+	if s.vecOn {
+		if ix := s.vectorIndex(); ix != nil {
+			top := ix.rank(qvec, limit, only)
+			if err := s.chunkSnippets(ctx, top); err != nil {
+				return nil, err
+			}
+			return rankItems(top), nil
+		}
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT rowid, doc_id, embedding FROM embeddings`)
 	if err != nil {

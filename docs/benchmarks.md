@@ -86,6 +86,8 @@ The tuning judgments are pooled: the top 10 of each ranking variant was judged t
 | Benchmark | Result |
 |---|---|
 | Search, real corpus (embed + search), p50 / max over 16 queries | 2.01 s / 2.17 s |
+| Search in the MCP server, vectors in memory (embed excluded), p50 / max | 41 ms / 258 ms |
+| Vector index load, MCP start | 4.6 s, ~566 MB |
 | `vectorRank`, synthetic | ~5.3 µs and ~1.8 KB allocated per chunk (4k and 40k chunks) |
 | `bm25Rank`, 10k docs | 41 ms |
 | `rrfFuse`, 2 × 50 candidates | 11 µs |
@@ -93,4 +95,4 @@ The tuning judgments are pooled: the top 10 of each ranking variant was judged t
 | Embedding model load | 121 ms, 307 MB allocated |
 | Embed one query | ~90 ms |
 
-The vector scan dominates: ~380k chunks per query. It reads only each chunk's rowid, doc_id and vector and scores them in place, then reads the text of the winners alone for their snippets; what remains is the SQLite driver reading every row. Keeping the vectors in memory in the MCP server (~560 MB) is the next lossless step if it is needed.
+The vector scan dominates: ~380k chunks per query. It reads only each chunk's rowid, doc_id and vector and scores them in place, then reads the text of the winners alone for their snippets; what remains is the SQLite driver reading every row. The MCP server keeps every vector in memory instead (`vecindex.go`), scored on every CPU with the scan's results (`TestVectorIndexMatchesScan`); the CLI keeps the scan.

@@ -47,6 +47,7 @@ func runMCP() error {
 		return err
 	}
 	defer st.Close()
+	st.EnableVectorIndex() // a long-lived server: search memory, not ~380k rows per query
 
 	emb, err := embed.New()
 	if err != nil {

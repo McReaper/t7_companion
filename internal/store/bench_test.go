@@ -41,7 +41,7 @@ var (
 
 // corpus builds (once per size, per process) a db of docs documents with chunks
 // embeddings each.
-func corpus(b *testing.B, docs, chunks int) benchCorpus {
+func corpus(b testing.TB, docs, chunks int) benchCorpus {
 	b.Helper()
 	key := fmt.Sprintf("%dx%d", docs, chunks)
 	benchMu.Lock()
