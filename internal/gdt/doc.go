@@ -44,8 +44,11 @@
 // Every GDT in the directories gdtdb scans (bin/converter_gdt_dirs_0.txt) is
 // indexed, gob-cached in the user cache dir and refreshed incrementally by
 // mtime/size; the MCP server warms it at start and refresh (index.go) keeps it
-// fresh in a long session. Parsed GDTs are cached by mtime/size
-// (Workspace.Load): never mutate what Load returns; edits parse their own copy.
+// fresh in a long session. gdtdb's own database can't stand in for it: a
+// standard SQLite build refuses gdtdb/gdt.db ("too many columns on
+// scriptbundle": a table exceeds the default column limit). Parsed GDTs are
+// cached by mtime/size (Workspace.Load): never mutate what Load returns; edits
+// parse their own copy.
 //
 // # Editing
 //

@@ -121,6 +121,7 @@ def check_budget(rel: str, body: str, first: int) -> None:
         report(rel, first, "ERROR",
                f"{words} words, over its budget of {budget}. Don't trim words elsewhere to make room: first decide whether "
                f"the new detail's reader is here at all; if it is, move a whole block to its reader — {home}. "
+               f"Raising the budget is a separate, justified decision (its own commit), never a way to fit this change. "
                f"Largest sections: {biggest}")
     elif words >= NEAR * budget:
         report(rel, first, "WARN",

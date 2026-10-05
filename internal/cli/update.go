@@ -43,6 +43,8 @@ func runUpdateCheck(cmd *cobra.Command) error {
 	current := strings.TrimPrefix(Version(), "v")
 	latest := strings.TrimPrefix(rel.TagName, "v")
 
+	// Plain string equality, no semver: GitHub's latest release is by definition
+	// newer than any other, so any difference means an update.
 	switch {
 	case Version() == "dev":
 		fmt.Fprintf(out, "Running a local/dev build. Latest release: %s (%s)\n", rel.TagName, rel.HTMLURL)

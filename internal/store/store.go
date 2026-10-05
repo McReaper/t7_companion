@@ -26,7 +26,7 @@ const Pool = 50
 // body (the summary half as much). Reference pages are short with precise
 // titles ("PlayFXOnTag (GSC)", "Wallbuy 0 Fix") and lost to long threads and
 // scripts repeating the words. Scored against internal/cli TestRetrievalQuality
-// (docs/benchmarks.md): it brings one more tuning query's key into the top 5
+// (docs/retrieval-quality.md): it brings one more tuning query's key into the top 5
 // and leaves the blind held-out set unchanged.
 //
 // Reliability stays a tiebreak only. Weighting the fused score by it
