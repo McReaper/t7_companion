@@ -85,12 +85,12 @@ The tuning judgments are pooled: the top 10 of each ranking variant was judged t
 
 | Benchmark | Result |
 |---|---|
-| Search, real corpus (embed + search), p50 / max over 16 queries | 2.52 s / 2.82 s |
-| `vectorRank`, synthetic | ~7.8 µs and ~8 KB allocated per chunk (4k and 40k chunks) |
+| Search, real corpus (embed + search), p50 / max over 16 queries | 2.01 s / 2.17 s |
+| `vectorRank`, synthetic | ~5.3 µs and ~1.8 KB allocated per chunk (4k and 40k chunks) |
 | `bm25Rank`, 10k docs | 41 ms |
 | `rrfFuse`, 2 × 50 candidates | 11 µs |
 | `Get`, one document | 0.12 ms |
 | Embedding model load | 121 ms, 307 MB allocated |
 | Embed one query | ~90 ms |
 
-The vector scan dominates: at ~350k chunks, ~7.8 µs/chunk is ~2.7 s per query, matching the measured search time. It reads every chunk's text along with its vector, though only the best chunks' text becomes a snippet.
+The vector scan dominates: ~380k chunks per query. It reads only each chunk's rowid, doc_id and vector and scores them in place, then reads the text of the winners alone for their snippets; what remains is the SQLite driver reading every row. Keeping the vectors in memory in the MCP server (~560 MB) is the next lossless step if it is needed.

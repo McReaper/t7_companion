@@ -227,17 +227,23 @@ type scoredDoc struct {
 	docID   string
 	score   float64
 	snippet string
+	chunk   int64 // rowid of the best chunk, whose text becomes the snippet
 }
 
 // vectorRank streams the embeddings table, scoring each chunk by cosine (dot,
 // since vectors are L2-normalized) against qvec and keeping the best chunk per
 // doc. Chunks whose dimension differs from qvec are skipped — so the tool
 // degrades to BM25-only against a db embedded with a different model.
+//
+// The scan reads only each chunk's rowid, doc_id and vector, scored in place
+// from the row's bytes: a full corpus is ~380k chunks, and copying each text
+// and vector cost more than the scoring. The text of the winners alone is read
+// afterwards, for their snippets.
 func (s *Store) vectorRank(ctx context.Context, qvec []float32, limit int, only map[string]bool) ([]rankItem, error) {
 	if len(qvec) == 0 {
 		return nil, nil
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT doc_id, chunk_text, embedding FROM embeddings`)
+	rows, err := s.db.QueryContext(ctx, `SELECT rowid, doc_id, embedding FROM embeddings`)
 	if err != nil {
 		return nil, nil // no embeddings table → vector disabled, not fatal
 	}
@@ -245,33 +251,62 @@ func (s *Store) vectorRank(ctx context.Context, qvec []float32, limit int, only 
 
 	best := make(map[string]scoredDoc)
 	for rows.Next() {
-		var docID string
-		var chunkText sql.NullString
-		var blob []byte
-		if err := rows.Scan(&docID, &chunkText, &blob); err != nil {
+		var rowid int64
+		var docID, blob sql.RawBytes // valid until the next Next: no copy per chunk
+		if err := rows.Scan(&rowid, &docID, &blob); err != nil {
 			return nil, err
 		}
-		if len(only) > 0 && !only[sourceOf(docID)] {
+		if len(blob) != 4*len(qvec) {
 			continue
 		}
-		v := decodeVec(blob)
-		if len(v) != len(qvec) {
+		if len(only) > 0 && !only[sourceOf(string(docID))] {
 			continue
 		}
-		score := dot(qvec, v)
-		if cur, ok := best[docID]; !ok || score > cur.score {
-			best[docID] = scoredDoc{docID, score, snippetOf(chunkText.String)}
+		score := dotBytes(qvec, blob)
+		if cur, ok := best[string(docID)]; !ok || score > cur.score { // a map lookup by string(bytes) doesn't allocate
+			id := string(docID)
+			best[id] = scoredDoc{docID: id, score: score, chunk: rowid}
 		}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	return topRankItems(best, limit), nil
+	top := topDocs(best, limit)
+	if err := s.chunkSnippets(ctx, top); err != nil {
+		return nil, err
+	}
+	return rankItems(top), nil
 }
 
-// topRankItems sorts scored docs by score (descending), truncates to limit, and
-// projects to rankItems.
-func topRankItems(byDoc map[string]scoredDoc, limit int) []rankItem {
+// chunkSnippets reads the best chunk's text of each doc and makes its snippet.
+func (s *Store) chunkSnippets(ctx context.Context, docs []scoredDoc) error {
+	if len(docs) == 0 {
+		return nil
+	}
+	ids := make([]string, len(docs))
+	args := make([]any, len(docs))
+	at := make(map[int64]int, len(docs))
+	for i, d := range docs {
+		ids[i], args[i], at[d.chunk] = "?", d.chunk, i
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT rowid, chunk_text FROM embeddings WHERE rowid IN (`+strings.Join(ids, ",")+`)`, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var rowid int64
+		var text sql.NullString
+		if err := rows.Scan(&rowid, &text); err != nil {
+			return err
+		}
+		docs[at[rowid]].snippet = snippetOf(text.String)
+	}
+	return rows.Err()
+}
+
+// topDocs returns the limit best-scoring docs, best first.
+func topDocs(byDoc map[string]scoredDoc, limit int) []scoredDoc {
 	docs := make([]scoredDoc, 0, len(byDoc))
 	for _, d := range byDoc {
 		docs = append(docs, d)
@@ -280,6 +315,10 @@ func topRankItems(byDoc map[string]scoredDoc, limit int) []rankItem {
 	if limit > 0 && len(docs) > limit {
 		docs = docs[:limit]
 	}
+	return docs
+}
+
+func rankItems(docs []scoredDoc) []rankItem {
 	items := make([]rankItem, len(docs))
 	for i, d := range docs {
 		items[i] = rankItem{docID: d.docID, snippet: d.snippet}
@@ -291,6 +330,16 @@ func dot(a, b []float32) float64 {
 	var sum float64
 	for i := range a {
 		sum += float64(a[i]) * float64(b[i])
+	}
+	return sum
+}
+
+// dotBytes is dot(a, decodeVec(b)) computed from the bytes in place, with the
+// same arithmetic, so the scores are identical to the bit.
+func dotBytes(a []float32, b []byte) float64 {
+	var sum float64
+	for i := range a {
+		sum += float64(a[i]) * float64(math.Float32frombits(binary.LittleEndian.Uint32(b[i*4:])))
 	}
 	return sum
 }
