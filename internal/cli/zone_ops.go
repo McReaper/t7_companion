@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"github.com/McReaper/t7_companion/internal/asset"
 	"os"
 	"path/filepath"
 	"sort"
@@ -195,7 +196,7 @@ func zoneExplain(toolsPath, name, asset, typ string) (*zoneExplainResult, error)
 	lists, _, _ := z.ignoreLists() // a map without a readable zone file still gets its chains
 	res := &zoneExplainResult{Map: name, zoneStatus: z.status}
 	for _, p := range z.report.Find(asset, typ) {
-		out := packedOut{Asset: p.String(), Resident: p.Resident, Streamed: p.Streamed, Stock: stockNote(lists.Lookup(p.Ref))}
+		out := packedOut{Asset: p.String(), Resident: p.Resident, Streamed: p.Streamed, Stock: stockNote(lists.Lookup(p.ID))}
 		for _, c := range p.Chain {
 			out.PulledInBy = append(out.PulledInBy, c.String())
 		}
@@ -259,15 +260,15 @@ func zoneContents(toolsPath, name, line string) (*zoneContentsResult, error) {
 }
 
 // parseRef reads "type,name", "type name" or a bare name.
-func parseRef(s string) zone.Ref {
+func parseRef(s string) asset.ID {
 	s = strings.TrimSpace(s)
 	if t, n, ok := strings.Cut(s, ","); ok {
-		return zone.Ref{Type: strings.TrimSpace(t), Name: strings.TrimSpace(n)}
+		return asset.ID{Type: strings.TrimSpace(t), Name: strings.TrimSpace(n)}
 	}
 	if t, n, ok := strings.Cut(s, " "); ok && !strings.ContainsAny(t, "/\\.") {
-		return zone.Ref{Type: t, Name: strings.TrimSpace(n)}
+		return asset.ID{Type: t, Name: strings.TrimSpace(n)}
 	}
-	return zone.Ref{Name: s}
+	return asset.ID{Name: s}
 }
 
 func size(p zone.Packed) int64 { return p.Resident + p.Streamed }
@@ -282,7 +283,7 @@ func totals(ps []zone.Packed) (n int, res, str int64) {
 
 // lineSummary groups assets by the zone line that pulled them in, heaviest first.
 func lineSummary(ps []zone.Packed) ([]zoneLineOut, int) {
-	by := map[zone.Ref]*zoneLineOut{}
+	by := map[asset.ID]*zoneLineOut{}
 	for _, p := range ps {
 		l := p.Line()
 		o := by[l]

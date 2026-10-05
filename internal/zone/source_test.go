@@ -1,6 +1,7 @@
 package zone
 
 import (
+	"github.com/McReaper/t7_companion/internal/asset"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -77,14 +78,14 @@ func TestAssetlists(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	active := lists.Lookup(Ref{Type: "ScriptParseTree", Name: "SCRIPTS/zm/_zm_weapons.gsc"})
+	active := lists.Lookup(asset.ID{Type: "ScriptParseTree", Name: "SCRIPTS/zm/_zm_weapons.gsc"})
 	if len(active) != 1 || !active[0].Active || active[0].Line != 1 || active[0].File() != "zone_source/all/assetlist/zm_patch.csv" {
 		t.Errorf("active entry: %+v", active)
 	}
-	if c := lists.Lookup(Ref{Type: "scriptparsetree", Name: "scripts/zm/_zm_perks.gsc"}); len(c) != 1 || c[0].Active || c[0].Line != 2 {
+	if c := lists.Lookup(asset.ID{Type: "scriptparsetree", Name: "scripts/zm/_zm_perks.gsc"}); len(c) != 1 || c[0].Active || c[0].Line != 2 {
 		t.Errorf("a // line is an override, kept with its line number: %+v", c)
 	}
-	if e := lists.Lookup(Ref{Type: "fx", Name: "zombie/fx_blood"}); len(e) != 1 || e[0].Line != 2 {
+	if e := lists.Lookup(asset.ID{Type: "fx", Name: "zombie/fx_blood"}); len(e) != 1 || e[0].Line != 2 {
 		t.Errorf("blank lines still count: %+v", e)
 	}
 	if _, err := LoadAssetlists(root, []string{"nope"}); err == nil {

@@ -122,7 +122,7 @@ func zonedShadows(root, zoneFile string, lists zone.Assetlists) []shadowOut {
 	}
 	var out []shadowOut
 	for _, l := range lines {
-		if e, ok := activeEntry(lists.Lookup(l.Ref)); ok {
+		if e, ok := activeEntry(lists.Lookup(l.ID)); ok {
 			out = append(out, shadowOut{Asset: l.String(), Yours: fmt.Sprintf("zoned at %s:%d", relTo(root, l.File), l.N), Stock: fmt.Sprintf("%s:%d", e.File(), e.Line)})
 		}
 	}
@@ -138,7 +138,7 @@ func gdtShadows(z *zoneCtx, lists zone.Assetlists) []shadowOut {
 	}
 	var out []shadowOut
 	for _, p := range z.report.Assets {
-		e, ok := activeEntry(lists.Lookup(p.Ref))
+		e, ok := activeEntry(lists.Lookup(p.ID))
 		if !ok {
 			continue
 		}
