@@ -15,6 +15,7 @@ func newSearchCmd() *cobra.Command {
 	var (
 		num     int
 		bm25    bool
+		vector  bool
 		scores  bool
 		sources []string
 	)
@@ -23,17 +24,21 @@ func newSearchCmd() *cobra.Command {
 		Short: "Hybrid (BM25 + vector) search",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runSearch(cmd, strings.Join(args, " "), num, bm25, scores, sources)
+			if bm25 && vector {
+				return fmt.Errorf("--bm25 and --vector each keep one half of the search: pass one, or neither for both")
+			}
+			return runSearch(cmd, strings.Join(args, " "), num, bm25, vector, scores, sources)
 		},
 	}
 	cmd.Flags().IntVarP(&num, "num", "n", 10, "number of results")
 	cmd.Flags().BoolVar(&bm25, "bm25", false, "keyword-only (skip vector embedding)")
+	cmd.Flags().BoolVar(&vector, "vector", false, "semantic-only (skip the keyword index): with --bm25, compares what each half finds")
 	cmd.Flags().BoolVar(&scores, "scores", false, "show fused RRF score + reliability per hit")
 	cmd.Flags().StringSliceVar(&sources, "source", nil, "only these sources: a group ("+strings.Join(store.SourceGroups(), ", ")+") or a source name; comma-separated or repeated")
 	return cmd
 }
 
-func runSearch(cmd *cobra.Command, query string, num int, bm25, scores bool, sources []string) error {
+func runSearch(cmd *cobra.Command, query string, num int, bm25, vector, scores bool, sources []string) error {
 	st, err := openStore()
 	if err != nil {
 		return err
@@ -51,7 +56,11 @@ func runSearch(cmd *cobra.Command, query string, num int, bm25, scores bool, sou
 		}
 	}
 
-	hits, err := st.SearchHybrid(cmd.Context(), query, qvec, num, only...)
+	keywords := query
+	if vector {
+		keywords = "" // an empty keyword query leaves the ranking to the vectors
+	}
+	hits, err := st.SearchHybrid(cmd.Context(), keywords, qvec, num, only...)
 	if err != nil {
 		return err
 	}
