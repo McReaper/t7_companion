@@ -3,6 +3,7 @@ package zone
 import (
 	"bufio"
 	"fmt"
+	"github.com/McReaper/t7_companion/internal/asset"
 	"os"
 	"path/filepath"
 	"slices"
@@ -112,7 +113,7 @@ type ListEntry struct {
 func (e ListEntry) File() string { return "zone_source/all/assetlist/" + e.List + ".csv" }
 
 // Assetlists indexes stock assetlist entries by lower-cased type and name.
-type Assetlists map[Ref][]ListEntry
+type Assetlists map[asset.ID][]ListEntry
 
 // LoadAssetlists reads zone_source/all/assetlist/<list>.csv for each list:
 // `type,name` lines, commented-out ones included (that is how an override is made).
@@ -131,7 +132,7 @@ func LoadAssetlists(root string, lists []string) (Assetlists, error) {
 			if !ok || typ == "" || name == "" {
 				continue
 			}
-			key := Ref{Type: strings.ToLower(strings.TrimSpace(typ)), Name: strings.ToLower(strings.TrimSpace(name))}
+			key := asset.ID{Type: strings.TrimSpace(typ), Name: strings.TrimSpace(name)}.Key()
 			out[key] = append(out[key], ListEntry{List: list, Line: n, Active: !commented})
 		}
 		err = sc.Err()
@@ -144,13 +145,13 @@ func LoadAssetlists(root string, lists []string) (Assetlists, error) {
 }
 
 // Lookup returns the entries for an asset.
-func (a Assetlists) Lookup(r Ref) []ListEntry {
-	return a[Ref{Type: strings.ToLower(r.Type), Name: strings.ToLower(r.Name)}]
+func (a Assetlists) Lookup(r asset.ID) []ListEntry {
+	return a[r.Key()]
 }
 
 // Line is an asset line of a zone source file.
 type Line struct {
-	Ref
+	asset.ID
 	File string `json:"file"`
 	N    int    `json:"line"`
 }
@@ -195,7 +196,7 @@ func zoneLines(root, mapDir, path string, seen map[string]bool, out *[]Line) err
 				return err
 			}
 		default:
-			*out = append(*out, Line{Ref: Ref{Type: typ, Name: name}, File: path, N: n})
+			*out = append(*out, Line{ID: asset.ID{Type: typ, Name: name}, File: path, N: n})
 		}
 	}
 	return sc.Err()

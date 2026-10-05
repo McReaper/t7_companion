@@ -8,49 +8,41 @@ package zone
 import (
 	"bufio"
 	"fmt"
+	"github.com/McReaper/t7_companion/internal/asset"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 )
 
-// Ref names an asset, or a zone file or zone package (type "csv") in a chain.
-type Ref struct{ Type, Name string }
-
-func (r Ref) String() string {
-	if r.Type == "csv" || r.Type == "" {
-		return r.Name
-	}
-	return r.Type + " " + r.Name
-}
-
 // Packed is one asset the link wrote into the fastfile.
 type Packed struct {
-	Ref
-	Resident, Streamed int64 // bytes loaded with the zone, bytes streamed from disk
-	Chain              []Ref // parents, nearest first; the last is the zone file
+	asset.ID
+	Resident, Streamed int64      // bytes loaded with the zone, bytes streamed from disk
+	Chain              []asset.ID // parents, nearest first; the last is the zone file
 }
 
 // Line is what pulled the asset in at the top: the zone line (the chain entry
 // just below the .zone file, or the asset itself when the zone lists it
 // directly), or the chain's root when it doesn't reach the zone — the linker
 // also packs assets for the map's texture combos and BSP volumes.
-func (p Packed) Line() Ref {
+func (p Packed) Line() asset.ID {
 	n := len(p.Chain)
 	switch {
 	case n == 0:
-		return p.Ref
+		return p.ID
 	case !isZoneFile(p.Chain[n-1]):
 		return p.Chain[n-1]
 	case n == 1:
-		return p.Ref
+		return p.ID
 	default:
 		return p.Chain[n-2]
 	}
 }
 
-func isZoneFile(r Ref) bool { return r.Type == "csv" && strings.HasSuffix(r.Name, ".zone") }
+func isZoneFile(r asset.ID) bool { return r.Type == "csv" && strings.HasSuffix(r.Name, ".zone") }
 
 // Report is a linker's assetinfo report for one zone.
 type Report struct {
@@ -74,17 +66,17 @@ func (r *Report) Find(name, typ string) []Packed {
 
 // Under returns the assets that ref pulled in: those whose chain holds it, and
 // ref itself. An empty ref type matches any type.
-func (r *Report) Under(ref Ref) []Packed {
+func (r *Report) Under(ref asset.ID) []Packed {
 	var out []Packed
 	for _, p := range r.Assets {
-		if matches(p.Ref, ref) || containsRef(p.Chain, ref) {
+		if matches(p.ID, ref) || containsRef(p.Chain, ref) {
 			out = append(out, p)
 		}
 	}
 	return out
 }
 
-func containsRef(chain []Ref, ref Ref) bool {
+func containsRef(chain []asset.ID, ref asset.ID) bool {
 	for _, c := range chain {
 		if matches(c, ref) {
 			return true
@@ -93,7 +85,7 @@ func containsRef(chain []Ref, ref Ref) bool {
 	return false
 }
 
-func matches(r, want Ref) bool {
+func matches(r, want asset.ID) bool {
 	return strings.EqualFold(r.Name, want.Name) && (want.Type == "" || strings.EqualFold(r.Type, want.Type))
 }
 
@@ -148,15 +140,37 @@ func parseLine(s string) (Packed, bool) {
 	if err1 != nil || err2 != nil {
 		return Packed{}, false
 	}
-	return Packed{Ref: Ref{Type: f[1], Name: f[2]}, Resident: res, Streamed: str, Chain: parseChain(f[5])}, true
+	return Packed{ID: asset.ID{Type: f[1], Name: f[2]}, Resident: res, Streamed: str, Chain: parseChain(f[5])}, true
 }
 
 // parseChain reads a parentStack, `|name|type|name|type…`, nearest parent first.
-func parseChain(s string) []Ref {
+func parseChain(s string) []asset.ID {
 	parts := strings.Split(strings.TrimPrefix(s, "|"), "|")
-	var out []Ref
+	var out []asset.ID
 	for i := 0; i+1 < len(parts); i += 2 {
-		out = append(out, Ref{Name: parts[i], Type: parts[i+1]})
+		out = append(out, asset.ID{Name: parts[i], Type: parts[i+1]})
 	}
 	return out
+}
+
+// Canonical is the name the sources use for an asset the report or a zone file
+// names: forward slashes; no category prefix on a material or techset (the
+// report adds mc/, ei/…); no .efx on an fx (a zone line may name the file); no
+// .all on a sound bank (the report's name for the bank a sound line makes); no
+// |dup (the report's mark for an asset packed a second time).
+func Canonical(id asset.ID) asset.ID {
+	id.Name = strings.ReplaceAll(strings.TrimSuffix(id.Name, "|dup"), `\`, "/")
+	switch id.Type {
+	case "material", "techset":
+		if _, name, ok := strings.Cut(id.Name, "/"); ok {
+			id.Name = name
+		}
+	case "sound":
+		id.Name = strings.TrimSuffix(id.Name, ".all")
+	case "fx":
+		if strings.EqualFold(path.Ext(id.Name), ".efx") {
+			id.Name = strings.TrimSuffix(id.Name, path.Ext(id.Name))
+		}
+	}
+	return id
 }

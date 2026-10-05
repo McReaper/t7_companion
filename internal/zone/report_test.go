@@ -1,6 +1,7 @@
 package zone
 
 import (
+	"github.com/McReaper/t7_companion/internal/asset"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -41,7 +42,7 @@ func TestLoadAndChains(t *testing.T) {
 	if len(img) != 2 {
 		t.Fatalf("an asset pulled in twice is listed twice, got %d", len(img))
 	}
-	want := []Ref{{"material", "ei/fog_mtl"}, {"fx", "fx/fog.efx"}, {"csv", "fury.zpkg"}, {"csv", "zone_source/zm_x.zone"}}
+	want := []asset.ID{{Type: "material", Name: "ei/fog_mtl"}, {Type: "fx", Name: "fx/fog.efx"}, {Type: "csv", Name: "fury.zpkg"}, {Type: "csv", Name: "zone_source/zm_x.zone"}}
 	if !reflect.DeepEqual(img[0].Chain, want) {
 		t.Errorf("chain = %v, want %v (nearest parent first)", img[0].Chain, want)
 	}
@@ -70,13 +71,13 @@ func TestUnder(t *testing.T) {
 		}
 		return strings.Join(s, ",")
 	}
-	if got := names(r.Under(Ref{Name: "fury.zpkg"})); got != "fxt_fog,ei/fog_mtl" {
+	if got := names(r.Under(asset.ID{Name: "fury.zpkg"})); got != "fxt_fog,ei/fog_mtl" {
 		t.Errorf("under the package: %s", got)
 	}
-	if got := names(r.Under(Ref{Type: "xmodel", Name: "skybox_default_day"})); got != "skybox_default_day,t6_skybox" {
+	if got := names(r.Under(asset.ID{Type: "xmodel", Name: "skybox_default_day"})); got != "skybox_default_day,t6_skybox" {
 		t.Errorf("under the xmodel line (itself included): %s", got)
 	}
-	if got := r.Under(Ref{Type: "image", Name: "skybox_default_day"}); len(got) != 0 {
+	if got := r.Under(asset.ID{Type: "image", Name: "skybox_default_day"}); len(got) != 0 {
 		t.Errorf("a typed ref matches its type only, got %s", names(got))
 	}
 }
@@ -132,5 +133,20 @@ func TestReportDir(t *testing.T) {
 	}
 	if _, err := ReportDir(root, "zm_unlinked"); err == nil || !strings.Contains(err.Error(), "link it first") {
 		t.Errorf("an unlinked map must say to link it first: %v", err)
+	}
+}
+
+func TestCanonical(t *testing.T) {
+	for in, want := range map[asset.ID]asset.ID{
+		{Type: "material", Name: "mc/mtl_wall"}:             {Type: "material", Name: "mtl_wall"},
+		{Type: "material", Name: "ei/gfx_smoke|dup"}:        {Type: "material", Name: "gfx_smoke"},
+		{Type: "fx", Name: `harry\perks\fx_light.efx`}:      {Type: "fx", Name: "harry/perks/fx_light"},
+		{Type: "sound", Name: "zm_test.all"}:                {Type: "sound", Name: "zm_test"},
+		{Type: "image", Name: "i_wall_c"}:                   {Type: "image", Name: "i_wall_c"},
+		{Type: "scriptparsetree", Name: `scripts\zm\a.gsc`}: {Type: "scriptparsetree", Name: "scripts/zm/a.gsc"},
+	} {
+		if got := Canonical(in); got != want {
+			t.Errorf("Canonical(%v) = %v, want %v", in, got, want)
+		}
 	}
 }
