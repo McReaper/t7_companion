@@ -28,9 +28,9 @@ type Techset struct {
 // TexSlot is a Texture( "…" ) block.
 type TexSlot struct {
 	Name         string `json:"name"`
-	Field        string `json:"gdt_field"` // the material field it reads, e.g. colorMap
-	DefaultImage string `json:"default_image,omitempty"`
-	Semantic     string `json:"semantic,omitempty"` // the image's semantic must match (diffuseMap, normalMap, …)
+	Field        string `json:"gdt_field"`               // the material field it reads, e.g. colorMap
+	DefaultImage string `json:"default_image,omitempty"` // the image an empty field gets: a $ built-in or a stock image
+	Semantic     string `json:"semantic,omitempty"`      // the image's semantic must match (diffuseMap, normalMap, …)
 	Usage        string `json:"usage,omitempty"`
 }
 
@@ -107,7 +107,7 @@ var (
 	declRE    = regexp.MustCompile(`(?m)^\s*(Texture|Sampler|Color|Bool|Float|Int|float[1-4]?|int[1-4]?|bool)\s*\(\s*"([^"]+)"\s*\)`)
 	globalsRE = regexp.MustCompile(`(?s)Globals\s*\(\s*\)\s*\{(.*?)\}`)
 	kvRE      = regexp.MustCompile(`(?m)^\s*(\w+)\s*=\s*"([^"]*)"`)
-	fieldRE   = regexp.MustCompile(`<\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:,\s*\$?([A-Za-z0-9_]+))?\s*>`)
+	fieldRE   = regexp.MustCompile(`<\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:,\s*(\$?[A-Za-z0-9_]+))?\s*>`)
 	sourceRE  = regexp.MustCompile(`source\s*=\s*"([^"]+)"`)
 )
 

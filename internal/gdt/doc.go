@@ -27,7 +27,10 @@
 // interpreted; a combo's options too when held in a variable built only from
 // literals, heredocs and other such variables (awivars.go). Anything assigned
 // from a call, an index or += leaves the combo unchecked, and a true third
-// argument makes an editable combo whose list is only suggestions.
+// argument makes an editable combo whose list is only suggestions. A
+// GenerateItemList( Asset, "<type>", …, "<prefix>", … ) call (the list helper
+// declares its fields with variables) declares references <prefix>01,
+// <prefix>02… and <prefix>Count; Refs reads only the items the count covers.
 //
 // Only the validation callbacks that matter are ported: ValidateLODs and
 // surfaceType <error> (an UNRECOVERABLE link error once the material reaches
@@ -94,9 +97,10 @@
 // gdt_check over a whole install and tallies issues by kind; diff its report
 // before and after changing any rule. A derived asset's parent must be in the
 // same GDT (gdtdb otherwise fails with "Parent Entity '<name>' does not exist in
-// GDT"): Resolved walks the chain inside one file, gdt_edit refuses a parent
-// from another GDT, and deriving from a stock asset is impossible (copy_from it
-// instead). The rules that follow from it are listed on Check (check.go).
+// GDT"): Resolved and TypeOf walk the chain inside one file, taking the first
+// definition when the file defines the parent's name twice (a material and an
+// xmodel), as gdtdb does; gdt_edit refuses a parent from another GDT, and
+// deriving from a stock asset is impossible (copy_from it instead). The rules that follow from it are listed on Check (check.go).
 //
 // # Output size
 //

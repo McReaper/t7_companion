@@ -292,3 +292,16 @@ func TestEditIsSurgical(t *testing.T) {
 		t.Fatalf("result no longer parses: %v", err)
 	}
 }
+
+// A slot's default keeps its $: a built-in ($white_diffuse) differs from a
+// stock image of the same name.
+func TestTechsetDefaultImageKeepsDollar(t *testing.T) {
+	w := fixture(t)
+	ts, err := w.Techsets.Resolve("lit")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ts.Textures) == 0 || ts.Textures[0].DefaultImage != "$white_diffuse" {
+		t.Fatalf("textures: %+v", ts.Textures)
+	}
+}

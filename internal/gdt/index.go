@@ -205,7 +205,9 @@ func (w *Workspace) Find(name string) ([]Location, error) {
 }
 
 // TypeOf is a definition's asset type, following a derived asset's parent chain
-// within its own GDT (where a parent has to be).
+// within its own GDT (where a parent has to be). When the GDT defines the
+// parent's name more than once (a material and an xmodel), the first
+// definition is the parent, as for gdtdb and Resolved.
 func (w *Workspace) TypeOf(l Location) string {
 	for depth := 0; l.Type == "" && l.Parent != "" && depth < 16; depth++ {
 		locs, err := w.Find(l.Parent)
@@ -213,9 +215,10 @@ func (w *Workspace) TypeOf(l Location) string {
 			return ""
 		}
 		next := l
-		for _, p := range locs {
+		for _, p := range locs { // sorted by file, then line
 			if p.File == l.File {
 				next = p
+				break
 			}
 		}
 		if next == l {
