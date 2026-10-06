@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Entry is one field APE's property page declares for an asset type, read
@@ -60,6 +61,8 @@ type Schema struct {
 	patterns []*Entry          // runtime-built names, most specific first
 
 	glossPresets map[string][2]string // material: glossSurfaceType -> glossRangeMin/Max (apeeffects.go)
+
+	patternHits sync.Map // key -> *Entry (or nil): runtime-built names already matched
 }
 
 // index builds the lookup tables once the schema is complete.
@@ -146,12 +149,18 @@ func (s *Schema) Lookup(key string) *Entry {
 	if e, ok := s.lower[strings.ToLower(key)]; ok {
 		return e
 	}
+	if hit, ok := s.patternHits.Load(key); ok {
+		return hit.(*Entry)
+	}
+	var found *Entry
 	for _, e := range s.patterns {
 		if e.re.MatchString(key) {
-			return e
+			found = e
+			break
 		}
 	}
-	return nil
+	s.patternHits.Store(key, found)
+	return found
 }
 
 // uiOnly kinds are page decoration, never saved to the GDT.
