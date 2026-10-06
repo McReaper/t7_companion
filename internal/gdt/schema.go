@@ -36,6 +36,17 @@ type Entry struct {
 	// value may be valid, so none is checked
 	openOptions bool
 	re          *regexp.Regexp // Pattern entries: the literal parts in order, anything between
+
+	// Alts are the asset types a Varies entry's declarations reference (an
+	// xanim note's actionparam1: a weapon, a rumble, a tagfx…, by action)
+	Alts []string `json:"-"`
+}
+
+// addAlt records an asset type one of the entry's declarations references.
+func (e *Entry) addAlt(d *Entry) {
+	if d.Kind == "AssetCombo" && d.AssetType != "" && !containsFold(e.Alts, d.AssetType) {
+		e.Alts = append(e.Alts, d.AssetType)
+	}
 }
 
 // Schema is the set of fields declared for one asset type.
@@ -91,6 +102,11 @@ func (s *Schema) Ordered() []*Entry {
 func (e *Entry) merge(d *Entry) {
 	if d.Kind != e.Kind || d.AssetType != e.AssetType {
 		e.Varies = true
+	}
+	e.addAlt(e)
+	e.addAlt(d)
+	if e.RelPath == "" {
+		e.RelPath = d.RelPath // a Path branch's directory (an xanim note's FX)
 	}
 	for _, o := range d.Options {
 		if !containsFold(e.Options, o) {
@@ -151,7 +167,7 @@ func LoadSchema(deffiles, assetType string) (*Schema, error) {
 		return nil, fmt.Errorf("no deffile for asset type %q: %w", assetType, err)
 	}
 	s := &Schema{Type: assetType, File: path, Entries: map[string]*Entry{}}
-	code := expandIncludes(deffiles, stripComments(string(src)), map[string]bool{path: true})
+	code := expandArrays(expandIncludes(deffiles, stripComments(string(src)), map[string]bool{path: true}))
 	vars := parseAwiVars(code)
 	s.glossPresets = glossPresets(code)
 	for _, m := range addEntryRE.FindAllStringSubmatchIndex(code, -1) {
@@ -311,6 +327,11 @@ func fillArgs(e *Entry, kind string, args []string, vars *awiVars) {
 	case "AssetCombo":
 		if v, lit := strArg(args, 0); lit {
 			e.AssetType = v
+		} else if len(args) > 0 && vars != nil {
+			// a static variable (scriptbundle.awi's animType: xanim, or sanim for a siege)
+			if vs, ok := vars.eval(args[0]); ok && len(vs) > 0 {
+				e.AssetType = strings.Join(vs, " | ")
+			}
 		}
 	case "String", "Path", "Texture", "Text":
 		if v, lit := strArg(args, 0); lit {

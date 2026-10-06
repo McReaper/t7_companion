@@ -27,10 +27,15 @@
 // interpreted; a combo's options too when held in a variable built only from
 // literals, heredocs and other such variables (awivars.go). Anything assigned
 // from a call, an index or += leaves the combo unchecked, and a true third
-// argument makes an editable combo whose list is only suggestions. A
+// argument makes an editable combo whose list is only suggestions; an
+// AssetCombo whose type is such a variable references any of its values. A
 // GenerateItemList( Asset, "<type>", …, "<prefix>", … ) call (the list helper
 // declares its fields with variables) declares references <prefix>01,
 // <prefix>02… and <prefix>Count; Refs reads only the items the count covers.
+// A name built from a constant string array walked with a counter
+// (gibPrefix + GIB_KEYS[keyIndex++]) is read element by element (awiarrays.go).
+// A field declared with different kinds or targets in script branches is
+// Varies, not type-checked; its Alts keep the asset types it may reference.
 //
 // Only the validation callbacks that matter are ported: ValidateLODs and
 // surfaceType <error> (an UNRECOVERABLE link error once the material reaches
@@ -40,7 +45,11 @@
 // request sets those fields itself. For materials the schema adds the techsetdef
 // a materialType resolves to under share/raw/techsetdefs_stable, following
 // #includes: texture slots with their GDT field and image semantic, the category
-// materialCategory must equal, HLSL sources.
+// materialCategory must equal, HLSL sources. The material type's own file is
+// read first and wins; a one-line `Texture( "x" ).image = Image( <field,
+// default> )` declares a slot like a block does, while `.tweak` and other
+// property assignments only adjust a slot an #include declares. A slot no
+// field sets (Image( rain_hit_n )) still carries its fixed image.
 //
 // # Index
 //
@@ -86,7 +95,8 @@
 // gdt_refs is the reverse lookup: field values (skinOverride entries too),
 // derived parents, and, for a material, the xmodels whose LOD or collision files
 // use it — read from the .xmodel_bin like the linker (APE's materials field is
-// mostly empty or stale), cached per file (modelmats.go);
+// mostly empty or stale; the custom bullet mesh counts only when
+// BulletCollisionLOD is Custom), cached per file (modelmats.go);
 // TestModelMaterialsMatchLinker (T7KB_ORACLE=1) checks them against every
 // linked map.
 //
