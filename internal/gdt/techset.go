@@ -28,7 +28,7 @@ type Techset struct {
 // TexSlot is a Texture( "…" ) block.
 type TexSlot struct {
 	Name         string `json:"name"`
-	Field        string `json:"gdt_field"`               // the material field it reads, e.g. colorMap
+	Field        string `json:"gdt_field,omitempty"`     // the material field it reads, e.g. colorMap; none for a fixed image
 	DefaultImage string `json:"default_image,omitempty"` // the image an empty field gets: a $ built-in or a stock image
 	Semantic     string `json:"semantic,omitempty"`      // the image's semantic must match (diffuseMap, normalMap, …)
 	Usage        string `json:"usage,omitempty"`
@@ -45,7 +45,9 @@ type Param struct {
 func (t *Techset) ExposedFields() map[string]bool {
 	out := map[string]bool{}
 	for _, s := range t.Textures {
-		out[s.Field] = true
+		if s.Field != "" { // a fixed image reads no field
+			out[s.Field] = true
+		}
 	}
 	for _, p := range t.Params {
 		for _, f := range p.Fields {
@@ -201,6 +203,10 @@ func readGlobals(ts *Techset, src string) {
 func (wk *techsetWalk) addDecls(src string) {
 	for _, m := range declRE.FindAllStringSubmatchIndex(src, -1) {
 		kind, name := src[m[2]:m[3]], src[m[4]:m[5]]
+		if prop, line, ok := property(src[m[1]:]); ok {
+			wk.addProperty(kind, name, prop, line)
+			continue
+		}
 		body := blockAfter(src, m[1])
 		if wk.seenDecl[kind+":"+name] {
 			continue
@@ -208,27 +214,77 @@ func (wk *techsetWalk) addDecls(src string) {
 		wk.seenDecl[kind+":"+name] = true
 		refs := fieldRE.FindAllStringSubmatch(body, -1)
 		if kind == "Texture" {
-			if slot := texSlot(name, refs, body); slot.Field != "" {
+			if slot := texSlot(name, refs, body); slot.Field != "" || slot.DefaultImage != "" {
 				wk.ts.Textures = append(wk.ts.Textures, slot)
 			}
 			continue
 		}
-		p := Param{Kind: kind, Name: name}
-		for _, r := range refs {
-			p.Fields = append(p.Fields, r[1])
-		}
-		if len(p.Fields) > 0 {
-			wk.ts.Params = append(wk.ts.Params, p)
-		}
+		wk.addParam(kind, name, refs)
 	}
 }
 
-// texSlot reads a Texture( "name" ) block: the first <field, default> it reads,
-// and its semantic and usage.
+// property reads a one-line property assignment after a declaration's name,
+// `Texture( "x" ).image = Image( <field, default> )`: the property and the
+// rest of the line.
+func property(after string) (prop, line string, ok bool) {
+	rest, ok := strings.CutPrefix(strings.TrimLeft(after, " \t"), ".")
+	if !ok {
+		return "", "", false
+	}
+	if i := strings.IndexByte(rest, '\n'); i >= 0 {
+		rest = rest[:i]
+	}
+	prop, line, _ = strings.Cut(rest, "=")
+	return strings.TrimSpace(prop), line, true
+}
+
+// addProperty applies `Decl( "name" ).prop = …`. An .image declares a texture
+// slot (unless a file walked earlier — the material type's own — did), a
+// .semantic sets one's; .tweak only retitles a declaration an #include makes;
+// any other property reads the fields it names.
+func (wk *techsetWalk) addProperty(kind, name, prop, line string) {
+	refs := fieldRE.FindAllStringSubmatch(line, -1)
+	switch {
+	case prop == "tweak":
+	case kind == "Texture" && prop == "image":
+		if !wk.seenDecl[kind+":"+name] && len(refs) > 0 {
+			wk.seenDecl[kind+":"+name] = true
+			wk.ts.Textures = append(wk.ts.Textures, TexSlot{Name: name, Field: refs[0][1], DefaultImage: refs[0][2]})
+		}
+	case kind == "Texture" && prop == "semantic":
+		for i := range wk.ts.Textures {
+			if s := &wk.ts.Textures[i]; s.Name == name && s.Semantic == "" {
+				s.Semantic = strings.Trim(strings.TrimSpace(line), `"`)
+			}
+		}
+	default:
+		wk.addParam(kind, name+"."+prop, refs)
+	}
+}
+
+// addParam adds a declaration that reads material fields.
+func (wk *techsetWalk) addParam(kind, name string, refs [][]string) {
+	p := Param{Kind: kind, Name: name}
+	for _, r := range refs {
+		p.Fields = append(p.Fields, r[1])
+	}
+	if len(p.Fields) > 0 {
+		wk.ts.Params = append(wk.ts.Params, p)
+	}
+}
+
+// fixedImageRE is a slot's image that no field sets: Image( rain_hit_n ),
+// Image( "$default" ).
+var fixedImageRE = regexp.MustCompile(`Image\(\s*"?(\$?[A-Za-z0-9_]+)"?\s*\)`)
+
+// texSlot reads a Texture( "name" ) block: the first <field, default> it reads
+// — or, for a slot no field sets, its fixed image — and its semantic and usage.
 func texSlot(name string, refs [][]string, body string) TexSlot {
 	slot := TexSlot{Name: name}
 	if len(refs) > 0 {
 		slot.Field, slot.DefaultImage = refs[0][1], refs[0][2]
+	} else if m := fixedImageRE.FindStringSubmatch(body); m != nil {
+		slot.DefaultImage = m[1]
 	}
 	for _, kv := range kvRE.FindAllStringSubmatch(body, -1) {
 		switch kv[1] {

@@ -15,6 +15,28 @@ import (
 
 var donorCache sync.Map // root + "|" + semantic -> donor
 
+// slotSemantic is the image semantic the texture slot a material field fills
+// expects, from the techset its material type resolves to.
+func (w *Workspace) slotSemantic(materialType, field string) (string, error) {
+	if materialType == "" || field == "" {
+		return "", fmt.Errorf("image: give semantic, or material_type + field to derive it from the techset")
+	}
+	ts, err := w.Techsets.Resolve(materialType)
+	if err != nil {
+		return "", err
+	}
+	var fields []string
+	for _, s := range ts.Textures {
+		if s.Field == field && s.Semantic != "" {
+			return s.Semantic, nil
+		}
+		if s.Field != "" { // a fixed image reads no field
+			fields = append(fields, s.Field)
+		}
+	}
+	return "", fmt.Errorf("image: material type %q has no texture slot %q (it reads: %s)", materialType, field, strings.Join(fields, ", "))
+}
+
 // imageFields builds an image asset's fields from a texture: the semantic comes
 // from the spec (or the techset slot it fills), everything else from the stock
 // images of the same semantic — the settings Treyarch actually ships for it.
@@ -22,24 +44,9 @@ func (w *Workspace) imageFields(spec *ImageSpec) ([]Field, []Issue, string, erro
 	var issues []Issue
 	sem := spec.Semantic
 	if sem == "" {
-		if spec.MaterialType == "" || spec.Field == "" {
-			return nil, nil, "", fmt.Errorf("image: give semantic, or material_type + field to derive it from the techset")
-		}
-		ts, err := w.Techsets.Resolve(spec.MaterialType)
-		if err != nil {
+		var err error
+		if sem, err = w.slotSemantic(spec.MaterialType, spec.Field); err != nil {
 			return nil, nil, "", err
-		}
-		for _, s := range ts.Textures {
-			if s.Field == spec.Field {
-				sem = s.Semantic
-			}
-		}
-		if sem == "" {
-			var fields []string
-			for _, s := range ts.Textures {
-				fields = append(fields, s.Field)
-			}
-			return nil, nil, "", fmt.Errorf("image: material type %q has no texture slot %q (it reads: %s)", spec.MaterialType, spec.Field, strings.Join(fields, ", "))
 		}
 	}
 	if spec.Texture == "" {

@@ -305,3 +305,47 @@ func TestTechsetDefaultImageKeepsDollar(t *testing.T) {
 		t.Fatalf("textures: %+v", ts.Textures)
 	}
 }
+
+// Property assignments: `.tweak` and other properties only adjust a slot an
+// #include declares (the include's field and default still count); a one-line
+// `.image = Image( <field, default> )` declares a slot, `.semantic` sets its; a
+// slot no field sets keeps its fixed image.
+func TestTechsetProperties(t *testing.T) {
+	w := fixture(t)
+	p := filepath.Join(w.Root, "share", "raw", "techsetdefs_stable", "geometry", "lit_props.techsetdef")
+	src := `#include "color_base"
+
+Texture( "colorMap" ).tweak = Tweak()
+{
+	title = "Color"
+}
+Texture( "colorMap" ).streamerUvScale = float2( "<columnCount>", "1" )
+Texture( "mixMap" ).image = Image( <alphaRevealMap, $black_multimask> )
+Texture( "mixMap" ).semantic = "multipleMask"
+Texture( "lookupMap" )
+{
+	image = Image( "$default" )
+}
+`
+	if err := os.WriteFile(p, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	techsets, err := OpenTechsets(filepath.Dir(filepath.Dir(p))) // indexed when opened: reopen after writing
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts, err := techsets.Resolve("lit_props")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, s := range ts.Textures {
+		got = append(got, s.Name+":"+s.Field+":"+s.DefaultImage+":"+s.Semantic)
+	}
+	if want := "mixMap:alphaRevealMap:$black_multimask:multipleMask,lookupMap::$default:,colorMap:colorMap:$white_diffuse:diffuseMap"; strings.Join(got, ",") != want {
+		t.Errorf("textures %s\nwant     %s", strings.Join(got, ","), want)
+	}
+	if !ts.ExposedFields()["columnCount"] {
+		t.Error("a property's fields are read too")
+	}
+}
