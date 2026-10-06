@@ -45,11 +45,14 @@ func (g *Graph) Closure(roots []asset.ID) Closure {
 	for _, r := range roots {
 		visit(r, asset.ID{})
 	}
-	for len(queue) > 0 {
-		id := queue[0]
-		queue = queue[1:]
-		for _, c := range g.Children(id) {
-			visit(c, id)
+	for len(queue) > 0 { // a level at a time, its GDT definitions resolved in one batch
+		level := queue
+		queue = nil
+		g.prefetch(level)
+		for _, id := range level {
+			for _, c := range g.Children(id) {
+				visit(c, id)
+			}
 		}
 	}
 	return out
@@ -64,12 +67,8 @@ func (g *Graph) shipped(id asset.ID) bool {
 	if g.stock == nil || !strings.EqualFold(id.Type, "scriptparsetree") {
 		return false
 	}
-	for _, e := range g.stock.Lookup(id) {
-		if e.Active {
-			return true
-		}
-	}
-	return false
+	_, active := activeEntry(g.stock.Lookup(id))
+	return active
 }
 
 // ZoneRoots returns the assets a zone file lists, its packages' lines included,

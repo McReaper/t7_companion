@@ -254,6 +254,16 @@ func zoneSamples(t *testing.T, root string, add func(key, s string)) {
 		}
 		chk, err := zoneCheck(root, name)
 		run("zone_check|the map", chk, err)
+		pred, err := zonePredict(root, name, "", "", "")
+		run("zone_predict|the map", pred, err)
+		for _, l := range predLines(pred) {
+			one, err := zonePredict(root, name, l, "", "")
+			run("zone_predict|its heaviest zone line", one, err)
+			break
+		}
+		id := zone.Canonical(deepest.ID)
+		why, err := zonePredict(root, name, "", id.Name, id.Type)
+		run("zone_predict|why: the asset with the longest chain", why, err)
 		return
 	}
 }
@@ -268,4 +278,18 @@ func mcpJSON(t *testing.T, v any) string {
 		t.Fatal(err)
 	}
 	return b.String()
+}
+
+// predLines are a prediction's zone lines, heaviest first, as zone_predict takes them.
+func predLines(p *zonePredictResult) []string {
+	var out []string
+	if p == nil {
+		return out
+	}
+	for _, l := range p.Lines {
+		if s, ok := strings.CutPrefix(l.Line, "zone line "); ok {
+			out = append(out, s)
+		}
+	}
+	return out
 }

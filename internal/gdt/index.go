@@ -35,6 +35,9 @@ type Workspace struct {
 	writeMu sync.Map // lower-cased abs path -> *sync.Mutex: one writer per GDT
 
 	models modelMats // xmodel LOD files and their materials, for ModelUses
+
+	gdtTypesOnce sync.Once
+	gdtTypes     map[string]bool // linker types a GDT type packs as (IsGDTType)
 }
 
 // lockFile serialises writes to one GDT within this process.
