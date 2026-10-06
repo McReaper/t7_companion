@@ -41,22 +41,30 @@ func (g *Graph) fxChildren(name string, out *idSet) {
 
 // efxRefs reads the assets an .efx names: in each element (a brace block of
 // tab-indented `key value;` lines), the quoted lines of a visuals block
-// (`model` then `{ "name" … };`) and the fx of efxKeys. Sound blocks name sound
+// (`model` then `{ "name" … };`) and the fx of efxKeys. An element whose
+// editorFlags hold dontExport stays in the editor. Sound blocks name sound
 // aliases, which the zone's sound bank packs, not the effect.
 func efxRefs(b []byte) []asset.ID {
-	var out []asset.ID
-	block := ""
+	var out, elem []asset.ID
+	block, skip := "", false
 	sc := bufio.NewScanner(bytes.NewReader(b))
 	sc.Buffer(make([]byte, 64<<10), 1<<20)
 	for sc.Scan() {
 		l := strings.TrimRight(sc.Text(), " \r")
 		inner, nested := strings.CutPrefix(l, "\t\t")
 		switch {
+		case l == "{": // an element starts
+			elem, skip = nil, false
+		case l == "}":
+			if !skip {
+				out = append(out, elem...)
+			}
+			elem = nil
 		case nested && block != "" && strings.HasPrefix(inner, `"`):
 			if v := strings.Trim(inner, `"`); v != "" {
-				out = append(out, efxRef(efxBlocks[block], v))
+				elem = append(elem, efxRef(efxBlocks[block], v))
 			}
-		case nested, l == "	{":
+		case nested, l == "\t{":
 		case strings.HasPrefix(l, "\t") && !strings.ContainsAny(l[1:], " \t{};"):
 			block = l[1:]
 			if efxBlocks[block] == "" {
@@ -65,8 +73,14 @@ func efxRefs(b []byte) []asset.ID {
 		default:
 			block = ""
 			key, v, ok := strings.Cut(strings.TrimPrefix(l, "\t"), " ")
-			if v = strings.Trim(strings.TrimSuffix(v, ";"), `"`); ok && efxKeys[key] && v != "" {
-				out = append(out, efxRef("fx", v))
+			switch {
+			case !ok:
+			case key == "editorFlags":
+				skip = skip || strings.Contains(" "+strings.TrimSuffix(v, ";")+" ", " dontExport ")
+			case efxKeys[key]:
+				if v = strings.Trim(strings.TrimSuffix(v, ";"), `"`); v != "" {
+					elem = append(elem, efxRef("fx", v))
+				}
 			}
 		}
 	}

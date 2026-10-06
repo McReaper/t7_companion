@@ -28,27 +28,48 @@ type Node struct {
 type Closure map[asset.ID]Node
 
 // Closure follows roots down to everything they pull in, breadth first, so an
-// asset's From is its nearest puller.
+// asset's From is its nearest puller. With a zone's stock lists (SetStock), a
+// script one of its active ignore lists provides is left out: the linker
+// packs nothing for it, the shipped one runs. Every other stock asset is
+// packed as a reference to the shipped one, and its children are followed.
 func (g *Graph) Closure(roots []asset.ID) Closure {
 	out := Closure{}
 	var queue []asset.ID
-	for _, r := range roots {
-		if _, ok := out[r.Key()]; !ok {
-			out[r.Key()] = Node{ID: r}
-			queue = append(queue, r)
+	visit := func(id, from asset.ID) {
+		if _, ok := out[id.Key()]; ok || g.shipped(id) {
+			return
 		}
+		out[id.Key()] = Node{ID: id, From: from}
+		queue = append(queue, id)
+	}
+	for _, r := range roots {
+		visit(r, asset.ID{})
 	}
 	for len(queue) > 0 {
 		id := queue[0]
 		queue = queue[1:]
 		for _, c := range g.Children(id) {
-			if _, ok := out[c.Key()]; !ok {
-				out[c.Key()] = Node{ID: c, From: id}
-				queue = append(queue, c)
-			}
+			visit(c, id)
 		}
 	}
 	return out
+}
+
+// SetStock gives the graph a zone's stock lists: the assets its active ignore
+// lists provide (zone.Inherit, zone.LoadAssetlists).
+func (g *Graph) SetStock(lists zone.Assetlists) { g.stock = lists }
+
+// shipped: a script an active ignore list of the zone provides.
+func (g *Graph) shipped(id asset.ID) bool {
+	if g.stock == nil || !strings.EqualFold(id.Type, "scriptparsetree") {
+		return false
+	}
+	for _, e := range g.stock.Lookup(id) {
+		if e.Active {
+			return true
+		}
+	}
+	return false
 }
 
 // ZoneRoots returns the assets a zone file lists, its packages' lines included,

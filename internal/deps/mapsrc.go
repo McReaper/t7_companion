@@ -18,40 +18,110 @@ type mapEntity struct {
 // material …` line per face, or a patch (`curve` or `mesh`, then a block whose
 // first bare line, after toolFlags, is the material). The lightmap material
 // that follows each one is not an asset.
+//
+// The header declares the layers (`"name" flags …`); an entity or a brush in a
+// layer flagged ignore, or under one, is not compiled and is left out.
 func readMap(r io.Reader) ([]mapEntity, error) {
-	var out []mapEntity
-	var cur *mapEntity
-	depth, patch := 0, false
+	p := mapParser{ignored: map[string]bool{}}
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 64<<10), 1<<20)
 	for sc.Scan() {
-		l := strings.TrimSpace(sc.Text())
-		switch {
-		case l == "{":
-			depth++
-			if depth == 1 {
-				out = append(out, mapEntity{keys: map[string]string{}})
-				cur = &out[len(out)-1]
-			}
-		case l == "}":
-			depth--
-		case cur == nil || depth == 0:
-		case depth == 1 && strings.HasPrefix(l, `"`):
-			if k, v, ok := keyValue(l); ok {
-				cur.keys[strings.ToLower(k)] = v
-			}
-		case l == "curve" || l == "mesh":
-			patch = true
-		case patch && isWord(l):
-			cur.materials = append(cur.materials, l)
-			patch = false
-		case strings.HasPrefix(l, "("):
-			if m := faceMaterial(l); m != "" {
-				cur.materials = append(cur.materials, m)
-			}
+		p.line(strings.TrimSpace(sc.Text()))
+	}
+	return p.out, sc.Err()
+}
+
+type mapParser struct {
+	out     []mapEntity
+	ignored map[string]bool // layers flagged ignore
+	depth   int
+	patch   bool
+	entity  mapEntity
+	layer   string   // the entity's
+	brush   []string // the current brush's materials
+	brushIn string   // the current brush's layer
+}
+
+func (p *mapParser) line(l string) {
+	switch {
+	case l == "{":
+		p.open()
+	case l == "}":
+		p.close()
+	case p.depth == 0:
+		if name, flags, ok := layerDecl(l); ok && strings.Contains(" "+flags+" ", " ignore ") {
+			p.ignored[name] = true
+		}
+	case strings.HasPrefix(l, "layer "):
+		if p.depth == 1 {
+			p.layer = strings.Trim(l[len("layer "):], `" `)
+		} else {
+			p.brushIn = strings.Trim(l[len("layer "):], `" `)
+		}
+	case p.depth == 1 && strings.HasPrefix(l, `"`):
+		if k, v, ok := keyValue(l); ok {
+			p.entity.keys[strings.ToLower(k)] = v
+		}
+	case l == "curve" || l == "mesh":
+		p.patch = true
+	case p.patch && isWord(l):
+		p.brush = append(p.brush, l)
+		p.patch = false
+	case strings.HasPrefix(l, "("):
+		if m := faceMaterial(l); m != "" {
+			p.brush = append(p.brush, m)
 		}
 	}
-	return out, sc.Err()
+}
+
+func (p *mapParser) open() {
+	p.depth++
+	switch p.depth {
+	case 1:
+		p.entity, p.layer = mapEntity{keys: map[string]string{}}, ""
+	case 2:
+		p.brush, p.brushIn = nil, ""
+	}
+}
+
+func (p *mapParser) close() {
+	switch p.depth {
+	case 1:
+		if !p.isIgnored(p.layer) {
+			p.out = append(p.out, p.entity)
+		}
+	case 2:
+		if !p.isIgnored(p.brushIn) {
+			p.entity.materials = append(p.entity.materials, p.brush...)
+		}
+		p.patch = false
+	}
+	p.depth--
+}
+
+// isIgnored: the layer, or a layer above it ("a" above "a/b"), is flagged ignore.
+func (p *mapParser) isIgnored(layer string) bool {
+	for layer != "" {
+		if p.ignored[layer] {
+			return true
+		}
+		i := strings.LastIndexByte(layer, '/')
+		if i < 0 {
+			return false
+		}
+		layer = layer[:i]
+	}
+	return false
+}
+
+// layerDecl reads a header layer line, `"000_Global/No Comp" flags hidden ignore`.
+func layerDecl(l string) (name, flags string, ok bool) {
+	parts := strings.SplitN(l, `"`, 3)
+	if len(parts) < 3 || parts[0] != "" {
+		return "", "", false
+	}
+	rest, ok := strings.CutPrefix(strings.TrimSpace(parts[2]), "flags")
+	return parts[1], strings.TrimSpace(rest), ok
 }
 
 // keyValue reads `"key" "value"`.

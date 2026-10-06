@@ -4,6 +4,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -19,6 +20,10 @@ type Graph struct {
 	mu     sync.Mutex
 	kids   map[asset.ID][]asset.ID // by Key
 	tools  map[string]bool         // lower-cased material -> of the Tools category
+	stock  zone.Assetlists         // the zone's stock lists, when set (SetStock)
+
+	klfOnce sync.Once
+	klfs    map[string][]string // lower-cased lens flare uuid -> its images
 }
 
 // New returns the graph of a workspace's assets as one map or mod links them:
@@ -59,6 +64,8 @@ func (g *Graph) Children(id asset.ID) []asset.ID {
 		g.mappingChildren(id.Name, &s)
 	case "fx":
 		g.fxChildren(id.Name, &s)
+	case "klf":
+		g.klfChildren(id.Name, &s)
 	default:
 		g.gdtChildren(id, &s)
 	}
@@ -75,11 +82,16 @@ func (g *Graph) gdtChildren(id asset.ID, out *idSet) {
 	case !ok:
 	case typ == "weaponcamotable":
 		g.camoTableChildren(fields, out)
+	case typ == "attachmentcosmeticvariant":
+		g.fieldChildren(typ, usedVariants(fields), out)
 	case typ == "material" && g.materialChildren(fields, out):
 	default:
 		g.fieldChildren(typ, fields, out)
-		if typ == "xmodel" {
+		switch typ {
+		case "xmodel":
 			g.modelChildren(name, fields, out)
+		case "xanim":
+			g.animChildren(fields, out)
 		}
 	}
 }
@@ -105,12 +117,75 @@ func (g *Graph) resolve(locs []gdt.Location, err error) (string, string, []gdt.F
 // fieldChildren adds the assets fields name: typed references (AssetCombo)
 // and file paths.
 func (g *Graph) fieldChildren(typ string, fields []gdt.Field, out *idSet) {
+	fields = setNotes(fields)
 	for _, r := range g.w.Refs(typ, fields) {
-		out.add(g.refID(r))
+		if !editorOnly[strings.ToLower(r.Field)] {
+			out.add(g.refID(r))
+		}
 	}
 	sc, _ := g.w.Schema(typ)
 	for _, fl := range fields {
 		g.fileChildren(sc, fl, out)
+		if sc != nil {
+			if e := sc.Lookup(fl.Key); e != nil && e.Varies {
+				g.variesChild(e, gdt.Unquote(fl.Value), out)
+			}
+		}
+	}
+}
+
+// noteParam is a note's parameter field (an xanim's customnote0actionparam1):
+// the note's action field is the name up to "param".
+var noteParam = regexp.MustCompile(`(?i)^(.*action)param\d+$`)
+
+// setNotes drops the parameters of the notes whose action is None (or unset):
+// APE keeps the last values, which nothing reads.
+func setNotes(fields []gdt.Field) []gdt.Field {
+	actions := fieldMap(fields)
+	out := fields[:0:0]
+	for _, f := range fields {
+		if m := noteParam.FindStringSubmatch(f.Key); m != nil {
+			if a := actions[strings.ToLower(m[1])]; a == "" || strings.EqualFold(a, "None") {
+				continue
+			}
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
+// editorOnly are the reference fields only the editors read, by their
+// deffiles' tooltips: the models an xanim plays on and attaches in
+// AssetViewer, a vehicle bundle's tag-dropdown model, the model Radiant shows
+// for a spawner or a destructible.
+var editorOnly = map[string]bool{"previewmodel": true, "previewattachmodel": true, "previewinclude": true, "radiantmodel": true}
+
+// variesChild resolves a field the deffile declares with several asset types,
+// one per script branch (an xanim note's actionparam1, by its action): the
+// value names the one the GDTs define it as, when exactly one. A path to an
+// effect is handled with the other file paths.
+func (g *Graph) variesChild(e *gdt.Entry, v string, out *idSet) {
+	if len(e.Alts) == 0 || v == "" {
+		return
+	}
+	want := map[string]bool{}
+	for _, alt := range e.Alts {
+		want[g.w.LinkerType(alt)] = true
+	}
+	locs, err := g.w.Find(v)
+	if err != nil {
+		return
+	}
+	types := map[string]bool{}
+	for _, l := range locs {
+		if lt := g.w.LinkerType(g.w.TypeOf(l)); want[lt] {
+			types[lt] = true
+		}
+	}
+	if len(types) == 1 {
+		for t := range types {
+			out.add(asset.ID{Type: t, Name: v})
+		}
 	}
 }
 
@@ -149,9 +224,11 @@ var tableTypes = map[string]string{
 	".ai_bt":  "behaviortree",
 }
 
-// fileChildren adds the asset a field's file path names: an .efx is an fx named
-// by its path under share/raw/fx without the extension, an AI table is packed
-// under its file name, and a zone package (csvInclude) adds its lines.
+// fileChildren adds the asset a field's file path names: an effect is an fx
+// named by its path under share/raw/fx without the extension (a path under
+// share/raw may leave the .efx out), an AI table is packed under its file
+// name, a path under pc/main is an image (a weapon's reticles), and a zone
+// package (csvInclude) adds its lines.
 func (g *Graph) fileChildren(sc *gdt.Schema, fl gdt.Field, out *idSet) {
 	v := strings.ReplaceAll(gdt.Unquote(fl.Value), `\`, "/")
 	if v == "" {
@@ -159,26 +236,33 @@ func (g *Graph) fileChildren(sc *gdt.Schema, fl gdt.Field, out *idSet) {
 	}
 	rel := ""
 	if sc != nil {
-		if e := sc.Lookup(fl.Key); e != nil && e.Kind == "Path" {
+		if e := sc.Lookup(fl.Key); e != nil && (e.Kind == "Path" || e.Varies) {
 			rel = strings.Trim(filepath.ToSlash(e.RelPath), "/")
 		}
 	}
 	ext := strings.ToLower(path.Ext(v))
 	switch {
 	case ext == ".efx":
-		out.add(asset.ID{Type: "fx", Name: g.fxName(rel, v)})
+		name, _ := g.fxName(rel, v)
+		out.add(asset.ID{Type: "fx", Name: name})
+	case ext == "" && strings.HasPrefix(strings.ToLower(rel), "share/raw"):
+		if name, ok := g.fxName(rel, v); ok {
+			out.add(asset.ID{Type: "fx", Name: name})
+		}
 	case tableTypes[ext] != "":
 		out.add(asset.ID{Type: tableTypes[ext], Name: v})
+	case strings.EqualFold(rel, "pc/main"):
+		out.add(asset.ID{Type: "image", Name: strings.TrimSuffix(path.Base(v), path.Ext(v))})
 	case strings.EqualFold(rel, "share/zone_source"):
 		g.packageChildren(v, out)
 	}
 }
 
-// fxName is the fx an .efx path names: its path under share/raw/fx without
-// the extension. The path is relative to the field's directory (rel) — when
-// the field says one — or to share/raw/fx or share/raw: the first whose file
-// exists wins.
-func (g *Graph) fxName(rel, v string) string {
+// fxName is the fx an effect path names, and whether its .efx exists: its path
+// under share/raw/fx without the extension. The path is relative to the
+// field's directory (rel) when the field says one, or to share/raw/fx or
+// share/raw: the first whose file exists wins.
+func (g *Graph) fxName(rel, v string) (string, bool) {
 	v = strings.TrimSuffix(v, path.Ext(v))
 	var names []string
 	for _, dir := range []string{rel, "share/raw/fx", "share/raw"} {
@@ -187,15 +271,15 @@ func (g *Graph) fxName(rel, v string) string {
 		}
 		if name, ok := strings.CutPrefix(path.Join(dir, v), "share/raw/fx/"); ok {
 			if _, found := g.raw("fx/" + name + ".efx"); found {
-				return name
+				return name, true
 			}
 			names = append(names, name)
 		}
 	}
 	if len(names) == 0 {
-		return v
+		return v, false
 	}
-	return names[0]
+	return names[0], false
 }
 
 // packageChildren adds the lines of share/zone_source/<name>.zpkg.

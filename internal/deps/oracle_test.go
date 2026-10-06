@@ -14,30 +14,34 @@ import (
 	"github.com/McReaper/t7_companion/internal/zone"
 )
 
-// derived are packed types no source names: the linker makes them from their
-// parent (an xmodel's meshes, a material's techset, an effect's lights), from
-// the compiled map (its parts, volumes, texture combos, navigation…) or for
-// the zone itself (string, assetlist).
-var derived = map[string]bool{
+// derivedTypes (lower-cased) are packed types no source names: the linker
+// makes them from their parent (an xmodel's meshes, a material's techset, an
+// effect's lights), from the compiled map (its parts, volumes, texture combos,
+// navigation…) or for the zone itself (string, assetlist).
+var derivedTypes = map[string]bool{
 	"xmodelmesh": true, "techset": true, "lightdescription": true, "string": true, "assetlist": true,
 	"gfx_map": true, "col_map": true, "com_map": true, "game_map": true, "map_ents": true,
-	"skyBox": true, "sstMinMaxCPU": true, "shadowTrees": true, "reflectionProbes": true, "cookieArray": true,
-	"sunVolumes": true, "texturecombo": true, "navmesh": true, "navvolume": true, "glasses": true,
-	"vertexData0": true, "vertexData1": true, "indices": true, "keyvaluepairs": true, "bgcache": true,
+	"skybox": true, "sstminmaxcpu": true, "shadowtrees": true, "reflectionprobes": true, "cookiearray": true,
+	"sunvolumes": true, "texturecombo": true, "navmesh": true, "navvolume": true, "glasses": true,
+	"vertexdata0": true, "vertexdata1": true, "indices": true, "keyvaluepairs": true, "bgcache": true,
 }
 
-// The graph against what the linker packed for a linked map (T7KB_ORACLE_MAP,
-// zm_test by default), two ways:
+func derived(typ string) bool { return derivedTypes[strings.ToLower(typ)] }
+
+// The graph against what the linker loaded for a linked map (T7KB_ORACLE_MAP,
+// zm_test by default):
 //
 //   - edges: for each packed asset whose report parent is an asset or the
 //     compiled map, whether the graph has that edge — per family (parent type
 //     → child type), so a family the graph doesn't read yet stands out;
 //   - closure: what the zone's lines and the map source pull in through the
 //     graph, against what the report shows each pulling in (recall) and
-//     against everything packed (precision: an asset the graph predicts that
-//     the link didn't pack).
+//     against everything the link loaded (precision);
+//   - causes: each miss and each extra traced up to the first edge out of an
+//     asset both sides have, so one wrong edge counts once with what it drags.
 //
-// Runs with T7KB_ORACLE=1 and TA_TOOLS_PATH.
+// Runs with T7KB_ORACLE=1 and TA_TOOLS_PATH; T7KB_ORACLE_EXAMPLES sets how
+// many examples a line shows.
 func TestGraphMatchesLinker(t *testing.T) {
 	root := os.Getenv("TA_TOOLS_PATH")
 	if root == "" || os.Getenv("T7KB_ORACLE") == "" {
@@ -55,27 +59,48 @@ func TestGraphMatchesLinker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	g, roots := oracleGraph(t, root, name, filepath.Dir(filepath.Dir(filepath.Dir(dir)))) // usermaps/<map>
+	scoreEdges(t, g, r, roots.fromMap)
+	c := g.Closure(append(roots.zone, roots.fromMap...))
+	loaded := loadedBy(r)
+	scoreClosure(t, c, loaded)
+	reportCauses(t, "causes of misses", missCauses(c, loaded))
+	reportCauses(t, "causes of extras", extraCauses(c, loaded))
+}
+
+type oracleRoots struct{ zone, fromMap []asset.ID }
+
+// oracleGraph builds the graph of a map with its zone's stock lists, and the
+// roots of its zone file and map source.
+func oracleGraph(t *testing.T, root, name, mapDir string) (*Graph, oracleRoots) {
 	w, err := gdt.Open(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	g := New(w, filepath.Dir(filepath.Dir(filepath.Dir(dir)))) // usermaps/<map>
+	g := New(w, mapDir)
 	zf, err := zone.ZoneFile(root, name)
 	if err != nil {
 		t.Fatal(err)
 	}
-	zoneRoots, err := ZoneRoots(root, zf)
+	var roots oracleRoots
+	if roots.zone, err = ZoneRoots(root, zf); err != nil {
+		t.Fatal(err)
+	}
+	inh, err := zone.Inherit(root, zf)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var mapRoots []asset.ID
+	lists, err := zone.LoadAssetlists(root, inh.Ignore)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.SetStock(lists)
 	if src, err := MapSource(root, name); err == nil {
-		if mapRoots, err = g.MapRoots(src); err != nil {
+		if roots.fromMap, err = g.MapRoots(src); err != nil {
 			t.Fatal(err)
 		}
 	}
-	scoreEdges(t, g, r, mapRoots)
-	scoreClosure(t, g.Closure(append(zoneRoots, mapRoots...)), r)
+	return g, roots
 }
 
 type score struct {
@@ -113,7 +138,7 @@ func scoreEdges(t *testing.T, g *Graph, r *zone.Report, mapRoots []asset.ID) {
 	fromMap := idKeys(mapRoots)
 	by := tally{}
 	for _, p := range r.Assets {
-		if len(p.Chain) == 0 || derived[p.Type] {
+		if len(p.Chain) == 0 || derived(p.Type) {
 			continue
 		}
 		parent, child := zone.Canonical(p.Chain[0]), zone.Canonical(p.ID)
@@ -121,39 +146,137 @@ func scoreEdges(t *testing.T, g *Graph, r *zone.Report, mapRoots []asset.ID) {
 		case parent.Type == "csv", parent.Key() == child.Key():
 		case isBSP(parent):
 			by.add(parent.Type+" → "+child.Type, fromMap[child.Key()], child.Name)
-		case !derived[parent.Type]:
+		case !derived(parent.Type):
 			by.add(parent.Type+" → "+child.Type, has(g.Children(parent), child), parent.Name+" → "+child.Name)
 		}
 	}
 	report(t, "edges (parent type → child type)", by)
 }
 
-func scoreClosure(t *testing.T, c Closure, r *zone.Report) {
+// counted: an asset the link loaded that the closure should predict — not one
+// the linker or the light bake made.
+func counted(k asset.ID, chain []asset.ID) bool {
+	return !derived(k.Type) && k.Type != "csv" && !throughDerived(chain)
+}
+
+func scoreClosure(t *testing.T, c Closure, loaded map[asset.ID][]asset.ID) {
 	zoneRecall, mapRecall := tally{}, tally{}
-	packed := map[asset.ID]bool{}
-	for _, p := range r.Assets {
-		id := zone.Canonical(p.ID)
-		packed[id.Key()] = true
-		if derived[p.Type] || throughDerived(p.Chain) {
+	for k, chain := range loaded {
+		if !counted(k, chain) {
 			continue
 		}
 		recall := zoneRecall
-		if throughBSP(p.Chain) {
+		if throughBSP(chain) {
 			recall = mapRecall
 		}
-		_, ok := c[id.Key()]
-		recall.add(id.Type, ok, id.Name)
+		_, ok := c[k]
+		recall.add(k.Type, ok, k.Name)
 	}
 	report(t, "closure recall, pulled in by the zone's lines", zoneRecall)
 	report(t, "closure recall, pulled in by the map (BSP)", mapRecall)
 
 	precision := tally{}
 	for k, n := range c {
-		if Packed(k.Type) {
-			precision.add(k.Type, packed[k], n.From.String()+" → "+n.Name)
+		if !Packed(k.Type) { // not an asset of its own: the report may show it or not
+			continue
+		}
+		_, ok := loaded[k]
+		precision.add(k.Type, ok, n.From.String()+" → "+n.Name)
+	}
+	report(t, "closure precision (predicted, and loaded by the link)", precision)
+}
+
+// loadedBy is every asset the link loaded, by Key, with the chain that pulled
+// it in: the report's lines, and the parents in their chains — the report has
+// no line for an asset packed inside its parent (a customization table's body
+// types) or for some it reached only through its children (a material whose
+// techset and images it lists).
+func loadedBy(r *zone.Report) map[asset.ID][]asset.ID {
+	out := map[asset.ID][]asset.ID{}
+	for _, p := range r.Assets {
+		chain := make([]asset.ID, len(p.Chain))
+		for i, c := range p.Chain {
+			chain[i] = zone.Canonical(c)
+		}
+		out[zone.Canonical(p.ID).Key()] = chain
+		for i, c := range chain {
+			if _, ok := out[c.Key()]; !ok {
+				out[c.Key()] = chain[i+1:]
+			}
 		}
 	}
-	report(t, "closure precision (predicted, and packed)", precision)
+	return out
+}
+
+// missCauses groups the loaded assets the closure lacks by the first edge, up
+// their report chain, out of an asset the closure has.
+func missCauses(c Closure, loaded map[asset.ID][]asset.ID) map[string][]string {
+	missing := map[asset.ID]bool{}
+	for k, chain := range loaded {
+		if _, ok := c[k]; !ok && counted(k, chain) {
+			missing[k] = true
+		}
+	}
+	causes := map[string][]string{}
+	for k := range missing {
+		child, chain := k, loaded[k]
+		for _, a := range chain {
+			if !missing[a.Key()] {
+				causes[edge(a, child)] = append(causes[edge(a, child)], k.String())
+				break
+			}
+			child = a
+		}
+	}
+	return causes
+}
+
+// extraCauses groups the predicted assets the link didn't load by the first
+// edge, up the closure, out of an asset it did load (or the root).
+func extraCauses(c Closure, loaded map[asset.ID][]asset.ID) map[string][]string {
+	causes := map[string][]string{}
+	for k, n := range c {
+		if _, ok := loaded[k]; ok || !Packed(k.Type) {
+			continue
+		}
+		cur := n
+		for cur.From.Name != "" {
+			if _, ok := loaded[cur.From.Key()]; ok {
+				break
+			}
+			cur = c[cur.From.Key()]
+		}
+		causes[edge(cur.From, cur.ID)] = append(causes[edge(cur.From, cur.ID)], k.String())
+	}
+	return causes
+}
+
+func edge(from, to asset.ID) string {
+	if from.Name == "" {
+		return "(root) → " + to.String()
+	}
+	return from.Type + " → " + to.Type + "  [" + from.Name + " → " + to.Name + "]"
+}
+
+func reportCauses(t *testing.T, title string, causes map[string][]string) {
+	keys := make([]string, 0, len(causes))
+	total := 0
+	for k, v := range causes {
+		keys = append(keys, k)
+		total += len(v)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if len(causes[keys[i]]) != len(causes[keys[j]]) {
+			return len(causes[keys[i]]) > len(causes[keys[j]])
+		}
+		return keys[i] < keys[j]
+	})
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s: %d assets, %d edges (each with what it drags)\n", title, total, len(keys))
+	for _, k := range keys {
+		fmt.Fprintf(&b, "  %4d  %s\n", len(causes[k]), k)
+	}
+	t.Log(b.String())
 }
 
 func idKeys(ids []asset.ID) map[asset.ID]bool {
@@ -168,8 +291,12 @@ func has(ids []asset.ID, want asset.ID) bool {
 	return idKeys(ids)[want.Key()]
 }
 
-// isBSP: the compiled map's parts (gfx_map, col_map…), named after the .d3dbsp.
-func isBSP(id asset.ID) bool { return strings.HasSuffix(id.Name, ".d3dbsp") }
+// isBSP: the compiled map's parts that place what its source names (gfx_map
+// draws, col_map collides and spawns), named after the .d3dbsp. Its other
+// parts (sun volumes, reflection probes…) carry what the light bake made.
+func isBSP(id asset.ID) bool {
+	return (id.Type == "gfx_map" || id.Type == "col_map") && strings.HasSuffix(id.Name, ".d3dbsp")
+}
 
 func throughBSP(chain []asset.ID) bool {
 	for _, c := range chain {
@@ -180,11 +307,11 @@ func throughBSP(chain []asset.ID) bool {
 	return false
 }
 
-// throughDerived: pulled in by something the linker made (a texture combo, sun
-// volumes…), not by a source.
+// throughDerived: pulled in by something the linker or the light bake made (a
+// texture combo, sun volume probes…), not by a source.
 func throughDerived(chain []asset.ID) bool {
 	for _, c := range chain {
-		if derived[c.Type] && !isBSP(c) {
+		if derived(c.Type) && !isBSP(c) {
 			return true
 		}
 	}
