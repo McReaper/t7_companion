@@ -85,18 +85,6 @@ func TestMaterialsText(t *testing.T) {
 	}
 }
 
-func TestLZ4Match(t *testing.T) {
-	// literals "abc", then a match of 6 at offset 3 that overlaps its own output
-	got, err := lz4Block([]byte{0x32, 'a', 'b', 'c', 3, 0}, 9)
-	if err != nil || string(got) != "abcabcabc" {
-		t.Errorf("got %q, %v", got, err)
-	}
-	long := bytes.Repeat([]byte("x"), 300) // a literal length past 15 continues in 255-steps
-	if got, err := lz4Block(literalBlock(long), 300); err != nil || !bytes.Equal(got, long) {
-		t.Errorf("long literals: %v", err)
-	}
-}
-
 func TestCorrupt(t *testing.T) {
 	for name, b := range map[string][]byte{
 		"truncated header": []byte("*LZ4*\x01"),

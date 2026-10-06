@@ -1,13 +1,41 @@
-package xmodelbin
+// Package lz4 unpacks the compression the BO3 export tools write model and
+// animation files with (.xmodel_bin, .xanim_bin): "*LZ4*", the uncompressed
+// size (uint32, little-endian), then one raw LZ4 block, without a frame.
+package lz4
 
-import "errors"
+import (
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"fmt"
+)
+
+// maxSize: a declared size beyond this is a corrupt header, not a file.
+const maxSize = 1 << 30
 
 var errCorrupt = errors.New("corrupt LZ4 block")
 
-// lz4Block decodes one raw LZ4 block (no frame) into exactly n bytes. Each
+// Unpack returns an export file's contents: decompressed when it starts with
+// "*LZ4*", as is otherwise.
+func Unpack(b []byte) ([]byte, error) {
+	rest, ok := bytes.CutPrefix(b, []byte("*LZ4*"))
+	if !ok {
+		return b, nil
+	}
+	if len(rest) < 4 {
+		return nil, errors.New("truncated *LZ4* header")
+	}
+	n := binary.LittleEndian.Uint32(rest)
+	if n > maxSize {
+		return nil, fmt.Errorf("declared size %d is not plausible", n)
+	}
+	return Block(rest[4:], int(n))
+}
+
+// Block decodes one raw LZ4 block (no frame) into exactly n bytes. Each
 // sequence is a token (literal length, match length), the literals, then a
 // 2-byte back-reference offset; lengths of 15 continue in 255-steps.
-func lz4Block(src []byte, n int) ([]byte, error) {
+func Block(src []byte, n int) ([]byte, error) {
 	dst := make([]byte, 0, n)
 	for i := 0; i < len(src); {
 		tok := src[i]

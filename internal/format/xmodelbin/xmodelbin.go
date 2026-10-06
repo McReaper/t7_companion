@@ -4,9 +4,8 @@
 // models and can be stale, so the file is the only reliable source.
 //
 // Two encodings are read:
-//   - .xmodel_bin: "*LZ4*", the uncompressed size (uint32, little-endian), one
-//     LZ4 block. Decompressed, it is a stream of tokens aligned to 4 bytes, each
-//     starting with a 16-bit id: NUMMATERIALS (0xA1B2, then the count) and, for
+//   - .xmodel_bin: LZ4-compressed (internal/format/lz4). Decompressed, it is a
+//     stream of tokens aligned to 4 bytes, each starting with a 16-bit id: NUMMATERIALS (0xA1B2, then the count) and, for
 //     each material, MATERIAL (0xA700, then its index and its NUL-terminated
 //     name, padded to 4 bytes).
 //   - .xmodel_export, the text form: MATERIAL <index> "<name>" … lines. Some
@@ -21,29 +20,20 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+
+	"github.com/McReaper/t7_companion/internal/format/lz4"
 )
 
 const (
 	tokNumMaterials = 0xA1B2
 	tokMaterial     = 0xA700
-	maxSize         = 1 << 30 // a declared size beyond this is a corrupt header, not a model
 )
 
 // Materials returns the names of a model file's materials, in index order.
 func Materials(b []byte) ([]string, error) {
-	if rest, ok := bytes.CutPrefix(b, []byte("*LZ4*")); ok {
-		if len(rest) < 4 {
-			return nil, errors.New("xmodel_bin: truncated header")
-		}
-		n := binary.LittleEndian.Uint32(rest)
-		if n > maxSize {
-			return nil, fmt.Errorf("xmodel_bin: declared size %d is not plausible", n)
-		}
-		d, err := lz4Block(rest[4:], int(n))
-		if err != nil {
-			return nil, fmt.Errorf("xmodel_bin: %w", err)
-		}
-		b = d
+	b, err := lz4.Unpack(b)
+	if err != nil {
+		return nil, fmt.Errorf("xmodel_bin: %w", err)
 	}
 	if isText(b) {
 		return textMaterials(b)
