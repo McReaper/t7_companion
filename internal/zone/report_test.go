@@ -1,13 +1,14 @@
 package zone
 
 import (
-	"github.com/McReaper/t7_companion/internal/asset"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/McReaper/t7_companion/internal/asset"
 )
 
 // A report as the linker writes it: header, then index,type,name,resident,streamed,parentStack.
@@ -143,6 +144,7 @@ func TestCanonical(t *testing.T) {
 		{Type: "fx", Name: `harry\perks\fx_light.efx`}:      {Type: "fx", Name: "harry/perks/fx_light"},
 		{Type: "sound", Name: "zm_test.all"}:                {Type: "sound", Name: "zm_test"},
 		{Type: "image", Name: "i_wall_c"}:                   {Type: "image", Name: "i_wall_c"},
+		{Type: "image", Name: "skybox_hellround#d696116f"}:  {Type: "image", Name: "skybox_hellround"},
 		{Type: "scriptparsetree", Name: `scripts\zm\a.gsc`}: {Type: "scriptparsetree", Name: "scripts/zm/a.gsc"},
 	} {
 		if got := Canonical(in); got != want {

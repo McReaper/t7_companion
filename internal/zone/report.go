@@ -8,13 +8,14 @@ package zone
 import (
 	"bufio"
 	"fmt"
-	"github.com/McReaper/t7_companion/internal/asset"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/McReaper/t7_companion/internal/asset"
 )
 
 // Packed is one asset the link wrote into the fastfile.
@@ -157,10 +158,15 @@ func parseChain(s string) []asset.ID {
 // names: forward slashes; no category prefix on a material or techset (the
 // report adds mc/, ei/…); no .efx on an fx (a zone line may name the file); no
 // .all on a sound bank (the report's name for the bank a sound line makes); no
-// |dup (the report's mark for an asset packed a second time).
+// #<hash> on an image the map's compile reprocessed (a sky's: the hash is the
+// map's); no |dup (the report's mark for an asset packed a second time).
 func Canonical(id asset.ID) asset.ID {
 	id.Name = strings.ReplaceAll(strings.TrimSuffix(id.Name, "|dup"), `\`, "/")
 	switch id.Type {
+	case "image":
+		if name, hash, ok := strings.Cut(id.Name, "#"); ok && len(hash) == 8 {
+			id.Name = name
+		}
 	case "material", "techset":
 		if _, name, ok := strings.Cut(id.Name, "/"); ok {
 			id.Name = name
