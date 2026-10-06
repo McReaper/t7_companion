@@ -86,3 +86,32 @@ func TestListHas(t *testing.T) {
 		t.Error("a value without the list separator is not a list")
 	}
 }
+
+// The custom bullet mesh (BulletCollisionFile) is read only when
+// BulletCollisionLOD is Custom; otherwise a LOD of the model itself collides.
+func TestModelMaterialsBulletMesh(t *testing.T) {
+	w := fixture(t)
+	write := func(rel, body string) {
+		p := filepath.Join(w.Root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("model_export/body.xmodel_bin", "MODEL\nVERSION 6\nMATERIAL 0 \"mtl_body\" \"Phong\" \"Phong\"\n")
+	write("model_export/col.xmodel_bin", "MODEL\nVERSION 6\nMATERIAL 0 \"mtl_col\" \"Phong\" \"Phong\"\n")
+	model := func(name, lod string) string {
+		return "\t\"" + name + "\" ( \"xmodel.gdf\" )\r\n\t{\r\n\t\t\"filename\" \"body.xmodel_bin\"\r\n" +
+			"\t\t\"BulletCollisionLOD\" \"" + lod + "\"\r\n\t\t\"BulletCollisionFile\" \"col.xmodel_bin\"\r\n\t}\r\n"
+	}
+	write("source_data/bullet.gdt", "{\r\n"+model("m_high", "High")+model("m_custom", "Custom")+"}\r\n")
+	w.Touched(filepath.Join(w.Root, "source_data", "bullet.gdt"))
+	for name, want := range map[string]string{"m_high": "mtl_body", "m_custom": "mtl_body,mtl_col"} {
+		mats, err := w.ModelMaterials(name)
+		if err != nil || strings.Join(mats, ",") != want {
+			t.Errorf("%s: %v, %v; want %s", name, mats, err, want)
+		}
+	}
+}

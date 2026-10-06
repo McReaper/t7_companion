@@ -20,7 +20,7 @@ import (
 // a lookup to stat calls once warm: per GDT, its xmodels' LOD files; per LOD
 // file, its materials.
 
-const modelMatsVersion = 2 // 2: BulletCollisionFile is read too
+const modelMatsVersion = 3 // 3: BulletCollisionFile only for a Custom BulletCollisionLOD
 
 type modelUse struct {
 	Asset string
@@ -176,9 +176,13 @@ func (w *Workspace) lodFilesIn(rel string) []modelUse {
 		if err != nil || typ != "xmodel" {
 			continue
 		}
+		custom := false // the custom bullet mesh is read only when BulletCollisionLOD says so
+		for _, fl := range fields {
+			custom = custom || (fl.Key == "BulletCollisionLOD" && Unquote(fl.Value) == "Custom")
+		}
 		for _, fl := range fields {
 			base, ok := fileFields["xmodel"][fl.Key]
-			if fl.Key == "BulletCollisionFile" { // its materials (bullet_collision_*) are packed too
+			if fl.Key == "BulletCollisionFile" && custom { // its materials (bullet_collision_*) are packed too
 				base, ok = "model_export", true
 			}
 			v := Unquote(fl.Value)
