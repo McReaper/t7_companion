@@ -448,12 +448,19 @@ func writeAtomic(path string, data []byte) error {
 	return werr
 }
 
+// The replacers are built once: Unquote runs for every field the tools read.
+var (
+	quoter   = strings.NewReplacer(`\`, `\\`, `"`, `\"`)
+	unquoter = strings.NewReplacer(`\\`, `\`, `\"`, `"`)
+)
+
 // Quote turns a real string into its GDT file form (backslashes and quotes escaped).
-func Quote(s string) string {
-	return strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s)
-}
+func Quote(s string) string { return quoter.Replace(s) }
 
 // Unquote turns a GDT file-form value back into the real string.
 func Unquote(s string) string {
-	return strings.NewReplacer(`\\`, `\`, `\"`, `"`).Replace(s)
+	if !strings.Contains(s, `\`) {
+		return s // nothing escaped: most values
+	}
+	return unquoter.Replace(s)
 }
