@@ -1,11 +1,12 @@
 package zone
 
 import (
-	"github.com/McReaper/t7_companion/internal/asset"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/McReaper/t7_companion/internal/asset"
 )
 
 // fakeRoot lays out a mod-tools root: two classes, one map with a zone and a
@@ -90,5 +91,30 @@ func TestAssetlists(t *testing.T) {
 	}
 	if _, err := LoadAssetlists(root, []string{"nope"}); err == nil {
 		t.Error("a missing list must be an error")
+	}
+}
+
+// A stock list names a material with its category; the sources and the zone
+// lines don't.
+func TestAssetlistsMaterialCategory(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "zone_source", "all", "assetlist")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "zm_common.csv"), []byte("material,mc/mtl_wall\n//image,i_wall_c\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	lists, err := LoadAssetlists(root, []string{"zm_common"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []asset.ID{{Type: "material", Name: "mtl_wall"}, {Type: "material", Name: "mc/mtl_wall"}, {Type: "material", Name: "MTL_WALL"}} {
+		if e := lists.Lookup(id); len(e) != 1 || !e[0].Active || e[0].Line != 1 {
+			t.Errorf("%v: %+v", id, e)
+		}
+	}
+	if e := lists.Lookup(asset.ID{Type: "image", Name: "i_wall_c"}); len(e) != 1 || e[0].Active {
+		t.Errorf("commented-out image: %+v", e)
 	}
 }

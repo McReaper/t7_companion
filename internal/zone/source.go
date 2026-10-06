@@ -3,11 +3,12 @@ package zone
 import (
 	"bufio"
 	"fmt"
-	"github.com/McReaper/t7_companion/internal/asset"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/McReaper/t7_companion/internal/asset"
 )
 
 // Inherited is what a zone takes from its >class chain: the stock assetlists
@@ -112,7 +113,8 @@ type ListEntry struct {
 // File is the entry's path relative to the mod-tools root.
 func (e ListEntry) File() string { return "zone_source/all/assetlist/" + e.List + ".csv" }
 
-// Assetlists indexes stock assetlist entries by lower-cased type and name.
+// Assetlists indexes stock assetlist entries by Canonical name, lower-cased:
+// a list names a material with its category (material,mc/mtl_x).
 type Assetlists map[asset.ID][]ListEntry
 
 // LoadAssetlists reads zone_source/all/assetlist/<list>.csv for each list:
@@ -132,7 +134,7 @@ func LoadAssetlists(root string, lists []string) (Assetlists, error) {
 			if !ok || typ == "" || name == "" {
 				continue
 			}
-			key := asset.ID{Type: strings.TrimSpace(typ), Name: strings.TrimSpace(name)}.Key()
+			key := Canonical(asset.ID{Type: strings.TrimSpace(typ), Name: strings.TrimSpace(name)}).Key()
 			out[key] = append(out[key], ListEntry{List: list, Line: n, Active: !commented})
 		}
 		err = sc.Err()
@@ -144,9 +146,10 @@ func LoadAssetlists(root string, lists []string) (Assetlists, error) {
 	return out, nil
 }
 
-// Lookup returns the entries for an asset.
+// Lookup returns the entries for an asset, named as the sources, a zone line
+// or the report name it.
 func (a Assetlists) Lookup(r asset.ID) []ListEntry {
-	return a[r.Key()]
+	return a[Canonical(r).Key()]
 }
 
 // Line is an asset line of a zone source file.

@@ -2,12 +2,12 @@ package cli
 
 import (
 	"fmt"
-	"github.com/McReaper/t7_companion/internal/asset"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/McReaper/t7_companion/internal/asset"
 	"github.com/McReaper/t7_companion/internal/gdt"
 	"github.com/McReaper/t7_companion/internal/zone"
 )
