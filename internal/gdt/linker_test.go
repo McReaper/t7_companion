@@ -77,3 +77,33 @@ func TestItemListRefs(t *testing.T) {
 		t.Errorf("refs in use: %v", got)
 	}
 }
+
+// Field names built from a constant array walked with a counter.
+func TestArrayBuiltFieldNames(t *testing.T) {
+	w := fixture(t)
+	awi := `const array<string> GIB_KEYS = {
+	"gibmodel",
+	"gibtag",
+};
+void piece( asset Asset, string prefix )
+{
+	const string gibPrefix = prefix + "_";
+	uint keyIndex = 0;
+	Asset.AddEntry_AssetCombo( gibPrefix + GIB_KEYS[keyIndex++], "xmodel" );
+	Asset.AddEntry_BoneCombo( gibPrefix + GIB_KEYS[keyIndex++], "ignore_model" );
+}
+`
+	if err := os.WriteFile(filepath.Join(w.Root, "deffiles", "gibcharacterdef.awi"), []byte(awi), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sc, err := w.Schema("gibcharacterdef")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e := sc.Lookup("leftleg_gibmodel"); e == nil || e.Kind != "AssetCombo" || e.AssetType != "xmodel" {
+		t.Fatalf("leftleg_gibmodel: %+v", e)
+	}
+	if e := sc.Lookup("leftleg_gibtag"); e == nil || e.Kind != "BoneCombo" {
+		t.Fatalf("leftleg_gibtag: %+v", e)
+	}
+}
