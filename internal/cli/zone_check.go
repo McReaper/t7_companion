@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/McReaper/t7_companion/internal/asset"
 	"github.com/McReaper/t7_companion/internal/zone"
 )
 
@@ -137,20 +138,22 @@ func gdtShadows(z *zoneCtx, lists zone.Assetlists) []shadowOut {
 		return nil
 	}
 	var out []shadowOut
+	seen := map[asset.ID]bool{}
 	for _, p := range z.report.Assets {
-		e, ok := activeEntry(lists.Lookup(p.ID))
-		if !ok {
+		id := zone.Canonical(p.ID) // the report names a material mc/x and a second packing x|dup
+		e, ok := activeEntry(lists.Lookup(id))
+		if !ok || seen[id.Key()] {
 			continue
 		}
-		locs, err := w.Find(p.Name)
+		seen[id.Key()] = true
+		locs, err := w.FindAsset(id) // by the type the linker packs it as: a bulletweapon is a weapon
 		if err != nil {
 			continue
 		}
 		for _, l := range locs {
-			if l.Stock || (l.Type != "" && !strings.EqualFold(l.Type, p.Type)) {
-				continue
+			if !l.Stock {
+				out = append(out, shadowOut{Asset: id.String(), Yours: fmt.Sprintf("defined in %s:%d", l.File, l.Line), Stock: fmt.Sprintf("%s:%d", e.File(), e.Line)})
 			}
-			out = append(out, shadowOut{Asset: p.String(), Yours: fmt.Sprintf("defined in %s:%d", l.File, l.Line), Stock: fmt.Sprintf("%s:%d", e.File(), e.Line)})
 		}
 	}
 	return out
