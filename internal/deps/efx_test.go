@@ -11,7 +11,8 @@ func TestEfxRefs(t *testing.T) {
 	src := "iwfx 3\n\n\tefPriority 0;\n{\n\tname \"def0\";\n\tfxOnImpact \"impacts/fx_hit\";\n\tfxOnDeath \"\";\n" +
 		"\tbillboardSprite\n\t{\n\t\t\"gfx_smoke\"\n\t\t\"gfx_smoke_2\"\n\t};\n\telemSpawnSound\n\t{\n\t\t\"amb_moth\"\n\t};\n}\n" +
 		"{\n\tname \"def1\";\n\tmodel\n\t{\n\t\t\"p7_debris\"\n\t};\n\trunner\n\t{\n\t\t\"smoke\\fx_child.efx\"\n\t};\n" +
-		"\tlensFlare\n\t{\n\t\t\"9852f2c0-4665-43fb-97d1-067c7d91e9b4\"\n\t};\n}\n"
+		"\tlensFlare\n\t{\n\t\t\"9852f2c0-4665-43fb-97d1-067c7d91e9b4\"\n\t};\n}\n" +
+		"{\n\tname \"editor_only\";\n\teditorFlags looping dontExport;\n\tmodel\n\t{\n\t\t\"p7_hidden\"\n\t};\n}\n"
 	var got []string
 	for _, id := range efxRefs([]byte(src)) {
 		got = append(got, id.String())
