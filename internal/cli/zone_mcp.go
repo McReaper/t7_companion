@@ -7,12 +7,14 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// zoneToolset reads the report the linker writes on every link: what a map's
-// fastfile holds, how big each asset is, and which zone line pulled it in.
+// zoneToolset reads the report the linker writes on every link — what a map's
+// fastfile holds, how big each asset is, and which zone line pulled it in —
+// and predicts the next link from the sources (zone_predict).
 func zoneToolset() toolset {
 	tp := mcp.WithString("tools_path", mcp.Description("BO3 mod-tools root (default $TA_TOOLS_PATH)."))
 	name := mcp.WithString("name", mcp.Required(), mcp.Description("Map or mod name, e.g. \"zm_mymap\"."))
-	return toolset{name: "zone", tools: []server.ServerTool{zoneExplainTool(name, tp), zoneContentsTool(name, tp), zoneCheckTool(name, tp)}}
+	return toolset{name: "zone", tools: []server.ServerTool{
+		zoneExplainTool(name, tp), zoneContentsTool(name, tp), zoneCheckTool(name, tp), zonePredictTool(name, tp)}}
 }
 
 func zoneExplainTool(name, tp mcp.ToolOption) server.ServerTool {
@@ -49,5 +51,25 @@ func zoneCheckTool(name, tp mcp.ToolOption) server.ServerTool {
 		name, tp),
 		Handler: jsonHandler(func(_ context.Context, r mcp.CallToolRequest) (any, error) {
 			return zoneCheck(r.GetString("tools_path", ""), r.GetString("name", ""))
+		})}
+}
+
+func zonePredictTool(name, tp mcp.ToolOption) server.ServerTool {
+	return server.ServerTool{Tool: mcp.NewTool("zone_predict",
+		mcp.WithDescription("Predict, before linking, what a map's or mod's build will pull in: from its .zone (and "+
+			".zpkg) lines and its map source (placed models, prefabs, entities, brush materials), following every "+
+			"reference the linker follows — GDT fields, model materials, effects, animation tables and notetracks. "+
+			"Without line or asset: the build by type, what each zone line pulls in, the assets referenced that no "+
+			"GDT, file or stock list defines (no_source), and your GDT versions of stock assets the build won't use. "+
+			"line: what one zone line or asset pulls in. asset: the chain that will pull an asset in. Unlike "+
+			"zone_contents and zone_explain, needs no link and sees changes since the last one, but knows no sizes; "+
+			"a whole large map takes ~15 s."),
+		name,
+		mcp.WithString("line", mcp.Description("A zone line or any asset: \"weapon,t9_rpk_up\", or a name the zone or the GDTs give one type.")),
+		mcp.WithString("asset", mcp.Description("Asset name: show the chain that will pull it into the build.")),
+		mcp.WithString("type", mcp.Description("With asset: its type, when one name is used by several.")), tp),
+		Handler: jsonHandler(func(_ context.Context, r mcp.CallToolRequest) (any, error) {
+			return zonePredict(r.GetString("tools_path", ""), r.GetString("name", ""), r.GetString("line", ""),
+				r.GetString("asset", ""), r.GetString("type", ""))
 		})}
 }

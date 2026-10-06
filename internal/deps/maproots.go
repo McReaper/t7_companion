@@ -63,6 +63,13 @@ func (g *Graph) mapRoots(file string, out *idSet, seen map[string]bool) error {
 	if err != nil {
 		return err
 	}
+	var mats []asset.ID // resolved in one batch: drawn() asks each one's category
+	for _, e := range ents {
+		for _, m := range e.materials {
+			mats = append(mats, asset.ID{Type: "material", Name: m})
+		}
+	}
+	g.prefetch(mats)
 	for _, e := range ents {
 		if !top && e.keys["classname"] == "worldspawn" {
 			g.drawn(e.materials, out) // a prefab's world brushes are compiled, not its settings
@@ -166,8 +173,8 @@ func (g *Graph) isTool(material string) bool {
 	if ok {
 		return tool
 	}
-	_, _, fields, found := g.resolve(g.w.FindAsset(asset.ID{Type: "material", Name: material}))
-	tool = found && strings.EqualFold(fieldMap(fields)["materialcategory"], "Tools")
+	d := g.lookup(asset.ID{Type: "material", Name: material})
+	tool = d.ok && strings.EqualFold(fieldMap(d.fields)["materialcategory"], "Tools")
 	g.mu.Lock()
 	g.tools[k] = tool
 	g.mu.Unlock()
@@ -182,7 +189,7 @@ func (g *Graph) defaultPhyspreset(model string, out *idSet) {
 	if model == "" {
 		return
 	}
-	if _, _, fields, ok := g.resolve(g.w.FindAsset(asset.ID{Type: "xmodel", Name: model})); ok && fieldMap(fields)["physicspreset"] != "" {
+	if d := g.lookup(asset.ID{Type: "xmodel", Name: model}); d.ok && fieldMap(d.fields)["physicspreset"] != "" {
 		return // the model's own preset, an xmodel edge
 	}
 	out.add(asset.ID{Type: "physpreset", Name: model})

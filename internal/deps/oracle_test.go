@@ -3,7 +3,6 @@ package deps
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -59,48 +58,20 @@ func TestGraphMatchesLinker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g, roots := oracleGraph(t, root, name, filepath.Dir(filepath.Dir(filepath.Dir(dir)))) // usermaps/<map>
-	scoreEdges(t, g, r, roots.fromMap)
-	c := g.Closure(append(roots.zone, roots.fromMap...))
-	loaded := loadedBy(r)
-	scoreClosure(t, c, loaded)
-	reportCauses(t, "causes of misses", missCauses(c, loaded))
-	reportCauses(t, "causes of extras", extraCauses(c, loaded))
-}
-
-type oracleRoots struct{ zone, fromMap []asset.ID }
-
-// oracleGraph builds the graph of a map with its zone's stock lists, and the
-// roots of its zone file and map source.
-func oracleGraph(t *testing.T, root, name, mapDir string) (*Graph, oracleRoots) {
 	w, err := gdt.Open(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	g := New(w, mapDir)
-	zf, err := zone.ZoneFile(root, name)
+	z, err := OpenZone(w, name)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var roots oracleRoots
-	if roots.zone, err = ZoneRoots(root, zf); err != nil {
-		t.Fatal(err)
-	}
-	inh, err := zone.Inherit(root, zf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	lists, err := zone.LoadAssetlists(root, inh.Ignore)
-	if err != nil {
-		t.Fatal(err)
-	}
-	g.SetStock(lists)
-	if src, err := MapSource(root, name); err == nil {
-		if roots.fromMap, err = g.MapRoots(src); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return g, roots
+	scoreEdges(t, z.Graph, r, z.MapRoots)
+	c := z.Predict()
+	loaded := loadedBy(r)
+	scoreClosure(t, c, loaded)
+	reportCauses(t, "causes of misses", missCauses(c, loaded))
+	reportCauses(t, "causes of extras", extraCauses(c, loaded))
 }
 
 type score struct {

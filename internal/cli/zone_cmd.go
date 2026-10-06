@@ -11,7 +11,7 @@ func newZoneCmd() *cobra.Command {
 	var toolsPath string
 	root := &cobra.Command{
 		Use:   "zone",
-		Short: "What a map's last link packed, and why (from the linker's own report)",
+		Short: "What a map's last link packed and why (from the linker's own report), and what the next one will",
 	}
 	root.PersistentFlags().StringVar(&toolsPath, "tools-path", "", "BO3 mod-tools root (default: $TA_TOOLS_PATH)")
 
@@ -37,7 +37,19 @@ func newZoneCmd() *cobra.Command {
 		RunE: func(c *cobra.Command, a []string) error {
 			return printIndented(c.OutOrStdout())(zoneCheck(toolsPath, a[0]))
 		}}
-	root.AddCommand(explain, contents, check)
+	var why, whyType string
+	predict := &cobra.Command{Use: "predict <map> [line]", Short: "Predict what the next link will pull in, from the sources",
+		Args: cobra.RangeArgs(1, 2),
+		RunE: func(c *cobra.Command, a []string) error {
+			line := ""
+			if len(a) == 2 {
+				line = a[1]
+			}
+			return printIndented(c.OutOrStdout())(zonePredict(toolsPath, a[0], line, why, whyType))
+		}}
+	predict.Flags().StringVar(&why, "asset", "", "show the chain that will pull this asset in")
+	predict.Flags().StringVar(&whyType, "type", "", "with --asset: its type, when one name is used by several")
+	root.AddCommand(explain, contents, check, predict)
 	return root
 }
 

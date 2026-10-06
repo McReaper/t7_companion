@@ -15,10 +15,11 @@ import (
 var efxBlocks = map[string]string{
 	"billboardSprite": "material", "orientedSprite": "material", "rotatedSprite": "material",
 	"tail": "material", "line": "material", "trail": "material", "cloud": "material",
-	"decal": "material", "dynamicLight": "material",
-	"model":     "xmodel",
-	"runner":    "fx",
-	"lensFlare": "klf",
+	"decal":        "material",
+	"dynamicLight": "lightdescription", // made into the light the linker names after it
+	"model":        "xmodel",
+	"runner":       "fx",
+	"lensFlare":    "klf",
 }
 
 // efxKeys are the element keys whose quoted value names another fx.

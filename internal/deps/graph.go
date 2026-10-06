@@ -22,6 +22,8 @@ type Graph struct {
 	tools  map[string]bool         // lower-cased material -> of the Tools category
 	stock  zone.Assetlists         // the zone's stock lists, when set (SetStock)
 
+	defs map[asset.ID]def // GDT definitions resolved so far (defs.go)
+
 	klfOnce sync.Once
 	klfs    map[string][]string // lower-cased lens flare uuid -> its images
 }
@@ -30,12 +32,13 @@ type Graph struct {
 // mapDir is its folder (usermaps/<name>), whose raw files the linker reads
 // before share/raw's (animtables/, scripts/…: the same tree); empty for none.
 func New(w *gdt.Workspace, mapDir string) *Graph {
-	return &Graph{w: w, mapDir: mapDir, kids: map[asset.ID][]asset.ID{}, tools: map[string]bool{}}
+	return &Graph{w: w, mapDir: mapDir, kids: map[asset.ID][]asset.ID{}, tools: map[string]bool{}, defs: map[asset.ID]def{}}
 }
 
 // raw finds a raw file, rel to share/raw, where the linker does: in the map's
 // folder first.
 func (g *Graph) raw(rel string) (string, bool) {
+	rel = strings.TrimPrefix(filepath.ToSlash(rel), "share/raw/") // a zone line may name it from the root
 	dirs := []string{filepath.Join(g.w.Root, "share", "raw")}
 	if g.mapDir != "" {
 		dirs = append([]string{g.mapDir}, dirs...)
@@ -77,9 +80,10 @@ func (g *Graph) Children(id asset.ID) []asset.ID {
 
 // gdtChildren adds what a GDT asset's fields name, and an xmodel's materials.
 func (g *Graph) gdtChildren(id asset.ID, out *idSet) {
-	name, typ, fields, ok := g.resolve(g.w.FindAsset(id))
+	d := g.lookup(id)
+	name, typ, fields := d.name, d.typ, d.fields
 	switch {
-	case !ok:
+	case !d.ok:
 	case typ == "weaponcamotable":
 		g.camoTableChildren(fields, out)
 	case typ == "attachmentcosmeticvariant":

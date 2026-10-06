@@ -38,12 +38,15 @@ It builds each answer with the same functions the MCP handlers use and counts to
 | `gdt_check` | one asset | 1 | 38 | 38 | 38 | 124 |
 | `gdt_check` | the whole GDT | 1 | 2005 | 2005 | 2005 | 6878 |
 | `gdt_schema` | material (names only) | 1 | 2894 | 2894 | 2894 | 11408 |
-| `gdt_schema` | material + material_type lit | 1 | 1223 | 1223 | 1223 | 4670 |
+| `gdt_schema` | material + material_type lit | 1 | 1226 | 1226 | 1226 | 4673 |
 | `gdt_schema` | xmodel | 1 | 2446 | 2446 | 2446 | 9956 |
 | `zone_explain` | the asset with the longest chain | 1 | 337 | 337 | 337 | 1123 |
 | `zone_contents` | every line of the zone | 1 | 1243 | 1243 | 1243 | 4019 |
 | `zone_contents` | its heaviest line | 1 | 972 | 972 | 972 | 3071 |
-| `zone_check` | the map | 1 | 1879 | 1879 | 1879 | 6392 |
+| `zone_check` | the map | 1 | 1899 | 1899 | 1899 | 6509 |
+| `zone_predict` | the map | 1 | 3313 | 3313 | 3313 | 10459 |
+| `zone_predict` | its heaviest zone line | 1 | 549 | 549 | 549 | 1800 |
+| `zone_predict` | why: the asset with the longest chain | 1 | 111 | 111 | 111 | 341 |
 | `create` | dry run, ZM Advanced Level | 1 | 873 | 873 | 873 | 3017 |
 | `create` | dry run, ZM Mod Level | 1 | 228 | 228 | 228 | 907 |
 

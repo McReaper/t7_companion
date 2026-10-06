@@ -1,6 +1,7 @@
 package gdt
 
 import (
+	"path/filepath"
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/asset"
@@ -62,4 +63,17 @@ func (w *Workspace) FindAsset(id asset.ID) ([]Location, error) {
 		}
 	}
 	return out, nil
+}
+
+// IsGDTType reports whether assets of a linker type come from GDTs: whether
+// some deffile type packs as it (weapon, scriptbundle, material…).
+func (w *Workspace) IsGDTType(linkerType string) bool {
+	w.gdtTypesOnce.Do(func() {
+		w.gdtTypes = map[string]bool{}
+		files, _ := filepath.Glob(filepath.Join(w.Deffiles, "*.awi"))
+		for _, f := range files {
+			w.gdtTypes[w.LinkerType(strings.TrimSuffix(filepath.Base(f), ".awi"))] = true
+		}
+	})
+	return w.gdtTypes[strings.ToLower(linkerType)]
 }
