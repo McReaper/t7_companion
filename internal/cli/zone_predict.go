@@ -18,17 +18,9 @@ const (
 	predictMaxDirect   = 40
 )
 
-// danglingNotes say what the linker does with a reference no source defines,
-// for the types where that was seen.
-var danglingNotes = map[string]string{
-	"klf":        "the linker packs a default lens flare",
-	"physpreset": "the linker packs an empty physpreset",
-}
-
 type danglingOut struct {
 	Asset   string `json:"asset"`
 	NamedBy string `json:"named_by"`
-	Linker  string `json:"linker,omitempty"`
 }
 
 type predictLineOut struct {
@@ -247,15 +239,15 @@ func addDangling(res *zonePredictResult, z *deps.Zone, c deps.Closure) {
 		if d.From.Name != "" {
 			by = d.From.String()
 		}
-		res.Dangling = append(res.Dangling, danglingOut{Asset: d.String(), NamedBy: by, Linker: danglingNotes[strings.ToLower(d.Type)]})
+		res.Dangling = append(res.Dangling, danglingOut{Asset: d.String(), NamedBy: by})
 	}
 	if len(res.Dangling) > predictMaxDangling {
 		res.More += len(res.Dangling) - predictMaxDangling
 		res.Dangling = res.Dangling[:predictMaxDangling]
 	}
 	if len(res.Dangling) > 0 {
-		res.Advice = append(res.Advice, "no_source: nothing defines these — no GDT, file or stock list — so the link can't "+
-			"build them from a source; fix the name that references them, or add the asset")
+		res.Advice = append(res.Advice, "no_source: no GDT, file or stock list defines these, so the link has nothing of "+
+			"yours to pack for them (only engine or shipped data could stand in): check the name that references them")
 	}
 }
 

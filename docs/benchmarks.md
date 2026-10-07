@@ -44,8 +44,8 @@ It builds each answer with the same functions the MCP handlers use and counts to
 | `zone_contents` | every line of the zone | 1 | 1243 | 1243 | 1243 | 4019 |
 | `zone_contents` | its heaviest line | 1 | 972 | 972 | 972 | 3071 |
 | `zone_check` | the map | 1 | 1899 | 1899 | 1899 | 6509 |
-| `zone_predict` | the map | 1 | 3313 | 3313 | 3313 | 10459 |
-| `zone_predict` | its heaviest zone line | 1 | 549 | 549 | 549 | 1800 |
+| `zone_predict` | the map | 1 | 2251 | 2251 | 2251 | 7620 |
+| `zone_predict` | its heaviest zone line | 1 | 548 | 548 | 548 | 1832 |
 | `zone_predict` | why: the asset with the longest chain | 1 | 111 | 111 | 111 | 341 |
 | `create` | dry run, ZM Advanced Level | 1 | 873 | 873 | 873 | 3017 |
 | `create` | dry run, ZM Mod Level | 1 | 228 | 228 | 228 | 907 |

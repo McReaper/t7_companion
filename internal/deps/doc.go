@@ -24,7 +24,8 @@
 //     instead of the originals.
 //   - an xanim: the rumbles its notetracks play (format/xanimbin).
 //   - a camo table: its enabled camo sets inline (camo.go); an attachment
-//     cosmetic variant: the variants that have a model (acv.go).
+//     cosmetic variant: the variants that have a model (acv.go); a weapon:
+//     also the default cosmetic variant, which every weapon carries.
 //   - an animation mapping table: its xanims; an fx: what its exported .efx
 //     elements name; a lens flare: its images.
 //
@@ -45,7 +46,12 @@
 // asset — except a script, which it leaves out (SetStock). Some nodes are not
 // packed as assets of their own (Packed).
 //
+// Zone.Dangling calls an asset missing only for a type whose every source the
+// graph reads (GDTs, effects, raw files): the linker links a lens flare with no
+// .klf, from data the graph doesn't see, so a lens flare is never called one.
+//
 // TestGraphMatchesLinker (T7KB_ORACLE=1) scores the graph against what the
-// linker loaded for a linked map, edge family by edge family, and traces each
-// miss and each extra to the edge that causes it.
+// linker loaded for a linked map, edge family by edge family, traces each miss
+// and each extra to the edge that causes it, and fails if an asset Dangling
+// lists was loaded with data.
 package deps
