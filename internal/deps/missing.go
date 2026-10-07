@@ -23,8 +23,8 @@ var rawTypes = map[string]string{
 }
 
 // defined reports whether a source defines an asset — a GDT, an .efx, a raw
-// file, a lens flare — and whether the graph can tell at all (a type whose
-// source it doesn't read, sound or localize, can't be checked).
+// file — and whether the graph can tell at all: a type whose sources it
+// doesn't all read (sound, localize, lens flares) can't be checked.
 func (g *Graph) defined(id asset.ID) (defined, known bool) {
 	t := strings.ToLower(id.Type)
 	if engineAsset(id) {
@@ -39,9 +39,9 @@ func (g *Graph) defined(id asset.ID) (defined, known bool) {
 		_, found := g.raw("fx/" + id.Name + ".efx")
 		return found, true
 	case t == "klf":
-		g.klfOnce.Do(g.loadKlfs)
-		_, found := g.klfs[strings.ToLower(id.Name)]
-		return found, true
+		// a lens flare with no .klf in lensflares/ still links, with its own data:
+		// the linker has a source for it the graph doesn't read
+		return false, false
 	case g.w.IsGDTType(t):
 		locs, err := g.w.FindAsset(id)
 		return err == nil && len(locs) > 0, err == nil

@@ -72,6 +72,26 @@ func TestGraphMatchesLinker(t *testing.T) {
 	scoreClosure(t, c, loaded)
 	reportCauses(t, "causes of misses", missCauses(c, loaded))
 	reportCauses(t, "causes of extras", extraCauses(c, loaded))
+	checkNoSource(t, z, c, loaded, r)
+}
+
+// checkNoSource: an asset zone_predict says no source defines must not be one
+// the link loaded with data — if it was, its source is one the graph doesn't
+// read, and calling it missing is wrong. An empty one (0 bytes, a physpreset
+// nothing defines) agrees with no source.
+func checkNoSource(t *testing.T, z *Zone, c Closure, loaded map[asset.ID][]asset.ID, r *zone.Report) {
+	t.Helper()
+	size := map[asset.ID]int64{}
+	for _, p := range r.Assets {
+		k := zone.Canonical(p.ID).Key()
+		size[k] = max(size[k], p.Resident+p.Streamed+1) // +1: listed, even when empty
+	}
+	for _, d := range z.Dangling(c) {
+		k := d.Key()
+		if _, ok := loaded[k]; ok && size[k] != 1 { // with data, or a parent in a chain (it pulled something)
+			t.Errorf("no_source lists %s (named by %s), but the link loaded it", d.ID, d.From)
+		}
+	}
 }
 
 type score struct {
