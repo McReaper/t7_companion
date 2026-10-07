@@ -1,6 +1,6 @@
 ---
 name: compiling
-description: How to build a Black Ops 3 map or mod — the Mod Tools Launcher pipeline (Compile, Light/LEDs, Link, Run), each mod-tools binary, the TA_* environment, the `zm_`/`mp_` prefix, converting GDT/assets before linking, usermap-vs-mod builds, overriding a stock asset or script by commenting its line out of `zone_source/all/assetlist/*.csv` (`zm_patch`, `zm_levelcommon`), which stage to re-run, headless builds via the `t7kb:build` MCP tool. Use when building, compiling, linking or lighting a map or mod, driving the binaries from the command line, when an edited or replaced stock asset is ignored and the original still ships, or judging whether a build succeeded — the linker returns non-zero on warnings too (`exit status 1000`, `Found 1 bad bulletmeshes`, `ok` false on a current Fast File), and the verdict lives in `zone_source/all/assetinfo/` (the map's `.errorlog` and `.csv`). Distinct from t7kb:debugging (reading the resulting errors) and t7kb:mapping (the geometry behind compile failures).
+description: How to build a Black Ops 3 map or mod — the Mod Tools Launcher pipeline (Compile, Light/LEDs, Link, Run), each mod-tools binary, the TA_* environment, the `zm_`/`mp_` prefix, converting GDT/assets before linking, usermap-vs-mod builds, overriding a stock asset or script by commenting its line out of `zone_source/all/assetlist/*.csv` (`zm_patch`, `zm_levelcommon`), which stage to re-run, headless builds (`t7kb:build`). Use when building, compiling, linking or lighting a map or mod, driving the binaries by hand, when an edited or replaced stock asset is ignored and the original still ships, a published map is huge or its `.xpak` grows every link, or judging whether a build succeeded — the linker exits non-zero on warnings too (`exit status 1000`, `Found 1 bad bulletmeshes`, `ok` false on a current Fast File), and the verdict lives in `zone_source/all/assetinfo/` (`.errorlog`, `.csv`). Distinct from t7kb:debugging (reading the errors) and t7kb:mapping (the geometry behind compile failures).
 ---
 
 # Building & compiling BO3 maps and mods
@@ -93,16 +93,7 @@ If the `t7kb` server has `search`/`get` but no `build` tool, its binary predates
 
 ### `t7kb build` — the shell fallback, when no MCP server is registered
 
-No MCP server this session, or you specifically want the CLI's `--json`/`--verbose` output? The same tool ships this subcommand. It runs the whole pipeline with every gotcha below handled — cwd, arg passing, the detached light poll, output-file verification — and prints a **compact per-stage summary** (or `--json`) with the first actionable error, instead of the hundreds of lines each tool spews:
-
-```
-t7kb build zm_mymap                          # usermap: compile,light,link (reads $TA_TOOLS_PATH)
-t7kb build zm_mymap --stages link            # script-only iteration — just re-link
-t7kb build my_mod --mod --stages link        # a mod's zone
-t7kb build zm_mymap --onlyents --json        # fast entity-only compile, machine-readable report
-```
-
-Flags: `--stages compile,light,link,run`, `--light low|medium|high`, `--onlyents`, `--mod`, `--tools-path`/`--game-path` (default `$TA_TOOLS_PATH`/`$TA_GAME_PATH`), `--verbose` to stream raw tool output; for the run stage, `--launcher-dvars` and `--dvar name=value` (MCP `launcher_dvars`, `dvars`). The run stage starts the game as the Launcher's Run does — `+set fs_game <map> +devmap <map>` for a usermap, `+set fs_game <mod>` for a mod — and reports a failure if the game exits within a few seconds (Steam not running or not signed in). It exits non-zero and surfaces the parsed error (e.g. a linker `SCRIPT ERROR … line N`) when a stage fails — hand that to **t7kb:debugging**.
+No MCP server this session, or you want the CLI's `--json`/`--verbose` output? The same tool ships a `t7kb build` subcommand that runs the same pipeline with the same gotchas handled; its usage and flags are in **`references/cli.md`**.
 
 ### Last resort: the raw Launcher binaries, only if `t7kb` itself isn't installed
 
@@ -125,6 +116,12 @@ So verify at the artefacts rather than the return value, all under `<map>/zone_s
 - **`<map>_bulletreport.csv`** — names the bad bulletmesh, if you'd rather clear the warning than keep explaining it.
 
 Plus the `.ff` mtime. A non-zero exit with a fresh `.ff`, a `done:` per zone, and your asset in the CSV is a **successful build**.
+
+## Publish uploads `zone/` as it is: link fresh, then shrink your images
+
+The Launcher's Publish uploads the whole `usermaps/<map>/zone/` folder (verified in the install), and the linker only appends to a `.xpak`: what each link replaces stays in it, read by nothing (verified on a real build: 93 MB of a 325 MB `.xpak`). `t7kb:zone_contents` without a line gives the upload and `xpak_dead_at_least`; link the build you publish with `t7kb:build` `fresh_xpak` (CLI `--fresh-xpak`). Deleting the `.xpak` files by hand works only for the languages you then relink.
+
+Images are most of the rest, and their data doesn't compress in the `.xpak`. Each `mipBase` step down (APE's *Mipmap Base Size*, `1/1` → `1/2` → `1/4` → `1/8`) halves width and height and leaves a quarter of the streamed bytes (verified on a real build: a 4K colour map 22.4 → 5.6 → 1.4 MB). `t7kb:zone_contents` with `images` ranks your GDTs and images by what a step saves; set it with `t7kb:gdt_edit` (a batch per GDT), relink, and check them in game. `doNotResize` locks an image's size; stock GDTs aren't editable.
 
 ## Don't invent
 
