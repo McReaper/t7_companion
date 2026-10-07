@@ -56,14 +56,14 @@ func zoneCheckTool(name, tp mcp.ToolOption) server.ServerTool {
 
 func zonePredictTool(name, tp mcp.ToolOption) server.ServerTool {
 	return server.ServerTool{Tool: mcp.NewTool("zone_predict",
-		mcp.WithDescription("Predict, before linking, what a map's or mod's build will pull in: from its .zone (and "+
-			".zpkg) lines and its map source (placed models, prefabs, entities, brush materials), following every "+
-			"reference the linker follows — GDT fields, model materials, effects, animation tables and notetracks. "+
-			"Without line or asset: the build by type, what each zone line pulls in, the assets referenced that no "+
-			"GDT, file or stock list defines (no_source), and your GDT versions of stock assets the build won't use. "+
-			"line: what one zone line or asset pulls in. asset: the chain that will pull an asset in. Unlike "+
-			"zone_contents and zone_explain, needs no link and sees changes since the last one, but knows no sizes; "+
-			"a whole large map takes ~15 s."),
+		mcp.WithDescription("On request, predict what a map's or mod's next link will pull in, without linking: from its "+
+			".zone (and .zpkg) lines and its map source (placed models, prefabs, entities, brush materials), following "+
+			"the references the linker follows in the sources — GDT fields, model materials, effects, animation tables "+
+			"and notetracks. Without line or asset: the build by type, what each zone line pulls in, referenced assets "+
+			"no GDT, file or stock list defines (no_source: check the name that references them), and your GDT versions "+
+			"of stock assets the build won't use. line: what one zone line or asset pulls in. asset: the chain that will "+
+			"pull an asset in. Use it when the zone or what it references changed, or to explain an asset; it knows no "+
+			"sizes (zone_contents and zone_explain read the last link's), and a whole large map takes ~15 s."),
 		name,
 		mcp.WithString("line", mcp.Description("A zone line or any asset: \"weapon,t9_rpk_up\", or a name the zone or the GDTs give one type.")),
 		mcp.WithString("asset", mcp.Description("Asset name: show the chain that will pull it into the build.")),
