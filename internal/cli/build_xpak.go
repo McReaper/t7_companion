@@ -21,14 +21,16 @@ type xpakAside struct {
 }
 
 // setXpaksAside moves every .xpak in dir aside, after putting back any a link
-// that never finished left aside and didn't replace.
+// that never finished left aside and didn't replace (one it did replace is
+// overwritten by setting the new file aside).
 func setXpaksAside(dir string) (*xpakAside, error) {
 	left, _ := filepath.Glob(filepath.Join(dir, "*.xpak"+asideSuffix))
 	for _, p := range left {
 		base := strings.TrimSuffix(p, asideSuffix)
 		if _, err := os.Stat(base); err == nil {
-			_ = os.Remove(p)
-		} else if err := os.Rename(p, base); err != nil {
+			continue
+		}
+		if err := os.Rename(p, base); err != nil {
 			return nil, err
 		}
 	}
