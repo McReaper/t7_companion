@@ -87,7 +87,7 @@ func sourcesRoot(t *testing.T) string {
 	write("source_data/mine.gdt", "{\r\n\t\"my_gun\" ( \"bulletweapon.gdf\" )\r\n\t{\r\n\t\t\"worldModel\" \"gun_world\"\r\n\t}\r\n"+
 		"\t\"mtl_wall\" ( \"material.gdf\" )\r\n\t{\r\n\t\t\"materialType\" \"lit\"\r\n\t}\r\n}\r\n")
 	write("share/zone_source/zm_mod_level.class", "ignore,zm_patch\n")
-	write("zone_source/all/assetlist/zm_patch.csv", "material,mc/mtl_wall\nweapon,my_gun\n")
+	write("zone_source/all/assetlist/zm_patch.csv", "material,mc/mtl_wall\nweapon,my_gun\nattachmentcosmeticvariant,defaultattachmentcosmeticvariant\n")
 	write("usermaps/zm_x/zone_source/zm_x.zone", ">class,zm_mod_level\nweapon,my_gun\nmaterial,mtl_wall\n")
 	return root
 }
