@@ -97,6 +97,9 @@ func (g *Graph) gdtChildren(id asset.ID, out *idSet) {
 		case "xanim":
 			g.animChildren(fields, out)
 		}
+		if g.w.LinkerType(typ) == "weapon" { // every weapon carries the default cosmetic variant
+			out.add(asset.ID{Type: "attachmentcosmeticvariant", Name: "defaultattachmentcosmeticvariant"})
+		}
 	}
 }
 

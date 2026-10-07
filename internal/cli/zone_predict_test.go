@@ -13,7 +13,7 @@ func TestZonePredict(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if all.ByType["weapon"] != 1 || all.ByType["material"] != 1 || all.ByType["xmodel"] != 1 {
+	if all.ByType["weapon"] != 1 || all.ByType["material"] != 1 || all.ByType["xmodel"] != 1 || all.ByType["attachmentcosmeticvariant"] != 1 {
 		t.Errorf("by type: %+v", all.ByType)
 	}
 	if len(all.Dangling) != 1 || all.Dangling[0].Asset != "xmodel gun_world" || all.Dangling[0].NamedBy != "weapon my_gun" {
@@ -24,7 +24,7 @@ func TestZonePredict(t *testing.T) {
 	}
 
 	line, err := zonePredict(root, "zm_x", "my_gun", "", "") // the type comes from the zone line
-	if err != nil || line.Line != "weapon my_gun" || strings.Join(line.Direct, ",") != "xmodel gun_world" {
+	if err != nil || line.Line != "weapon my_gun" || strings.Join(line.Direct, ",") != "attachmentcosmeticvariant defaultattachmentcosmeticvariant,xmodel gun_world" {
 		t.Errorf("one line: %+v, %v", line, err)
 	}
 
