@@ -40,7 +40,7 @@ func buildToolDef() mcp.Tool {
 		mcp.WithBoolean("gdt_rebuild",
 			mcp.Description("Run gdtdb /rebuild (~1.5 min) instead of /update. /update does pick up GDTs edited outside APE (it reports processed (N GDTs)); use this only if it reports 0 GDTs and the linker then can't find an edited asset (default false).")),
 		mcp.WithBoolean("fresh_xpak",
-			mcp.Description("link stage: write the .xpak from scratch. The linker only appends to it, so the data every earlier link replaced stays in it and uploads with the zone/ folder the Launcher publishes. Use it for the link you publish (default false).")),
+			mcp.Description("link stage: write the .xpak from scratch. The linker only appends to it, so the data every earlier link replaced stays in it and uploads with the zone/ folder the Launcher publishes; zone_contents says how much. Use it for the link you publish (default false).")),
 		mcp.WithObject("dvars",
 			mcp.Description("run stage: dvars to start the game with, as {\"developer\": \"2\", \"logfile\": \"2\"} — logfile 2 writes console_mp.log, the way to read a script error. Overrides launcher_dvars.")),
 		mcp.WithBoolean("launcher_dvars",

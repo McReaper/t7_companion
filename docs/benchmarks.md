@@ -41,7 +41,7 @@ It builds each answer with the same functions the MCP handlers use and counts to
 | `gdt_schema` | material + material_type lit | 1 | 1226 | 1226 | 1226 | 4673 |
 | `gdt_schema` | xmodel | 1 | 2446 | 2446 | 2446 | 9956 |
 | `zone_explain` | the asset with the longest chain | 1 | 337 | 337 | 337 | 1123 |
-| `zone_contents` | every line of the zone | 1 | 1243 | 1243 | 1243 | 4019 |
+| `zone_contents` | every line of the zone | 1 | 1317 | 1317 | 1317 | 4280 |
 | `zone_contents` | its heaviest line | 1 | 972 | 972 | 972 | 3071 |
 | `zone_check` | the map | 1 | 1899 | 1899 | 1899 | 6509 |
 | `zone_predict` | the map | 1 | 2251 | 2251 | 2251 | 7620 |
