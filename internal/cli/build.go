@@ -37,6 +37,7 @@ type buildOpts struct {
 	language      string
 	skipGDT       bool
 	gdtRebuild    bool
+	freshXpak     bool // link: write the .xpak files from scratch
 	jsonOut       bool
 	verbose       bool
 	dvars         []string // run: name=value dvars to start the game with
@@ -84,6 +85,7 @@ func newBuildCmd() *cobra.Command {
 	f.StringVar(&o.language, "language", "english", "linker language")
 	f.BoolVar(&o.skipGDT, "skip-gdt", false, "skip the gdtdb /update pass before building")
 	f.BoolVar(&o.gdtRebuild, "gdt-rebuild", false, "run gdtdb /rebuild instead of /update (only if /update reports 0 GDTs and the linker then misses an edited asset)")
+	f.BoolVar(&o.freshXpak, "fresh-xpak", false, "link: write the .xpak from scratch, dropping the data earlier links replaced (it only grows otherwise, and uploads with zone/); use before publishing")
 	f.BoolVar(&o.jsonOut, "json", false, "emit the report as JSON")
 	f.BoolVar(&o.verbose, "verbose", false, "stream each tool's full output as it runs")
 	f.StringArrayVar(&o.dvars, "dvar", nil, "run: start the game with this dvar, name=value (repeatable; e.g. developer=2, logfile=2)")
@@ -238,8 +240,21 @@ func (p *buildPlan) linkStage() (stageResult, bool) {
 	if !p.stages["link"] {
 		return stageResult{}, false
 	}
+	if !p.o.freshXpak {
+		return p.linkTarget(), true
+	}
+	aside, err := setXpaksAside(p.zoneDir())
+	if err != nil {
+		return stageResult{Name: "link", Errors: []string{err.Error()}}, true
+	}
+	sr := p.linkTarget()
+	sr.Note = joinNotes(sr.Note, aside.settle(sr.OK))
+	return sr, true
+}
+
+func (p *buildPlan) linkTarget() stageResult {
 	if p.o.isMod {
-		return p.linkMod(), true
+		return p.linkMod()
 	}
 	start := time.Now()
 	sr := p.link("-modsource", p.name)
@@ -247,7 +262,7 @@ func (p *buildPlan) linkStage() (stageResult, bool) {
 	if note, ok := warningsOnly(errorlog, start); !sr.OK && ok {
 		sr.OK, sr.Errors, sr.Note = true, nil, note
 	}
-	return sr, true
+	return sr
 }
 
 func (p *buildPlan) link(args ...string) stageResult {
