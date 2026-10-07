@@ -43,6 +43,8 @@ It builds each answer with the same functions the MCP handlers use and counts to
 | `zone_explain` | the asset with the longest chain | 1 | 337 | 337 | 337 | 1123 |
 | `zone_contents` | every line of the zone | 1 | 1317 | 1317 | 1317 | 4280 |
 | `zone_contents` | its heaviest line | 1 | 972 | 972 | 972 | 3071 |
+| `zone_contents` | images: the map | 1 | 1320 | 1320 | 1320 | 3839 |
+| `zone_contents` | images: its heaviest line | 1 | 1185 | 1185 | 1185 | 3497 |
 | `zone_check` | the map | 1 | 1899 | 1899 | 1899 | 6509 |
 | `zone_predict` | the map | 1 | 2251 | 2251 | 2251 | 7620 |
 | `zone_predict` | its heaviest zone line | 1 | 548 | 548 | 548 | 1832 |
