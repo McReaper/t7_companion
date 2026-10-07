@@ -70,6 +70,7 @@ type zoneContentsResult struct {
 	Largest  []sizedOut     `json:"largest,omitempty"`
 	Lines    []zoneLineOut  `json:"lines,omitempty"`
 	More     int            `json:"more,omitempty"`
+	Upload   *uploadOut     `json:"upload,omitempty"`
 }
 
 // zoneCtx is a map's last linker report, opened under a mod-tools root.
@@ -239,6 +240,7 @@ func zoneContents(toolsPath, name, line string) (*zoneContentsResult, error) {
 	if line == "" {
 		res.Assets, res.Resident, res.Streamed = totals(r.Assets)
 		res.Lines, res.More = lineSummary(r.Assets)
+		res.Upload = upload(r.OutDir())
 		return res, nil
 	}
 	ref := parseRef(line)

@@ -104,6 +104,10 @@ func ReportDir(root, name string) (string, error) {
 	return "", fmt.Errorf("no linker report for %q: link it first (looked in %s)", name, strings.Join(tried, " and "))
 }
 
+// OutDir is the zone/ folder beside the report's zone_source/: where the link
+// writes the fastfiles (.ff, .xpak), and the folder the Launcher publishes.
+func (r *Report) OutDir() string { return filepath.Join(r.Dir, "..", "..", "..", "zone") }
+
 // Load reads <dir>/<zone>.csv.
 func Load(dir, zoneName string) (*Report, error) {
 	path := filepath.Join(dir, zoneName+".csv")
