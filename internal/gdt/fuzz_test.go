@@ -15,6 +15,7 @@ func FuzzParse(f *testing.F) {
 		"\xEF\xBB\xBF{\r\n}\r\n",
 		"{\n\t\"p\" ( \"xmodel.gdf\" )\n\t{\n\t\t\"filename\" \"a\\\\b\\\"c.xmodel_bin\"\n\t}\n}\n",
 		"",
+		"{}", // braces on one line: an added asset was spliced in before the "{"
 	} {
 		f.Add([]byte(seed))
 	}
