@@ -82,9 +82,8 @@ func (g *Graph) mapRoots(file string, out *idSet, seen map[string]bool) error {
 
 // entityKeys are the entity keys (lower-cased) naming an asset, by its type.
 var entityKeys = map[string]string{
-	"fxdef":                 "fx", // an fx entity's effect
-	"destroyefx":            "fx", // a destructible's
-	"rattleefx":             "fx",
+	"fxdef":                 "fx",     // an fx entity's effect
+	"destroyefx":            "fx",     // a destructible's
 	"destroyedmodel":        "xmodel", // a dyn_model's broken version
 	"physpreset":            "physpreset",
 	"scriptbundlename":      "scriptbundle", // an fxanim's bundle
