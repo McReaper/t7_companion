@@ -57,6 +57,9 @@ func zoneFiles(t *testing.T, zone string) map[string]string {
 	}
 	out := map[string]string{}
 	for _, e := range es {
+		if e.IsDir() {
+			continue
+		}
 		b, err := os.ReadFile(filepath.Join(zone, e.Name()))
 		if err != nil {
 			t.Fatal(err)
@@ -81,17 +84,20 @@ func sameFiles(got, want map[string]string) bool {
 // The link writes the neutral and the English .xpak from scratch: they replace
 // the old ones, while French, which this link didn't build, keeps its own.
 func TestFreshXpakKeepsWhatTheLinkWrote(t *testing.T) {
-	before := map[string]string{"zm_x.xpak": "old+dead", "en_zm_x.xpak": "old-en+dead", "fr_zm_x.xpak": "old-fr", "zm_x.ff": "ff"}
-	zone, o := xpakLink(t, "usermaps", before, map[string]string{"zm_x.xpak": "new", "en_zm_x.xpak": "new-en"}, true)
+	mb := func(n float64, c string) string { return strings.Repeat(c, int(n*1e6)) }
+	before := map[string]string{"zm_x.xpak": mb(3, "o"), "en_zm_x.xpak": mb(1, "e"), "fr_zm_x.xpak": "old-fr", "zm_x.ff": "ff"}
+	writes := map[string]string{"zm_x.xpak": mb(2, "n"), "en_zm_x.xpak": mb(0.5, "m")}
+	zone, o := xpakLink(t, "usermaps", before, writes, true)
 	rep, err := runBuildReport(&o, "zm_x", io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]string{"zm_x.xpak": "new", "en_zm_x.xpak": "new-en", "fr_zm_x.xpak": "old-fr", "zm_x.ff": "ff"}
+	want := map[string]string{"zm_x.xpak": writes["zm_x.xpak"], "en_zm_x.xpak": writes["en_zm_x.xpak"], "fr_zm_x.xpak": "old-fr", "zm_x.ff": "ff"}
 	if got := zoneFiles(t, zone); !sameFiles(got, want) {
-		t.Errorf("zone/ after the link: %v, want %v", got, want)
+		t.Errorf("zone/ after the link: %d files, want %d", len(got), len(want))
 	}
-	if !rep.OK || !strings.Contains(rep.Stages[0].Note, "0.0 MB -> 0.0 MB") {
+	// French was put back, not rewritten: only the two files the link wrote count
+	if !rep.OK || rep.Stages[0].Note != ".xpak written from scratch: 4.0 MB -> 2.5 MB" {
 		t.Errorf("report: %+v", rep)
 	}
 }
@@ -127,14 +133,50 @@ func TestFreshXpakAfterAnInterruptedLink(t *testing.T) {
 	}
 }
 
-// A mod's .xpak files live in mods/<mod>/zone.
+// A mod's .xpak files live in mods/<mod>/zone: they are the ones set aside.
 func TestFreshXpakForAMod(t *testing.T) {
 	zone, o := xpakLink(t, "mods", map[string]string{"zm_mod.xpak": "old"}, map[string]string{"zm_mod.xpak": "new"}, true)
-	if _, err := runBuildReport(&o, "zm_x", io.Discard); err != nil {
+	rep, err := runBuildReport(&o, "zm_x", io.Discard)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if got := zoneFiles(t, zone); !sameFiles(got, map[string]string{"zm_mod.xpak": "new"}) {
 		t.Errorf("zone/: %v", got)
+	}
+	if note := rep.Stages[0].Note; !strings.Contains(note, ".xpak written from scratch") {
+		t.Errorf("the mod's .xpak wasn't set aside: %q", note)
+	}
+}
+
+// A file that can't be set aside (the game holds it open) stops the stage
+// before the link, with the ones already set aside put back.
+func TestFreshXpakWhenAFileCantBeSetAside(t *testing.T) {
+	before := map[string]string{"en_zm_x.xpak": "old-en", "zm_x.xpak": "old"}
+	zone, o := xpakLink(t, "usermaps", before, map[string]string{"zm_x.xpak": "new", "en_zm_x.xpak": "new-en"}, true)
+	blocker := filepath.Join(zone, "zm_x.xpak"+asideSuffix) // a non-empty folder where zm_x.xpak would go
+	if err := os.MkdirAll(blocker, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(blocker, "x"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rep, err := runBuildReport(&o, "zm_x", io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.OK || len(rep.Stages[0].Errors) == 0 || !strings.Contains(rep.Stages[0].Errors[0], "can't set zm_x.xpak aside") {
+		t.Errorf("report: %+v", rep)
+	}
+	if got := zoneFiles(t, zone); !sameFiles(got, before) {
+		t.Errorf("zone/ (the link must not run, en_zm_x.xpak must be back): %v", got)
+	}
+}
+
+func TestJoinNotes(t *testing.T) {
+	for _, c := range [][3]string{{"", "b", "b"}, {"a", "", "a"}, {"a", "b", "a; b"}, {"", "", ""}} {
+		if got := joinNotes(c[0], c[1]); got != c[2] {
+			t.Errorf("joinNotes(%q, %q) = %q, want %q", c[0], c[1], got, c[2])
+		}
 	}
 }
 

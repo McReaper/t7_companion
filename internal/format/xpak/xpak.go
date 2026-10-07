@@ -13,6 +13,7 @@
 package xpak
 
 import (
+	"cmp"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -78,8 +79,8 @@ func Read(r io.ReaderAt, size int64) (*Index, error) {
 	if x.DataStart > uint64(size) || x.DataSize > uint64(size)-x.DataStart {
 		return nil, errors.New("xpak data runs past the file")
 	}
-	if n > uint64(size)/entryLen || tableLen != n*entryLen || tableAt > uint64(size) || tableLen > uint64(size)-tableAt {
-		return nil, errors.New("xpak entry table runs past the file")
+	if n > uint64(size)/entryLen || tableLen != n*entryLen { // more entries than the file holds, or a count whose length wraps
+		return nil, errors.New("xpak entry count doesn't fit the file")
 	}
 	t := make([]byte, tableLen)
 	if err := readAt(r, t, int64(tableAt)); err != nil {
@@ -100,7 +101,7 @@ func Read(r io.ReaderAt, size int64) (*Index, error) {
 // earlier links left behind (see the package doc).
 func (x *Index) Dead() int64 {
 	es := slices.Clone(x.Entries)
-	slices.SortFunc(es, func(a, b Entry) int { return cmpU64(a.Offset, b.Offset) })
+	slices.SortFunc(es, func(a, b Entry) int { return cmp.Compare(a.Offset, b.Offset) })
 	var end, dead uint64
 	for _, e := range es {
 		if b := roundUp(end); e.Offset > b {
@@ -115,16 +116,6 @@ func (x *Index) Dead() int64 {
 }
 
 func roundUp(v uint64) uint64 { return (v + align - 1) &^ (align - 1) }
-
-func cmpU64(a, b uint64) int {
-	switch {
-	case a < b:
-		return -1
-	case a > b:
-		return 1
-	}
-	return 0
-}
 
 // readAt fills b: io.ReaderAt may report io.EOF along with a complete read.
 func readAt(r io.ReaderAt, b []byte, off int64) error {

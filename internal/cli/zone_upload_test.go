@@ -26,9 +26,10 @@ func xpakFile(dataSize, entrySize uint64) []byte {
 
 // The upload is the whole zone/ folder; its .xpak files' dead data is worth a
 // fresh link once it is a share of them.
-func TestUpload(t *testing.T) {
-	dir := t.TempDir()
-	write := func(rel string, b []byte) {
+// writeFiles lays files out under dir.
+func writeFiles(t *testing.T, dir string, files map[string][]byte) {
+	t.Helper()
+	for rel, b := range files {
 		p := filepath.Join(dir, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
@@ -37,25 +38,37 @@ func TestUpload(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write("zm_x.xpak", xpakFile(0x40000, 0x8000)) // 224 KiB past the entry's padding
-	write("en_zm_x.xpak", xpakFile(0x8000, 0x8000))
-	write("zm_x.ff", make([]byte, 100))
-	write("snd/zm_x.sabs", make([]byte, 50))
+}
+
+func TestUpload(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string][]byte{
+		"zm_x.xpak":     xpakFile(0x40000, 0x8000), // 224 KiB past the entry's padding
+		"en_zm_x.xpak":  xpakFile(0x10000, 0x8000), // and 32 KiB more
+		"zm_x.ff":       make([]byte, 100),
+		"snd/zm_x.sabs": make([]byte, 50),
+		"snd/old.xpak":  xpakFile(0x40000, 0x8000), // uploads, but no fastfile reads a .xpak there
+	})
 	u := upload(dir)
 	var total int64
-	for _, n := range []int{0x100 + 0x40000 + 24, 0x100 + 0x8000 + 24, 100, 50} {
+	for _, n := range []int{0x100 + 0x40000 + 24, 0x100 + 0x10000 + 24, 100, 50, 0x100 + 0x40000 + 24} {
 		total += int64(n)
 	}
-	if u == nil || u.Bytes != total || u.XpakDead != 0x38000 || !strings.Contains(u.Advice, "fresh_xpak") {
-		t.Errorf("got %+v, want %d bytes, %d dead, and the advice", u, total, 0x38000)
+	if u == nil || u.Bytes != total || u.XpakDead != 0x38000+0x8000 || !strings.Contains(u.Advice, "fresh_xpak") {
+		t.Errorf("got %+v, want %d bytes, %d dead, and the advice", u, total, 0x38000+0x8000)
 	}
 
+	// the share is of every .xpak: 32 KiB dead in 4 MiB plus a clean 32 KiB file is under 1%
 	small := t.TempDir()
-	if err := os.WriteFile(filepath.Join(small, "zm_x.xpak"), xpakFile(0x400000, 0x400000-0x8000), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeFiles(t, small, map[string][]byte{"en_zm_x.xpak": xpakFile(0x400000, 0x400000-0x8000), "zm_x.xpak": xpakFile(0x8000, 0x8000)})
 	if u := upload(small); u == nil || u.XpakDead != 0x8000 || u.Advice != "" {
 		t.Errorf("32 KiB dead of 4 MiB is under 1%%, no advice: %+v", u)
+	}
+
+	none := t.TempDir()
+	writeFiles(t, none, map[string][]byte{"zm_x.ff": make([]byte, 100)})
+	if u := upload(none); u == nil || u.Bytes != 100 || u.XpakDead != 0 || u.Advice != "" {
+		t.Errorf("no .xpak, nothing dead, no advice: %+v", u)
 	}
 	if u := upload(filepath.Join(small, "missing")); u != nil {
 		t.Errorf("no zone/ folder: %+v", u)

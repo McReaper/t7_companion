@@ -2,6 +2,7 @@ package xpak
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/binary"
 	"os"
 	"path/filepath"
@@ -15,8 +16,8 @@ func file(dataSize uint64, es ...Entry) []byte {
 	const dataStart = 0x100
 	le := binary.LittleEndian
 	b := make([]byte, dataStart+dataSize)
-	copy(b, magic)
-	le.PutUint16(b[6:], version)
+	copy(b, "KAPI")
+	le.PutUint16(b[6:], 10) // the format's version, written out so a changed constant fails
 	tableAt := uint64(len(b))
 	for _, e := range es {
 		b = le.AppendUint64(b, e.Key)
@@ -47,6 +48,24 @@ func TestRead(t *testing.T) {
 	if x.DataStart != 0x100 || x.DataSize != 0x20000 || len(x.Entries) != 2 || x.Entries[1] != (Entry{2, 0x100, 0x50}) {
 		t.Errorf("got %+v", x)
 	}
+	if x := read(t, file(0x100, Entry{1, 0x100, 0})); len(x.Entries) != 1 {
+		t.Errorf("an empty entry at the very end of the data is valid: %+v", x)
+	}
+}
+
+func TestOpen(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "zm_x.xpak")
+	b := file(0x100, Entry{7, 0, 0x100})
+	if err := os.WriteFile(p, b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	x, err := Open(p)
+	if err != nil || x.FileSize != int64(len(b)) || len(x.Entries) != 1 || x.Entries[0].Key != 7 {
+		t.Errorf("got %+v, %v", x, err)
+	}
+	if _, err := Open(p + ".missing"); err == nil {
+		t.Error("a missing file must be an error")
+	}
 }
 
 // Padding up to the next 32 KiB boundary is a fresh file's layout; anything
@@ -64,6 +83,9 @@ func TestDead(t *testing.T) {
 		{"a replaced entry's old bytes", 0x30000, []Entry{{1, 0, 0x8000}, {2, 0x20000, 0x10000}}, 0x18000},
 		{"left at the end", 0x40000, []Entry{{1, 0, 0x8000}}, 0x38000},
 		{"overlapping entries", 0x10000, []Entry{{1, 0, 0x10000}, {2, 0x100, 0x10}}, 0},
+		{"two dead runs, then a dead tail", 0x40000, []Entry{{1, 0, 0x100}, {2, 0x20000, 0x100}, {3, 0x30000, 0x100}}, 0x18000 + 0x8000 + 0x8000},
+		{"ends a byte past a boundary", 0x10100, []Entry{{1, 0, 0x8001}, {2, 0x10000, 0x100}}, 0},
+		{"listed out of order", 0x20100, []Entry{{3, 0x20000, 0x100}, {1, 0, 0x8000}, {2, 0x8000, 0x8000}}, 0x10000},
 		{"empty", 0x10000, nil, 0x10000},
 	}
 	for _, c := range cases {
@@ -75,17 +97,28 @@ func TestDead(t *testing.T) {
 
 func TestReadRejects(t *testing.T) {
 	good := file(0x100, Entry{1, 0, 0x100})
+	le := binary.LittleEndian
 	cases := map[string]func(b []byte){
-		"magic":         func(b []byte) { copy(b, "KAPX") },
-		"version":       func(b []byte) { b[6] = 11 },
-		"data size":     func(b []byte) { binary.LittleEndian.PutUint64(b[0x28:], 1<<40) },
-		"table length":  func(b []byte) { binary.LittleEndian.PutUint64(b[0x40:], 25) },
-		"table offset":  func(b []byte) { binary.LittleEndian.PutUint64(b[0x38:], 1<<40) },
-		"entry offset":  func(b []byte) { binary.LittleEndian.PutUint64(b[len(b)-16:], 0x200) },
-		"entry size":    func(b []byte) { binary.LittleEndian.PutUint64(b[len(b)-8:], 0x101) },
-		"entry count":   func(b []byte) { binary.LittleEndian.PutUint64(b[0x30:], 1<<60) },
+		"magic":             func(b []byte) { copy(b, "KAPX") },
+		"a later version":   func(b []byte) { b[6] = 11 },
+		"an older version":  func(b []byte) { b[6] = 9 },
+		"data size":         func(b []byte) { le.PutUint64(b[0x28:], 1<<40) },
+		"data a byte long":  func(b []byte) { le.PutUint64(b[0x28:], uint64(len(b))-0x100+1) },
+		"data past the end": func(b []byte) { le.PutUint64(b[0x20:], uint64(len(b))+1) },
+		"table length":      func(b []byte) { le.PutUint64(b[0x40:], 25) },
+		"table offset":      func(b []byte) { le.PutUint64(b[0x38:], 1<<40) },
+		"entry offset":      func(b []byte) { le.PutUint64(b[len(b)-16:], 0x200) },
+		"entry size":        func(b []byte) { le.PutUint64(b[len(b)-8:], 0x101) },
+		"entry past the data from inside it": func(b []byte) {
+			le.PutUint64(b[len(b)-16:], 0x80)
+			le.PutUint64(b[len(b)-8:], 0x81)
+		},
+		"entry count": func(b []byte) { le.PutUint64(b[0x30:], 1<<60) },
+		"entry count whose length wraps": func(b []byte) { // (2^61+1) * 24 wraps to 24: one entry's worth of table
+			le.PutUint64(b[0x30:], 1<<61+1)
+		},
 		"short header":  func(b []byte) {},
-		"no entry room": func(b []byte) { binary.LittleEndian.PutUint64(b[0x30:], 2) },
+		"no entry room": func(b []byte) { le.PutUint64(b[0x30:], 2) },
 	}
 	for name, corrupt := range cases {
 		b := bytes.Clone(good)
@@ -142,7 +175,7 @@ func TestInstallXpaks(t *testing.T) {
 // overlapping counts entries that start before an earlier one ends.
 func overlapping(x *Index) int {
 	es := slices.Clone(x.Entries)
-	slices.SortFunc(es, func(a, b Entry) int { return cmpU64(a.Offset, b.Offset) })
+	slices.SortFunc(es, func(a, b Entry) int { return cmp.Compare(a.Offset, b.Offset) })
 	var end uint64
 	n := 0
 	for _, e := range es {
