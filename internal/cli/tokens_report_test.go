@@ -248,9 +248,13 @@ func zoneSamples(t *testing.T, root string, add func(key, s string)) {
 		run("zone_explain|the asset with the longest chain", v, err)
 		all, err := zoneContents(root, name, "")
 		run("zone_contents|every line of the zone", all, err)
+		imgs, err := zoneImages(root, name, "")
+		run("zone_contents|images: the map", imgs, err)
 		if err == nil && len(all.Lines) > 0 {
 			heavy, err := zoneContents(root, name, all.Lines[0].Line)
 			run("zone_contents|its heaviest line", heavy, err)
+			heavyImgs, err := zoneImages(root, name, all.Lines[0].Line)
+			run("zone_contents|images: its heaviest line", heavyImgs, err)
 		}
 		chk, err := zoneCheck(root, name)
 		run("zone_check|the map", chk, err)

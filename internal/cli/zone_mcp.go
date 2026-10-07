@@ -35,10 +35,15 @@ func zoneContentsTool(name, tp mcp.ToolOption) server.ServerTool {
 		mcp.WithDescription("What a zone line pulls into a map's build, from the last link's report: asset count and bytes "+
 			"(resident and streamed), counts per type, and the largest assets. Without a line: every zone line by weight, "+
 			"to see what makes a fastfile big, and what publishing uploads (the zone/ folder), with the .xpak data earlier links "+
-			"left in it."),
+			"left in it. images: where the upload can shrink without cutting content: the images by who defines them (your "+
+			"GDTs, stock, none), your GDTs and largest images by what one mipBase step down would save."),
 		name,
-		mcp.WithString("line", mcp.Description("A zone line (\"weapon,t8_knife_zm\"), an asset name, or an included .zpkg name.")), tp),
+		mcp.WithString("line", mcp.Description("A zone line (\"weapon,t8_knife_zm\"), an asset name, or an included .zpkg name.")),
+		mcp.WithBoolean("images", mcp.Description("Weigh the images instead (of the whole build, or of the line) and what mipBase would save.")), tp),
 		Handler: jsonHandler(func(_ context.Context, r mcp.CallToolRequest) (any, error) {
+			if r.GetBool("images", false) {
+				return zoneImages(r.GetString("tools_path", ""), r.GetString("name", ""), r.GetString("line", ""))
+			}
 			return zoneContents(r.GetString("tools_path", ""), r.GetString("name", ""), r.GetString("line", ""))
 		})}
 }

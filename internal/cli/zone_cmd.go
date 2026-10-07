@@ -23,6 +23,7 @@ func newZoneCmd() *cobra.Command {
 		}}
 	explain.Flags().StringVar(&typ, "type", "", "asset type, when one name is used by several")
 
+	var images bool
 	contents := &cobra.Command{Use: "contents <map> [line]", Short: "Show what a zone line pulls in, or every line by weight",
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(c *cobra.Command, a []string) error {
@@ -30,8 +31,12 @@ func newZoneCmd() *cobra.Command {
 			if len(a) == 2 {
 				line = a[1]
 			}
+			if images {
+				return printIndented(c.OutOrStdout())(zoneImages(toolsPath, a[0], line))
+			}
 			return printIndented(c.OutOrStdout())(zoneContents(toolsPath, a[0], line))
 		}}
+	contents.Flags().BoolVar(&images, "images", false, "weigh the images by who defines them, and what a mipBase step down would save")
 	check := &cobra.Command{Use: "check <map>", Short: "Find your versions of stock assets that the build won't use",
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, a []string) error {
