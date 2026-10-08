@@ -1,0 +1,60 @@
+name: mutation
+
+# Mutation testing of the Go lines a PR changes (gremlins --diff). Advisory: the
+# lived mutants and the changed lines no test runs land in the job summary, and
+# gremlins.json as an artifact. Each lived mutant gets a test that fails on it,
+# or the PR says why it changes nothing observable — none is silenced by a list.
+# Actions → mutation → Run workflow mutates the diff from any ref.
+on:
+  pull_request:
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/mutation.yml"
+      - ".github/scripts/mutation_report.py"
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "Ref to diff against (a tag, a branch, a commit)"
+        required: true
+        default: "main"
+
+permissions:
+  contents: read
+
+jobs:
+  mutate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CGO_ENABLED: "0"
+      HF_HOME: ${{ github.workspace }}/.hf # the embedding model TestHybridSearch loads
+      GOFLAGS: -count=1 # gremlins times each mutant from the coverage run: a cached one would make every timeout tiny
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Cache the embedding model
+        uses: actions/cache@v6
+        with:
+          path: .hf
+          key: hf-all-MiniLM-L6-v2
+      - name: Install gremlins
+        run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
+      - name: Mutate the changed lines
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || inputs.base }}
+        run: gremlins unleash --diff "$BASE" -o gremlins.json || echo "gremlins exited $?"
+      - name: Report
+        if: always()
+        run: python3 .github/scripts/mutation_report.py gremlins.json "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: gremlins
+          path: gremlins.json
+          if-no-files-found: ignore

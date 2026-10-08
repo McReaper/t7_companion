@@ -1,0 +1,49 @@
+name: fuzz
+
+# Go's fuzzer, time-boxed (go test in ci.yml only replays the seeds): on a PR,
+# 45 s per Fuzz target of each package the PR changes; every night, 5 min per
+# target. A failing input fails the job and is kept as an artifact: fold it into
+# the target's seed list with the bug it guards (.github/scripts/fuzz.sh).
+on:
+  pull_request:
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/fuzz.yml"
+      - ".github/scripts/fuzz.sh"
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      fuzztime:
+        description: "Time per target"
+        required: true
+        default: "5m"
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7 # its build cache carries the fuzz corpus from run to run
+        with:
+          go-version-file: go.mod
+      - name: Fuzz
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
+          FUZZTIME: ${{ github.event_name == 'pull_request' && '45s' || inputs.fuzztime || '5m' }}
+        run: bash .github/scripts/fuzz.sh
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: failing-inputs
+          path: "**/testdata/fuzz/**"
