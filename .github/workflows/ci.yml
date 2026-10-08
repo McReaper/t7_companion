@@ -9,6 +9,7 @@ on:
       - "go.mod"
       - "go.sum"
       - ".github/workflows/ci.yml"
+      - ".github/scripts/patch_coverage.py"
       - ".golangci.yml"
   push:
     branches: [main]
@@ -30,6 +31,8 @@ jobs:
       HF_HOME: ${{ github.workspace }}/.hf # the embedding model TestHybridSearch loads
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the PR's base, for the coverage of its changed lines
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
@@ -55,4 +58,8 @@ jobs:
           GOOS=windows GOARCH=amd64 go build -o /dev/null ./cmd/t7kb
           GOOS=linux GOARCH=amd64 go build -o /dev/null ./cmd/t7kb
       - name: test
-        run: go test ./...
+        run: go test -coverpkg=./... -coverprofile=cover.out ./...
+      - name: coverage of the changed lines # at least 80% of a PR's changed Go lines run under test
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: python3 .github/scripts/patch_coverage.py cover.out "origin/${{ github.base_ref }}" 80 "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.sha }}" | tee -a "$GITHUB_STEP_SUMMARY"
