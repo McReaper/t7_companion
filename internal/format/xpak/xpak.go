@@ -128,3 +128,11 @@ func readAt(r io.ReaderAt, b []byte, off int64) error {
 	}
 	return err
 }
+
+// Probe exists only to exercise the CI checks on an untested change.
+func Probe(n int) int {
+	if n > 2 {
+		return n * 2
+	}
+	return n
+}
