@@ -56,7 +56,11 @@
 // Every GDT in the directories gdtdb scans (bin/converter_gdt_dirs_0.txt) is
 // indexed, gob-cached in the user cache dir and refreshed incrementally by
 // mtime/size; the MCP server warms it at start and refresh (index.go) keeps it
-// fresh in a long session. gdtdb's own database, gdtdb/gdt.db, can't stand in
+// fresh in a long session. The techsetdef tree stays fresh too (techset.go): a
+// material type it doesn't know rescans it, it is rescanned once it is two
+// minutes old, and a resolved techset whose techsetdef or #includes changed is
+// read again — a custom techset written mid-session is a material type at
+// once. gdtdb's own database, gdtdb/gdt.db, can't stand in
 // for it: it sees a GDT only after gdtdb /update, while an edit is checked the
 // moment it is written, and it doesn't exist before gdtdb first runs. It is a
 // SQLite file with a table per asset type and a column per field, which a

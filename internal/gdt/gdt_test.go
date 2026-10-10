@@ -330,7 +330,7 @@ Texture( "lookupMap" )
 	if err := os.WriteFile(p, []byte(src), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	techsets, err := OpenTechsets(filepath.Dir(filepath.Dir(p))) // indexed when opened: reopen after writing
+	techsets, err := OpenTechsets(filepath.Dir(filepath.Dir(p)))
 	if err != nil {
 		t.Fatal(err)
 	}
