@@ -189,3 +189,109 @@ func TestTechsetsConcurrentLookups(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+// A root that can't be walked is an error, not an empty index.
+func TestOpenTechsetsMissingRoot(t *testing.T) {
+	if _, err := OpenTechsets(filepath.Join(t.TempDir(), "missing")); err == nil {
+		t.Error("no error")
+	}
+}
+
+// A material type the index knows never walks the tree, however often it is
+// looked up: only an unknown one may.
+func TestTechsetsKnownTypeDoesNotRescan(t *testing.T) {
+	root := techsetTreeFor(t, map[string]string{"geometry/known.techsetdef": oneSlot})
+	ts, err := OpenTechsets(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts.rescanEvery = 0
+	if err := os.Remove(filepath.Join(root, "geometry", "known.techsetdef")); err != nil {
+		t.Fatal(err)
+	}
+	if !ts.Exists("known") {
+		t.Error("a known material type rescanned the tree")
+	}
+}
+
+// A techsetdef outside include/ wins over an include of the same name, in
+// whichever order the walk meets them (postfx/ comes after include/).
+func TestTechsetsPreferTheMaterialTypeOverAnInclude(t *testing.T) {
+	root := techsetTreeFor(t, map[string]string{
+		"include/shared.techsetdef": oneSlot,
+		"postfx/shared.techsetdef":  oneSlot,
+	})
+	ts, err := OpenTechsets(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ts.Exists("shared") {
+		t.Error("the include shadows the material type")
+	}
+}
+
+// An edit that keeps the size, or one that keeps the time, is still seen.
+func TestTechsetsSeeAnEditByTimeOrBySize(t *testing.T) {
+	sameSize := strings.Replace(oneSlot, "$white", "$black", 1)
+	bigger := oneSlot + `Texture( "normalMap" ) { image = Image( <normalMap, $identitynormalmap> ) }
+`
+	for name, edit := range map[string]func(p string){
+		"same size, later time": func(p string) {
+			writeTechset(t, filepath.Dir(p), filepath.Base(p), sameSize)
+			later(t, p)
+		},
+		"same time, other size": func(p string) {
+			fi, err := os.Stat(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			writeTechset(t, filepath.Dir(p), filepath.Base(p), bigger)
+			if err := os.Chtimes(p, fi.ModTime(), fi.ModTime()); err != nil {
+				t.Fatal(err)
+			}
+		},
+	} {
+		root := techsetTreeFor(t, map[string]string{"geometry/mine.techsetdef": oneSlot})
+		ts, err := OpenTechsets(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ts.restatEvery = 0
+		before, _ := ts.Resolve("mine")
+		edit(filepath.Join(root, "geometry", "mine.techsetdef"))
+		if after, _ := ts.Resolve("mine"); after == before {
+			t.Errorf("%s: the edit isn't seen", name)
+		}
+	}
+}
+
+// A deleted techsetdef that was resolved rescans the tree once, not on every
+// later lookup.
+func TestTechsetsDeletedTypeRescansOnce(t *testing.T) {
+	root := techsetTreeFor(t, map[string]string{"geometry/gone.techsetdef": oneSlot})
+	ts, err := OpenTechsets(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts.restatEvery = 0
+	if _, err := ts.Resolve("gone"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(root, "geometry", "gone.techsetdef")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ts.Resolve("gone"); err == nil {
+		t.Fatal("resolved a deleted techsetdef")
+	}
+	ts.scanMu.Lock()
+	scanned := ts.lastScan
+	ts.scanMu.Unlock()
+	if _, err := ts.Resolve("gone"); err == nil {
+		t.Fatal("resolved a deleted techsetdef")
+	}
+	ts.scanMu.Lock()
+	defer ts.scanMu.Unlock()
+	if !ts.lastScan.Equal(scanned) {
+		t.Error("the second lookup rescanned the tree")
+	}
+}
