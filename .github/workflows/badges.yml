@@ -1,0 +1,43 @@
+name: badges
+
+# The README's installs badge. t7kb.db.zip is fetched once per install, so its
+# downloads summed over every release count installs; shields.io's own per-asset
+# downloads badge appends "[t7kb.db.zip]" to that count, so this job writes the
+# sum as a shields endpoint JSON on the `badges` branch (an orphan branch holding
+# only installs.json, one commit per change of the count), which the README reads.
+on:
+  schedule:
+    - cron: "41 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  installs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Publish installs.json on the badges branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            --jq '.[].assets[] | select(.name == "t7kb.db.zip") | .download_count' |
+            awk '{ s += $1 } END { print s + 0 }')
+          git init -q badges && cd badges
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git fetch -q --depth 1 origin badges; then
+            git checkout -q -b badges FETCH_HEAD
+          else
+            git checkout -q --orphan badges
+          fi
+          printf '{"schemaVersion":1,"label":"installs","message":"%s","color":"brightgreen"}\n' "$n" > installs.json
+          git add installs.json
+          if git diff --cached --quiet; then
+            echo "installs: $n (unchanged)"
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "installs: $n"
+          git push -q origin badges
