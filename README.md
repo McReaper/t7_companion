@@ -6,7 +6,7 @@
 
 <p align="center">
     <a href="https://github.com/McReaper/t7_companion/releases/latest"><img src="https://img.shields.io/github/v/release/McReaper/t7_companion?sort=semver" alt="Latest release"/></a>
-    <a href="https://github.com/McReaper/t7_companion/releases"><img src="https://img.shields.io/github/downloads/McReaper/t7_companion/total" alt="Downloads"/></a>
+    <a href="https://github.com/McReaper/t7_companion/releases"><img src="https://img.shields.io/github/downloads/McReaper/t7_companion/t7kb.db.zip?label=installs" alt="Installs"/></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"/></a>
     <img src="https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white" alt="Go 1.25"/>
     <img src="https://img.shields.io/badge/runs-offline-brightgreen" alt="Runs offline"/>
