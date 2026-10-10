@@ -7,7 +7,7 @@
     {
       "name": "t7kb",
       "source": { "source": "git-subdir", "url": "https://github.com/McReaper/t7_companion.git", "path": "plugin" },
-      "description": "Local Black Ops 3 modding knowledge base — hybrid (keyword + semantic) search over the BO3 modding community, served to the agent over MCP with tools to check and edit GDTs and to build maps and mods headlessly, plus grounded skills for scripting, debugging, mapping, building/compiling, assets/porting, animation, cross-generation animation retargeting, zombies AI, moving platforms and vehicles, HUD/Lua, particle FX, atmosphere and audio, localization, and cross-referencing other Call of Duty titles. Run /t7kb:setup once to install; /t7kb:contribute sends a skill fix or a newly found trap upstream as a pull request."
+      "description": "Local Black Ops 3 modding knowledge base — hybrid (keyword + semantic) search over the BO3 modding community, served to the agent over MCP with tools to check and edit GDTs and to build maps and mods headlessly, plus grounded skills for scripting, debugging, mapping, building/compiling, assets/porting, animation, cross-generation animation retargeting, zombies AI, moving platforms and vehicles, HUD/Lua, particle FX, custom shaders, atmosphere and audio, localization, and cross-referencing other Call of Duty titles. Run /t7kb:setup once to install; /t7kb:contribute sends a skill fix or a newly found trap upstream as a pull request."
     }
   ]
 }
