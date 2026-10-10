@@ -103,7 +103,7 @@ func TestGDTToolsOverMCP(t *testing.T) {
 		t.Fatal(err)
 	}
 	tools, err := c.ListTools(ctx, mcp.ListToolsRequest{})
-	if err != nil || len(tools.Tools) != 14 { // search, get, build, 6 gdt_*, 4 zone_*, create
+	if err != nil || len(tools.Tools) != 15 { // search, get, build, 6 gdt_*, 4 zone_*, create, shader_decompile
 		t.Fatalf("tools/list: %d tools, %v", len(tools.Tools), err)
 	}
 
