@@ -2,7 +2,9 @@ package shader
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -29,6 +31,7 @@ func TestParseName(t *testing.T) {
 		{"a.fx_gs_main_X", Name{"a.fx", "gs", "X"}, true},
 		{"x.hlsl_ps_main_", Name{}, false},   // no hash
 		{"x.hlsl_ps_entry_H", Name{}, false}, // not an entry point the cache uses
+		{"x.hlsl_ps_H", Name{}, false},       // no entry point at all
 		{"x.hlsl_zz_main_H", Name{}, false},  // no such stage
 		{"_ps_main_H", Name{}, false},        // no source
 		{"ps_main_H", Name{}, false},
@@ -99,7 +102,7 @@ func TestVariants(t *testing.T) {
 		"sample.hlsl_ps_main_AAAAAAAAAAAAAAAAAAAAAAAAAA", "sample.hlsl_ps_main_BBBBBBBBBBBBBBBBBBBBBBBBBB"}) {
 		t.Errorf("first variant: %+v", first)
 	}
-	if !slices.Equal(first.Resources, []string{"colorSampler@s0", "colorMap@t0", "Material@cb0"}) ||
+	if first.Globals != nil || !slices.Equal(first.Resources, []string{"colorSampler@s0", "colorMap@t0", "Material@cb0"}) ||
 		!slices.Equal(first.Inputs, []string{"SV_Position0", "TEXCOORD0", "NORMAL0"}) {
 		t.Errorf("what the first variant reads: %+v", first)
 	}
@@ -132,8 +135,84 @@ func TestVariantsOfAnUnreadableFile(t *testing.T) {
 	if _, err := Variants(dir, []Name{n}, ""); err == nil || !strings.Contains(err.Error(), n.File()) {
 		t.Errorf("err = %v", err)
 	}
-	if _, err := Variants(dir, []Name{{"gone.hlsl", "ps", "H"}}, ""); err == nil {
-		t.Error("a missing file is no error")
+	if _, err := Variants(dir, []Name{{"gone.hlsl", "ps", "H"}}, ""); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("a missing file: %v", err)
+	}
+}
+
+// Variants come by stage, then largest first, ties in the order the files
+// came, each one's files sorted, whatever the order they are given in.
+func TestVariantsOrder(t *testing.T) {
+	files, err := Files(cache)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := slices.Clone(files["sample.hlsl"])
+	slices.Reverse(names) // vs first, C before A and B
+	vs, err := Variants(cache, names, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, v := range vs {
+		got = append(got, v.Stage+":"+strings.Join(v.Files, "+"))
+	}
+	want := []string{"ps:sample.hlsl_ps_main_AAAAAAAAAAAAAAAAAAAAAAAAAA+sample.hlsl_ps_main_BBBBBBBBBBBBBBBBBBBBBBBBBB",
+		"ps:sample.hlsl_ps_main_CCCCCCCCCCCCCCCCCCCCCCCCCC", "vs:sample.hlsl_vs_main_AAAAAAAAAAAAAAAAAAAAAAAAAA"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %v\nwant %v", got, want)
+	}
+
+	// two programs of one permutation each keep their order
+	dir := t.TempDir()
+	for i, src := range []string{"sample.hlsl_ps_main_CCCCCCCCCCCCCCCCCCCCCCCCCC", "material.hlsl_ps_main_EEEEEEEEEEEEEEEEEEEEEEEEEE"} {
+		copyFile(t, filepath.Join(cache, src), filepath.Join(dir, Name{"tie.hlsl", "ps", string(rune('1' + i))}.File()))
+	}
+	ties, err := Files(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vs, err = Variants(dir, ties["tie.hlsl"], "ps")
+	if err != nil || len(vs) != 2 || vs[0].Files[0] != "tie.hlsl_ps_main_1" {
+		t.Errorf("ties: %+v, %v", vs, err)
+	}
+}
+
+// Programs whose chunks have the same sizes but other bytes are two variants.
+func TestVariantsTellSameSizesApart(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join(cache, "sample.hlsl_ps_main_AAAAAAAAAAAAAAAAAAAAAAAAAA"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := bytes.Index(b, []byte("SHEX"))
+	if at < 0 {
+		t.Fatal("no SHEX")
+	}
+	other := slices.Clone(b)
+	size := int(binary.LittleEndian.Uint32(b[at+4:]))
+	other[at+8+size-1] ^= 0xFF // the program's last byte: sizes unchanged
+	dir := t.TempDir()
+	a, c := Name{"same.hlsl", "ps", "A"}, Name{"same.hlsl", "ps", "B"}
+	if err := os.WriteFile(filepath.Join(dir, a.File()), b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, c.File()), other, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	vs, err := Variants(dir, []Name{a, c}, "ps")
+	if err != nil || len(vs) != 2 {
+		t.Errorf("variants %+v, %v", vs, err)
+	}
+}
+
+func copyFile(t *testing.T, from, to string) {
+	t.Helper()
+	b, err := os.ReadFile(from)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(to, b, 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -142,10 +221,13 @@ func TestDecompile(t *testing.T) {
 	if err != nil || !strings.Contains(src, "void ps_main(") {
 		t.Fatalf("err %v, HLSL:\n%s", err, src)
 	}
-	for _, bad := range []string{"../v7/sample.hlsl_ps_main_AAAAAAAAAAAAAAAAAAAAAAAAAA", "sample.hlsl", "x.hlsl_ps_main_MISSING"} {
-		if _, err := Decompile(cache, bad); err == nil {
-			t.Errorf("Decompile(%q): no error", bad)
+	for _, bad := range []string{"../v7/sample.hlsl_ps_main_AAAAAAAAAAAAAAAAAAAAAAAAAA", "sample.hlsl"} {
+		if _, err := Decompile(cache, bad); err == nil || !strings.Contains(err.Error(), "not a shader cache file's name") {
+			t.Errorf("Decompile(%q): %v", bad, err)
 		}
+	}
+	if _, err := Decompile(cache, "x.hlsl_ps_main_MISSING"); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("a missing file: %v", err)
 	}
 }
 

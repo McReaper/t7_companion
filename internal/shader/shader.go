@@ -42,28 +42,28 @@ var stages = map[string]bool{"ps": true, "vs": true, "gs": true, "cs": true, "hs
 
 // ParseName splits a cache file's name; ok is false for any other name.
 func ParseName(s string) (n Name, ok bool) {
-	head, hash, ok := cut(s, "_")
-	if !ok || hash == "" {
+	head, hash := cut(s, "_")
+	if hash == "" {
 		return Name{}, false
 	}
 	head, ok = strings.CutSuffix(head, "_main")
 	if !ok {
 		return Name{}, false
 	}
-	source, stage, ok := cut(head, "_")
-	if !ok || source == "" || !stages[stage] {
+	source, stage := cut(head, "_")
+	if source == "" || !stages[stage] {
 		return Name{}, false
 	}
 	return Name{source, stage, hash}, true
 }
 
-// cut splits s around the last sep.
-func cut(s, sep string) (before, after string, ok bool) {
+// cut splits s around the last sep; after is "" without one.
+func cut(s, sep string) (before, after string) {
 	i := strings.LastIndex(s, sep)
 	if i < 0 {
-		return s, "", false
+		return s, ""
 	}
-	return s[:i], s[i+len(sep):], true
+	return s[:i], s[i+len(sep):]
 }
 
 // SourceName is how the cache names a source a techset gives with its
@@ -179,12 +179,11 @@ func summarize(b []byte) ([32]byte, *Variant, error) {
 // reads lists the $Globals variables a shader reads and what it binds.
 func reads(ref *dxbc.Reflection) (globals, resources []string) {
 	for _, b := range ref.Buffers {
-		if b.Name != "$Globals" {
-			continue
-		}
-		for _, v := range b.Vars {
-			if v.Flags&dxbc.VariableUsed != 0 {
-				globals = append(globals, v.Name)
+		if b.Name == "$Globals" {
+			for _, v := range b.Vars {
+				if v.Flags&dxbc.VariableUsed != 0 {
+					globals = append(globals, v.Name)
+				}
 			}
 		}
 	}

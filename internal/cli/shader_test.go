@@ -3,7 +3,9 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,7 +18,8 @@ import (
 // shaderRoot is a fake mod-tools root with internal/shader's miniature cache
 // and three material types: mtl_sample draws with sample.hlsl (and previews
 // with a ToolsGfx source), mtl_two with sample.hlsl and fx/count.hlsl,
-// mtl_gone with a source the cache doesn't have.
+// mtl_gone with a source the cache doesn't have, mtl_broken with one a test
+// breaks, and mtl_vanish is there for a test to delete.
 func shaderRoot(t *testing.T) string {
 	t.Helper()
 	root := fakeToolsRoot(t)
@@ -60,6 +63,10 @@ Technique( "lit" )
 }
 `,
 		"mtl_gone": `Technique( "lit" ) { ps = PixelShader() { source = "gone.hlsl" } }
+`,
+		"mtl_broken": `Technique( "lit" ) { ps = PixelShader() { source = "broken.hlsl" } }
+`,
+		"mtl_vanish": `Technique( "lit" ) { ps = PixelShader() { source = "sample.hlsl" } }
 `,
 	} {
 		if err := os.WriteFile(filepath.Join(techsets, name+".techsetdef"), []byte(body), 0o644); err != nil {
@@ -152,13 +159,13 @@ func TestShaderDecompile(t *testing.T) {
 // than a quarter of the page, a space.
 func TestShaderDecompilePages(t *testing.T) {
 	root := shaderRoot(t)
-	whole, err := shaderDecompile(root, sampleC, "", 0, 0, true)
+	whole, err := shaderDecompile(root, sampleA, "", 0, 0, true)
 	if err != nil || whole.NextOffset != 0 || len(whole.HLSL) != whole.Length {
 		t.Fatalf("all: %v, %+v", err, whole)
 	}
 	var got strings.Builder
 	for offset, pages := 0, 0; ; pages++ {
-		out, err := shaderDecompile(root, sampleC, "", offset, 400, false)
+		out, err := shaderDecompile(root, sampleA, "", offset, 400, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -180,8 +187,20 @@ func TestShaderDecompilePages(t *testing.T) {
 	if got.String() != whole.HLSL {
 		t.Error("the pages don't make the whole HLSL")
 	}
+	if out, err := shaderDecompile(root, sampleA, "", 0, 0, false); err != nil || out.Alike != 1 {
+		t.Errorf("the first page counts the permutations alike: %+v, %v", out, err)
+	}
+	if out, err := shaderDecompile(root, sampleA, "", 1, 0, false); err != nil || out.Alike != 0 {
+		t.Errorf("a later page doesn't: %+v, %v", out, err)
+	}
+	if out, err := shaderDecompile(root, sampleA, "", 0, whole.Length, false); err != nil || out.NextOffset != 0 {
+		t.Errorf("a page the size of the HLSL is the last: %+v, %v", out, err)
+	}
+	if out, err := shaderDecompile(root, sampleA, "", 0, 400, true); err != nil || out.NextOffset != 0 || out.HLSL != whole.HLSL {
+		t.Errorf("all ignores the page size: %v", err)
+	}
 	for _, off := range []int{-1, whole.Length} {
-		if _, err := shaderDecompile(root, sampleC, "", off, 0, false); err == nil || !strings.Contains(err.Error(), "outside") {
+		if _, err := shaderDecompile(root, sampleA, "", off, 0, false); err == nil || !strings.Contains(err.Error(), "outside") {
 			t.Errorf("offset %d: %v", off, err)
 		}
 	}
@@ -292,5 +311,102 @@ func TestShaderToolOverMCP(t *testing.T) {
 	}
 	if text, isErr := call(t, c, "shader_decompile", map[string]any{"name": "nothing_alike"}); !isErr {
 		t.Errorf("an unknown name is no tool error: %s", text)
+	}
+}
+
+// The answers at the edges.
+func TestShaderDecompileEdges(t *testing.T) {
+	root := shaderRoot(t)
+	cache := filepath.Join(root, "share", "assetconvert", "shaders", "pc", "v7")
+	read := func(name string) []byte {
+		t.Helper()
+		b, err := os.ReadFile(filepath.Join(cache, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	put := func(name string, b []byte) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(cache, name), b, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	run := func(name, stage string) (*shaderOut, error) { return shaderDecompile(root, name, stage, 0, 0, false) }
+
+	if out, err := run("sample", "VS"); err != nil || !strings.Contains(out.HLSL, "vs_main") {
+		t.Errorf("a stage in capitals: %v", err)
+	}
+	put("material.hlsl_ps_main_FFFFFFFFFFFFFFFFFFFFFFFFFF", read("material.hlsl_ps_main_EEEEEEEEEEEEEEEEEEEEEEEEEE"))
+	if out, err := run("material.hlsl", "ps"); err != nil || out.Alike != 1 || out.HLSL == "" {
+		t.Errorf("one program in two permutations: %+v, %v", out, err)
+	}
+	if out, err := run("sample.hlsl", ""); err != nil || !strings.HasPrefix(out.Note, "sample.hlsl compiled to 3 programs") {
+		t.Errorf("the note leads with the count: %+v, %v", out, err)
+	}
+	if _, err := run("sample.hlsl_ps_main_MISSING", ""); err == nil || !strings.Contains(err.Error(), "no compiled shader, shader source or material type named") {
+		t.Errorf("a well-formed name the cache lacks: %v", err)
+	}
+	for _, name := range []string{"nothing_alike", ".hlsl"} {
+		if _, err := run(name, ""); err == nil || strings.Contains(err.Error(), "named like it") {
+			t.Errorf("%q: %v", name, err)
+		}
+	}
+
+	for i := 10; i >= 1; i-- {
+		put(fmt.Sprintf("many%02d.hlsl_ps_main_M", i), read(sampleA))
+	}
+	ten := "many01.hlsl, many02.hlsl, many03.hlsl, many04.hlsl, many05.hlsl, many06.hlsl, many07.hlsl, many08.hlsl, many09.hlsl, many10.hlsl"
+	if _, err := run("many", ""); err == nil || !strings.HasSuffix(err.Error(), "sources named like it: "+ten) {
+		t.Errorf("ten similar sources, sorted: %v", err)
+	}
+	put("many11.hlsl_ps_main_M", read(sampleA))
+	if _, err := run("many", ""); err == nil || !strings.HasSuffix(err.Error(), "sources named like it: "+ten+", …") {
+		t.Errorf("ten at most: %v", err)
+	}
+
+	b := read(sampleA)
+	at := bytes.Index(b, []byte("SHEX"))
+	bad := append([]byte(nil), b...)
+	binary.LittleEndian.PutUint32(bad[at+12:], 1<<30) // the program's length token: past its chunk
+	put("badprog.hlsl_ps_main_Z", bad)
+	if _, err := run("badprog.hlsl_ps_main_Z", ""); err == nil || strings.Contains(err.Error(), "outside") {
+		t.Errorf("a program the decompiler can't read: %v", err)
+	}
+	put("broken.hlsl_ps_main_Y", []byte("DXBC"))
+	if _, err := run("broken.hlsl", ""); err == nil || !strings.Contains(err.Error(), "broken.hlsl_ps_main_Y") {
+		t.Errorf("an unreadable permutation names its file: %v", err)
+	}
+	if _, err := run("mtl_broken", ""); err == nil {
+		t.Error("a material type whose source can't be read is no error")
+	}
+	put("sample.hlsl_ps_main_ZZZZZZZZZZZZZZZZZZZZZZZZZZ", []byte("DXBC"))
+	if out, err := run(sampleA, ""); err != nil || out.HLSL == "" || out.Alike != 0 {
+		t.Errorf("a broken sibling leaves the answer, without alike: %+v, %v", out, err)
+	}
+	if err := os.Remove(filepath.Join(cache, "sample.hlsl_ps_main_ZZZZZZZZZZZZZZZZZZZZZZZZZZ")); err != nil {
+		t.Fatal(err)
+	}
+	put("toolsgfx_simple.hlsl_vs_main_T", read("sample.hlsl_vs_main_AAAAAAAAAAAAAAAAAAAAAAAAAA"))
+	if out, err := run("mtl_sample", "vs"); err != nil || out.HLSL == "" || out.Sources != nil {
+		t.Errorf("a ToolsGfx source isn't the game's: %+v, %v", out, err)
+	}
+	if err := os.Remove(filepath.Join(root, "share", "raw", "techsetdefs_stable", "geometry", "mtl_vanish.techsetdef")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run("mtl_vanish", ""); err == nil {
+		t.Error("a techset deleted under the index is no error")
+	}
+
+	bare := t.TempDir() // a cache without the rest of an install
+	bareCache := filepath.Join(bare, "share", "assetconvert", "shaders", "pc", "v7")
+	if err := os.MkdirAll(bareCache, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(bareCache, sampleA), b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := shaderDecompile(bare, "mtl_sample", "", 0, 0, false); err == nil || !strings.Contains(err.Error(), "no compiled shader") {
+		t.Errorf("no install to read techsets from: %v", err)
 	}
 }
