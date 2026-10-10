@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 
@@ -181,19 +182,16 @@ func shaderOfSource(dir, source string, names []shader.Name, stage string, pg pa
 }
 
 // decompileShader decompiles one cache file, counting the permutations alike
-// on its first page.
+// on its first page. A permutation that can't be read leaves the count out,
+// not the answer.
 func decompileShader(dir string, names []shader.Name, n shader.Name, pg page) (*shaderOut, error) {
 	out, err := decompileFile(dir, n, pg)
 	if err != nil || pg.offset > 0 {
 		return out, err
 	}
-	vs, err := shader.Variants(dir, names, n.Stage)
-	if err != nil {
-		return nil, err
-	}
-	for _, v := range vs {
-		for _, f := range v.Files {
-			if strings.EqualFold(f, n.File()) {
+	if vs, err := shader.Variants(dir, names, n.Stage); err == nil {
+		for _, v := range vs {
+			if slices.ContainsFunc(v.Files, func(f string) bool { return strings.EqualFold(f, n.File()) }) {
 				out.Alike = len(v.Files) - 1
 			}
 		}
@@ -216,7 +214,7 @@ func decompileFile(dir string, n shader.Name, pg page) (*shaderOut, error) {
 	case err != nil:
 		return nil, err
 	}
-	if pg.offset < 0 || pg.offset > 0 && pg.offset >= len(src) {
+	if pg.offset < 0 || pg.offset >= len(src) {
 		return nil, fmt.Errorf("offset %d is outside the HLSL (%d characters)", pg.offset, len(src))
 	}
 	end := len(src)
