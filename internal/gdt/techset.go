@@ -200,8 +200,8 @@ func (t *Techsets) Resolve(materialType string) (*Techset, error) {
 		if t.unchanged(r) {
 			return r.ts, nil
 		}
-		t.resolved.Delete(materialType)
-		t.rescan(true) // a file gone or renamed may have moved the material type
+		t.resolved.Delete(materialType) // or every later call would rescan the tree
+		t.rescan(true)                  // a file gone or renamed may have moved the material type
 	}
 	r, err := t.resolve(materialType)
 	if err != nil {
@@ -257,11 +257,10 @@ func (wk *techsetWalk) walk(path string, top bool) error {
 		return nil
 	}
 	wk.seenFile[path] = true
-	fi, err := os.Stat(path)
-	if err != nil {
-		return err
+	// stamped before the read: a write in between shows as a change next time
+	if fi, err := os.Stat(path); err == nil {
+		wk.files = append(wk.files, fileStamp{path, fi.ModTime(), fi.Size()})
 	}
-	wk.files = append(wk.files, fileStamp{path, fi.ModTime(), fi.Size()})
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return err
