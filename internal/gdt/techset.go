@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 // Techset is what a material type's techsetdef exposes: the GDT fields it reads,
@@ -57,16 +59,58 @@ func (t *Techset) ExposedFields() map[string]bool {
 	return out
 }
 
-// Techsets indexes the techsetdef tree (share/raw/techsetdefs_stable).
+// Techsets indexes the techsetdef tree (share/raw/techsetdefs_stable). A
+// long-lived MCP server must see the techsetdefs written meanwhile: a material
+// type it doesn't know rescans the tree (at most every rescanEvery), the tree
+// is rescanned anyway once it is walkEvery old (a techsetdef deleted), and a
+// resolved techset is read again when a file it read has changed (checked at
+// most every restatEvery).
 type Techsets struct {
 	root     string
-	byName   map[string]string // basename without extension -> path
-	resolved sync.Map          // material type -> *Techset (shared: callers must not modify it)
+	tree     atomic.Pointer[techsetTree]
+	resolved sync.Map // material type -> *resolvedTechset
+
+	scanMu                   sync.Mutex
+	lastScan                 time.Time
+	rescanEvery, restatEvery time.Duration
+}
+
+// techsetTree maps a techsetdef's basename, without the extension, to its
+// path. A rescan replaces it whole: readers never see one half-built.
+type techsetTree map[string]string
+
+// rescanEvery bounds how often lookups of unknown material types rescan the
+// tree: a GDT full of misspelt types mustn't walk it once per asset.
+const rescanEvery = 2 * time.Second
+
+// resolvedTechset is a resolved techset and the files it was read from.
+type resolvedTechset struct {
+	ts      *Techset // shared: callers must not modify it
+	files   []fileStamp
+	checked atomic.Int64 // when files were last found unchanged, in UnixNano
+}
+
+// fileStamp is a file as it was read.
+type fileStamp struct {
+	path string
+	mod  time.Time
+	size int64
 }
 
 // OpenTechsets indexes every *.techsetdef under root.
 func OpenTechsets(root string) (*Techsets, error) {
-	t := &Techsets{root: root, byName: map[string]string{}}
+	t := &Techsets{root: root, rescanEvery: rescanEvery, restatEvery: statEvery}
+	tree, err := scanTechsets(root)
+	if err != nil {
+		return nil, err
+	}
+	t.tree.Store(&tree)
+	t.lastScan = time.Now()
+	return t, nil
+}
+
+func scanTechsets(root string) (techsetTree, error) {
+	tree := techsetTree{}
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -74,8 +118,8 @@ func OpenTechsets(root string) (*Techsets, error) {
 		if !d.IsDir() && strings.HasSuffix(p, ".techsetdef") {
 			name := strings.TrimSuffix(d.Name(), ".techsetdef")
 			// prefer non-include definitions for a material type name
-			if _, seen := t.byName[name]; !seen || filepath.Base(filepath.Dir(p)) != "include" {
-				t.byName[name] = p
+			if _, seen := tree[name]; !seen || filepath.Base(filepath.Dir(p)) != "include" {
+				tree[name] = p
 			}
 		}
 		return nil
@@ -83,19 +127,53 @@ func OpenTechsets(root string) (*Techsets, error) {
 	if err != nil {
 		return nil, fmt.Errorf("index techsetdefs: %w", err)
 	}
-	return t, nil
+	return tree, nil
 }
 
-// Exists reports whether a material type has a techsetdef.
+// current is the tree, rescanned first when it is walkEvery old.
+func (t *Techsets) current() techsetTree {
+	t.scanMu.Lock()
+	stale := time.Since(t.lastScan) >= walkEvery
+	t.scanMu.Unlock()
+	if stale {
+		t.rescan(true)
+	}
+	return *t.tree.Load()
+}
+
+// rescan walks the tree again, unless it was walked less than rescanEvery ago
+// and the caller doesn't insist. A failed walk keeps the tree it had.
+func (t *Techsets) rescan(force bool) {
+	t.scanMu.Lock()
+	defer t.scanMu.Unlock()
+	if !force && time.Since(t.lastScan) < t.rescanEvery {
+		return
+	}
+	if tree, err := scanTechsets(t.root); err == nil {
+		t.tree.Store(&tree)
+	}
+	t.lastScan = time.Now()
+}
+
+// Exists reports whether a material type has a techsetdef, rescanning the tree
+// for one it doesn't know.
 func (t *Techsets) Exists(materialType string) bool {
-	p, ok := t.byName[materialType]
+	if t.has(materialType) {
+		return true
+	}
+	t.rescan(false)
+	return t.has(materialType)
+}
+
+func (t *Techsets) has(materialType string) bool {
+	p, ok := t.current()[materialType]
 	return ok && filepath.Base(filepath.Dir(p)) != "include"
 }
 
 // Names lists the material types (techsetdefs outside include/), sorted.
 func (t *Techsets) Names() []string {
 	var out []string
-	for n, p := range t.byName {
+	for n, p := range t.current() {
 		if filepath.Base(filepath.Dir(p)) != "include" {
 			out = append(out, n)
 		}
@@ -114,30 +192,55 @@ var (
 )
 
 // Resolve loads a material type's techsetdef and everything it #includes. The
-// result is cached and shared: copy it before changing it.
+// result is cached and shared: copy it before changing it. A cached techset
+// whose files changed is read again.
 func (t *Techsets) Resolve(materialType string) (*Techset, error) {
 	if v, ok := t.resolved.Load(materialType); ok {
-		return v.(*Techset), nil
+		r := v.(*resolvedTechset)
+		if t.unchanged(r) {
+			return r.ts, nil
+		}
+		t.resolved.Delete(materialType)
+		t.rescan(true) // a file gone or renamed may have moved the material type
 	}
-	ts, err := t.resolve(materialType)
+	r, err := t.resolve(materialType)
 	if err != nil {
 		return nil, err
 	}
-	t.resolved.Store(materialType, ts)
-	return ts, nil
+	t.resolved.Store(materialType, r)
+	return r.ts, nil
 }
 
-func (t *Techsets) resolve(materialType string) (*Techset, error) {
+// unchanged reports whether the files a techset was read from are as they
+// were, statting them at most every restatEvery.
+func (t *Techsets) unchanged(r *resolvedTechset) bool {
+	now := time.Now()
+	if now.Sub(time.Unix(0, r.checked.Load())) < t.restatEvery {
+		return true
+	}
+	for _, f := range r.files {
+		fi, err := os.Stat(f.path)
+		if err != nil || !fi.ModTime().Equal(f.mod) || fi.Size() != f.size {
+			return false
+		}
+	}
+	r.checked.Store(now.UnixNano())
+	return true
+}
+
+func (t *Techsets) resolve(materialType string) (*resolvedTechset, error) {
 	if !t.Exists(materialType) {
 		return nil, fmt.Errorf("no techsetdef for material type %q", materialType)
 	}
-	ts := &Techset{MaterialType: materialType, File: t.byName[materialType]}
+	ts := &Techset{MaterialType: materialType, File: t.current()[materialType]}
 	wk := &techsetWalk{t: t, ts: ts, seenFile: map[string]bool{}, seenDecl: map[string]bool{}, seenSrc: map[string]bool{}}
 	if err := wk.walk(ts.File, true); err != nil {
 		return nil, err
 	}
 	sort.Strings(ts.Sources)
-	return ts, nil
+	r := &resolvedTechset{ts: ts, files: wk.files}
+	r.checked.Store(time.Now().UnixNano())
+	return r, nil
 }
 
 // techsetWalk follows a techsetdef and its #includes into one Techset. A
@@ -146,6 +249,7 @@ type techsetWalk struct {
 	t                           *Techsets
 	ts                          *Techset
 	seenFile, seenDecl, seenSrc map[string]bool
+	files                       []fileStamp // what was read, as it was
 }
 
 func (wk *techsetWalk) walk(path string, top bool) error {
@@ -153,6 +257,11 @@ func (wk *techsetWalk) walk(path string, top bool) error {
 		return nil
 	}
 	wk.seenFile[path] = true
+	fi, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	wk.files = append(wk.files, fileStamp{path, fi.ModTime(), fi.Size()})
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -308,7 +417,7 @@ func (t *Techsets) includePath(from, name string) (string, bool) {
 			}
 		}
 	}
-	p, ok := t.byName[name]
+	p, ok := t.current()[name]
 	return p, ok
 }
 
