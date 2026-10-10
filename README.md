@@ -72,6 +72,7 @@ The database: a ~0.9 GB download, unpacked to ~3.5 GB on first run.
 - **GDT tools** — find, read, check and edit APE's GDTs against the install's own schema, as a dry run unless told to write. `gdt_check` catches broken references, missing files and duplicates before the linker does.
 - **What the build packed** — why an asset is in your fastfile, what each zone line weighs, and which of your stock overrides won't ship.
 - **A headless build** — create, compile, light, link and launch your map, with a short report and the first real error instead of hundreds of lines: *"Relink zm_mymap"*. Windows only.
+- **Shader decompilation** — the game's compiled shaders back to HLSL, to start a custom shader from a stock one.
 
 ## ⌨️ CLI
 
@@ -85,6 +86,7 @@ t7kb create <name>           new map or mod from a template  (--write)
 t7kb build <name>            compile/light/link/run  (--stages · --mod · --json)
 t7kb gdt <command>           find | get | schema | edit | check | refs
 t7kb zone <command>          explain | contents | check
+t7kb shader decompile <name> a stock shader's HLSL  (--stage · --json)
 t7kb mcp                     run the MCP server
 t7kb update-check            is a newer release out? is the plugin behind?
 ```

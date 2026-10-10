@@ -3,6 +3,7 @@ module github.com/McReaper/t7_companion
 go 1.25.5
 
 require (
+	github.com/McReaper/t7_dxbc v0.0.0-20261010154416-eda05ce43426
 	github.com/edgetools/go-sentex v0.1.0
 	github.com/mark3labs/mcp-go v0.55.1
 	github.com/spf13/cobra v1.10.2
