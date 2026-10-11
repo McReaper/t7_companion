@@ -42,3 +42,21 @@ func TestChangedSince(t *testing.T) {
 		t.Errorf("without a workspace, .deps alone: %v", got)
 	}
 }
+
+// The report names a material with its category (mc/x) and a second packing
+// x|dup: a GDT of yours defining it, saved after the link, still makes the
+// report stale.
+func TestChangedSinceMaterial(t *testing.T) {
+	root, w := gdtRoot(t, map[string]string{
+		"source_data/mats.gdt": "{\n" + gdtAsset("mtl_wall", "material", "materialType", "lit") + "}\n",
+	})
+	r := linked(t, root, "zm_x", "1,material,mc/mtl_wall,20,0,|zone_source/zm_x.zone|csv\n"+
+		"2,material,mc/mtl_wall|dup,20,0,|zone_source/zm_x.zone|csv\n")
+	after := r.Linked.Add(time.Hour)
+	if err := os.Chtimes(filepath.Join(root, "source_data", "mats.gdt"), after, after); err != nil {
+		t.Fatal(err)
+	}
+	if got := ChangedSince(r, w); !reflect.DeepEqual(got, []string{w.Abs("source_data/mats.gdt")}) {
+		t.Errorf("got %v", got)
+	}
+}

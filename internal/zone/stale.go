@@ -20,7 +20,7 @@ func ChangedSince(r *Report, w *gdt.Workspace) []string {
 	seen := map[string]bool{}
 	var gdts []string
 	for _, p := range r.Assets {
-		locs, err := w.Find(p.Name)
+		locs, err := w.Find(Canonical(p.ID).Name) // the report names a material mc/x
 		if err != nil {
 			continue
 		}
