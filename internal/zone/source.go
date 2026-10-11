@@ -2,9 +2,7 @@ package zone
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -215,48 +213,4 @@ func findPackage(root, mapDir, name string) string {
 		}
 	}
 	return ""
-}
-
-// BareTechsets lists, lower-cased, the techsets a shipped fastfile holds
-// without a prefix (techset,tools_blend#da7372ff in a stock assetlist,
-// commented-out lines included): Treyarch built that variant, so the shader
-// cache has it even where the techset's availablePrefixes offers none. The
-// folder is listed, not globbed: an install path may hold [ or *.
-func BareTechsets(root string) (map[string]bool, error) {
-	dir := filepath.Join(root, "zone_source", "all", "assetlist")
-	entries, err := os.ReadDir(dir)
-	if errors.Is(err, fs.ErrNotExist) {
-		return map[string]bool{}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	out := map[string]bool{}
-	for _, e := range entries {
-		if e.IsDir() || !strings.EqualFold(filepath.Ext(e.Name()), ".csv") {
-			continue
-		}
-		if err := bareTechsetsIn(filepath.Join(dir, e.Name()), out); err != nil {
-			return nil, err
-		}
-	}
-	return out, nil
-}
-
-func bareTechsetsIn(path string, out map[string]bool) error {
-	f, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		body := strings.TrimPrefix(strings.TrimSpace(sc.Text()), "//")
-		typ, name, ok := strings.Cut(strings.TrimSpace(body), ",")
-		name, _, _ = strings.Cut(strings.TrimSpace(name), "#")
-		if ok && strings.EqualFold(strings.TrimSpace(typ), "techset") && name != "" && !strings.Contains(name, "/") {
-			out[strings.ToLower(name)] = true
-		}
-	}
-	return sc.Err()
 }

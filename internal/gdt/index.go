@@ -356,25 +356,3 @@ func (w *Workspace) Resolved(f *File, a *Asset) (string, []Field, error) {
 	}
 	return typ, out, nil
 }
-
-// MaterialTechset resolves the techset of a material a GDT defines, by the
-// materialType it has or inherits from its parent.
-func (w *Workspace) MaterialTechset(name string) (*Techset, error) {
-	if w.Techsets == nil {
-		return nil, fmt.Errorf("no techsetdefs under %s", w.Root)
-	}
-	f, a, err := w.loadAsset(name, "material")
-	if err != nil {
-		return nil, err
-	}
-	_, fields, err := w.Resolved(f, a)
-	if err != nil {
-		return nil, err
-	}
-	for _, fl := range fields {
-		if strings.EqualFold(fl.Key, "materialType") {
-			return w.Techsets.Resolve(Unquote(fl.Value))
-		}
-	}
-	return nil, fmt.Errorf("material %q has no materialType", name)
-}

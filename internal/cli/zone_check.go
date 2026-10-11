@@ -32,21 +32,18 @@ type shadowGDT struct {
 type zoneCheckResult struct {
 	Map string `json:"map"`
 	*zoneStatus
-	Bare       []bareMaterial `json:"bare_materials,omitempty"`
-	BareAdvice string         `json:"bare_materials_advice,omitempty"`
-	Inherited  zone.Inherited `json:"inherited"`
-	Zoned      []shadowOut    `json:"zoned_but_stock_ships,omitempty"`
-	GDTs       []shadowGDT    `json:"gdt_versions_not_used,omitempty"`
-	More       int            `json:"more,omitempty"`
-	Advice     string         `json:"advice,omitempty"`
+	Inherited zone.Inherited `json:"inherited"`
+	Zoned     []shadowOut    `json:"zoned_but_stock_ships,omitempty"`
+	GDTs      []shadowGDT    `json:"gdt_versions_not_used,omitempty"`
+	More      int            `json:"more,omitempty"`
+	Advice    string         `json:"advice,omitempty"`
 }
 
-// zoneCheck lists the material lines the link would fail on (bareMaterials),
-// and the assets you made your own version of — zoned in the map's .zone/.zpkg,
-// or defined in a non-stock GDT the last link drew on — whose stock version
-// ships instead, because an assetlist the map's >class marks `ignore` still
-// lists them. Works before the first link (from the zone files) and better
-// after (from the linker's report).
+// zoneCheck lists the assets you made your own version of — zoned in the map's
+// .zone/.zpkg, or defined in a non-stock GDT the last link drew on — whose stock
+// version ships instead, because an assetlist the map's >class marks `ignore`
+// still lists them. Works before the first link (from the zone files) and
+// better after (from the linker's report).
 func zoneCheck(toolsPath, name string) (*zoneCheckResult, error) {
 	root := strings.TrimRight(firstNonEmpty(toolsPath, os.Getenv("TA_TOOLS_PATH")), `\/`)
 	if root == "" {
@@ -64,10 +61,7 @@ func zoneCheck(toolsPath, name string) (*zoneCheckResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	res := &zoneCheckResult{Map: name, Inherited: inh, Zoned: zonedShadows(root, zf, lists), Bare: bareMaterials(root, zf)}
-	if len(res.Bare) > 0 {
-		res.BareAdvice = bareAdvice
-	}
+	res := &zoneCheckResult{Map: name, Inherited: inh, Zoned: zonedShadows(root, zf, lists)}
 	if len(res.Zoned) > zoneMaxShadowed {
 		res.More += len(res.Zoned) - zoneMaxShadowed
 		res.Zoned = res.Zoned[:zoneMaxShadowed]

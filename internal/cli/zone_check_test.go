@@ -3,7 +3,6 @@ package cli
 import (
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -115,120 +114,5 @@ func TestZoneCheckAfterLink(t *testing.T) {
 	}
 	if len(res.GDTs) != 1 || res.GDTs[0].GDT != "source_data/mine.gdt" || res.GDTs[0].Assets != 2 {
 		t.Errorf("GDT versions stock replaces: %+v", res.GDTs)
-	}
-}
-
-// bareRoot lays out a map that zones materials on their own: of a geometry
-// techset (built only mc/, wc/…), of a 2D one (no prefixes), of a decal one
-// that lists "/", and of a tools one stock ships bare anyway.
-func bareRoot(t *testing.T) string {
-	t.Helper()
-	root := t.TempDir()
-	t.Setenv("LOCALAPPDATA", t.TempDir()) // keep the index caches out of the real profile
-	t.Setenv("XDG_CACHE_HOME", t.TempDir())
-	write := func(rel, body string) {
-		p := filepath.Join(root, filepath.FromSlash(rel))
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	globals := func(category, prefixes string) string {
-		return "Globals()\n{\n\tcategory = \"" + category + "\"\n" + prefixes + "}\n"
-	}
-	write("deffiles/material.awi", `	Asset.AddEntry_Combo( "materialType", "lit" );`)
-	write("bin/converter_gdt_dirs_0.txt", "source_data\n")
-	write("share/raw/techsetdefs_stable/geometry/lit.techsetdef", globals("Geometry", "\tavailablePrefixes = \"mc/ mcs/ wc/\"\n"))
-	write("share/raw/techsetdefs_stable/2d/hud.techsetdef", globals("2D", ""))
-	write("share/raw/techsetdefs_stable/decal/decal.techsetdef", globals("Decal", "\tavailablePrefixes = \"mc/ wc/ / vd/\"\n"))
-	write("share/raw/techsetdefs_stable/tools/tools_blend.techsetdef", globals("Tools", "\tavailablePrefixes = \"mc/ mcs/ wc/\"\n"))
-	write("zone_source/all/assetlist/core_gfx.csv", "material,$blend\ntechset,tools_blend#da7372ff\n")
-	mtl := func(name, typ string) string {
-		return "\t\"" + name + "\" ( \"material.gdf\" )\r\n\t{\r\n\t\t\"materialType\" \"" + typ + "\"\r\n\t}\r\n"
-	}
-	write("source_data/mine.gdt", "{\r\n"+mtl("mtl_wall", "lit")+mtl("hud_icon", "hud")+mtl("decal_mtl", "decal")+
-		mtl("tool_mtl", "tools_blend")+"\t\"mtl_child\" [ \"mtl_wall\" ]\r\n\t{\r\n\t}\r\n}\r\n")
-	write("share/zone_source/zm_mod_level.class", "ignore,core_gfx\n")
-	write("usermaps/zm_x/zone_source/zm_x.zone", ">class,zm_mod_level\nmaterial,mc/mtl_wall\nmaterial,hud_icon\n"+
-		"material,mtl_wall\nmaterial,decal_mtl\nmaterial,tool_mtl\nmaterial,no_such_mtl\nimage,mtl_wall\ninclude,mine\n")
-	write("usermaps/zm_x/zone_source/mine.zpkg", "material,mtl_child\n")
-	return root
-}
-
-// A material zoned on its own is reported when its techset has no bare
-// variant in the shader cache; not with a prefix, of a techset that builds
-// bare or that stock ships bare, nor when no GDT defines it, nor a line of
-// another type that shares a material's name.
-func TestZoneCheckBareMaterials(t *testing.T) {
-	root := bareRoot(t)
-	res, err := zoneCheck(root, "zm_x")
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []bareMaterial{
-		{Line: "material,mtl_wall", At: "usermaps/zm_x/zone_source/zm_x.zone:4", MaterialType: "lit", Prefixes: []string{"mc/", "mcs/", "wc/"}},
-		{Line: "material,mtl_child", At: "usermaps/zm_x/zone_source/mine.zpkg:1", MaterialType: "lit", Prefixes: []string{"mc/", "mcs/", "wc/"}},
-	}
-	if !reflect.DeepEqual(res.Bare, want) {
-		t.Errorf("bare materials:\n got %+v\nwant %+v", res.Bare, want)
-	}
-	if !strings.Contains(res.BareAdvice, "X1507") || !strings.Contains(res.BareAdvice, "mc/<name>") {
-		t.Errorf("advice: %q", res.BareAdvice)
-	}
-	if res.Advice != "" || len(res.Zoned) != 0 {
-		t.Errorf("no stock shadow here: %+v", res)
-	}
-}
-
-// A zone whose one line is such a material reports it.
-func TestZoneCheckBareMaterialAlone(t *testing.T) {
-	root := bareRoot(t)
-	zf := filepath.Join(root, "usermaps", "zm_x", "zone_source", "zm_x.zone")
-	if err := os.WriteFile(zf, []byte(">class,zm_mod_level\nmaterial,mtl_wall\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if got := bareMaterials(root, zf); len(got) != 1 || got[0].Line != "material,mtl_wall" {
-		t.Errorf("got %+v", got)
-	}
-}
-
-// Without the GDT index (no deffiles/) or the stock lists, nothing is reported
-// rather than a guess.
-func TestZoneCheckBareMaterialsUnknowable(t *testing.T) {
-	zfOf := func(root string) string { return filepath.Join(root, "usermaps", "zm_x", "zone_source", "zm_x.zone") }
-	noDefs := bareRoot(t)
-	if err := os.RemoveAll(filepath.Join(noDefs, "deffiles")); err != nil {
-		t.Fatal(err)
-	}
-	if got := bareMaterials(noDefs, zfOf(noDefs)); got != nil {
-		t.Errorf("no deffiles: %+v", got)
-	}
-	noLists := bareRoot(t)
-	long := filepath.Join(noLists, "zone_source", "all", "assetlist", "zz_long.csv") // past the scanner's 64 KiB
-	if err := os.WriteFile(long, []byte("techset,"+strings.Repeat("x", 70000)), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if got := bareMaterials(noLists, zfOf(noLists)); got != nil {
-		t.Errorf("unreadable lists: %+v", got)
-	}
-}
-
-// A zone with no material line, or whose materials all build, gets no advice.
-func TestZoneCheckBareMaterialsNone(t *testing.T) {
-	root := bareRoot(t)
-	zf := filepath.Join(root, "usermaps", "zm_x", "zone_source", "zm_x.zone")
-	for _, body := range []string{">class,zm_mod_level\nxmodel,a\n", ">class,zm_mod_level\nmaterial,hud_icon\n"} {
-		if err := os.WriteFile(zf, []byte(body), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		res, err := zoneCheck(root, "zm_x")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if res.Bare != nil || res.BareAdvice != "" {
-			t.Errorf("%q: %+v", body, res)
-		}
 	}
 }
