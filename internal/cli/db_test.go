@@ -291,6 +291,45 @@ func TestSyncDBErrors(t *testing.T) {
 	}
 }
 
+// A database or staged copy that can't be read is an error, not "it differs":
+// unpacking over it would hide the fault. A directory the entry's size stands in
+// for the file; reading it fails on every OS.
+func TestSyncDBReportsAnUnreadableFile(t *testing.T) {
+	for _, suffix := range []string{"", ".new"} {
+		path := dbPath(t)
+		if err := os.Mkdir(path+suffix, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		info, err := os.Stat(path + suffix)
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeDBZip(t, path, strings.Repeat("x", int(info.Size())))
+		if suffix != "" {
+			writeFile(t, path, "a db the zip doesn't hold")
+		}
+		if err := syncDB(path, &bytes.Buffer{}); err == nil {
+			t.Errorf("t7kb.db%s unreadable: want an error", suffix)
+		}
+	}
+}
+
+func TestSyncDBReportsAFailedUnpack(t *testing.T) {
+	path := dbPath(t)
+	writeFile(t, path, "old")
+	writeDBZip(t, path, "new db")
+	if err := os.Mkdir(stagedDB(path)+".tmp", 0o755); err != nil { // where the unpack writes
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := syncDB(path, &out); err == nil {
+		t.Errorf("want the unpack's error; out = %q", out.String())
+	}
+	if got := readFile(t, path); got != "old" {
+		t.Errorf("db = %q", got)
+	}
+}
+
 func TestHolds(t *testing.T) {
 	path := dbPath(t)
 	writeDBZip(t, path, "abc")
