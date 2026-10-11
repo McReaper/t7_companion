@@ -50,6 +50,32 @@ func TestZoneExplain(t *testing.T) {
 	}
 }
 
+// With the map's zone file there, explain says when a stock assetlist ships an
+// asset in place of the user's version.
+func TestZoneExplainStockNote(t *testing.T) {
+	root := zoneRoot(t)
+	for rel, body := range map[string]string{
+		"usermaps/zm_x/zone_source/zm_x.zone":    ">class,zm_mod_level\n",
+		"share/zone_source/zm_mod_level.class":   "ignore,zm_patch\n",
+		"zone_source/all/assetlist/zm_patch.csv": "xmodel,skybox_default_day\n",
+	} {
+		p := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	res, err := zoneExplain(root, "zm_x", "skybox_default_day", "")
+	if err != nil || len(res.Packed) != 1 || !strings.Contains(res.Packed[0].Stock, "zm_patch.csv:1 is active") {
+		t.Fatalf("got %+v, %v", res, err)
+	}
+	if res, _ := zoneExplain(root, "zm_x", "fxt_fog", ""); len(res.Packed) != 1 || res.Packed[0].Stock != "" {
+		t.Errorf("an asset no stock list names: %+v", res)
+	}
+}
+
 func TestZoneContents(t *testing.T) {
 	root := zoneRoot(t)
 	all, err := zoneContents(root, "zm_x", "")

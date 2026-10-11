@@ -75,7 +75,7 @@ func TestGDTShadows(t *testing.T) {
 		t.Fatalf("want the material once and the weapon: %+v", got)
 	}
 	for _, s := range got {
-		if s.File != "source_data/mine.gdt" || !s.InGDT || s.Line == 0 || !s.Stock.Active || s.Stock.List != "zm_patch" {
+		if s.File != "source_data/mine.gdt" || s.Line == 0 || !s.Stock.Active || s.Stock.List != "zm_patch" {
 			t.Errorf("%+v", s)
 		}
 	}

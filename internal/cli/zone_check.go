@@ -55,7 +55,7 @@ func zoneCheck(toolsPath, name string) (*zoneCheckResult, error) {
 	}
 	res := &zoneCheckResult{Map: name, Inherited: inh}
 	for _, s := range zone.ZonedShadows(root, zf, lists) {
-		res.Zoned = append(res.Zoned, toShadowOut(s))
+		res.Zoned = append(res.Zoned, zonedOut(s))
 	}
 	if len(res.Zoned) > zoneMaxShadowed {
 		res.More += len(res.Zoned) - zoneMaxShadowed
@@ -78,12 +78,9 @@ func zoneCheck(toolsPath, name string) (*zoneCheckResult, error) {
 	return res, nil
 }
 
-func toShadowOut(s zone.Shadow) shadowOut {
-	where := "zoned at"
-	if s.InGDT {
-		where = "defined in"
-	}
-	return shadowOut{Asset: s.String(), Yours: fmt.Sprintf("%s %s:%d", where, s.File, s.Line), Stock: fmt.Sprintf("%s:%d", s.Stock.File(), s.Stock.Line)}
+// zonedOut is a zoned shadow as zone_check lists it.
+func zonedOut(s zone.Shadow) shadowOut {
+	return shadowOut{Asset: s.String(), Yours: fmt.Sprintf("zoned at %s:%d", s.File, s.Line), Stock: fmt.Sprintf("%s:%d", s.Stock.File(), s.Stock.Line)}
 }
 
 // groupByGDT folds GDT shadows into one entry per GDT, largest first: a
