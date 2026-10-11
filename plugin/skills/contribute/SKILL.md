@@ -44,7 +44,7 @@ Contribution:
 
 ## First: does this actually need a new skill?
 
-There are already 14 domain skills (plus `setup` and `contribute`) over one fairly narrow domain, so **the marginal cost of a new one is trigger competition**: a skill that overlaps a sibling makes *both* fire less reliably. Default to **extending an existing skill**. A new one earns its place only when all three hold:
+There are already 14 domain skills (plus `setup-or-update` and `contribute`) over one fairly narrow domain, so **the marginal cost of a new one is trigger competition**: a skill that overlaps a sibling makes *both* fire less reliably. Default to **extending an existing skill**. A new one earns its place only when all three hold:
 
 - **Its own toolchain or workflow.** `anim-retarget` split from `animation` because Maya/HumanIK retargeting is a different tool and failure mode than the export→APE→linker pipeline — not because there was a lot to say.
 - **Silent-failure traps of its own.** If the answers are all "look up the right name", that's a `t7kb:search`, not a skill.
@@ -59,7 +59,7 @@ plugin/skills/<name>/SKILL.md          ← the skill; <name> is also its frontma
 plugin/skills/<name>/references/*.md   ← optional detail, one level deep
 ```
 
-- **`name` must equal the directory name** — the Agent Skills spec requires it, and Claude Code lists and invokes plugin skills as `t7kb:<directory>`. Refer to siblings by that listed name, `t7kb:<name>` (**t7kb:scripting**), everywhere: descriptions, bodies, `templates/AGENTS.md`.
+- **`name` must equal the directory name** — the Agent Skills spec requires it, and Claude Code lists and invokes plugin skills as `t7kb:<directory>`. Refer to siblings by that listed name, `t7kb:<name>` (**t7kb:scripting**), everywhere: descriptions and bodies.
 - **Single-file until the body earns a split.** Frontmatter is always in context, the body loads when triggered, `references/` only on demand — so a split earns its keep once the body gets long or splits cleanly per variant.
 - **Judge the split on words, not lines.** Body under 500 lines (hard) and **under ~3,000 words** (aim) — a 170-line skill can be 3,900 words of dense prose.
 - **At the word budget, move a block — never trim words to make room.** The checker (`.github/scripts/check_markdown.py`) warns at 95% and fails above the budget, listing the largest sections. Trimming a phrase here and a fact there to fit a new line erodes the skill at random. First ask whether the new detail belongs in this skill at all; if it does, move a whole section with a narrower reader into `references/` (one level deep, linked from `SKILL.md`), as `anim-retarget` and `moving-platforms` do. Raising a budget is a decision of its own, in its own commit and justified, never a way to fit an addition.

@@ -37,8 +37,6 @@ BUDGETS: list[tuple[str, int | None, str]] = [
      "docs/ (detail for humans), a skill (for agents), the tool's own description"),
     (".claude/CLAUDE.md", 3500,                      # loaded into every contributor session
      "the package doc (internal/<pkg>/doc.go) or a comment beside the code it rules, docs/ for reference"),
-    ("templates/AGENTS.md", 1200,                    # loaded into every user's agent
-     "the skill that owns the craft (AGENTS.md keeps a one-line floor pointing to it)"),
     ("plugin/skills/*/SKILL.md", 3000,               # body, frontmatter excluded
      "the skill's references/ (one level deep, linked from SKILL.md)"),
     ("plugin/skills/*/references/*.md", 2000,        # loaded on demand

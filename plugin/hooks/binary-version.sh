@@ -22,5 +22,5 @@ fi
 binary="$("$bin" --version 2>/dev/null | sed -n 's/^t7kb version v*//p')"
 [ -n "$binary" ] && [ "$binary" != "dev" ] && [ "$binary" != "$plugin" ] || exit 0
 
-msg="t7kb: the installed t7kb binary is $binary but the t7kb plugin (its skills) is $plugin, so tools a skill names may be missing from the t7kb MCP server, or skills may not know a tool it has. Run /t7kb:setup to update the binary, or run t7kb update-check for the plugin update commands."
+msg="t7kb: the installed t7kb binary is $binary but the t7kb plugin (its skills) is $plugin, so tools a skill names may be missing from the t7kb MCP server, or skills may not know a tool it has. Run /t7kb:setup-or-update to update the binary, or run t7kb update-check for the plugin update commands."
 printf '{"systemMessage":"%s","hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"%s"}}\n' "$msg" "$msg"

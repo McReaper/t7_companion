@@ -84,7 +84,7 @@ release:
     /plugin marketplace add McReaper/t7_companion
     /plugin install t7kb@t7-reapy
     /reload-plugins
-    /t7kb:setup
+    /t7kb:setup-or-update
     ```
 
     **Any other MCP-capable agent (Codex, OpenCode, Cursor, Copilot, ...):** paste this release page, or the [README](https://github.com/McReaper/t7_companion), to your agent and it can run the steps below itself — or do it by hand:
