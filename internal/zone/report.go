@@ -1,8 +1,3 @@
-// Package zone reads what the BO3 linker reports about a zone it built. Every
-// link writes, beside the fastfile, zone_source/all/assetinfo/<zone>.csv (each
-// packed asset with its size and the chain of parents that pulled it in, up to
-// the zone line) and <zone>.deps (every source file the link read, with the
-// timestamp it had then).
 package zone
 
 import (

@@ -1,4 +1,4 @@
-package cli
+package gdt_test
 
 import (
 	"os"
@@ -20,7 +20,7 @@ func TestModelMaterialsMatchLinker(t *testing.T) {
 	if root == "" || os.Getenv("T7KB_ORACLE") == "" {
 		t.Skip("set T7KB_ORACLE=1 and TA_TOOLS_PATH to check LOD materials against the linker's reports")
 	}
-	w, err := workspace(root)
+	w, err := gdt.Open(root)
 	if err != nil {
 		t.Fatal(err)
 	}

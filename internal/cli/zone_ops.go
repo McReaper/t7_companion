@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -97,7 +96,8 @@ func openZone(toolsPath, name string) (*zoneCtx, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &zoneCtx{root: root, toolsPath: toolsPath, name: name, report: r, status: reportStatus(root, toolsPath, r)}, nil
+	w, _ := workspace(toolsPath) // without one, staleness comes from .deps alone
+	return &zoneCtx{root: root, toolsPath: toolsPath, name: name, report: r, status: reportStatus(root, r, w)}, nil
 }
 
 // ignoreLists loads the stock assetlists the map's >class chain marks `ignore`:
@@ -109,12 +109,7 @@ func (z *zoneCtx) ignoreLists() (zone.Assetlists, zone.Inherited, error) {
 	if err != nil {
 		return nil, zone.Inherited{}, err
 	}
-	inh, err := zone.Inherit(z.root, zf)
-	if err != nil {
-		return nil, inh, err
-	}
-	lists, err := zone.LoadAssetlists(z.root, inh.Ignore)
-	return lists, inh, err
+	return zone.IgnoreLists(z.root, zf)
 }
 
 // stockNote says what an asset's stock assetlist entry means for the build.
@@ -131,12 +126,10 @@ func stockNote(entries []zone.ListEntry) string {
 	return ""
 }
 
-// reportStatus compares the report with the sources: the files the link read
-// (from .deps) and the non-stock GDTs that define a packed asset.
-func reportStatus(root, toolsPath string, r *zone.Report) zoneStatus {
+// reportStatus says whether the report still describes the sources.
+func reportStatus(root string, r *zone.Report, w *gdt.Workspace) zoneStatus {
 	st := zoneStatus{Linked: r.Linked.Format("2006-01-02 15:04")}
-	changed, _ := zone.Changed(r.Dir, r.Zone)
-	changed = append(changed, changedGDTs(toolsPath, r)...)
+	changed := zone.ChangedSince(r, w)
 	if len(changed) == 0 {
 		return st
 	}
@@ -149,42 +142,6 @@ func reportStatus(root, toolsPath string, r *zone.Report) zoneStatus {
 	}
 	st.StaleAdvice = "files changed since this link: relink for a report that matches them"
 	return st
-}
-
-// changedGDTs lists the non-stock GDTs defining a packed asset that were saved
-// after the link. The linker's .deps records GDT assets by hash, not by file.
-func changedGDTs(toolsPath string, r *zone.Report) []string {
-	w, err := workspace(toolsPath)
-	if err != nil {
-		return nil
-	}
-	seen := map[string]bool{}
-	var out []string
-	for _, p := range r.Assets {
-		locs, err := w.Find(p.Name)
-		if err != nil {
-			continue
-		}
-		for _, l := range locs {
-			if seen[l.File] {
-				continue
-			}
-			seen[l.File] = true
-			if newerThanLink(w, l, r) {
-				out = append(out, w.Abs(l.File))
-			}
-		}
-	}
-	sort.Strings(out)
-	return out
-}
-
-func newerThanLink(w *gdt.Workspace, l gdt.Location, r *zone.Report) bool {
-	if l.Stock {
-		return false
-	}
-	st, err := os.Stat(w.Abs(l.File))
-	return err == nil && st.ModTime().After(r.Linked)
 }
 
 // zoneExplain says why an asset is in the build: the chain of parents that pulled

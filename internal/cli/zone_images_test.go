@@ -121,10 +121,10 @@ func TestZoneImages(t *testing.T) {
 // The answer keeps the 10 GDTs and the 10 images that save the most, and says
 // how many GDTs it left out.
 func TestImageCaps(t *testing.T) {
-	var ims []yourImage
+	var ims []zone.Image
 	for i := range 12 {
-		ims = append(ims, yourImage{Packed: zone.Packed{ID: asset.ID{Type: "image", Name: fmt.Sprintf("img%02d", i)}, Streamed: 1 << 20},
-			loc: gdt.Location{File: fmt.Sprintf("g%02d.gdt", i)}, mipBase: "1/1"})
+		ims = append(ims, zone.Image{Packed: zone.Packed{ID: asset.ID{Type: "image", Name: fmt.Sprintf("img%02d", i)}, Streamed: 1 << 20},
+			Loc: gdt.Location{File: fmt.Sprintf("g%02d.gdt", i)}, MipBase: "1/1"})
 	}
 	by, more, total := imagesByGDT(ims)
 	if len(by) != 10 || more != 2 || total != 12*786432 {
