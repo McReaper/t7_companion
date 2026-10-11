@@ -42,22 +42,21 @@ Globals()
 	cases := []struct {
 		typ, category string
 		prefixes      []string
-		bare          bool
 	}{
-		{"reticle", "Weapons", []string{"mc/", "mcs/"}, false},
-		{"trail", "Effect", []string{"ei/", "el/"}, false},
-		{"trail_bare", "Effect", nil, true},                   // its own "" wins over the include's
-		{"trail_mine", "Mine", []string{"ei/", "el/"}, false}, // the include's keys after one it sets still count
-		{"hud", "2D", nil, true},
-		{"decal", "Decal", []string{"mc/", "wc/", "/", "vd/"}, true},
+		{"reticle", "Weapons", []string{"mc/", "mcs/"}},
+		{"trail", "Effect", []string{"ei/", "el/"}},
+		{"trail_bare", "Effect", nil},                  // its own "" wins over the include's
+		{"trail_mine", "Mine", []string{"ei/", "el/"}}, // the include's keys after one it sets still count
+		{"hud", "2D", nil},
+		{"decal", "Decal", []string{"mc/", "wc/", "/", "vd/"}},
 	}
 	for _, c := range cases {
 		got, err := ts.Resolve(c.typ)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got.Category != c.category || !slices.Equal(got.Prefixes, c.prefixes) || got.BuildsBare() != c.bare {
-			t.Errorf("%s: category %q prefixes %q bare %v, want %q %q %v", c.typ, got.Category, got.Prefixes, got.BuildsBare(), c.category, c.prefixes, c.bare)
+		if got.Category != c.category || !slices.Equal(got.Prefixes, c.prefixes) {
+			t.Errorf("%s: category %q prefixes %q, want %q %q", c.typ, got.Category, got.Prefixes, c.category, c.prefixes)
 		}
 	}
 	for _, typ := range []string{"trail", "trail_mine"} {

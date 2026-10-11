@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -43,13 +42,6 @@ type Param struct {
 	Kind   string   `json:"kind"`
 	Name   string   `json:"name"`
 	Fields []string `json:"gdt_fields"`
-}
-
-// BuildsBare reports whether the techset has a variant for a material named
-// without a prefix, as a `material,<name>` zone line names it. A techset that
-// declares no prefixes has only that one.
-func (t *Techset) BuildsBare() bool {
-	return len(t.Prefixes) == 0 || slices.Contains(t.Prefixes, "/")
 }
 
 // ExposedFields is every material GDT field the techset reads.

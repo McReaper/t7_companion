@@ -37,7 +37,7 @@ func newZoneCmd() *cobra.Command {
 			return printIndented(c.OutOrStdout())(zoneContents(toolsPath, a[0], line))
 		}}
 	contents.Flags().BoolVar(&images, "images", false, "weigh the images by who defines them, and what a mipBase step down would save")
-	check := &cobra.Command{Use: "check <map>", Short: "Find the material lines the link will fail on, and your versions of stock assets the build won't use",
+	check := &cobra.Command{Use: "check <map>", Short: "Find your versions of stock assets that the build won't use",
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, a []string) error {
 			return printIndented(c.OutOrStdout())(zoneCheck(toolsPath, a[0]))

@@ -50,13 +50,10 @@ func zoneContentsTool(name, tp mcp.ToolOption) server.ServerTool {
 
 func zoneCheckTool(name, tp mcp.ToolOption) server.ServerTool {
 	return server.ServerTool{Tool: mcp.NewTool("zone_check",
-		mcp.WithDescription("Check a map's zone before linking. Finds the material lines the link will fail on: a "+
-			"material zoned on its own (material,<name>) whose techset has no unprefixed variant in the shader cache, which "+
-			"fails with X1507 failed to open source file 'techsetdef_….hlsl'. And your versions of stock assets that the "+
-			"build won't use: a stock script or asset you copied and zoned, or defined in your own GDT, that a stock "+
-			"assetlist inherited through the map's >class still lists, so the linker packs only a reference to the shipped "+
-			"one; gives the assetlist line to comment out. Works before the first link; after a link it also checks every "+
-			"GDT asset the build drew on."),
+		mcp.WithDescription("Find your versions of stock assets that the build won't use: a stock script or asset you "+
+			"copied and zoned, or defined in your own GDT, that a stock assetlist inherited through the map's >class still "+
+			"lists, so the linker packs only a reference to the shipped one. Gives the assetlist line to comment out. "+
+			"Works before the first link; after a link it also checks every GDT asset the build drew on."),
 		name, tp),
 		Handler: jsonHandler(func(_ context.Context, r mcp.CallToolRequest) (any, error) {
 			return zoneCheck(r.GetString("tools_path", ""), r.GetString("name", ""))
