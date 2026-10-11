@@ -31,15 +31,23 @@ https://github.com/user-attachments/assets/0d533897-fd35-4f0d-9774-948546c0af6b
 ```mermaid
 flowchart LR
     U(["You"]) -->|"ask, in your own words"| A["Your AI agent<br/>Claude Code, Codex, Cursor…"]
+    A <-->|"follows the skills,<br/>calls t7kb"| TC
+    TC -->|"reads, edits, builds"| MT
     subgraph TC["T7 Companion"]
+        direction TB
         S["Skills (Claude Code)<br/>how each craft works,<br/>where it fails silently"]
         T["t7kb<br/>runs on your machine"]
         K[("Knowledge base<br/>what the BO3 modding<br/>community knows")]
+        T -->|"searches"| K
     end
-    A -->|"follows"| S
-    A <-->|"MCP"| T
-    T -->|"searches"| K
-    T -->|"reads, edits, builds"| I["Your BO3 mod tools<br/>GDTs, maps, fastfiles, shaders"]
+    subgraph MT["Your BO3 mod tools"]
+        direction TB
+        G["GDTs<br/>APE's assets"]
+        M["Map build<br/>compile, light"]
+        L["Linker<br/>fastfiles, shaders"]
+        P["Black Ops III<br/>run your map"]
+        G ~~~ M ~~~ L ~~~ P
+    end
 ```
 
 ## 📥 Install
