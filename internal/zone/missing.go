@@ -69,7 +69,7 @@ func MissingLookups(root, dir, zoneName string) ([]Missing, error) {
 		}
 		kind, rest, ok := strings.Cut(line, ",")
 		switch {
-		case !ok || strings.HasPrefix(line, "\t") || kind == "version":
+		case !ok || strings.HasPrefix(line, "\t"):
 		case kind == "ignore" || kind == "ignore_missing_shipped":
 			lists = append(lists, rest)
 		default:

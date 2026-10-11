@@ -79,25 +79,32 @@ func TestLinkListsWhatTheLinkerFoundNowhere(t *testing.T) {
 	}
 }
 
-// A .deps older than the link isn't its record; a long list is capped.
+// A .deps more than 2 s older than the link isn't its record (the margin
+// absorbs the file system's clock); a long list stops at 10.
 func TestMissingAfterStaleOrCapped(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "assetinfo")
 	var many []string
-	for i := range maxMissing + 3 {
+	for i := range 13 {
 		many = append(many, fmt.Sprintf("img%02d", i))
 	}
 	p := writeDepsAt(t, dir, "zm_x", many...)
 	got := missingAfter(root, dir, "zm_x", time.Now())
-	if len(got) != maxMissing+1 || got[maxMissing] != "…and 3 more" || !strings.HasPrefix(got[0], "image img00 ") {
+	if len(got) != 11 || got[10] != "…and 3 more" || !strings.HasPrefix(got[0], "image img00 ") {
 		t.Errorf("capped: %q", got)
 	}
-	old := time.Now().Add(-time.Hour)
-	if err := os.Chtimes(p, old, old); err != nil {
-		t.Fatal(err)
-	}
-	if got := missingAfter(root, dir, "zm_x", time.Now()); got != nil {
-		t.Errorf("stale .deps: %q", got)
+	start := time.Now()
+	for _, c := range []struct {
+		age   time.Duration
+		stale bool
+	}{{1500 * time.Millisecond, false}, {2500 * time.Millisecond, true}, {time.Hour, true}} {
+		at := start.Add(-c.age)
+		if err := os.Chtimes(p, at, at); err != nil {
+			t.Fatal(err)
+		}
+		if got := missingAfter(root, dir, "zm_x", start); (got == nil) != c.stale {
+			t.Errorf(".deps %v older than the link: %d listed", c.age, len(got))
+		}
 	}
 	if got := missingAfter(root, dir, "zm_none", time.Time{}); got != nil {
 		t.Errorf("no .deps: %q", got)
