@@ -2,7 +2,9 @@ package zone
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -218,15 +220,23 @@ func findPackage(root, mapDir, name string) string {
 // BareTechsets lists, lower-cased, the techsets a shipped fastfile holds
 // without a prefix (techset,tools_blend#da7372ff in a stock assetlist,
 // commented-out lines included): Treyarch built that variant, so the shader
-// cache has it even where the techset's availablePrefixes offers none.
+// cache has it even where the techset's availablePrefixes offers none. The
+// folder is listed, not globbed: an install path may hold [ or *.
 func BareTechsets(root string) (map[string]bool, error) {
-	lists, err := filepath.Glob(filepath.Join(root, "zone_source", "all", "assetlist", "*.csv"))
+	dir := filepath.Join(root, "zone_source", "all", "assetlist")
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return map[string]bool{}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
 	out := map[string]bool{}
-	for _, list := range lists {
-		if err := bareTechsetsIn(list, out); err != nil {
+	for _, e := range entries {
+		if e.IsDir() || !strings.EqualFold(filepath.Ext(e.Name()), ".csv") {
+			continue
+		}
+		if err := bareTechsetsIn(filepath.Join(dir, e.Name()), out); err != nil {
 			return nil, err
 		}
 	}

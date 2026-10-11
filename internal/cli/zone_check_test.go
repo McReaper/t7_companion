@@ -152,14 +152,15 @@ func bareRoot(t *testing.T) string {
 		mtl("tool_mtl", "tools_blend")+"\t\"mtl_child\" [ \"mtl_wall\" ]\r\n\t{\r\n\t}\r\n}\r\n")
 	write("share/zone_source/zm_mod_level.class", "ignore,core_gfx\n")
 	write("usermaps/zm_x/zone_source/zm_x.zone", ">class,zm_mod_level\nmaterial,mc/mtl_wall\nmaterial,hud_icon\n"+
-		"material,mtl_wall\nmaterial,decal_mtl\nmaterial,tool_mtl\nmaterial,no_such_mtl\ninclude,mine\n")
+		"material,mtl_wall\nmaterial,decal_mtl\nmaterial,tool_mtl\nmaterial,no_such_mtl\nimage,mtl_wall\ninclude,mine\n")
 	write("usermaps/zm_x/zone_source/mine.zpkg", "material,mtl_child\n")
 	return root
 }
 
 // A material zoned on its own is reported when its techset has no bare
 // variant in the shader cache; not with a prefix, of a techset that builds
-// bare or that stock ships bare, nor when no GDT defines it.
+// bare or that stock ships bare, nor when no GDT defines it, nor a line of
+// another type that shares a material's name.
 func TestZoneCheckBareMaterials(t *testing.T) {
 	root := bareRoot(t)
 	res, err := zoneCheck(root, "zm_x")
@@ -178,6 +179,39 @@ func TestZoneCheckBareMaterials(t *testing.T) {
 	}
 	if res.Advice != "" || len(res.Zoned) != 0 {
 		t.Errorf("no stock shadow here: %+v", res)
+	}
+}
+
+// A zone whose one line is such a material reports it.
+func TestZoneCheckBareMaterialAlone(t *testing.T) {
+	root := bareRoot(t)
+	zf := filepath.Join(root, "usermaps", "zm_x", "zone_source", "zm_x.zone")
+	if err := os.WriteFile(zf, []byte(">class,zm_mod_level\nmaterial,mtl_wall\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := bareMaterials(root, zf); len(got) != 1 || got[0].Line != "material,mtl_wall" {
+		t.Errorf("got %+v", got)
+	}
+}
+
+// Without the GDT index (no deffiles/) or the stock lists, nothing is reported
+// rather than a guess.
+func TestZoneCheckBareMaterialsUnknowable(t *testing.T) {
+	zfOf := func(root string) string { return filepath.Join(root, "usermaps", "zm_x", "zone_source", "zm_x.zone") }
+	noDefs := bareRoot(t)
+	if err := os.RemoveAll(filepath.Join(noDefs, "deffiles")); err != nil {
+		t.Fatal(err)
+	}
+	if got := bareMaterials(noDefs, zfOf(noDefs)); got != nil {
+		t.Errorf("no deffiles: %+v", got)
+	}
+	noLists := bareRoot(t)
+	long := filepath.Join(noLists, "zone_source", "all", "assetlist", "zz_long.csv") // past the scanner's 64 KiB
+	if err := os.WriteFile(long, []byte("techset,"+strings.Repeat("x", 70000)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := bareMaterials(noLists, zfOf(noLists)); got != nil {
+		t.Errorf("unreadable lists: %+v", got)
 	}
 }
 

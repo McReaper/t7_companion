@@ -31,6 +31,7 @@ Globals()
 `,
 		"effect/trail.techsetdef":      "#include \"base_blend\"\n",
 		"effect/trail_bare.techsetdef": "#include \"base_blend\"\nGlobals()\n{\n\tavailablePrefixes = \"\"\n}\n",
+		"effect/trail_mine.techsetdef": "#include \"base_blend\"\nGlobals()\n{\n\tcategory = \"Mine\"\n}\n",
 		"2d/hud.techsetdef":            "Globals()\n{\n\tcategory = \"2D\"\n}\n",
 		"geometry/decal.techsetdef":    "Globals()\n{\n\tcategory = \"Decal\"\n\tavailablePrefixes = \"mc/ wc/ / vd/\"\n}\n",
 	})
@@ -45,7 +46,8 @@ Globals()
 	}{
 		{"reticle", "Weapons", []string{"mc/", "mcs/"}, false},
 		{"trail", "Effect", []string{"ei/", "el/"}, false},
-		{"trail_bare", "Effect", nil, true}, // its own "" wins over the include's
+		{"trail_bare", "Effect", nil, true},                   // its own "" wins over the include's
+		{"trail_mine", "Mine", []string{"ei/", "el/"}, false}, // the include's keys after one it sets still count
 		{"hud", "2D", nil, true},
 		{"decal", "Decal", []string{"mc/", "wc/", "/", "vd/"}, true},
 	}
@@ -58,7 +60,9 @@ Globals()
 			t.Errorf("%s: category %q prefixes %q bare %v, want %q %q %v", c.typ, got.Category, got.Prefixes, got.BuildsBare(), c.category, c.prefixes, c.bare)
 		}
 	}
-	if trail, _ := ts.Resolve("trail"); trail.RenderFlags != "emissive" {
-		t.Errorf("render flags from the include: %q", trail.RenderFlags)
+	for _, typ := range []string{"trail", "trail_mine"} {
+		if trail, _ := ts.Resolve(typ); trail.RenderFlags != "emissive" {
+			t.Errorf("%s: render flags from the include: %q", typ, trail.RenderFlags)
+		}
 	}
 }
