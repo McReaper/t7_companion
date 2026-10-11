@@ -13,7 +13,8 @@ A custom shader isn't written from scratch: it is **a stock technique with one s
 
 So, in a copied technique:
 
-- **Keep the stock vertex shader as it is, `defines` included.** The cache has exactly that variant; change its source or its defines and the linker looks for one nothing ships, and fails like **t7kb:assets**' `failed to open source file`.
+- **Keep a stock source's `defines` as they are.** The cache holds only the combinations of a stock source and its defines that Treyarch compiled. With any other, the linker compiles the source from `share/raw/shaders_stable`, where stock sources aren't shipped, and fails like **t7kb:assets**' `failed to open source file` (inferred from the cache, not link-tested).
+- **Your own source can replace any stage, the vertex shader included** (`vs_main`): the linker compiles it like your pixel shader (a hand-written vertex shader linked; not yet seen in game). Its outputs must match what the pixel shader reads, or the link fails with `Pixel shader input '…' doesn't have a corresponding vertex shader output`.
 - **Every edit of your source adds a file to `v7`** (`my_shader.hlsl_ps_main_<new hash>`). They are harmless, but when you remove a custom shader, delete its `my_shader.hlsl_*` files there too.
 - **A shader-only edit needs a relink, not a compile**: `t7kb:build` with `stages="link"`.
 
@@ -26,13 +27,15 @@ Call `t7kb:shader_decompile` with the material type you're copying and the stage
 
 The HLSL compiles back to the same shader — t7_dxbc is checked against the game's own shaders by recompiling and running its output — with the names a techset binds by: entry point `ps_main`/`vs_main`, material constants as global variables, the reflected texture and sampler names and registers. It reads at the register level (`r0`, `i0` banks, `asuint`): **leave the decompiled block as it is and add your code after it**, working on its output (`out_SV_TARGET0`). That keeps a known-good baseline: comment your block out and you're back to the stock look.
 
+A shader written from scratch works too (a hand-written one linked): the decompiled one is then the reference for its interface — the inputs the stock vertex shader passes, and the texture, sampler and constant names the techset binds.
+
 ## Copy the techset, change only the source
 
 1. **Copy** `share/raw/techsetdefs_stable/<category>/<stock>.techsetdef` to `<category>/my_material_type.techsetdef`. The file name **is** the material type.
 2. **In each in-game technique** (the `#else` side of `#if TOOLSGFX == "1"`), change only the pixel shader's `source`: `ps = PixelShader() { source = "my_shader.hlsl" … }`. Keep its `defines` and its bindings (`colorMapSampler = "colorMap"`), and the vertex shader's stock source.
 3. **Put the same file in `share/raw/techsetdefs_stable_toolsgfx/`** at the same path: the install keeps a twin of every techsetdef there (verified in the install: 1,153 of 1,154 identical).
 4. **Write `share/raw/shaders_stable/my_shader.hlsl`**: the decompiled HLSL, then your code.
-5. **The material**: `materialCategory` = the techset's `Globals()` category, `materialType` = the file name. `t7kb:gdt_edit` and `t7kb:gdt_check` validate both.
+5. **The material**: `materialCategory` = the techset's `Globals()` category, `materialType` = the file name. `t7kb:gdt_edit` and `t7kb:gdt_check` validate both. An effect material (category `Effect`) on brushes also needs a `surfaceType`: without one the linker stops on a modal `SANITY CHECK FAILURE` dialog (`surfaceTypeName '<error>' not in surfaceTypeParms array`), which a headless `t7kb:build` waits on (verified on a real link).
 6. **Use it** on brushes (built as `wc/<material>`) or a model (`mc/<material>`), never as a bare `material,` zone line (**t7kb:assets**), and build.
 
 APE and Radiant preview the material with the `#if TOOLSGFX` branch, which keeps a stock tools shader (`ToolsGfx/…`): **your HLSL only shows in game** (read in the install's techsetdefs).
