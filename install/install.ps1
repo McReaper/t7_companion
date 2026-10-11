@@ -29,48 +29,34 @@ function Get-Release([string]$name, [string]$out) {
     if ($LASTEXITCODE -ne 0) { throw "downloading $name failed (curl exit $LASTEXITCODE)" }
 }
 
+$updating = Test-Path $db
 New-Item -ItemType Directory -Force -Path $Target | Out-Null
 $tmp = Join-Path $env:TEMP "t7kb_install.zip"
 
 Write-Host "Installing t7kb to $Target"
 Get-Release "t7kb_windows_amd64.zip" $tmp
 
-# Each open agent session runs t7kb.exe, and Windows can't overwrite a running
-# exe, but it can rename one: move it aside, and drop those no session still runs.
-Remove-Item (Join-Path $Target "t7kb.exe.*.old") -Force -ErrorAction SilentlyContinue
-$aside = $null
-if (Test-Path $exe) {
-    $aside = "$exe.$(Get-Date -Format yyyyMMddHHmmss).old"
-    Move-Item $exe $aside
-}
-try {
-    Expand-Archive -Path $tmp -DestinationPath $Target -Force
-} catch {
-    if ($aside) { Move-Item $aside $exe -Force }
-    throw
-}
-if ($aside) { Remove-Item $aside -Force -ErrorAction SilentlyContinue }
+# Each open agent session runs this t7kb.exe as its MCP server, which holds the
+# exe and t7kb.db open, and Windows can't replace an open file: stop them.
+# Each session starts the new one when it restarts.
+Get-Process t7kb -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe } |
+    Stop-Process -Force -PassThru | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
+
+Expand-Archive -Path $tmp -DestinationPath $Target -Force
 Remove-Item $tmp -Force
 
-# Downloaded beside, then moved: an interrupted download leaves the old zip whole.
-Get-Release "t7kb.db.zip" "$dbZip.part"
-Move-Item "$dbZip.part" $dbZip -Force
-
-# The zip stays: unpack-db compares the database with it, and unpacks it only
-# when they differ, staging it as t7kb.db.new while a running t7kb holds t7kb.db.
-# This script comes from main, the binary from the latest release: one older than
-# unpack-db would take it for a browse query and wait on stdin, so ask first.
-if ((& $exe --help | Out-String) -match 'unpack-db') {
-    & $exe unpack-db --db $db
-    if ($LASTEXITCODE -ne 0) { throw "unpacking the database failed (t7kb exit $LASTEXITCODE)" }
-}
+Get-Release "t7kb.db.zip" $dbZip
+# Left zipped on purpose: the binary unpacks it on its next start. On an
+# update that means deleting the old database, which would otherwise stay.
+if ($updating) { Remove-Item $db -Force }
 
 # No exit here: piped into iex, it would close the user's PowerShell.
-if (Test-Path "$db.new") {
+if ($updating) {
     Write-Host @"
 
-t7kb updated, but the new database waits as t7kb.db.new: close every agent
-session (Claude Code, Codex, ...) and start one to swap it in.  Binary: $exe
+t7kb updated.  Binary: $exe
+Its MCP server was stopped: restart your agent sessions. The first one to
+start unpacks the new database (~3.8 GB, about 20 s, once).
 "@
 } else {
     Write-Host @"
@@ -81,6 +67,7 @@ Register it as an MCP server in your agent (command + args):
     command: $exe
     args:    ["mcp"]
 
+The database unpacks automatically the first time the server runs.
 See the README for per-client config (Claude Code, Codex, OpenCode, Copilot, Cursor).
 "@
 }

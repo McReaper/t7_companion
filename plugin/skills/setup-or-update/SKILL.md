@@ -9,13 +9,13 @@ Download the t7kb tool + database, register it as an MCP server so it auto-start
 
 ## 1. Run the installer — it's idempotent, don't force a redownload
 
-Detect the OS and run the matching command. It downloads the binary, the embedding model, and the ~0.9 GB database archive into one folder, unpacks the database, and prints the install path. Both installers are idempotent: if a binary + database are already present at the target path, they skip the download — safe to run even after a manual or earlier install.
+Detect the OS and run the matching command. It downloads the binary, the embedding model, and the ~0.9 GB database archive into one folder, and prints the install path. Both installers are idempotent: if a binary + database are already present at the target path, they skip the download — safe to run even after a manual or earlier install.
 
 If a binary already exists at the target path (the case the idempotency check would otherwise just skip), run `<path>/t7kb update-check` (`.exe` on Windows) first — it's a lightweight, on-demand-only network check (no automatic/background calls anywhere else in `t7kb`), and reports one of three things:
 
 - **Up to date** — proceed to skip the install as usual.
 - **"Running a local/dev build"** — the binary at the install path was built from source, not downloaded from a release, so it may lack tools the skills name. Unless the user says they put it there on purpose, treat it like an available update and offer `-Force`/`--force`.
-- **Update available** — tell the user, and offer to re-run with `-Force`/`--force` below. That refreshes the binary + database only, never the plugin. If the installer then says the new database **waits as `t7kb.db.new`** (Windows: each open session's t7kb server holds the old one open), relay it: the user closes every agent session, and the next t7kb to start swaps it in.
+- **Update available** — tell the user, and offer to re-run with `-Force`/`--force` below. That refreshes the binary + database only, never the plugin. **Tell the user first that it stops t7kb's MCP server in every open session** (Windows can't replace the binary or the database while one runs) and deletes the old database: they restart Claude Code afterwards, and the first session to start unpacks the new one, about 20 s once.
 - **"The t7kb Claude Code plugin (its skills) is behind …"** (with either verdict above) — one or more installs of this plugin, per scope, are on an older version. Relay the listed installs and offer to run the printed `claude plugin marketplace update` / `claude plugin update … --scope …` commands (a `project`/`local` one from the project path it names); after they succeed, tell the user to restart Claude Code, which is what loads the new skills. Step 4 keeps it from falling behind again.
 - **Check failed** (e.g. offline) — don't block setup on it; fall back to skipping the install as before, with a one-line note that the check itself couldn't run.
 
@@ -97,6 +97,6 @@ Nothing else tells the user a release exists: a third-party marketplace such as 
 
 ## 5. Confirm — never claim success if a step failed
 
-Tell the user what was done. After a first install, the `t7kb:search` and `t7kb:get` MCP tools become available in the **next session** (or after `/reload-plugins`); after an update, a restart of Claude Code loads the new binary and skills.
+Tell the user what was done. After a first install, the `t7kb:search` and `t7kb:get` MCP tools become available in the **next session** (or after `/reload-plugins`); after an update, a restart of Claude Code loads the new binary and skills. Either way, the ~3.8 GB database unpacks itself the first time the server starts, about 20 s once.
 
 If the install or registration failed at any step above, report the exact error there instead of reaching this step — don't claim success.

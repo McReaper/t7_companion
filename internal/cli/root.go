@@ -42,13 +42,13 @@ func newRootCmd() *cobra.Command {
 	}
 	root.PersistentFlags().StringVar(&dbFlag, "db", "",
 		"path to t7kb.db (default: $T7KB_DB, then beside the binary, then ./t7kb.db)")
-	root.AddCommand(newSearchCmd(), newGetCmd(), newMCPCmd(), newEmbedCmd(), newUpdateCheckCmd(), newUnpackDBCmd(), newBuildCmd(), newGDTCmd(), newZoneCmd(), newCreateCmd(), newShaderCmd())
+	root.AddCommand(newSearchCmd(), newGetCmd(), newMCPCmd(), newEmbedCmd(), newUpdateCheckCmd(), newBuildCmd(), newGDTCmd(), newZoneCmd(), newCreateCmd(), newShaderCmd())
 	return root
 }
 
 // resolveDB picks where t7kb.db should live: --db > $T7KB_DB > beside the
 // binary > cwd. It returns the intended path whether or not the file exists yet
-// (ensureDB swaps in a staged t7kb.db.new, or unpacks a sibling t7kb.db.zip).
+// (ensureDB unpacks a sibling t7kb.db.zip there on first run).
 func resolveDB() string {
 	if dbFlag != "" {
 		return dbFlag
@@ -64,7 +64,7 @@ func resolveDB() string {
 
 func openStore() (*store.Store, error) {
 	path := resolveDB()
-	if err := ensureDB(path, os.Stderr); err != nil {
+	if err := ensureDB(path); err != nil {
 		return nil, err
 	}
 	return store.Open(path)
