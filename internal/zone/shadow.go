@@ -13,9 +13,8 @@ import (
 // linker pack only a reference to the shipped asset.
 type Shadow struct {
 	asset.ID
-	File  string    // your version: a zone file, relative to the root, or a GDT as the gdt package names it
+	File  string    // your version: a zone file relative to the root (ZonedShadows), or a GDT as the gdt package names it (GDTShadows)
 	Line  int       // its line there
-	InGDT bool      // defined in a GDT, rather than zoned
 	Stock ListEntry // the active line that ships the stock asset
 }
 
@@ -78,7 +77,7 @@ func GDTShadows(r *Report, w *gdt.Workspace, lists Assetlists) []Shadow {
 		}
 		for _, l := range locs {
 			if !l.Stock {
-				out = append(out, Shadow{ID: id, File: l.File, Line: l.Line, InGDT: true, Stock: e})
+				out = append(out, Shadow{ID: id, File: l.File, Line: l.Line, Stock: e})
 			}
 		}
 	}
