@@ -118,3 +118,36 @@ func TestAssetlistsMaterialCategory(t *testing.T) {
 		t.Errorf("commented-out image: %+v", e)
 	}
 }
+
+// BareTechsets takes every unprefixed techset line of every stock list,
+// commented out or not, and none with a prefix or of another type.
+func TestBareTechsets(t *testing.T) {
+	root, _ := fakeRoot(t)
+	list := filepath.Join(root, "zone_source", "all", "assetlist", "core_gfx.csv")
+	body := "techset,Tools_Blend#da7372ff\r\n//techset,uie_feather_blend#da7372ff\ntechset,mc/lit#e6142445\n" +
+		"material,tools_flat\n techset , spaced#da7372ff \ntechset,\nnot a line\n"
+	if err := os.WriteFile(list, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := BareTechsets(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{"tools_blend": true, "uie_feather_blend": true, "spaced": true}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if got, err := BareTechsets(t.TempDir()); err != nil || len(got) != 0 {
+		t.Errorf("no lists: %v %v", got, err)
+	}
+}
+
+func TestBareTechsetsUnreadableList(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "zone_source", "all", "assetlist", "broken.csv"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := BareTechsets(root); err == nil {
+		t.Error("a list that can't be read must be an error")
+	}
+}
