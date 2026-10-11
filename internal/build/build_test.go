@@ -151,6 +151,7 @@ func TestRunBuildReport_Validation(t *testing.T) {
 		wantErr string
 	}{
 		{"name too short", &Options{ToolsPath: tools, Stages: "link", Light: "medium"}, "z", "too short"},
+		{"two letters are a name", &Options{ToolsPath: tools, Stages: "bogus", Light: "medium"}, "zm", "unknown stage"},
 		{"no tools path", &Options{Stages: "link", Light: "medium"}, "zm_test", "no mod-tools path"},
 		{"tools not found", &Options{ToolsPath: t.TempDir(), Stages: "link", Light: "medium"}, "zm_test", "mod tools not found"},
 		{"bad stage", &Options{ToolsPath: tools, Stages: "bogus", Light: "medium"}, "zm_test", "unknown stage"},
