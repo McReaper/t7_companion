@@ -60,3 +60,25 @@ func TestChangedSinceMaterial(t *testing.T) {
 		t.Errorf("got %v", got)
 	}
 }
+
+// Changed GDTs come sorted, each once, a GDT met second for an asset included.
+func TestChangedSinceSeveralGDTs(t *testing.T) {
+	root, w := gdtRoot(t, map[string]string{
+		"source_data/z.gdt": "{\n" + gdtAsset("img_z", "image") + "}\n",
+		"source_data/a.gdt": "{\n" + gdtAsset("img_a", "image") + gdtAsset("img_both", "image") + "}\n",
+		"source_data/b.gdt": "{\n" + gdtAsset("img_both", "image") + "}\n",
+	})
+	r := linked(t, root, "zm_x", "1,image,img_z,20,0,|zone_source/zm_x.zone|csv\n"+
+		"2,image,img_a,20,0,|zone_source/zm_x.zone|csv\n"+
+		"3,image,img_both,20,0,|zone_source/zm_x.zone|csv\n")
+	after := r.Linked.Add(time.Hour)
+	for _, f := range []string{"z.gdt", "a.gdt", "b.gdt"} {
+		if err := os.Chtimes(filepath.Join(root, "source_data", f), after, after); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want := []string{w.Abs("source_data/a.gdt"), w.Abs("source_data/b.gdt"), w.Abs("source_data/z.gdt")}
+	if got := ChangedSince(r, w); !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v\nwant %v", got, want)
+	}
+}
