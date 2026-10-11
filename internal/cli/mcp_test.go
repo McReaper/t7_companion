@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -49,5 +50,33 @@ func TestBuildToolHandler_NoToolsPath(t *testing.T) {
 	}
 	if txt := resultText(res); !strings.Contains(txt, "mod-tools path") {
 		t.Fatalf("unexpected error text: %q", txt)
+	}
+}
+
+// The server's instructions are what reaches an agent that loaded no skill: the
+// always-on rule, and the pointer to the skills.
+func TestMCPServerInstructions(t *testing.T) {
+	c, err := client.NewInProcessClient(newMCPServer(nil, nil, false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if err := c.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	init := mcp.InitializeRequest{}
+	init.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
+	init.Params.ClientInfo = mcp.Implementation{Name: "test", Version: "0"}
+	res, err := c.Initialize(ctx, init)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"search t7kb before answering from memory", "mid-task too", "t7kb:* skills", "load the one that owns the task"} {
+		if !strings.Contains(res.Instructions, want) {
+			t.Errorf("instructions lack %q:\n%s", want, res.Instructions)
+		}
+	}
+	if n := len(strings.Fields(res.Instructions)); n > 120 {
+		t.Errorf("instructions are %d words: they load in every session, keep them near 100", n)
 	}
 }

@@ -63,10 +63,22 @@ func runMCP() error {
 	return server.ServeStdio(newMCPServer(st, emb, true))
 }
 
+// mcpInstructions reach the agent in every session where the server is
+// registered, so they hold only the rule that always applies: each tool's
+// description says what it does, and the t7kb:* skills carry the craft.
+const mcpInstructions = "t7kb is a local knowledge base of the Black Ops 3 (BO3) modding community, " +
+	"with tools over this machine's Treyarch mod tools. For any BO3 modding question or task " +
+	"(GSC/CSC, Radiant, zombies, assets, FX, audio, compile and link errors), search t7kb before " +
+	"answering from memory, mid-task too: before asserting how the pipeline behaves, or asking the " +
+	"user to confirm it. Read the top hits with get rather than answering from snippets. " +
+	"When t7kb:* skills are available (the Claude Code plugin), load the one that owns the task " +
+	"first: it holds the method and the traps that fail silently."
+
 // newMCPServer registers every toolset on one server — the one runMCP serves,
 // and the one tests drive in-process.
 func newMCPServer(st *store.Store, emb *embed.Embedder, warm bool) *server.MCPServer {
 	s := server.NewMCPServer("t7kb", Version(), server.WithToolCapabilities(false),
+		server.WithInstructions(mcpInstructions),
 		server.WithRecovery()) // a panicking handler must not take the whole stdio server down
 	for _, ts := range toolsets(st, emb) {
 		s.AddTools(ts.tools...)
