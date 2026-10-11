@@ -63,7 +63,7 @@ irm https://raw.githubusercontent.com/McReaper/t7_companion/main/install/install
 
 Then register `t7kb mcp` as a stdio server ([per-client config](docs/clients.md)) and drop [`templates/AGENTS.md`](templates/AGENTS.md) at your BO3 mod-tools root — it carries the skills' core guidance for agents without them. Or paste this README to your agent and let it do all of that.
 
-The database: a ~0.9 GB download, unpacked to ~3.5 GB on first run.
+The database: a ~0.9 GB download, unpacked to ~3.8 GB at install.
 
 ## ✨ What your agent gets
 

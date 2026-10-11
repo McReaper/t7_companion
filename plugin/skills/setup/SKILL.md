@@ -15,7 +15,7 @@ If a binary already exists at the target path (the case the idempotency check wo
 
 - **Up to date** — proceed to skip the install as usual.
 - **"Running a local/dev build"** — the binary at the install path was built from source, not downloaded from a release, so it may lack tools the skills name. Unless the user says they put it there on purpose, treat it like an available update and offer `-Force`/`--force`.
-- **Update available** — tell the user, and offer to re-run with `-Force`/`--force` below. That refreshes the binary + database only, never the plugin.
+- **Update available** — tell the user, and offer to re-run with `-Force`/`--force` below. That refreshes the binary + database only, never the plugin. If the installer then says the new database **waits as `t7kb.db.new`** (Windows: each open session's t7kb server holds the old one open), relay it: the user closes every agent session, and the next t7kb to start swaps it in.
 - **"The t7kb Claude Code plugin (its skills) is behind …"** (with either verdict above) — one or more installs of this plugin, per scope, are on an older version: a third-party marketplace doesn't auto-update by default, so a user can keep running old skills for months. Relay the listed installs and offer to run the printed `claude plugin marketplace update` / `claude plugin update … --scope …` commands (a `project`/`local` one from the project path it names); after they succeed, tell the user to restart Claude Code, which is what loads the new skills.
 - **Check failed** (e.g. offline) — don't block setup on it; fall back to skipping the install as before, with a one-line note that the check itself couldn't run.
 
@@ -108,6 +108,6 @@ Modding edits **shared, install-wide files** — an assetlist line commented out
 
 ## 4. Confirm — never claim success if a step failed
 
-Tell the user setup is done and that the `t7kb:search` and `t7kb:get` MCP tools become available in the **next session** (or after `/reload-plugins`). The 3.5 GB database unpacks itself automatically the first time the server runs.
+Tell the user setup is done and that the `t7kb:search` and `t7kb:get` MCP tools become available in the **next session** (or after `/reload-plugins`). The installer has already unpacked the ~3.8 GB database.
 
 If the install or registration failed at any step above, report the exact error there instead of reaching this step — don't claim success.
