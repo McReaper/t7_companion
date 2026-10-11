@@ -85,7 +85,7 @@ Every stage is a **console binary**; the Launcher GUI only chains them. An agent
 
 ### `t7kb:build` — the MCP tool, use this first
 
-If this skill fired over MCP, the `t7kb` server is very likely already registered — it's the same server that exposes `t7kb:search`/`t7kb:get` — so call the `build` tool directly instead of shelling out. Its parameters (from the tool's own schema): `name` (required, e.g. `"zm_mymap"`), `stages` (comma list `compile,light,link,run`, default `"compile,light,link"`; pass `"link"` alone for a script-only change), `mod` (bool, target is `mods/<name>` instead of a usermap; default `false`), `light` (`low`|`medium`|`high`, default `"medium"`), `onlyents` (bool, fast entity-only compile; default `false`), `language` (default `"english"`), `skip_gdt` (bool, skip the `gdtdb /update` pass; default `false`), `gdt_rebuild` (bool, run `gdtdb /rebuild` instead — the recovery when a GDT change leaves every asset missing; default `false`), `tools_path`/`game_path` (default `$TA_TOOLS_PATH`/`$TA_GAME_PATH`). It returns the same compact per-stage JSON report as `t7kb build --json` below, first-actionable-error included — and it inherits the same `ok: false`-on-a-warning trap, see the exit-code section further down.
+If this skill fired over MCP, the `t7kb` server is very likely already registered — it's the same server that exposes `t7kb:search`/`t7kb:get` — so call the `build` tool directly instead of shelling out. Its parameters (from the tool's own schema): `name` (required, e.g. `"zm_mymap"`), `stages` (comma list `compile,light,link,run`, default `"compile,light,link"`; pass `"link"` alone for a script-only change), `mod` (bool, target is `mods/<name>` instead of a usermap; default `false`), `light` (`low`|`medium`|`high`, default `"medium"`), `onlyents` (bool, fast entity-only compile; default `false`), `language` (default `"english"`), `skip_gdt` (bool, skip the `gdtdb /update` pass; default `false`), `gdt_rebuild` (bool, run `gdtdb /rebuild` instead — the recovery when a GDT change leaves every asset missing; default `false`), `tools_path`/`game_path` (default `$TA_TOOLS_PATH`/`$TA_GAME_PATH`). It returns the same per-stage JSON report as `t7kb build --json` below, with every error and warning the link logged (see the errors-and-warnings section further down).
 
 If the `t7kb` server has `search`/`get` but no `build` tool, its binary predates it (it ships from 1.5.0): tell the user and offer `/t7kb:setup` to update it, then fall back to the shell tier below meanwhile.
 
@@ -103,25 +103,17 @@ Whichever way you build, these are the outputs to check (`<pp>` = the map's `zm`
 
 - **Outputs to expect** (confirm the build by their mtime): compile → `share/raw/maps/<pp>/<map>.d3dbsp` (+ `<map>_navmesh.hkt`, `<map>.d3dprt`); light → `share/raw/maps/<pp>/<map>.led`; link → Fast Files in `usermaps/<map>/zone/` (or `mods/<mod>/zone/`): `<map>.ff` + `<map>.xpak`. One `-language <lang>` pass writes the language-neutral `<map>.ff` **and** that language's `<lang>_<map>.ff`; the other languages' localized Fast Files keep their previous content until you pass their language too. Scripts and models are in the neutral one, so an english-only pass does refresh your code. What goes *into* those localized Fast Files — `.str` files, reference naming, `linkerflag,noloc` — is **t7kb:localization**.
 
-## The linker exits non-zero on warnings — read the errorlog, not the exit code
+## A link's errors and warnings: look each one up, fix it at its source, relink
 
-A link whose only complaint is `^3Found 1 bad bulletmeshes, dumped to …_bulletreport.csv`, and which prints `done: 0m7.08s` for every zone, still returns **1000** while the Fast File is correct and current (verified on a real build). Anything that gates on the exit code calls that build failed, so don't "fix" a build that already works. `t7kb:build`/`t7kb build` read the map's `.errorlog` in that case and report the link OK, with the warning as a note, when it has no error line (older versions reported `ok: false`, `exit status 1000`).
+The linker exits non-zero on warnings too (`^3Found 1 bad bulletmeshes` returns 1000 on a correct, current Fast File; verified on a real build), so its errorlogs are the verdict. `t7kb:build` returns every entry of every errorlog the link wrote, each with the asset chain the linker indents under it (`xmodel:x < csv:zone_source/<map>.zone`): `errors` (`^1`, the link failed) and `warnings` (`^3`, the Fast File is built). It adds `missing`: assets the link looked up and found in no GDT, which it links without and logs nothing about — fix the field that names one, or create the asset (verified against the linker's `.deps`).
 
-The `^3` prefix is a colour code marking the line as a warning; an error is a `^1` line (`^1ERROR: xmodel 'x' is missing`), with a larger return code (`return 1001000`), and does **not** print `done:` (verified on a real link).
+For each entry, `t7kb:search` its fixed words, names and numbers stripped, unfiltered: the Discord threads hold the fixes. Fix it in the asset or zone line its chain names, with the skill that owns it (**t7kb:assets**, **t7kb:scripting**, **t7kb:mapping**, **t7kb:shaders**). Relink until the summary is clean, or tell the user which warning stays and why.
 
-So verify at the artefacts rather than the return value, all under `<map>/zone_source/all/assetinfo/`:
+To prove an asset was packed rather than infer it from a green build, `t7kb:zone_explain` and `t7kb:zone_contents` read `<map>.csv` beside the errorlog; relink first if they say sources changed. Without MCP, grep it, and check the `.ff`'s modification time.
 
-- **`<map>.errorlog`** — the authoritative verdict. It holds the literal `return <code>` line plus the message that produced it.
-- **`<map>.csv`** — the built assetlist: every packed asset, its size, and the chain of parents that pulled it in up to the zone line. `t7kb:zone_explain` reads it for one asset (packed or not, and through which line); `t7kb:zone_contents` for what a zone line pulls in, or which lines make the fastfile big. Without MCP, grep it. That is how you prove a new xanim/model actually got packed, rather than inferring it from a green build; both tools say when sources changed since the link, so relink first if they do.
-- **`<map>_bulletreport.csv`** — names the bad bulletmesh, if you'd rather clear the warning than keep explaining it.
+## Publishing: link fresh, then shrink your images
 
-Plus the `.ff` mtime. A non-zero exit with a fresh `.ff`, a `done:` per zone, and your asset in the CSV is a **successful build**.
-
-## Publish uploads `zone/` as it is: link fresh, then shrink your images
-
-The Launcher's Publish uploads the whole `usermaps/<map>/zone/` folder (verified in the install), and the linker only appends to a `.xpak`: what each link replaces stays in it, read by nothing (verified on a real build: 93 MB of a 325 MB `.xpak`). `t7kb:zone_contents` without a line gives the upload and `xpak_dead_at_least`; link the build you publish with `t7kb:build` `fresh_xpak` (CLI `--fresh-xpak`). Deleting the `.xpak` files by hand works only for the languages you then relink.
-
-Images are most of the rest, and their data doesn't compress in the `.xpak`. Each `mipBase` step down (APE's *Mipmap Base Size*, `1/1` → `1/2` → `1/4` → `1/8`) halves width and height and leaves a quarter of the streamed bytes (verified on a real build: a 4K colour map 22.4 → 5.6 → 1.4 MB). `t7kb:zone_contents` with `images` ranks your GDTs and images by what a step saves; set it with `t7kb:gdt_edit` (a batch per GDT), relink, and check them in game. `doNotResize` locks an image's size; stock GDTs aren't editable.
+What Publish uploads, why the `.xpak` grows on every link, and how to cut the upload without cutting content (`fresh_xpak`, `mipBase`, `t7kb:zone_contents` `images`) are in **`references/publish.md`**.
 
 ## Don't invent
 
