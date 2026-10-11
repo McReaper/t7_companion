@@ -1,34 +1,25 @@
 name: ci
 
-# Build, lint and test the Go tool on every PR and push to main. Pure Go, no cgo:
-# the Windows binary is cross-compiled here exactly as the release does.
+# Every check a PR gets, in one workflow (a push to main reruns go and docs).
+# Each job says what it does; the scripts it calls are under .github/scripts/.
 on:
   pull_request:
-    paths:
-      - "**.go"
-      - "go.mod"
-      - "go.sum"
-      - ".github/workflows/ci.yml"
-      - ".github/scripts/patch_coverage.py"
-      - ".golangci.yml"
   push:
     branches: [main]
-    paths:
-      - "**.go"
-      - "go.mod"
-      - "go.sum"
-      - ".github/workflows/ci.yml"
-      - ".golangci.yml"
 
 permissions:
   contents: read
 
+env:
+  CGO_ENABLED: "0"
+  HF_HOME: ${{ github.workspace }}/.hf # the embedding model TestHybridSearch loads
+
 jobs:
+  # Build, lint and test the Go tool. Pure Go, no cgo: the Windows binary is
+  # cross-compiled here exactly as the release does. On a PR, at least 80% of
+  # the changed Go lines must run under test.
   go:
     runs-on: ubuntu-latest
-    env:
-      CGO_ENABLED: "0"
-      HF_HOME: ${{ github.workspace }}/.hf # the embedding model TestHybridSearch loads
     steps:
       - uses: actions/checkout@v7
         with:
@@ -59,7 +50,86 @@ jobs:
           GOOS=linux GOARCH=amd64 go build -o /dev/null ./cmd/t7kb
       - name: test # uncached: a cached package's profile keeps the old lines of every package -coverpkg covers
         run: go test -count=1 -coverpkg=./... -coverprofile=cover.out ./...
-      - name: coverage of the changed lines # at least 80% of a PR's changed Go lines run under test
+      - name: coverage of the changed lines
         if: github.event_name == 'pull_request'
         shell: bash
         run: python3 .github/scripts/patch_coverage.py cover.out "origin/${{ github.base_ref }}" 80 "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.sha }}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # The skills' format, the markdown word budgets and the JSON manifests: the
+  # same checks the pre-commit hook runs.
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Validate skills
+        run: python plugin/skills/contribute/scripts/check_skills.py
+      - name: Markdown word budgets
+        run: python .github/scripts/check_markdown.py
+      - name: Validate JSON manifests
+        run: |
+          python -m json.tool .claude-plugin/marketplace.json > /dev/null
+          python -m json.tool plugin/.claude-plugin/plugin.json > /dev/null
+
+  # Go's fuzzer, 45 s per Fuzz target of each package the PR changes (go test
+  # only replays the seeds). A failing input fails the job and is kept as an
+  # artifact: fold it into the target's seed list with the bug it guards.
+  fuzz:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7 # its build cache carries the fuzz corpus from run to run
+        with:
+          go-version-file: go.mod
+      - name: Fuzz
+        env:
+          BASE: origin/${{ github.base_ref }}
+          FUZZTIME: 45s
+        run: bash .github/scripts/fuzz.sh
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: failing-inputs
+          path: "**/testdata/fuzz/**"
+
+  # Mutation testing of the changed Go lines (gremlins --diff), advisory: the
+  # lived mutants land in the job summary and gremlins.json as an artifact. Each
+  # gets a test that fails on it, or the PR says why it changes nothing
+  # observable — none is silenced by a list.
+  mutate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GOFLAGS: -count=1 # gremlins times each mutant from the coverage run: a cached one would make every timeout tiny
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Cache the embedding model
+        uses: actions/cache@v6
+        with:
+          path: .hf
+          key: hf-all-MiniLM-L6-v2
+      - name: Install gremlins
+        run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
+      - name: Mutate the changed lines
+        run: gremlins unleash --diff "origin/${{ github.base_ref }}" -o gremlins.json || echo "gremlins exited $?"
+      - name: Report
+        if: always()
+        run: python3 .github/scripts/mutation_report.py gremlins.json "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: gremlins
+          path: gremlins.json
+          if-no-files-found: ignore

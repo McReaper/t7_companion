@@ -4,7 +4,7 @@ What a call to `t7kb` costs: time and memory for the retrieval path, and **token
 
 ## How to run
 
-Synthetic benchmarks need neither the database nor the model, and run anywhere (the `bench` workflow runs them on demand):
+Synthetic benchmarks need neither the database nor the model, and run anywhere:
 
 ```
 go test ./internal/store -run '^$' -bench . -benchmem
