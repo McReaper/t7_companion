@@ -59,7 +59,11 @@ fetch "$BASE/t7kb.db.zip" "$TARGET/t7kb.db.zip.part"
 mv -f "$TARGET/t7kb.db.zip.part" "$TARGET/t7kb.db.zip"
 # The zip stays: unpack-db compares the database with it and unpacks it only
 # when they differ (a running server keeps reading the old file until it restarts).
-"$TARGET/t7kb" unpack-db --db "$TARGET/t7kb.db"
+# This script comes from main, the binary from the latest release: one older than
+# unpack-db would take it for a browse query and wait on stdin, so ask first.
+if "$TARGET/t7kb" --help 2>/dev/null | grep unpack-db >/dev/null; then
+  "$TARGET/t7kb" unpack-db --db "$TARGET/t7kb.db"
+fi
 
 cat <<EOF
 
