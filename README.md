@@ -30,13 +30,16 @@ https://github.com/user-attachments/assets/0d533897-fd35-4f0d-9774-948546c0af6b
 
 ```mermaid
 flowchart LR
-    S["Skills<br/>(Claude Code plugin)"] -. "how each craft works,<br/>where it fails silently" .-> A([Your AI agent])
-    A <-->|MCP| T["t7kb<br/>one local binary"]
-    T --> K[("Knowledge base")]
-    T --> G["Your GDTs"]
-    T --> B["Headless build"]
-    T --> Z["What the build packed"]
-    T --> H["Game shaders"]
+    U(["You"]) -->|"ask, in your own words"| A["Your AI agent<br/>Claude Code, Codex, Cursor…"]
+    subgraph TC["T7 Companion"]
+        S["Skills (Claude Code)<br/>how each craft works,<br/>where it fails silently"]
+        T["t7kb<br/>runs on your machine"]
+        K[("Knowledge base<br/>what the BO3 modding<br/>community knows")]
+    end
+    A -->|"follows"| S
+    A <-->|"MCP"| T
+    T -->|"searches"| K
+    T -->|"reads, edits, builds"| I["Your BO3 mod tools<br/>GDTs, maps, fastfiles, shaders"]
 ```
 
 ## 📥 Install
@@ -78,20 +81,7 @@ The database: a ~0.9 GB download, unpacked to ~3.8 GB on first run.
 
 ## ⌨️ CLI
 
-From a terminal:
-
-```
-t7kb                         browse: type a query, pick a hit, read it
-t7kb search <query>...       search  (--source api,wiki… · -n N · --bm25)
-t7kb get <doc_id>            read a document  (--find · --offset · --all)
-t7kb create <name>           new map or mod from a template  (--write)
-t7kb build <name>            compile/light/link/run  (--stages · --mod · --json)
-t7kb gdt <command>           find | get | schema | edit | check | refs
-t7kb zone <command>          explain | contents | check
-t7kb shader decompile <name> a stock shader's HLSL  (--stage · --json)
-t7kb mcp                     run the MCP server
-t7kb update-check            is a newer release out? is the plugin behind?
-```
+Every tool is also a command: `t7kb` alone opens an interactive search, and [the command list](docs/cli.md) has the rest.
 
 ## 🔄 Updating
 
