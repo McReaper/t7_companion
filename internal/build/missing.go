@@ -1,4 +1,4 @@
-package cli
+package build
 
 import (
 	"fmt"

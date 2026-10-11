@@ -3,10 +3,15 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"sort"
+	"strconv"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+
+	"github.com/McReaper/t7_companion/internal/build"
 )
 
 // buildToolset drives the mod-tools build pipeline (the one tool that runs the
@@ -60,24 +65,24 @@ func buildToolHandler() server.ToolHandlerFunc {
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
-		o := &buildOpts{
-			toolsPath:  req.GetString("tools_path", ""),
-			gamePath:   req.GetString("game_path", ""),
-			isMod:      req.GetBool("mod", false),
-			stages:     req.GetString("stages", "compile,light,link"),
-			onlyEnts:   req.GetBool("onlyents", false),
-			light:      req.GetString("light", "medium"),
-			language:   req.GetString("language", "english"),
-			skipGDT:    req.GetBool("skip_gdt", false),
-			gdtRebuild: req.GetBool("gdt_rebuild", false),
-			freshXpak:  req.GetBool("fresh_xpak", false),
+		o := &build.Options{
+			ToolsPath:  req.GetString("tools_path", ""),
+			GamePath:   req.GetString("game_path", ""),
+			Mod:        req.GetBool("mod", false),
+			Stages:     req.GetString("stages", "compile,light,link"),
+			OnlyEnts:   req.GetBool("onlyents", false),
+			Light:      req.GetString("light", "medium"),
+			Language:   req.GetString("language", "english"),
+			SkipGDT:    req.GetBool("skip_gdt", false),
+			GDTRebuild: req.GetBool("gdt_rebuild", false),
+			FreshXpak:  req.GetBool("fresh_xpak", false),
 
-			launcherDvars: req.GetBool("launcher_dvars", false),
+			LauncherDvars: req.GetBool("launcher_dvars", false),
 		}
-		if o.dvars, err = dvarPairs(req.GetArguments()["dvars"]); err != nil {
+		if o.Dvars, err = dvarPairs(req.GetArguments()["dvars"]); err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
-		rep, err := runBuildReport(o, name, io.Discard)
+		rep, err := build.Run(o, name, io.Discard)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -87,4 +92,37 @@ func buildToolHandler() server.ToolHandlerFunc {
 		}
 		return mcp.NewToolResultText(string(out)), nil
 	}
+}
+
+// dvarPairs turns the MCP dvars object into sorted "name=value" pairs; numbers
+// and booleans are accepted as values (true -> 1, false -> 0).
+func dvarPairs(v any) ([]string, error) {
+	if v == nil {
+		return nil, nil
+	}
+	m, ok := v.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("dvars must be an object of name: value")
+	}
+	names := make([]string, 0, len(m))
+	for k := range m {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	var out []string
+	for _, k := range names {
+		var s string
+		switch x := m[k].(type) {
+		case string:
+			s = x
+		case bool:
+			s = map[bool]string{true: "1", false: "0"}[x]
+		case float64:
+			s = strconv.FormatFloat(x, 'f', -1, 64)
+		default:
+			return nil, fmt.Errorf("dvar %q: value must be a string, number or boolean", k)
+		}
+		out = append(out, k+"="+s)
+	}
+	return out, nil
 }

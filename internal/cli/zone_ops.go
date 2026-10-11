@@ -82,7 +82,7 @@ type zoneCtx struct {
 
 // openZone loads a map's (or mod's) last linker report and checks it is current.
 func openZone(toolsPath, name string) (*zoneCtx, error) {
-	root := strings.TrimRight(firstNonEmpty(toolsPath, os.Getenv("TA_TOOLS_PATH")), `\/`)
+	root := toolsRoot(toolsPath)
 	if root == "" {
 		return nil, fmt.Errorf("no mod-tools path: pass tools_path / --tools-path or set TA_TOOLS_PATH")
 	}

@@ -3,7 +3,6 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"os"
 	"slices"
 	"sort"
 	"strings"
@@ -45,7 +44,7 @@ var shaderStages = map[string]bool{"": true, "ps": true, "vs": true, "gs": true,
 // file, its source or a material type. all returns the whole HLSL instead of
 // a page.
 func shaderDecompile(toolsPath, name, stage string, offset, maxChars int, all bool) (*shaderOut, error) {
-	root := strings.TrimRight(firstNonEmpty(toolsPath, os.Getenv("TA_TOOLS_PATH")), `\/`)
+	root := toolsRoot(toolsPath)
 	if root == "" {
 		return nil, fmt.Errorf("no mod-tools path: pass tools_path / --tools-path or set TA_TOOLS_PATH")
 	}

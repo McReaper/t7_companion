@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -45,7 +44,7 @@ type zoneCheckResult struct {
 // still lists them. Works before the first link (from the zone files) and
 // better after (from the linker's report).
 func zoneCheck(toolsPath, name string) (*zoneCheckResult, error) {
-	root := strings.TrimRight(firstNonEmpty(toolsPath, os.Getenv("TA_TOOLS_PATH")), `\/`)
+	root := toolsRoot(toolsPath)
 	if root == "" {
 		return nil, fmt.Errorf("no mod-tools path: pass tools_path / --tools-path or set TA_TOOLS_PATH")
 	}

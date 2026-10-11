@@ -1,7 +1,6 @@
-package cli
+package build
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -132,24 +131,24 @@ func TestApplyLinkLog(t *testing.T) {
 	zs := t.TempDir()
 	start := time.Now()
 	writeLog(t, zs, "all/assetinfo/zm_x.errorlog", "return 1000\n^3a warning\n", 0)
-	sr := stageResult{Name: "link", Errors: []string{"exit status 1000"}}
+	sr := StageResult{Name: "link", Errors: []string{"exit status 1000"}}
 	applyLinkLog(&sr, zs, "zm_mod: ", start)
 	if !sr.OK || sr.Errors != nil || !reflect.DeepEqual(sr.Warnings, []string{"zm_mod: a warning"}) ||
 		sr.Note != "zm_mod: the linker returned 1000 for warnings only: the fastfile is built" {
 		t.Errorf("warnings only: %+v", sr)
 	}
-	ok := stageResult{Name: "link", OK: true, Note: "kept"}
+	ok := StageResult{Name: "link", OK: true, Note: "kept"}
 	applyLinkLog(&ok, zs, "", start)
 	if !ok.OK || ok.Note != "kept" || len(ok.Warnings) != 1 {
 		t.Errorf("a link that exited 0 keeps its note: %+v", ok)
 	}
 	writeLog(t, zs, "all/assetinfo/zm_x.errorlog", "return 1001000\n^1an error\n^3a warning\n", 0)
-	failed := stageResult{Name: "link", Errors: []string{"UNRECOVERABLE ERROR:"}}
+	failed := StageResult{Name: "link", Errors: []string{"UNRECOVERABLE ERROR:"}}
 	applyLinkLog(&failed, zs, "", start)
 	if failed.OK || !reflect.DeepEqual(failed.Errors, []string{"an error"}) || len(failed.Warnings) != 1 {
 		t.Errorf("errors replace the console's: %+v", failed)
 	}
-	none := stageResult{Name: "link", Errors: []string{"exit status 1"}}
+	none := StageResult{Name: "link", Errors: []string{"exit status 1"}}
 	applyLinkLog(&none, t.TempDir(), "", start)
 	if none.OK || len(none.Errors) != 1 {
 		t.Errorf("no errorlog leaves the result as it is: %+v", none)
@@ -166,7 +165,7 @@ func TestLinkReturnsTheErrorlogs(t *testing.T) {
 		f := &fakePipeline{root: root, fail: "link"} // the linker exits non-zero
 		f.install(t)
 		fake := stageRunner
-		stageRunner = func(label, dir, exe string, d time.Duration, v bool, w io.Writer, args ...string) stageResult {
+		stageRunner = func(label, dir, exe string, d time.Duration, v bool, w io.Writer, args ...string) StageResult {
 			if label == "link" {
 				kind, zoneName := "usermaps", "zm_test"
 				if mod {
@@ -185,7 +184,7 @@ func TestLinkReturnsTheErrorlogs(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		rep, err := runBuildReport(&buildOpts{toolsPath: root, stages: "link", light: "medium", language: "english", skipGDT: true, isMod: mod}, "zm_test", io.Discard)
+		rep, err := Run(&Options{ToolsPath: root, Stages: "link", Light: "medium", Language: "english", SkipGDT: true, Mod: mod}, "zm_test", io.Discard)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -196,11 +195,6 @@ func TestLinkReturnsTheErrorlogs(t *testing.T) {
 		link := rep.Stages[len(rep.Stages)-1]
 		if !rep.OK || !reflect.DeepEqual(link.Warnings, []string{want}) {
 			t.Errorf("mod=%v: %+v", mod, rep.Stages)
-		}
-		var out bytes.Buffer
-		printBuildReport(&out, rep)
-		if !strings.Contains(out.String(), "      warning: "+want+"\n") {
-			t.Errorf("summary:\n%s", out.String())
 		}
 	}
 }
@@ -214,7 +208,7 @@ func TestModLinkErrorsFromTheErrorlog(t *testing.T) {
 	f := &fakePipeline{root: root, fail: "link"}
 	f.install(t)
 	fake := stageRunner
-	stageRunner = func(label, dir, exe string, d time.Duration, v bool, w io.Writer, args ...string) stageResult {
+	stageRunner = func(label, dir, exe string, d time.Duration, v bool, w io.Writer, args ...string) StageResult {
 		writeLog(t, filepath.Join(root, "mods", "zm_test", "zone_source"), "all/assetinfo/zm_mod.errorlog", "return 1001000\n^1first\n^1second\n", 0)
 		return fake(label, dir, exe, d, v, w, args...)
 	}
@@ -225,7 +219,7 @@ func TestModLinkErrorsFromTheErrorlog(t *testing.T) {
 	if err := os.WriteFile(zf, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	rep, err := runBuildReport(&buildOpts{toolsPath: root, stages: "link", light: "medium", language: "english", skipGDT: true, isMod: true}, "zm_test", io.Discard)
+	rep, err := Run(&Options{ToolsPath: root, Stages: "link", Light: "medium", Language: "english", SkipGDT: true, Mod: true}, "zm_test", io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}

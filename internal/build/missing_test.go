@@ -1,7 +1,6 @@
-package cli
+package build
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -40,7 +39,7 @@ func TestLinkListsWhatTheLinkerFoundNowhere(t *testing.T) {
 		f := &fakePipeline{root: root}
 		f.install(t)
 		fake := stageRunner
-		stageRunner = func(label, dir, exe string, d time.Duration, v bool, w io.Writer, args ...string) stageResult {
+		stageRunner = func(label, dir, exe string, d time.Duration, v bool, w io.Writer, args ...string) StageResult {
 			if label == "link" { // the linker writes the zone's .deps
 				kind, zoneName := "usermaps", "zm_test"
 				if mod {
@@ -59,7 +58,7 @@ func TestLinkListsWhatTheLinkerFoundNowhere(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		rep, err := runBuildReport(&buildOpts{toolsPath: root, stages: "link", light: "medium", language: "english", skipGDT: true, isMod: mod}, "zm_test", io.Discard)
+		rep, err := Run(&Options{ToolsPath: root, Stages: "link", Light: "medium", Language: "english", SkipGDT: true, Mod: mod}, "zm_test", io.Discard)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -70,11 +69,6 @@ func TestLinkListsWhatTheLinkerFoundNowhere(t *testing.T) {
 		link := rep.Stages[len(rep.Stages)-1]
 		if !rep.OK || len(link.Missing) != 1 || link.Missing[0] != want {
 			t.Errorf("mod=%v: %+v", mod, rep.Stages)
-		}
-		var out bytes.Buffer
-		printBuildReport(&out, rep)
-		if !strings.Contains(out.String(), "linked without (looked up, found in no GDT):\n        "+want) {
-			t.Errorf("summary:\n%s", out.String())
 		}
 	}
 }

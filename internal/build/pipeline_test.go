@@ -1,4 +1,4 @@
-package cli
+package build
 
 import (
 	"io"
@@ -29,7 +29,7 @@ func (f *fakePipeline) install(t *testing.T) {
 	}
 	prevStage, prevLight, prevGame := stageRunner, lightRunner, gameRunner
 	t.Cleanup(func() { stageRunner, lightRunner, gameRunner = prevStage, prevLight, prevGame })
-	stageRunner = func(label, dir, exe string, _ time.Duration, _ bool, _ io.Writer, args ...string) stageResult {
+	stageRunner = func(label, dir, exe string, _ time.Duration, _ bool, _ io.Writer, args ...string) StageResult {
 		args = append([]string(nil), args...)
 		for i, a := range args {
 			if strings.HasPrefix(a, f.root) { // a path, not a flag: on Linux "/update" is absolute too
@@ -46,15 +46,15 @@ func (f *fakePipeline) install(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		return stageResult{Name: label, OK: label != f.fail}
+		return StageResult{Name: label, OK: label != f.fail}
 	}
-	lightRunner = func(bin, mapSrc, led, quality string) stageResult {
+	lightRunner = func(bin, mapSrc, led, quality string) StageResult {
 		f.calls = append(f.calls, strings.Join([]string{"light", rel(bin), rel(mapSrc), rel(led), quality}, " "))
-		return stageResult{Name: "light", OK: f.fail != "light"}
+		return StageResult{Name: "light", OK: f.fail != "light"}
 	}
-	gameRunner = func(game string, args []string) stageResult {
+	gameRunner = func(game string, args []string) StageResult {
 		f.calls = append(f.calls, "run "+rel(game)+" "+strings.Join(args, " "))
-		return stageResult{Name: "run", OK: true}
+		return StageResult{Name: "run", OK: true}
 	}
 }
 
@@ -63,7 +63,7 @@ func TestRunBuildReportPipeline(t *testing.T) {
 	t.Setenv("TA_GAME_PATH", "")
 	cases := []struct {
 		name   string
-		opts   buildOpts
+		opts   Options
 		fail   string
 		noBSP  bool
 		calls  []string
@@ -74,7 +74,7 @@ func TestRunBuildReportPipeline(t *testing.T) {
 	}{
 		{
 			name: "usermap, every stage",
-			opts: buildOpts{stages: "compile,light,link,run", light: "high", language: "english"},
+			opts: Options{Stages: "compile,light,link,run", Light: "high", Language: "english"},
 			calls: []string{
 				"gdt gdtdb gdtdb.exe /update",
 				"compile bin cod2map64.exe -platform pc -navmesh -navvolume -loadFrom map_source/zm/zm_test.map share/raw/maps/zm/zm_test.d3dbsp",
@@ -87,13 +87,13 @@ func TestRunBuildReportPipeline(t *testing.T) {
 		},
 		{
 			name:  "onlyents, rebuild the gdt db",
-			opts:  buildOpts{stages: "compile", light: "medium", onlyEnts: true, gdtRebuild: true},
+			opts:  Options{Stages: "compile", Light: "medium", OnlyEnts: true, GDTRebuild: true},
 			calls: []string{"gdt gdtdb gdtdb.exe /rebuild", "compile bin cod2map64.exe -platform pc -onlyents -loadFrom map_source/zm/zm_test.map share/raw/maps/zm/zm_test.d3dbsp"},
 			ok:    true,
 		},
 		{
 			name:  "mod: no compile or light, each zone linked with -fs_game",
-			opts:  buildOpts{stages: "compile,light,link", light: "medium", language: "french", isMod: true},
+			opts:  Options{Stages: "compile,light,link", Light: "medium", Language: "french", Mod: true},
 			zones: []string{"zm_mod", "core_mod"},
 			calls: []string{"gdt gdtdb gdtdb.exe /update",
 				"link bin linker_modtools.exe -language french -fs_game zm_test -modsource core_mod",
@@ -103,26 +103,26 @@ func TestRunBuildReportPipeline(t *testing.T) {
 		},
 		{
 			name:   "mod with no zone file: nothing to link",
-			opts:   buildOpts{stages: "link", light: "medium", isMod: true, skipGDT: true},
+			opts:   Options{Stages: "link", Light: "medium", Mod: true, SkipGDT: true},
 			failed: "link",
 			notes:  map[string]string{"link": "no core_mod, mp_mod, cp_mod or zm_mod .zone"},
 		},
 		{
 			name:  "skip gdt, run only",
-			opts:  buildOpts{stages: "run", light: "medium", skipGDT: true, dvars: []string{"developer=2", "logfile=2"}},
+			opts:  Options{Stages: "run", Light: "medium", SkipGDT: true, Dvars: []string{"developer=2", "logfile=2"}},
 			calls: []string{"run . +set developer 2 +set logfile 2 +set fs_game zm_test +devmap zm_test"},
 			ok:    true,
 		},
 		{
 			name:   "a failed gdt pass stops the build",
-			opts:   buildOpts{stages: "compile,link", light: "medium"},
+			opts:   Options{Stages: "compile,link", Light: "medium"},
 			fail:   "gdt",
 			calls:  []string{"gdt gdtdb gdtdb.exe /update"},
 			failed: "gdt",
 		},
 		{
 			name:   "cod2map exiting 0 without writing the bsp is a failure",
-			opts:   buildOpts{stages: "compile,link", light: "medium", skipGDT: true},
+			opts:   Options{Stages: "compile,link", Light: "medium", SkipGDT: true},
 			noBSP:  true,
 			calls:  []string{"compile bin cod2map64.exe -platform pc -navmesh -navvolume -loadFrom map_source/zm/zm_test.map share/raw/maps/zm/zm_test.d3dbsp"},
 			failed: "compile",
@@ -130,7 +130,7 @@ func TestRunBuildReportPipeline(t *testing.T) {
 		},
 		{
 			name:   "a failed light stops before link",
-			opts:   buildOpts{stages: "light,link", light: "low", skipGDT: true},
+			opts:   Options{Stages: "light,link", Light: "low", SkipGDT: true},
 			fail:   "light",
 			calls:  []string{"light bin map_source/zm/zm_test.map share/raw/maps/zm/zm_test.led low"},
 			failed: "light",
@@ -151,8 +151,8 @@ func TestRunBuildReportPipeline(t *testing.T) {
 			f := &fakePipeline{root: root, fail: tc.fail, noBSP: tc.noBSP}
 			f.install(t)
 			opts := tc.opts
-			opts.toolsPath = root
-			rep, err := runBuildReport(&opts, "zm_test", io.Discard)
+			opts.ToolsPath = root
+			rep, err := Run(&opts, "zm_test", io.Discard)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -163,7 +163,7 @@ func TestRunBuildReportPipeline(t *testing.T) {
 				t.Errorf("ok=%v failed=%q, want ok=%v failed=%q", rep.OK, rep.FailedStage, tc.ok, tc.failed)
 			}
 			wantKind := "usermap"
-			if opts.isMod {
+			if opts.Mod {
 				wantKind = "mod"
 			}
 			if rep.Target != "zm_test" || rep.Kind != wantKind {
@@ -191,7 +191,7 @@ func TestRunBuildReportUsesTheGamePath(t *testing.T) {
 	t.Setenv("TA_GAME_PATH", game)
 	f := &fakePipeline{root: root}
 	f.install(t)
-	if _, err := runBuildReport(&buildOpts{toolsPath: root, stages: "light,run", light: "medium", skipGDT: true}, "mp_test", io.Discard); err != nil {
+	if _, err := Run(&Options{ToolsPath: root, Stages: "light,run", Light: "medium", SkipGDT: true}, "mp_test", io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	want := "light bin game/map_source/mp/mp_test.map game/share/raw/maps/mp/mp_test.led medium\nrun game +set fs_game mp_test +devmap mp_test"
@@ -239,9 +239,5 @@ func TestDvarsAsTheLauncherPassesThem(t *testing.T) {
 	}
 	if _, err := parseDvars([]string{"novalue"}); err == nil {
 		t.Fatal("name=value is required")
-	}
-	pairs, err := dvarPairs(map[string]any{"logfile": float64(2), "developer": "2", "scr_mod_enable_devblock": true})
-	if err != nil || strings.Join(pairs, " ") != "developer=2 logfile=2 scr_mod_enable_devblock=1" {
-		t.Fatalf("MCP dvars: %v %v", pairs, err)
 	}
 }

@@ -2,8 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/McReaper/t7_companion/internal/scaffold"
 )
@@ -23,7 +21,7 @@ type createResult struct {
 // write, creates it. A dry run (the default) lists the files and any that
 // already exist; a write refuses when one does.
 func createOp(toolsPath, name, template string, zones []string, write bool) (*createResult, error) {
-	root := strings.TrimRight(firstNonEmpty(toolsPath, os.Getenv("TA_TOOLS_PATH")), `\/`)
+	root := toolsRoot(toolsPath)
 	if root == "" {
 		return nil, fmt.Errorf("no mod-tools path: pass tools_path / --tools-path or set TA_TOOLS_PATH")
 	}

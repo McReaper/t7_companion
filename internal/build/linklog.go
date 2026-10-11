@@ -1,4 +1,4 @@
-package cli
+package build
 
 import (
 	"fmt"
@@ -111,7 +111,7 @@ func capped(list []string, files []string) []string {
 // applyLinkLog puts what the link's errorlogs say into its stage result: the
 // linker exits non-zero on warnings too, so a link whose errorlogs hold no
 // error built its fastfile. prefix names a mod's zone.
-func applyLinkLog(sr *stageResult, zoneSource, prefix string, since time.Time) {
+func applyLinkLog(sr *StageResult, zoneSource, prefix string, since time.Time) {
 	log, ok := readLinkLogs(zoneSource, since)
 	if !ok {
 		return

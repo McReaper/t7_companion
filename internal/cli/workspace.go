@@ -15,9 +15,18 @@ var (
 	wsCache = map[string]*gdt.Workspace{}
 )
 
+// toolsRoot is the mod-tools root a tool works on: its tools_path argument,
+// else $TA_TOOLS_PATH.
+func toolsRoot(toolsPath string) string {
+	if toolsPath == "" {
+		toolsPath = os.Getenv("TA_TOOLS_PATH")
+	}
+	return strings.TrimRight(toolsPath, `\/`)
+}
+
 // workspace opens (and caches, for the long-lived MCP server) the mod-tools root.
 func workspace(toolsPath string) (*gdt.Workspace, error) {
-	root := strings.TrimRight(firstNonEmpty(toolsPath, os.Getenv("TA_TOOLS_PATH")), `\/`)
+	root := toolsRoot(toolsPath)
 	if root == "" {
 		return nil, fmt.Errorf("no mod-tools path: pass tools_path / --tools-path or set TA_TOOLS_PATH")
 	}

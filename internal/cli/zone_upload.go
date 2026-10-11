@@ -52,3 +52,5 @@ func upload(dir string) *uploadOut {
 	}
 	return out
 }
+
+func megabytes(n int64) string { return fmt.Sprintf("%.1f MB", float64(n)/1e6) }

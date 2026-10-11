@@ -1,0 +1,88 @@
+package cli
+
+import (
+	"bytes"
+	"encoding/json"
+	"strings"
+	"testing"
+
+	"github.com/McReaper/t7_companion/internal/build"
+)
+
+func sampleReport(ok bool) build.Report {
+	rep := build.Report{Target: "zm_test", Kind: "usermap", OK: ok, Stages: []build.StageResult{
+		{Name: "compile", OK: true, Seconds: 12.3, Note: "wrote zm_test.d3dbsp"},
+		{Name: "link", OK: ok, Seconds: 4, Warnings: []string{"Found 2 bad bulletmeshes"}, Missing: []string{"image:i_rust"}},
+	}}
+	if !ok {
+		rep.FailedStage = "link"
+		rep.Stages[1].Errors = []string{"Could not find scriptparsetree"}
+	}
+	return rep
+}
+
+// The text summary: one line per stage, then its errors, warnings and what the
+// linker linked without.
+func TestPrintBuildReport(t *testing.T) {
+	var out bytes.Buffer
+	if err := finishBuild(&out, false, sampleReport(true)); err != nil {
+		t.Fatal(err)
+	}
+	want := "build zm_test (usermap)\n" +
+		"  compile  ok     12.3s  wrote zm_test.d3dbsp\n" +
+		"  link     ok      4.0s\n" +
+		"      warning: Found 2 bad bulletmeshes\n" +
+		"      linked without (looked up, found in no GDT):\n" +
+		"        image:i_rust\n" +
+		"build OK\n"
+	if out.String() != want {
+		t.Errorf("got:\n%s\nwant:\n%s", out.String(), want)
+	}
+
+	out.Reset()
+	err := finishBuild(&out, false, sampleReport(false))
+	if err == nil || err.Error() != "build failed at link" {
+		t.Errorf("err = %v", err)
+	}
+	for _, line := range []string{"  link     FAIL", "      Could not find scriptparsetree\n", "build FAILED at link\n"} {
+		if !strings.Contains(out.String(), line) {
+			t.Errorf("missing %q in:\n%s", line, out.String())
+		}
+	}
+}
+
+func TestFinishBuildJSON(t *testing.T) {
+	var out bytes.Buffer
+	err := finishBuild(&out, true, sampleReport(false))
+	if err == nil {
+		t.Error("a failed build must still fail the command")
+	}
+	var rep build.Report
+	if err := json.Unmarshal(out.Bytes(), &rep); err != nil {
+		t.Fatalf("not JSON: %v\n%s", err, out.String())
+	}
+	if rep.FailedStage != "link" || len(rep.Stages) != 2 || rep.Stages[1].Missing[0] != "image:i_rust" {
+		t.Errorf("%+v", rep)
+	}
+	if !strings.Contains(out.String(), "\n  \"target\"") {
+		t.Errorf("want indented JSON:\n%s", out.String())
+	}
+}
+
+// The MCP dvars object becomes the CLI's name=value pairs, sorted; a number or
+// a boolean is a value too.
+func TestDvarPairs(t *testing.T) {
+	pairs, err := dvarPairs(map[string]any{"logfile": float64(2), "developer": "2", "scr_mod_enable_devblock": true, "ai_disableSpawn": false})
+	if err != nil || strings.Join(pairs, " ") != "ai_disableSpawn=0 developer=2 logfile=2 scr_mod_enable_devblock=1" {
+		t.Fatalf("MCP dvars: %v %v", pairs, err)
+	}
+	if pairs, err := dvarPairs(nil); err != nil || pairs != nil {
+		t.Errorf("no dvars: %v %v", pairs, err)
+	}
+	if _, err := dvarPairs("developer=2"); err == nil {
+		t.Error("a string instead of an object: want an error")
+	}
+	if _, err := dvarPairs(map[string]any{"developer": []any{2}}); err == nil {
+		t.Error("a list value: want an error")
+	}
+}
