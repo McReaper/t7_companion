@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// update-check against a fake GitHub API: the verdict the setup skill relies on.
+// update-check against a fake GitHub API: the verdict the setup-or-update skill relies on.
 func TestUpdateCheck(t *testing.T) {
 	status, tag := http.StatusOK, "v2.1.0"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

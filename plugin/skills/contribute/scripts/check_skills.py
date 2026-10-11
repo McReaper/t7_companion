@@ -33,7 +33,7 @@ SECOND_PERSON_RE = re.compile(r"\b(you|your|you're|I|I'm|we)\b")
 REF_LINK_RE = re.compile(r"references/[\w.-]+\.md")
 PERSONAL_PATH_RE = re.compile(r"(?i)(?:[A-Z]:\\+Users\\+|/Users/|/home/)(?!<)[A-Za-z0-9._-]+")
 CROSS_REF_RE = re.compile(r"\bt7kb:([a-z0-9_-]+)")
-TOOL_NAMES = {"search", "get", "build", "setup", "gdt_find", "gdt_get", "gdt_schema", "gdt_edit", "gdt_check", "gdt_refs", "zone_explain", "zone_contents", "zone_check", "create", "shader_decompile"}   # t7kb:search etc. are MCP tools / the setup skill
+TOOL_NAMES = {"search", "get", "build", "setup-or-update", "gdt_find", "gdt_get", "gdt_schema", "gdt_edit", "gdt_check", "gdt_refs", "zone_explain", "zone_contents", "zone_check", "create", "shader_decompile"}   # t7kb:search etc. are MCP tools / the setup-or-update skill
 
 findings: list[tuple[str, int, str, str]] = []
 
@@ -113,7 +113,7 @@ def check_skill(skill_md: Path, known: set[str]) -> None:
     words = len(body.split())
     if words > BODY_AIM_WORDS:
         report(skill_md, end + 2, "WARN", f"body is {words} words (aim < {BODY_AIM_WORDS}) -- move secondary detail into references/")
-    if dirname.startswith("bo3-") or name not in {"setup", "contribute"}:
+    if dirname.startswith("bo3-") or name not in {"setup-or-update", "contribute"}:
         if "## Don't invent" not in body:
             report(skill_md, end + 2, "WARN", "domain skill has no closing `## Don't invent` section")
 
@@ -181,7 +181,7 @@ def check_router(skills_dir: Path, names: set[str]) -> None:
         return
     fields, _, _ = parse_frontmatter(router.read_text(encoding="utf-8"))
     desc = (fields or {}).get("description", ("", 1))[0]
-    for n in sorted(names - {"knowledge-base", "setup", "contribute"}):
+    for n in sorted(names - {"knowledge-base", "setup-or-update", "contribute"}):
         if f"t7kb:{n}" not in desc:
             report(router, 3, "ERROR", f"knowledge-base's description doesn't route to t7kb:{n}")
 

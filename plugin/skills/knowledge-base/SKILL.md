@@ -7,9 +7,9 @@ description: How to search the t7kb knowledge base for Black Ops 3 / BO3 / Treya
 
 You have a local knowledge base of the Black Ops 3 modding community via the **t7kb** MCP server — tools `t7kb:search` (hybrid keyword + semantic) and `t7kb:get` (full document by `doc_id`). For any non-trivial BO3 modding question, query it before answering from memory; the corpus is the authority on what BO3 modding actually contains, your training data is not. That holds mid-task too, not only for a question or an error: before asserting how the pipeline behaves (what the linker packs, how a zone, assetlist or GDT works) or asking the user to confirm it, search, and load the skill that owns it.
 
-_If the `t7kb` tools aren't available, the knowledge base isn't installed — run `/t7kb:setup` first._
+_If the `t7kb` tools aren't available, the knowledge base isn't installed — run `/t7kb:setup-or-update` first._
 
-_If you're working under a BO3 mod-tools root (has `raw/`, `share_raw/`, `usermaps/`, or `mods/`) and there's no `AGENTS.md`/`CLAUDE.md` at that root yet, offer to drop one in (`/t7kb:setup` step 3 fetches the primer and, for Claude Code, a `CLAUDE.md` that imports it) — one file at the root covers every map/mod under it, and a per-map/mod file still layers on top for that project's own conventions._
+_If you're working under a BO3 mod-tools root (has `raw/`, `share_raw/`, `usermaps/`, or `mods/`) whose `CLAUDE.md` doesn't record it yet, offer `/t7kb:setup-or-update`: its step 3 writes a short `CLAUDE.md` stub there naming the root, which covers every map/mod under it._
 
 ## Query it well
 
@@ -23,7 +23,7 @@ _If you're working under a BO3 mod-tools root (has `raw/`, `share_raw/`, `userma
 
 The corpus is a starting point, not the final authority. For anything Treyarch **shipped** — exact function names, entity KVPs, asset fields, error strings, file paths — confirm against the raw mod-tools install (the game's own files under the BO3 root) before stating it as fact. Decompiled and community sources can be paraphrased or subtly wrong; the shipped files are ground truth. Drop any claim you can't ground.
 
-Check the project's `AGENTS.md`/`CLAUDE.md` first for a "Raw mod-tools root" fact (`/t7kb:setup` records it there when found) — if it's there, use that path directly instead of searching for the install.
+Check the BO3 root's `CLAUDE.md` first for a "Raw mod-tools root" fact (`/t7kb:setup-or-update` records it there when found; an `AGENTS.md` from t7kb 2.x has it too, until the user migrates) — if it's there, use that path directly instead of searching for the install.
 
 ### When the raw install isn't available
 

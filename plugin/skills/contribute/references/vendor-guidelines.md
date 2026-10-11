@@ -17,5 +17,3 @@ Anthropic publishes [skill-authoring best practices](https://platform.claude.com
 11. [A+O] **Scripts behave like tiny CLIs** — deterministic output, fail loudly, handle their own errors, no unexplained constants (`scripts/check_skills.py` is the model).
 12. [A] **Hygiene** — no time-sensitive claims (use an "old patterns" note), consistent terminology, forward slashes in skill-internal paths, fully-qualified MCP tool names (`t7kb:search`, never bare `search`).
 13. [O] **Skills are privileged code** — gate side-effecting actions behind the user's go-ahead, and don't duplicate a skill's content into always-loaded context, or callers act on the copy and never load the skill.
-
-On 13: `templates/AGENTS.md` deliberately restates a floor of craft rules for agents running **without** this plugin — a legitimate exception, but each such bullet has to end by pointing at the skill that owns it. Duplication as a fallback is fine; duplication that reads as sufficient is not.

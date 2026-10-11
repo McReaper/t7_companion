@@ -45,12 +45,12 @@ flowchart LR
 /plugin marketplace add McReaper/t7_companion
 /plugin install t7kb@t7-reapy
 /reload-plugins
-/t7kb:setup
+/t7kb:setup-or-update
 ```
 
 Pick the **User** scope: a project-scope install doesn't load in `usermaps/<map>`.
 
-`/t7kb:setup` downloads `t7kb` and its database, registers the MCP server, and offers an `AGENTS.md` primer and git tracking for your BO3 mod-tools root.
+`/t7kb:setup-or-update` downloads `t7kb` and its database, registers the MCP server, records your BO3 mod-tools root, and offers git tracking for it and plugin auto-update.
 
 ### Other MCP clients (Codex, OpenCode, Cursor, Copilot…)
 
@@ -61,7 +61,7 @@ curl -fsSL https://raw.githubusercontent.com/McReaper/t7_companion/main/install/
 irm https://raw.githubusercontent.com/McReaper/t7_companion/main/install/install.ps1 | iex
 ```
 
-Then register `t7kb mcp` as a stdio server ([per-client config](docs/clients.md)) and drop [`templates/AGENTS.md`](templates/AGENTS.md) at your BO3 mod-tools root — it carries the skills' core guidance for agents without them. Or paste this README to your agent and let it do all of that.
+Then register `t7kb mcp` as a stdio server ([per-client config](docs/clients.md)), or paste this README to your agent and let it do that.
 
 The database: a ~0.9 GB download, unpacked to ~3.8 GB at install.
 
@@ -93,7 +93,7 @@ t7kb update-check            is a newer release out? is the plugin behind?
 
 ## 🔄 Updating
 
-`t7kb update-check` says whether the binary or the Claude Code plugin is behind, with the commands to update each. Enable auto-update in `/plugin` to keep the plugin current. To refresh the binary, run `/t7kb:setup` in Claude Code, or re-run the installer with `--force` / `-Force`.
+**Turn on auto-update** for the `t7-reapy` marketplace (`/plugin` → Marketplaces; `/t7kb:setup-or-update` offers it): Claude Code then keeps the skills current, and at the next session start t7kb says when the binary is behind. `t7kb update-check` says whether either is behind, with the commands to update each. To refresh the binary, run `/t7kb:setup-or-update` in Claude Code, or re-run the installer with `--force` / `-Force`.
 
 ## 🤝 Contributing
 
