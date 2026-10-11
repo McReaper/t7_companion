@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/McReaper/t7_companion/internal/asset"
@@ -142,9 +143,25 @@ func TestBareTechsets(t *testing.T) {
 	}
 }
 
-func TestBareTechsetsUnreadableList(t *testing.T) {
-	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, "zone_source", "all", "assetlist", "broken.csv"), 0o755); err != nil {
+// A root whose path holds glob characters still has its lists read; a folder
+// named .csv is skipped, and a list that can't be read is an error.
+func TestBareTechsetsListsTheFolder(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "BO3 [mod tools]")
+	dir := filepath.Join(root, "zone_source", "all", "assetlist")
+	if err := os.MkdirAll(filepath.Join(dir, "folder.csv"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{"core_gfx.CSV": "techset,tools_blend#da7372ff\n", "notes.txt": "techset,not_a_list#da7372ff\n"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := BareTechsets(root)
+	if err != nil || !reflect.DeepEqual(got, map[string]bool{"tools_blend": true}) {
+		t.Errorf("got %v %v", got, err)
+	}
+	long := filepath.Join(dir, "zz_long.csv") // a line past the scanner's 64 KiB
+	if err := os.WriteFile(long, []byte("techset,"+strings.Repeat("x", 70000)), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := BareTechsets(root); err == nil {
