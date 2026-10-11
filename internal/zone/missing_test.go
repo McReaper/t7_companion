@@ -13,8 +13,9 @@ import (
 // depsFixture is a .deps as the linker writes it: the inherited lists, then
 // each asset line followed by its indented lookups.
 const depsFixture = "version,3421953,593\n" +
-	"ignore_missing_shipped,zm_levelcommon\n" + // a list the install lacks: skipped
+	"ignore_missing_shipped,zm_levelcommon\n" +
 	"ignore,core_common\n" +
+	"ignore,zm_absent\n" + // a list the install lacks: skipped
 	"material,mc/mtl_a\n" +
 	"\tgdt,material,mtl_a,AA-BB\n" +
 	"\tgdt,image,img_found,11-22\n" +
@@ -27,9 +28,12 @@ const depsFixture = "version,3421953,593\n" +
 	"\tgdt,image,pc:img_variant,33-44\n" + // found under its platform variant
 	"\tfile,C:\\bo3\\deffiles\\material.awi,1731004459,\n" +
 	"\tgdt,image\n" + // too short: ignored
+	"\tgdt,image,no_hash_field\n" + // too short: ignored
 	"material,mc/mtl_b\n" +
 	"\tgdt,emblem,icon_shipped,\n" +
 	"\tgdt,image,icon_shipped,\n" + // core_common ships it
+	"\tgdt,image,icon_levelcommon,\n" + // zm_levelcommon ships it
+	"\tfile,C:\\bo3\\share\\raw\\x.efx,1731004459,\n" + // a file line is no parent
 	"\tgdt,emblem,poly,\n" +
 	"\tgdt,image,poly,55-66\n" + // found as another type
 	"\tgdt,image,IMG_Case,\n" +
@@ -48,8 +52,10 @@ func writeDeps(t *testing.T, body string) (root, dir string) {
 			t.Fatal(err)
 		}
 	}
-	if err := os.WriteFile(filepath.Join(lists, "core_common.csv"), []byte("image,icon_shipped\n"), 0o644); err != nil {
-		t.Fatal(err)
+	for list, body := range map[string]string{"core_common": "image,icon_shipped\n", "zm_levelcommon": "//image,icon_levelcommon\n"} {
+		if err := os.WriteFile(filepath.Join(lists, list+".csv"), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := os.WriteFile(filepath.Join(dir, "zm_x.deps"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
@@ -75,6 +81,16 @@ func TestMissingLookups(t *testing.T) {
 	}
 	if s := got[0].String(); s != "image img_missing (named by material mc/mtl_a)" {
 		t.Errorf("String: %q", s)
+	}
+}
+
+// A lookup line past bufio's default 64 KiB is still read.
+func TestMissingLookupsLongLine(t *testing.T) {
+	long := strings.Repeat("y", 100_000)
+	root, dir := writeDeps(t, "material,x\n\tgdt,image,"+long+",\n")
+	got, err := MissingLookups(root, dir, "zm_x")
+	if err != nil || len(got) != 1 || got[0].Name != long {
+		t.Errorf("got %d missing, %v", len(got), err)
 	}
 }
 
