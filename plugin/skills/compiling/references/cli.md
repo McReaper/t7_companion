@@ -2,7 +2,7 @@
 
 Referenced from `plugin/skills/compiling/SKILL.md`. Read that file first — this is for when no MCP server is registered this session, or you want the CLI's `--json`/`--verbose` output.
 
-`t7kb build` runs the whole pipeline with every gotcha `SKILL.md` describes handled — cwd, arg passing, the detached light poll, output-file verification — and prints a **compact per-stage summary** (or `--json`) with the first actionable error, instead of the hundreds of lines each tool spews:
+`t7kb build` runs the whole pipeline with every gotcha `SKILL.md` describes handled — cwd, arg passing, the detached light poll, output-file verification — and prints a **compact per-stage summary** (or `--json`) with each failing stage's errors and every error and warning the link logged, instead of the hundreds of lines each tool spews:
 
 ```
 t7kb build zm_mymap                          # usermap: compile,light,link (reads $TA_TOOLS_PATH)
