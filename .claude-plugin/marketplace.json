@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
   "name": "t7-reapy",
   "owner": { "name": "McReaper", "url": "https://github.com/McReaper" },
-  "description": "Black Ops 3 modding tools by the T7 Modding Area.",
+  "description": "Black Ops 3 modding tools by McReaper.",
   "plugins": [
     {
       "name": "t7kb",
