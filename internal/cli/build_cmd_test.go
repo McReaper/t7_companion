@@ -86,3 +86,18 @@ func TestDvarPairs(t *testing.T) {
 		t.Error("a list value: want an error")
 	}
 }
+
+// `t7kb build` hands its flags to build.Run and fails with its preflight error.
+func TestBuildCommandPreflightError(t *testing.T) {
+	root := newRootCmd()
+	var out bytes.Buffer
+	root.SetOut(&out)
+	root.SetArgs([]string{"build", "zm_test", "--tools-path", t.TempDir(), "--json"})
+	err := root.Execute()
+	if err == nil || !strings.Contains(err.Error(), "mod tools not found") {
+		t.Errorf("err = %v", err)
+	}
+	if out.Len() != 0 {
+		t.Errorf("no stage ran, yet it printed %q", out.String())
+	}
+}
