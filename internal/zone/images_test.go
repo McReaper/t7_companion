@@ -72,3 +72,27 @@ func TestClassifyImage(t *testing.T) {
 		}
 	}
 }
+
+// A GDT defining an image twice: the first definition is the one read, as for
+// gdtdb.
+func TestClassifyImageFirstDefinition(t *testing.T) {
+	_, w := gdtRoot(t, map[string]string{
+		"source_data/mine.gdt": "{\n" + gdtAsset("twice", "image", "mipBase", "1/2") + gdtAsset("twice", "image", "mipBase", "1/8") + "}\n",
+	})
+	im, owner := ClassifyImage(w, Packed{ID: asset.ID{Type: "image", Name: "twice"}})
+	if owner != Yours || im.MipBase != "1/2" || im.Also != 1 {
+		t.Errorf("%s %+v", owner, im)
+	}
+}
+
+// A GDT the parser rejects still indexes its image: it stays the user's, at
+// the default mipBase, rather than crashing the answer.
+func TestClassifyImageUnparsableGDT(t *testing.T) {
+	_, w := gdtRoot(t, map[string]string{
+		"source_data/broken.gdt": "{\n" + gdtAsset("brk", "image", "mipBase", "1/4") + "\t\"cut\" ( \"image.gdf\"\n",
+	})
+	im, owner := ClassifyImage(w, Packed{ID: asset.ID{Type: "image", Name: "brk"}})
+	if owner != Yours || im.MipBase != "1/1" || im.Loc.File != "source_data/broken.gdt" {
+		t.Errorf("%s %+v", owner, im)
+	}
+}

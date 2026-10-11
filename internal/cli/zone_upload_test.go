@@ -18,6 +18,9 @@ func TestUploadAdvice(t *testing.T) {
 	if u := toUploadOut(zone.Upload{Bytes: 5 << 20, Xpak: 4 << 20, XpakDead: 0xa3d6}); u.Advice != "" {
 		t.Errorf("under 1%%: %+v", u)
 	}
+	if u := toUploadOut(zone.Upload{Bytes: 100, Xpak: 100, XpakDead: 1}); u.Advice == "" {
+		t.Errorf("exactly 1%%: %+v", u)
+	}
 	if u := toUploadOut(zone.Upload{Bytes: 100}); u.Advice != "" || u.XpakDead != 0 {
 		t.Errorf("no .xpak: %+v", u)
 	}
