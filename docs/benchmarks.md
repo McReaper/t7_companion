@@ -38,7 +38,7 @@ It builds each answer with the same functions the MCP handlers use and counts to
 | `gdt_check` | one asset | 1 | 38 | 38 | 38 | 124 |
 | `gdt_check` | the whole GDT | 1 | 2005 | 2005 | 2005 | 6878 |
 | `gdt_schema` | material (names only) | 1 | 2894 | 2894 | 2894 | 11408 |
-| `gdt_schema` | material + material_type lit | 1 | 1226 | 1226 | 1226 | 4673 |
+| `gdt_schema` | material + material_type lit | 1 | 1241 | 1241 | 1241 | 4715 |
 | `gdt_schema` | xmodel | 1 | 2446 | 2446 | 2446 | 9956 |
 | `zone_explain` | the asset with the longest chain | 1 | 337 | 337 | 337 | 1123 |
 | `zone_contents` | every line of the zone | 1 | 1317 | 1317 | 1317 | 4280 |

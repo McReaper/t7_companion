@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -21,6 +22,7 @@ type Techset struct {
 	File         string    `json:"file"`
 	Category     string    `json:"category"` // must equal the material's materialCategory
 	RenderFlags  string    `json:"render_flags,omitempty"`
+	Prefixes     []string  `json:"available_prefixes,omitempty"` // what a material's built name may start with: mc/ (a model's), wc/ (map geometry's), "/" for none
 	Includes     []string  `json:"includes,omitempty"`
 	Textures     []TexSlot `json:"textures"`
 	Params       []Param   `json:"params,omitempty"`
@@ -41,6 +43,13 @@ type Param struct {
 	Kind   string   `json:"kind"`
 	Name   string   `json:"name"`
 	Fields []string `json:"gdt_fields"`
+}
+
+// BuildsBare reports whether the techset has a variant for a material named
+// without a prefix, as a `material,<name>` zone line names it. A techset that
+// declares no prefixes has only that one.
+func (t *Techset) BuildsBare() bool {
+	return len(t.Prefixes) == 0 || slices.Contains(t.Prefixes, "/")
 }
 
 // ExposedFields is every material GDT field the techset reads.
@@ -185,7 +194,7 @@ func (t *Techsets) Names() []string {
 var (
 	includeRE = regexp.MustCompile(`(?m)^\s*#include\s+"([^"]+)"`)
 	declRE    = regexp.MustCompile(`(?m)^\s*(Texture|Sampler|Color|Bool|Float|Int|float[1-4]?|int[1-4]?|bool)\s*\(\s*"([^"]+)"\s*\)`)
-	globalsRE = regexp.MustCompile(`(?s)Globals\s*\(\s*\)\s*\{(.*?)\}`)
+	globalsRE = regexp.MustCompile(`Globals\s*\(\s*\)`)
 	kvRE      = regexp.MustCompile(`(?m)^\s*(\w+)\s*=\s*"([^"]*)"`)
 	fieldRE   = regexp.MustCompile(`<\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:,\s*(\$?[A-Za-z0-9_]+))?\s*>`)
 	sourceRE  = regexp.MustCompile(`source\s*=\s*"([^"]+)"`)
@@ -233,7 +242,7 @@ func (t *Techsets) resolve(materialType string) (*resolvedTechset, error) {
 		return nil, fmt.Errorf("no techsetdef for material type %q", materialType)
 	}
 	ts := &Techset{MaterialType: materialType, File: t.current()[materialType]}
-	wk := &techsetWalk{t: t, ts: ts, seenFile: map[string]bool{}, seenDecl: map[string]bool{}, seenSrc: map[string]bool{}}
+	wk := &techsetWalk{t: t, ts: ts, seenFile: map[string]bool{}, seenDecl: map[string]bool{}, seenSrc: map[string]bool{}, seenGlobal: map[string]bool{}}
 	if err := wk.walk(ts.File, true); err != nil {
 		return nil, err
 	}
@@ -244,12 +253,13 @@ func (t *Techsets) resolve(materialType string) (*resolvedTechset, error) {
 }
 
 // techsetWalk follows a techsetdef and its #includes into one Techset. A
-// declaration seen first wins (the including file overrides its includes).
+// declaration or Globals() key seen first wins (the including file overrides
+// its includes).
 type techsetWalk struct {
-	t                           *Techsets
-	ts                          *Techset
-	seenFile, seenDecl, seenSrc map[string]bool
-	files                       []fileStamp // what was read, as it was
+	t                                       *Techsets
+	ts                                      *Techset
+	seenFile, seenDecl, seenSrc, seenGlobal map[string]bool
+	files                                   []fileStamp // what was read, as it was
 }
 
 func (wk *techsetWalk) walk(path string, top bool) error {
@@ -266,9 +276,7 @@ func (wk *techsetWalk) walk(path string, top bool) error {
 		return err
 	}
 	src := stripComments(string(b))
-	if top {
-		readGlobals(wk.ts, src)
-	}
+	wk.readGlobals(src)
 	wk.addDecls(src)
 	for _, s := range sourceRE.FindAllStringSubmatch(src, -1) {
 		if !wk.seenSrc[s[1]] {
@@ -291,18 +299,27 @@ func (wk *techsetWalk) walk(path string, top bool) error {
 	return nil
 }
 
-// readGlobals takes the category and render flags from the Globals() block.
-func readGlobals(ts *Techset, src string) {
-	g := globalsRE.FindStringSubmatch(src)
+// readGlobals takes the category, render flags and prefixes from a Globals()
+// block, whose braces may nest (renderFlags = RenderFlags() : "…" { … }). A
+// techset that includes another (geotrail_lit_blend: effect_lit_blend) takes
+// the keys it doesn't set from there.
+func (wk *techsetWalk) readGlobals(src string) {
+	g := globalsRE.FindStringIndex(src)
 	if g == nil {
 		return
 	}
-	for _, kv := range kvRE.FindAllStringSubmatch(g[1], -1) {
+	for _, kv := range kvRE.FindAllStringSubmatch(blockAfter(src, g[1]), -1) {
+		if wk.seenGlobal[kv[1]] {
+			continue
+		}
+		wk.seenGlobal[kv[1]] = true
 		switch kv[1] {
 		case "category":
-			ts.Category = kv[2]
+			wk.ts.Category = kv[2]
 		case "renderFlags":
-			ts.RenderFlags = kv[2]
+			wk.ts.RenderFlags = kv[2]
+		case "availablePrefixes":
+			wk.ts.Prefixes = strings.Fields(kv[2])
 		}
 	}
 }
