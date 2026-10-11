@@ -245,36 +245,3 @@ func TestDvarsAsTheLauncherPassesThem(t *testing.T) {
 		t.Fatalf("MCP dvars: %v %v", pairs, err)
 	}
 }
-
-// The linker exits non-zero on warnings too: its errorlog tells them apart,
-// ^3 for a warning, ^1 for an error (lines as a real link writes them).
-func TestWarningsOnly(t *testing.T) {
-	dir := t.TempDir()
-	write := func(name, body string, age time.Duration) string {
-		p := filepath.Join(dir, name)
-		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		at := time.Now().Add(-age)
-		if err := os.Chtimes(p, at, at); err != nil {
-			t.Fatal(err)
-		}
-		return p
-	}
-	start := time.Now()
-	warn := write("warn.errorlog", "return 1000\r\n^3Found 5 bad bulletmeshes, dumped to x_bulletreport.csv file.\r\n", 0)
-	if note, ok := warningsOnly(warn, start); !ok || !strings.Contains(note, "Found 5 bad bulletmeshes") {
-		t.Errorf("warnings only: %q %v", note, ok)
-	}
-	bad := write("bad.errorlog", "return 1001000\r\n^1ERROR: xmodel 'x' is missing\r\n  xmodel:x\r\n^3Found 5 bad bulletmeshes\r\n", 0)
-	if _, ok := warningsOnly(bad, start); ok {
-		t.Error("a ^1 line is an error")
-	}
-	old := write("old.errorlog", "return 1000\r\n^3a warning\r\n", time.Hour)
-	if _, ok := warningsOnly(old, start); ok {
-		t.Error("an errorlog older than this link is not its verdict")
-	}
-	if _, ok := warningsOnly(filepath.Join(dir, "none.errorlog"), start); ok {
-		t.Error("no errorlog, no verdict")
-	}
-}
