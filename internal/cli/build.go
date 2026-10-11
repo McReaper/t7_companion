@@ -465,13 +465,15 @@ func extractErrors(out string) []string {
 	return errs
 }
 
-// failureTail is how many of its last console lines a failed tool's result
-// keeps when no line matches extractErrors.
-const failureTail = 10
+// unknownFailure ends a failed tool's result when no line of its output
+// matched extractErrors: the patterns t7kb knows are incomplete, and the fix
+// for that is upstream.
+const unknownFailure = "no line of this output matched an error t7kb knows: once you find the cause, " +
+	"offer the user t7kb:contribute to teach t7kb's build tool this error"
 
 // failureLines is what a failed tool said: its actionable error lines or,
-// when none matches, its last console lines — an unknown message still
-// reaches the agent — then the exit status.
+// when none matches, its whole console output — an unknown message still
+// reaches the agent — then the exit status and unknownFailure.
 func failureLines(out string, err error) []string {
 	if errs := extractErrors(out); len(errs) > 0 {
 		return errs
@@ -482,10 +484,7 @@ func failureLines(out string, err error) []string {
 			lines = append(lines, l)
 		}
 	}
-	if len(lines) > failureTail {
-		lines = lines[len(lines)-failureTail:]
-	}
-	return append(lines, err.Error())
+	return append(lines, err.Error(), unknownFailure)
 }
 
 func stripColor(s string) string {
