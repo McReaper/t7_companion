@@ -10,6 +10,9 @@ import (
 	"github.com/McReaper/t7_companion/internal/build"
 )
 
+// buildRun is build.Run; tests swap it to see what each surface asks for.
+var buildRun = build.Run
+
 func newBuildCmd() *cobra.Command {
 	o := &build.Options{}
 	var jsonOut bool
@@ -46,7 +49,7 @@ func newBuildCmd() *cobra.Command {
 
 func runBuild(cmd *cobra.Command, o *build.Options, name string, jsonOut bool) error {
 	stdout := cmd.OutOrStdout()
-	rep, err := build.Run(o, name, stdout)
+	rep, err := buildRun(o, name, stdout)
 	if err != nil {
 		return err
 	}

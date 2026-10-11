@@ -3,6 +3,8 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"io"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -72,8 +74,8 @@ func TestFinishBuildJSON(t *testing.T) {
 // The MCP dvars object becomes the CLI's name=value pairs, sorted; a number or
 // a boolean is a value too.
 func TestDvarPairs(t *testing.T) {
-	pairs, err := dvarPairs(map[string]any{"logfile": float64(2), "developer": "2", "scr_mod_enable_devblock": true, "ai_disableSpawn": false})
-	if err != nil || strings.Join(pairs, " ") != "ai_disableSpawn=0 developer=2 logfile=2 scr_mod_enable_devblock=1" {
+	pairs, err := dvarPairs(map[string]any{"logfile": float64(2), "developer": "2", "scr_mod_enable_devblock": true, "ai_disableSpawn": false, "timescale": 0.5})
+	if err != nil || strings.Join(pairs, " ") != "ai_disableSpawn=0 developer=2 logfile=2 scr_mod_enable_devblock=1 timescale=0.5" {
 		t.Fatalf("MCP dvars: %v %v", pairs, err)
 	}
 	if pairs, err := dvarPairs(nil); err != nil || pairs != nil {
@@ -99,5 +101,69 @@ func TestBuildCommandPreflightError(t *testing.T) {
 	}
 	if out.Len() != 0 {
 		t.Errorf("no stage ran, yet it printed %q", out.String())
+	}
+}
+
+// The CLI's flags and the MCP tool's arguments ask build.Run for the same
+// build: every flag lands in its option, and the two surfaces agree.
+func TestBuildCLIAndMCPAskForTheSameBuild(t *testing.T) {
+	var got []build.Options
+	old := buildRun
+	t.Cleanup(func() { buildRun = old })
+	buildRun = func(o *build.Options, name string, _ io.Writer) (build.Report, error) {
+		if name != "zm_x" {
+			t.Errorf("name %q", name)
+		}
+		got = append(got, *o)
+		return build.Report{OK: true}, nil
+	}
+	want := build.Options{ToolsPath: "C:/bo3", GamePath: "D:/game", Mod: true, Stages: "link,run", OnlyEnts: true,
+		Light: "high", Language: "french", SkipGDT: true, GDTRebuild: true, FreshXpak: true,
+		Dvars: []string{"developer=2", "logfile=2"}, LauncherDvars: true}
+
+	root := newRootCmd()
+	root.SetOut(io.Discard)
+	root.SetArgs([]string{"build", "zm_x", "--tools-path", "C:/bo3", "--game-path", "D:/game", "--mod", "--stages", "link,run",
+		"--onlyents", "--light", "high", "--language", "french", "--skip-gdt", "--gdt-rebuild", "--fresh-xpak",
+		"--dvar", "developer=2", "--dvar", "logfile=2", "--launcher-dvars", "--verbose", "--json"})
+	if err := root.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	callBuildTool(t, map[string]any{"name": "zm_x", "tools_path": "C:/bo3", "game_path": "D:/game", "mod": true, "stages": "link,run",
+		"onlyents": true, "light": "high", "language": "french", "skip_gdt": true, "gdt_rebuild": true, "fresh_xpak": true,
+		"dvars": map[string]any{"logfile": float64(2), "developer": "2"}, "launcher_dvars": true})
+	if len(got) != 2 {
+		t.Fatalf("build.Run called %d times", len(got))
+	}
+	cli, mcp := got[0], got[1]
+	if !cli.Verbose || mcp.Verbose {
+		t.Errorf("verbose streams tool output to a terminal only: cli %v, mcp %v", cli.Verbose, mcp.Verbose)
+	}
+	cli.Verbose = false
+	if !reflect.DeepEqual(cli, want) || !reflect.DeepEqual(mcp, want) {
+		t.Errorf("cli %+v\nmcp %+v\nwant %+v", cli, mcp, want)
+	}
+
+	got = nil
+	root = newRootCmd()
+	root.SetOut(io.Discard)
+	root.SetArgs([]string{"build", "zm_x"})
+	if err := root.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	callBuildTool(t, map[string]any{"name": "zm_x"})
+	defaults := build.Options{Stages: "compile,light,link", Light: "medium", Language: "english"}
+	for i, o := range got {
+		if !reflect.DeepEqual(o, defaults) {
+			t.Errorf("surface %d defaults: %+v", i, o)
+		}
+	}
+}
+
+func TestMegabytesAreDecimal(t *testing.T) {
+	for n, want := range map[int64]string{1_349_999: "1.3 MB", 1_350_001: "1.4 MB", 0: "0.0 MB"} {
+		if got := megabytes(n); got != want {
+			t.Errorf("megabytes(%d) = %q, want %q", n, got, want)
+		}
 	}
 }
