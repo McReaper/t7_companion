@@ -45,12 +45,13 @@ type buildOpts struct {
 }
 
 type stageResult struct {
-	Name    string   `json:"name"`
-	OK      bool     `json:"ok"`
-	Seconds float64  `json:"seconds"`
-	Errors  []string `json:"errors,omitempty"`
-	Note    string   `json:"note,omitempty"`
-	Missing []string `json:"missing,omitempty"` // link: looked up, found in no GDT, linked without
+	Name     string   `json:"name"`
+	OK       bool     `json:"ok"`
+	Seconds  float64  `json:"seconds"`
+	Errors   []string `json:"errors,omitempty"`
+	Note     string   `json:"note,omitempty"`
+	Warnings []string `json:"warnings,omitempty"` // link: every ^3 entry of the errorlogs it wrote
+	Missing  []string `json:"missing,omitempty"`  // link: looked up, found in no GDT, linked without
 }
 
 type buildReport struct {
@@ -414,6 +415,9 @@ func printBuildReport(out io.Writer, rep buildReport) {
 		fmt.Fprintln(out, line)
 		for _, e := range s.Errors {
 			fmt.Fprintf(out, "      %s\n", e)
+		}
+		for _, w := range s.Warnings {
+			fmt.Fprintf(out, "      warning: %s\n", w)
 		}
 		if len(s.Missing) > 0 {
 			fmt.Fprintln(out, "      linked without (looked up, found in no GDT):")
