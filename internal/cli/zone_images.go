@@ -4,23 +4,16 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/McReaper/t7_companion/internal/gdt"
 	"github.com/McReaper/t7_companion/internal/zone"
 )
 
-// Images are most of a map's upload, and the part a modder can shrink without
-// cutting content: an image's mipBase (1/1, 1/2, 1/4, 1/8) halves its width
-// and height per step. Image data doesn't compress in the .xpak, so the
-// streamed bytes the report gives are what the upload carries; a step leaves
-// a quarter of them, each streamed part rounded up to 64 KiB.
+// The images' share of the upload, and what a mipBase step down saves
+// (zone.Image says how it is estimated).
 
 const (
 	imagesMaxGDTs    = 10
 	imagesMaxLargest = 10
-	streamPart       = 64 << 10
 )
-
-var mipSteps = []string{"1/1", "1/2", "1/4", "1/8"}
 
 type imageGroup struct {
 	Images int   `json:"images"`
@@ -62,24 +55,6 @@ const imagesAdvice = "step_down_saves estimates what one mipBase step down (1/1 
 	"(a batch per GDT), relink, and look at them in game. Stock images aren't editable: what pulls them in is the lever. " +
 	"An image with doNotResize set keeps its size, so it isn't counted."
 
-// yourImage is one image a non-stock GDT defines, as the build packed it.
-type yourImage struct {
-	zone.Packed
-	loc     gdt.Location
-	also    int
-	mipBase string
-	locked  bool
-}
-
-// saves estimates what one mipBase step down takes off its streamed bytes.
-func (im yourImage) saves() int64 {
-	if im.locked || im.mipBase == mipSteps[len(mipSteps)-1] {
-		return 0
-	}
-	after := (im.Streamed/4 + streamPart - 1) / streamPart * streamPart
-	return max(0, im.Streamed-after)
-}
-
 // zoneImages sorts the images of a map's last link (or of one zone line) by
 // who defines them, and says what a mipBase step down on yours would save.
 func zoneImages(toolsPath, name, line string) (*zoneImagesResult, error) {
@@ -100,16 +75,16 @@ func zoneImages(toolsPath, name, line string) (*zoneImagesResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	var yours []yourImage
+	var yours []zone.Image
 	for _, p := range assets {
 		if p.Type != "image" {
 			continue
 		}
-		im, group := classifyImage(w, p)
-		g := map[string]*imageGroup{"yours": &res.Yours, "stock": &res.Stock, "no_gdt": &res.NoGDT}[group]
+		im, owner := zone.ClassifyImage(w, p)
+		g := map[zone.Owner]*imageGroup{zone.Yours: &res.Yours, zone.Stock: &res.Stock, zone.NoGDT: &res.NoGDT}[owner]
 		g.Images++
 		g.Bytes += size(p)
-		if group == "yours" {
+		if owner == zone.Yours {
 			yours = append(yours, im)
 		}
 	}
@@ -118,53 +93,19 @@ func zoneImages(toolsPath, name, line string) (*zoneImagesResult, error) {
 	return res, nil
 }
 
-// classifyImage finds who defines an image: a non-stock GDT (with its mipBase),
-// a stock one, or none (images the link makes, or engine ones).
-func classifyImage(w *gdt.Workspace, p zone.Packed) (yourImage, string) {
-	locs, err := w.FindTyped(p.Name, "image")
-	if err != nil || len(locs) == 0 {
-		return yourImage{}, "no_gdt"
-	}
-	if locs[0].Stock {
-		return yourImage{}, "stock"
-	}
-	im := yourImage{Packed: p, loc: locs[0], also: len(locs) - 1, mipBase: mipSteps[0]}
-	f, err := w.Load(locs[0].File)
-	if err != nil {
-		return im, "yours"
-	}
-	for _, a := range f.Assets {
-		if a.Name != p.Name {
-			continue
-		}
-		if _, fields, err := w.Resolved(f, a); err == nil {
-			for _, fl := range fields {
-				switch {
-				case fl.Key == "mipBase" && fl.Value != "":
-					im.mipBase = fl.Value
-				case fl.Key == "doNotResize":
-					im.locked = fl.Value == "1"
-				}
-			}
-		}
-		break
-	}
-	return im, "yours"
-}
-
-func imagesByGDT(yours []yourImage) ([]imageGDTOut, int, int64) {
+func imagesByGDT(yours []zone.Image) ([]imageGDTOut, int, int64) {
 	by := map[string]*imageGDTOut{}
 	var total int64
 	for _, im := range yours {
-		o := by[im.loc.File]
+		o := by[im.Loc.File]
 		if o == nil {
-			o = &imageGDTOut{GDT: im.loc.File}
-			by[im.loc.File] = o
+			o = &imageGDTOut{GDT: im.Loc.File}
+			by[im.Loc.File] = o
 		}
 		o.Images++
 		o.Bytes += size(im.Packed)
-		o.StepSaves += im.saves()
-		total += im.saves()
+		o.StepSaves += im.StepSaves()
+		total += im.StepSaves()
 	}
 	out := make([]imageGDTOut, 0, len(by))
 	for _, o := range by {
@@ -183,7 +124,7 @@ func imagesByGDT(yours []yourImage) ([]imageGDTOut, int, int64) {
 }
 
 // largestImages lists the biggest of your images a step can still shrink.
-func largestImages(yours []yourImage) []imageOut {
+func largestImages(yours []zone.Image) []imageOut {
 	sort.Slice(yours, func(i, j int) bool {
 		if a, b := size(yours[i].Packed), size(yours[j].Packed); a != b {
 			return a > b
@@ -192,11 +133,11 @@ func largestImages(yours []yourImage) []imageOut {
 	})
 	var out []imageOut
 	for _, im := range yours {
-		if im.saves() == 0 {
+		if im.StepSaves() == 0 {
 			continue
 		}
-		out = append(out, imageOut{Image: im.Name, Bytes: size(im.Packed), MipBase: im.mipBase, GDT: im.loc.File,
-			AlsoIn: im.also, Line: im.Line().String()})
+		out = append(out, imageOut{Image: im.Name, Bytes: size(im.Packed), MipBase: im.MipBase, GDT: im.Loc.File,
+			AlsoIn: im.Also, Line: im.Line().String()})
 		if len(out) == imagesMaxLargest {
 			break
 		}

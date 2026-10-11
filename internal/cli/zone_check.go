@@ -2,12 +2,9 @@ package cli
 
 import (
 	"fmt"
-	"path/filepath"
 	"slices"
 	"sort"
-	"strings"
 
-	"github.com/McReaper/t7_companion/internal/asset"
 	"github.com/McReaper/t7_companion/internal/zone"
 )
 
@@ -52,22 +49,23 @@ func zoneCheck(toolsPath, name string) (*zoneCheckResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	inh, err := zone.Inherit(root, zf)
+	lists, inh, err := zone.IgnoreLists(root, zf)
 	if err != nil {
 		return nil, err
 	}
-	lists, err := zone.LoadAssetlists(root, inh.Ignore)
-	if err != nil {
-		return nil, err
+	res := &zoneCheckResult{Map: name, Inherited: inh}
+	for _, s := range zone.ZonedShadows(root, zf, lists) {
+		res.Zoned = append(res.Zoned, toShadowOut(s))
 	}
-	res := &zoneCheckResult{Map: name, Inherited: inh, Zoned: zonedShadows(root, zf, lists)}
 	if len(res.Zoned) > zoneMaxShadowed {
 		res.More += len(res.Zoned) - zoneMaxShadowed
 		res.Zoned = res.Zoned[:zoneMaxShadowed]
 	}
 	if z, err := openZone(toolsPath, name); err == nil {
 		res.zoneStatus = &z.status
-		res.GDTs = groupByGDT(gdtShadows(z, lists))
+		if w, err := workspace(toolsPath); err == nil {
+			res.GDTs = groupByGDT(zone.GDTShadows(z.report, w, lists))
+		}
 		if len(res.GDTs) > zoneMaxShadowed {
 			res.More += len(res.GDTs) - zoneMaxShadowed
 			res.GDTs = res.GDTs[:zoneMaxShadowed]
@@ -80,24 +78,30 @@ func zoneCheck(toolsPath, name string) (*zoneCheckResult, error) {
 	return res, nil
 }
 
+func toShadowOut(s zone.Shadow) shadowOut {
+	where := "zoned at"
+	if s.InGDT {
+		where = "defined in"
+	}
+	return shadowOut{Asset: s.String(), Yours: fmt.Sprintf("%s %s:%d", where, s.File, s.Line), Stock: fmt.Sprintf("%s:%d", s.Stock.File(), s.Stock.Line)}
+}
+
 // groupByGDT folds GDT shadows into one entry per GDT, largest first: a
 // community pack often redefines dozens of stock assets.
-func groupByGDT(shadows []shadowOut) []shadowGDT {
+func groupByGDT(shadows []zone.Shadow) []shadowGDT {
 	by := map[string]*shadowGDT{}
 	for _, s := range shadows {
-		file, _, _ := strings.Cut(strings.TrimPrefix(s.Yours, "defined in "), ":")
-		g := by[file]
+		g := by[s.File]
 		if g == nil {
-			g = &shadowGDT{GDT: file}
-			by[file] = g
+			g = &shadowGDT{GDT: s.File}
+			by[s.File] = g
 		}
 		g.Assets++
 		if len(g.Examples) < 3 {
-			g.Examples = append(g.Examples, s.Asset)
+			g.Examples = append(g.Examples, s.String())
 		}
-		list := strings.TrimSuffix(strings.TrimPrefix(s.Stock[:strings.LastIndex(s.Stock, ":")], "zone_source/all/assetlist/"), ".csv")
-		if !slices.Contains(g.Lists, list) {
-			g.Lists = append(g.Lists, list)
+		if !slices.Contains(g.Lists, s.Stock.List) {
+			g.Lists = append(g.Lists, s.Stock.List)
 		}
 	}
 	out := make([]shadowGDT, 0, len(by))
@@ -111,65 +115,4 @@ func groupByGDT(shadows []shadowOut) []shadowGDT {
 		return out[i].GDT < out[j].GDT
 	})
 	return out
-}
-
-// zonedShadows: lines of the map's zone files naming an asset an ignore list
-// still provides — the classic stock script copied into the map and zoned.
-func zonedShadows(root, zoneFile string, lists zone.Assetlists) []shadowOut {
-	lines, err := zone.ZoneLines(root, zoneFile)
-	if err != nil {
-		return nil
-	}
-	var out []shadowOut
-	for _, l := range lines {
-		if e, ok := activeEntry(lists.Lookup(l.ID)); ok {
-			out = append(out, shadowOut{Asset: l.String(), Yours: fmt.Sprintf("zoned at %s:%d", relTo(root, l.File), l.N), Stock: fmt.Sprintf("%s:%d", e.File(), e.Line)})
-		}
-	}
-	return out
-}
-
-// gdtShadows: assets the last link packed only as a reference to the shipped
-// one, that a non-stock GDT also defines.
-func gdtShadows(z *zoneCtx, lists zone.Assetlists) []shadowOut {
-	w, err := workspace(z.toolsPath)
-	if err != nil {
-		return nil
-	}
-	var out []shadowOut
-	seen := map[asset.ID]bool{}
-	for _, p := range z.report.Assets {
-		id := zone.Canonical(p.ID) // the report names a material mc/x and a second packing x|dup
-		e, ok := activeEntry(lists.Lookup(id))
-		if !ok || seen[id.Key()] {
-			continue
-		}
-		seen[id.Key()] = true
-		locs, err := w.FindAsset(id) // by the type the linker packs it as: a bulletweapon is a weapon
-		if err != nil {
-			continue
-		}
-		for _, l := range locs {
-			if !l.Stock {
-				out = append(out, shadowOut{Asset: id.String(), Yours: fmt.Sprintf("defined in %s:%d", l.File, l.Line), Stock: fmt.Sprintf("%s:%d", e.File(), e.Line)})
-			}
-		}
-	}
-	return out
-}
-
-func activeEntry(entries []zone.ListEntry) (zone.ListEntry, bool) {
-	for _, e := range entries {
-		if e.Active {
-			return e, true
-		}
-	}
-	return zone.ListEntry{}, false
-}
-
-func relTo(root, p string) string {
-	if rel, err := filepath.Rel(root, p); err == nil && !strings.HasPrefix(rel, "..") {
-		return filepath.ToSlash(rel)
-	}
-	return p
 }
