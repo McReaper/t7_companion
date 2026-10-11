@@ -289,10 +289,7 @@ func runStage(label, dir, exe string, timeout time.Duration, verbose bool, stdou
 		sr.Errors = []string{fmt.Sprintf("timed out after %s", timeout)}
 	case err != nil:
 		sr.OK = false
-		sr.Errors = extractErrors(buf.String())
-		if len(sr.Errors) == 0 {
-			sr.Errors = []string{err.Error()}
-		}
+		sr.Errors = failureLines(buf.String(), err)
 	default:
 		sr.OK = true
 		if e := extractErrors(buf.String()); len(e) > 0 {
@@ -466,6 +463,29 @@ func extractErrors(out string) []string {
 		}
 	}
 	return errs
+}
+
+// failureTail is how many of its last console lines a failed tool's result
+// keeps when no line matches extractErrors.
+const failureTail = 10
+
+// failureLines is what a failed tool said: its actionable error lines or,
+// when none matches, its last console lines — an unknown message still
+// reaches the agent — then the exit status.
+func failureLines(out string, err error) []string {
+	if errs := extractErrors(out); len(errs) > 0 {
+		return errs
+	}
+	var lines []string
+	for _, raw := range strings.Split(strings.ReplaceAll(out, "\r", ""), "\n") {
+		if l := stripColor(strings.TrimSpace(raw)); l != "" {
+			lines = append(lines, l)
+		}
+	}
+	if len(lines) > failureTail {
+		lines = lines[len(lines)-failureTail:]
+	}
+	return append(lines, err.Error())
 }
 
 func stripColor(s string) string {

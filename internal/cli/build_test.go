@@ -1,10 +1,12 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -97,6 +99,26 @@ func TestExtractErrors(t *testing.T) {
 	}
 	if n := len(extractErrors(strings.Join(lines, "\n"))); n != 8 {
 		t.Fatalf("extractErrors cap = %d, want 8", n)
+	}
+}
+
+// A failed tool whose output matches no error pattern still says something:
+// its last console lines, colour codes stripped, then the exit status.
+func TestFailureLines(t *testing.T) {
+	exit := errors.New("exit status 3")
+	if got := failureLines("noise\nERROR: known\n", exit); !reflect.DeepEqual(got, []string{"ERROR: known"}) {
+		t.Errorf("a known error line: %q", got)
+	}
+	var out []string
+	for i := range 14 {
+		out = append(out, fmt.Sprintf("^3line %d^7\r", i), "")
+	}
+	got := failureLines(strings.Join(out, "\n"), exit)
+	if len(got) != 11 || got[0] != "line 4" || got[9] != "line 13" || got[10] != "exit status 3" {
+		t.Errorf("the last 10 lines then the exit status: %q", got)
+	}
+	if got := failureLines("", exit); !reflect.DeepEqual(got, []string{"exit status 3"}) {
+		t.Errorf("no output: %q", got)
 	}
 }
 
