@@ -87,7 +87,16 @@ Modding edits **shared, install-wide files** — an assetlist line commented out
 - **It is a repository with no `.gitignore`**: offer the same two files.
 - **It already has one**: leave it alone.
 
-## 4. Offer plugin auto-update — the only automatic path to the next release
+## 4. Keep the plugin current — its source, then auto-update
+
+### The marketplace must point at `McReaper/t7_companion`
+
+Installs made before 2026-09-29 added the marketplace from `t7-reapy/t7_companion`. That GitHub organization is deleted: updates still arrive through GitHub's redirect to the repository's new home, but the freed name can be registered by anyone, and the marketplace would then serve their plugins instead (a plugin's hooks run code on the user's machine).
+
+- **Check** `claude plugin marketplace list --json`: the `t7-reapy` entry must have `"source": "github"` and `"repo": "McReaper/t7_companion"`.
+- **Any other source:** explain the above in two sentences and, on the user's yes, set `extraKnownMarketplaces["t7-reapy"].source` to `{"source": "github", "repo": "McReaper/t7_companion"}` in the settings file that declares it (`~/.claude/settings.json`, else the project's `.claude/settings.json`), keeping every other key. Then run `claude plugin marketplace add McReaper/t7_companion`, which re-clones the marketplace from there; the installed plugin stays (verified on a test install). The settings edit comes first: Claude Code refuses an `add` whose source differs from the declared one.
+
+### Offer auto-update — the only automatic path to the next release
 
 Nothing else tells the user a release exists: a third-party marketplace such as `t7-reapy` doesn't auto-update by default, the SessionStart hook works offline (it compares the installed binary's version with the plugin's, so it only speaks once one of them has updated), and `t7kb update-check` runs only when asked. With auto-update on, Claude Code updates the plugin in the background and the next session loads it; the hook then sees the binary behind and sends the user back here.
 
