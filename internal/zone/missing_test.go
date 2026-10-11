@@ -13,9 +13,9 @@ import (
 // depsFixture is a .deps as the linker writes it: the inherited lists, then
 // each asset line followed by its indented lookups.
 const depsFixture = "version,3421953,593\n" +
+	"ignore,zm_absent\n" + // a list the install lacks: skipped, the next ones still read
 	"ignore_missing_shipped,zm_levelcommon\n" +
 	"ignore,core_common\n" +
-	"ignore,zm_absent\n" + // a list the install lacks: skipped
 	"material,mc/mtl_a\n" +
 	"\tgdt,material,mtl_a,AA-BB\n" +
 	"\tgdt,image,img_found,11-22\n" +
@@ -95,9 +95,9 @@ func TestMissingLookupsLongLine(t *testing.T) {
 }
 
 func TestMissingLookupsUnreadable(t *testing.T) {
-	root, dir := writeDeps(t, "material,x\n\tgdt,image,"+strings.Repeat("y", 2<<20)+",\n")
+	root, dir := writeDeps(t, "material,x\n\tgdt,image,"+strings.Repeat("y", 1<<20+1000)+",\n")
 	if _, err := MissingLookups(root, dir, "zm_x"); err == nil {
-		t.Error("a line past the scanner's buffer must be an error")
+		t.Error("a line past 1 MiB must be an error")
 	}
 	if _, err := MissingLookups(root, dir, "zm_none"); err == nil {
 		t.Error("no .deps must be an error")
