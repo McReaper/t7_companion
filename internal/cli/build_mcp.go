@@ -19,7 +19,8 @@ func buildToolDef() mcp.Tool {
 	return mcp.NewTool("build",
 		mcp.WithDescription("Headlessly compile/light/link a Black Ops 3 map or mod by driving the "+
 			"mod-tools pipeline (gdtdb, cod2map64, radiant light, linker), returning a compact "+
-			"per-stage JSON report with the first actionable error of any failing stage. Requires a "+
+			"per-stage JSON report with the first actionable error of any failing stage, and after a link "+
+			"`missing`: what the linker looked up and found in no GDT (it links on without it). Requires a "+
 			"Windows BO3 mod-tools install (path from $TA_TOOLS_PATH or the tools_path arg). "+
 			"NOTE: runs synchronously and can take minutes (link) up to 20-30 min (full compile+light) "+
 			"— set a long client timeout. For a script-only change, pass stages=\"link\"."),
