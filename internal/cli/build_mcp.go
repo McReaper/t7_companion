@@ -82,7 +82,7 @@ func buildToolHandler() server.ToolHandlerFunc {
 		if o.Dvars, err = dvarPairs(req.GetArguments()["dvars"]); err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
-		rep, err := build.Run(o, name, io.Discard)
+		rep, err := buildRun(o, name, io.Discard)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}

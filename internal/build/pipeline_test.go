@@ -16,6 +16,7 @@ type fakePipeline struct {
 	root, fail string
 	noBSP      bool
 	calls      []string
+	timeouts   map[string]time.Duration // each stage's, by label
 }
 
 func (f *fakePipeline) install(t *testing.T) {
@@ -29,7 +30,9 @@ func (f *fakePipeline) install(t *testing.T) {
 	}
 	prevStage, prevLight, prevGame := stageRunner, lightRunner, gameRunner
 	t.Cleanup(func() { stageRunner, lightRunner, gameRunner = prevStage, prevLight, prevGame })
-	stageRunner = func(label, dir, exe string, _ time.Duration, _ bool, _ io.Writer, args ...string) StageResult {
+	f.timeouts = map[string]time.Duration{}
+	stageRunner = func(label, dir, exe string, timeout time.Duration, _ bool, _ io.Writer, args ...string) StageResult {
+		f.timeouts[label] = timeout
 		args = append([]string(nil), args...)
 		for i, a := range args {
 			if strings.HasPrefix(a, f.root) { // a path, not a flag: on Linux "/update" is absolute too
@@ -239,5 +242,27 @@ func TestDvarsAsTheLauncherPassesThem(t *testing.T) {
 	}
 	if _, err := parseDvars([]string{"novalue"}); err == nil {
 		t.Fatal("name=value is required")
+	}
+}
+
+// Each tool gets time for its slow case before it is killed: a first link
+// converts every image it packs (~23 min for the ZM Advanced template), and
+// the light bake is waited on for longer than a high-quality bake takes,
+// polling without spinning.
+func TestStageTimeouts(t *testing.T) {
+	t.Setenv("TA_TOOLS_PATH", "")
+	t.Setenv("TA_GAME_PATH", "")
+	f := &fakePipeline{root: fakeTools(t)}
+	f.install(t)
+	if _, err := Run(&Options{ToolsPath: f.root, Stages: "compile,link", Light: "medium", Language: "english"}, "zm_test", io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	for stage, least := range map[string]time.Duration{"gdt": 5 * time.Minute, "compile": 10 * time.Minute, "link": 30 * time.Minute} {
+		if got := f.timeouts[stage]; got < least {
+			t.Errorf("%s times out after %v, want at least %v", stage, got, least)
+		}
+	}
+	if lightTimeout < 20*time.Minute || lightPoll <= 0 || lightPoll > 5*time.Second {
+		t.Errorf("light waits %v, polling every %v", lightTimeout, lightPoll)
 	}
 }
