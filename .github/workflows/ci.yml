@@ -57,8 +57,8 @@ jobs:
         run: |
           GOOS=windows GOARCH=amd64 go build -o /dev/null ./cmd/t7kb
           GOOS=linux GOARCH=amd64 go build -o /dev/null ./cmd/t7kb
-      - name: test
-        run: go test -coverpkg=./... -coverprofile=cover.out ./...
+      - name: test # uncached: a cached package's profile keeps the old lines of every package -coverpkg covers
+        run: go test -count=1 -coverpkg=./... -coverprofile=cover.out ./...
       - name: coverage of the changed lines # at least 80% of a PR's changed Go lines run under test
         if: github.event_name == 'pull_request'
         shell: bash
