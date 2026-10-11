@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 )
@@ -27,8 +26,7 @@ type linkLog struct {
 // each language. One counts when it is no more than 2 s older than since; ok
 // is false when there is none.
 func readLinkLogs(zoneSource string, since time.Time) (log linkLog, ok bool) {
-	paths, _ := filepath.Glob(filepath.Join(zoneSource, "*", "assetinfo", "*.errorlog"))
-	sort.Strings(paths)
+	paths, _ := filepath.Glob(filepath.Join(zoneSource, "*", "assetinfo", "*.errorlog")) // sorted
 	seen := map[string]bool{}
 	for _, p := range paths {
 		if fileMTime(p).Before(since.Add(-2 * time.Second)) {
@@ -46,11 +44,26 @@ func readLinkLogs(zoneSource string, since time.Time) (log linkLog, ok bool) {
 	return log, ok
 }
 
-// add reads one errorlog: `return <code>`, then entries, each a ^1 or ^3 line
-// followed by its indented chain (`  xmodel:x`, `    csv:zone_source/…`),
-// written as "message (xmodel:x < csv:…)". An entry seen already is skipped.
+// logEntry is one ^1 or ^3 entry of an errorlog: its message lines (the
+// marked line and any unindented line after it, such as a shader compiler's
+// "error X1507 …") and the chain of assets the linker indents under it.
+type logEntry struct {
+	msg   []string
+	chain []string
+}
+
+func (e logEntry) String() string {
+	s := strings.Join(e.msg, " ")
+	if len(e.chain) > 0 {
+		s += " (" + strings.Join(e.chain, " < ") + ")"
+	}
+	return s
+}
+
+// add reads one errorlog: `return <code>`, then its entries, each written as
+// "message (xmodel:x < csv:zone_source/…)". An entry seen already is skipped.
 func (l *linkLog) add(text string, seen map[string]bool) {
-	var cur *string
+	var cur *logEntry
 	for _, raw := range strings.Split(strings.ReplaceAll(text, "\r", ""), "\n") {
 		line := strings.TrimSpace(raw)
 		switch {
@@ -59,29 +72,31 @@ func (l *linkLog) add(text string, seen map[string]bool) {
 			l.codes = append(l.codes, strings.TrimPrefix(line, "return "))
 		case strings.HasPrefix(line, "^1"), strings.HasPrefix(line, "^3"):
 			l.flush(cur, seen)
-			e := line
-			cur = &e
-		case cur != nil && raw != line: // an indented chain line
-			if strings.HasSuffix(*cur, ")") && strings.Contains(*cur, " (") {
-				*cur = strings.TrimSuffix(*cur, ")") + " < " + line + ")"
-			} else {
-				*cur += " (" + line + ")"
-			}
+			cur = &logEntry{msg: []string{line}}
+		case cur == nil: // nothing to attach it to
+		case raw != line: // indented: the asset chain
+			cur.chain = append(cur.chain, line)
+		default:
+			cur.msg = append(cur.msg, line)
 		}
 	}
 	l.flush(cur, seen)
 }
 
 // flush files the entry under errors or warnings by its colour code.
-func (l *linkLog) flush(e *string, seen map[string]bool) {
-	if e == nil || seen[*e] {
+func (l *linkLog) flush(e *logEntry, seen map[string]bool) {
+	if e == nil {
 		return
 	}
-	seen[*e] = true
-	if strings.HasPrefix(*e, "^1") {
-		l.errors = append(l.errors, strings.TrimPrefix(*e, "^1"))
+	s := e.String()
+	if seen[s] {
+		return
+	}
+	seen[s] = true
+	if strings.HasPrefix(s, "^1") {
+		l.errors = append(l.errors, strings.TrimPrefix(s, "^1"))
 	} else {
-		l.warnings = append(l.warnings, strings.TrimPrefix(*e, "^3"))
+		l.warnings = append(l.warnings, strings.TrimPrefix(s, "^3"))
 	}
 }
 
