@@ -63,7 +63,7 @@ irm https://raw.githubusercontent.com/McReaper/t7_companion/main/install/install
 
 Then register `t7kb mcp` as a stdio server ([per-client config](docs/clients.md)), or paste this README to your agent and let it do that.
 
-The database: a ~0.9 GB download, unpacked to ~3.8 GB at install.
+The database: a ~0.9 GB download, unpacked to ~3.8 GB on first run.
 
 ## ✨ What your agent gets
 

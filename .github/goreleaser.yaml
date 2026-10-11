@@ -91,7 +91,7 @@ release:
 
     1. Download your OS archive (`t7kb_windows_amd64.zip` or `t7kb_linux_amd64.tar.gz`) **and** `t7kb.db.zip`.
     2. Extract the OS archive at your **Black Ops III root**.
-    3. Drop `t7kb.db.zip` into the same folder, next to the binary, and run `t7kb unpack-db` there (else the first run unpacks it). After an update, run it again: it unpacks the new database only when it changed.
+    3. Drop `t7kb.db.zip` into the same folder, next to the binary — it is unpacked automatically on first run. After an update, delete the old `t7kb.db` so the new zip is unpacked.
     4. Register `t7kb mcp` as an MCP stdio server with your agent.
 
     Everything runs locally and offline.

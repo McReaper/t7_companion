@@ -54,15 +54,15 @@ tar -xzf "$tmp/$ARCHIVE" -C "$TARGET"
 chmod +x "$TARGET/t7kb"
 
 echo "  downloading t7kb.db.zip (~0.9 GB) …"
-# Downloaded beside, then moved: an interrupted download leaves the old zip whole.
-fetch "$BASE/t7kb.db.zip" "$TARGET/t7kb.db.zip.part"
-mv -f "$TARGET/t7kb.db.zip.part" "$TARGET/t7kb.db.zip"
-# The zip stays: unpack-db compares the database with it and unpacks it only
-# when they differ (a running server keeps reading the old file until it restarts).
-# This script comes from main, the binary from the latest release: one older than
-# unpack-db would take it for a browse query and wait on stdin, so ask first.
-if "$TARGET/t7kb" --help 2>/dev/null | grep unpack-db >/dev/null; then
-  "$TARGET/t7kb" unpack-db --db "$TARGET/t7kb.db"
+fetch "$BASE/t7kb.db.zip" "$TARGET/t7kb.db.zip"
+# Left zipped on purpose: the binary unpacks it once on first run (saves a
+# redundant 3.5 GB write here and keeps one code path for it). On an update,
+# delete the old database so the next start unpacks the new one; a server still
+# running keeps reading the old file until it restarts.
+if [ -f "$TARGET/t7kb.db" ]; then
+  rm -f "$TARGET/t7kb.db"
+  echo "  old database deleted: restart your agent sessions, and the first one to start"
+  echo "  unpacks the new one (~3.8 GB, about 20 s, once)."
 fi
 
 cat <<EOF
@@ -73,5 +73,6 @@ Register it as an MCP server in your agent (command + args):
     command: $TARGET/t7kb
     args:    ["mcp"]
 
+The database unpacks automatically the first time the server runs.
 See the README for per-client config (Claude Code, Codex, OpenCode, Copilot, Cursor).
 EOF
