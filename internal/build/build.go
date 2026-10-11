@@ -1,9 +1,8 @@
-package cli
+package build
 
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -11,40 +10,27 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/spf13/cobra"
 )
 
-// build drives the Black Ops 3 mod-tools compile/light/link pipeline headlessly,
-// so an agent can build a map or mod without the GUI Launcher and get back a
-// compact per-stage summary (plus the first actionable error) instead of the
-// hundreds of lines each tool spews. It shells the same binaries the Launcher
-// does — cod2map64, radiant_modtools, linker_modtools, gdtdb — with the non-obvious
-// things they need baked in: each tool runs with cwd = its own exe directory like the
-// Launcher (cod2map needs cwd=bin to load default_navmesh_settings.json; gdtdb ties its
-// recorded asset paths to cwd, so a different cwd makes it flag every asset as a phantom
-// duplicate), args are passed via exec (no shell, so no MSYS/`/update` mangling), and the
-// detached light step is waited on by polling for its .led output rather than a synchronous
-// exit code.
-
-type buildOpts struct {
-	toolsPath     string
-	gamePath      string
-	isMod         bool
-	stages        string
-	onlyEnts      bool
-	light         string
-	language      string
-	skipGDT       bool
-	gdtRebuild    bool
-	freshXpak     bool // link: write the .xpak files from scratch
-	jsonOut       bool
-	verbose       bool
-	dvars         []string // run: name=value dvars to start the game with
-	launcherDvars bool     // run: also the Launcher's saved Dvar Options
+// Options is one build: the target's install, which stages run, and how.
+type Options struct {
+	ToolsPath     string
+	GamePath      string
+	Mod           bool
+	Stages        string
+	OnlyEnts      bool
+	Light         string
+	Language      string
+	SkipGDT       bool
+	GDTRebuild    bool
+	FreshXpak     bool // link: write the .xpak files from scratch
+	Verbose       bool
+	Dvars         []string // run: name=value dvars to start the game with
+	LauncherDvars bool     // run: also the Launcher's saved Dvar Options
 }
 
-type stageResult struct {
+// StageResult is what one stage did; Report.Stages lists them in pipeline order.
+type StageResult struct {
 	Name     string   `json:"name"`
 	OK       bool     `json:"ok"`
 	Seconds  float64  `json:"seconds"`
@@ -54,54 +40,13 @@ type stageResult struct {
 	Missing  []string `json:"missing,omitempty"`  // link: looked up, found in no GDT, linked without
 }
 
-type buildReport struct {
+// Report is a build's result: OK, or the stage that failed.
+type Report struct {
 	Target      string        `json:"target"`
 	Kind        string        `json:"kind"`
 	OK          bool          `json:"ok"`
 	FailedStage string        `json:"failed_stage,omitempty"`
-	Stages      []stageResult `json:"stages"`
-}
-
-func newBuildCmd() *cobra.Command {
-	o := &buildOpts{}
-	cmd := &cobra.Command{
-		Use:   "build <name>",
-		Short: "Headlessly compile/light/link a BO3 map or mod (drives the mod tools)",
-		Long: "Runs the Black Ops 3 mod-tools build pipeline for a map (or --mod) without the\n" +
-			"GUI Launcher, and prints a compact per-stage result. It calls the same binaries\n" +
-			"the Launcher does (cod2map64, radiant_modtools, linker_modtools, gdtdb).\n\n" +
-			"Requires a Windows BO3 mod-tools install; the path comes from --tools-path or\n" +
-			"$TA_TOOLS_PATH. Example: t7kb build zm_mymap --stages compile,light,link",
-		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runBuild(cmd, o, args[0])
-		},
-	}
-	f := cmd.Flags()
-	f.StringVar(&o.toolsPath, "tools-path", "", "BO3 mod-tools root (default: $TA_TOOLS_PATH)")
-	f.StringVar(&o.gamePath, "game-path", "", "BO3 game root (default: $TA_GAME_PATH, then --tools-path)")
-	f.BoolVar(&o.isMod, "mod", false, "target is a mod (mods/<name>), not a usermap")
-	f.StringVar(&o.stages, "stages", "compile,light,link", "comma list of stages: compile,light,link,run")
-	f.BoolVar(&o.onlyEnts, "onlyents", false, "fast entity-only compile (-onlyents; invalid after brush edits)")
-	f.StringVar(&o.light, "light", "medium", "light quality: low|medium|high")
-	f.StringVar(&o.language, "language", "english", "linker language")
-	f.BoolVar(&o.skipGDT, "skip-gdt", false, "skip the gdtdb /update pass before building")
-	f.BoolVar(&o.gdtRebuild, "gdt-rebuild", false, "run gdtdb /rebuild instead of /update (only if /update reports 0 GDTs and the linker then misses an edited asset)")
-	f.BoolVar(&o.freshXpak, "fresh-xpak", false, "link: write the .xpak from scratch, dropping the data earlier links replaced (it only grows otherwise, and uploads with zone/); use before publishing")
-	f.BoolVar(&o.jsonOut, "json", false, "emit the report as JSON")
-	f.BoolVar(&o.verbose, "verbose", false, "stream each tool's full output as it runs")
-	f.StringArrayVar(&o.dvars, "dvar", nil, "run: start the game with this dvar, name=value (repeatable; e.g. developer=2, logfile=2)")
-	f.BoolVar(&o.launcherDvars, "launcher-dvars", false, "run: start the game with the dvars saved in the mod tools Launcher's Dvars dialog (--dvar overrides them)")
-	return cmd
-}
-
-func runBuild(cmd *cobra.Command, o *buildOpts, name string) error {
-	stdout := cmd.OutOrStdout()
-	rep, err := runBuildReport(o, name, stdout)
-	if err != nil {
-		return err
-	}
-	return finishBuild(stdout, o.jsonOut, rep)
+	Stages      []StageResult `json:"stages"`
 }
 
 // The stage runners, as variables so tests can drive runBuildReport's pipeline
@@ -112,22 +57,22 @@ var (
 	gameRunner  = runGame
 )
 
-// runBuildReport runs the mod-tools pipeline and returns the per-stage report. A
+// Run runs the mod-tools pipeline and returns the per-stage report. A
 // non-nil error is only a preflight/validation failure (bad args, no tools path,
 // tools not found) before any stage ran — stage failures are carried in the report
 // (rep.OK / rep.FailedStage). stdout receives per-tool output only when o.verbose.
-func runBuildReport(o *buildOpts, name string, stdout io.Writer) (buildReport, error) {
+func Run(o *Options, name string, stdout io.Writer) (Report, error) {
 	p, err := newBuildPlan(o, name, stdout)
 	if err != nil {
-		return buildReport{}, err
+		return Report{}, err
 	}
-	rep := buildReport{Target: name, Kind: "usermap", OK: true}
-	if o.isMod {
+	rep := Report{Target: name, Kind: "usermap", OK: true}
+	if o.Mod {
 		rep.Kind = "mod"
 	}
 	// In pipeline order; each returns false when it doesn't apply. The build stops
 	// at the first stage that fails.
-	for _, stage := range []func() (stageResult, bool){p.gdtStage, p.compileStage, p.lightStage, p.linkStage, p.gameStage} {
+	for _, stage := range []func() (StageResult, bool){p.gdtStage, p.compileStage, p.lightStage, p.linkStage, p.gameStage} {
 		sr, applies := stage()
 		if !applies {
 			continue
@@ -144,7 +89,7 @@ func runBuildReport(o *buildOpts, name string, stdout io.Writer) (buildReport, e
 // buildPlan is a validated build: where the tools and game are, which stages
 // run, and the map's source and outputs.
 type buildPlan struct {
-	o                   *buildOpts
+	o                   *Options
 	name                string
 	stdout              io.Writer
 	tools, game, bin    string
@@ -154,24 +99,24 @@ type buildPlan struct {
 	dvars               []dvar // the game's dvars, for the run stage
 }
 
-func newBuildPlan(o *buildOpts, name string, stdout io.Writer) (*buildPlan, error) {
+func newBuildPlan(o *Options, name string, stdout io.Writer) (*buildPlan, error) {
 	if len(name) < 2 {
 		return nil, fmt.Errorf("map/mod name %q is too short", name)
 	}
-	tools := strings.TrimRight(firstNonEmpty(o.toolsPath, os.Getenv("TA_TOOLS_PATH")), `\/`)
+	tools := strings.TrimRight(firstNonEmpty(o.ToolsPath, os.Getenv("TA_TOOLS_PATH")), `\/`)
 	if tools == "" {
 		return nil, fmt.Errorf("no mod-tools path: pass --tools-path or set TA_TOOLS_PATH")
 	}
 	p := &buildPlan{o: o, name: name, stdout: stdout, tools: tools, bin: filepath.Join(tools, "bin")}
-	p.game = strings.TrimRight(firstNonEmpty(o.gamePath, os.Getenv("TA_GAME_PATH"), tools), `\/`)
+	p.game = strings.TrimRight(firstNonEmpty(o.GamePath, os.Getenv("TA_GAME_PATH"), tools), `\/`)
 	if _, err := os.Stat(filepath.Join(p.bin, "linker_modtools.exe")); err != nil {
 		return nil, fmt.Errorf("mod tools not found at %s — build needs a Windows BO3 mod-tools install", p.bin)
 	}
 	var err error
-	if p.stages, err = parseStages(o.stages); err != nil {
+	if p.stages, err = parseStages(o.Stages); err != nil {
 		return nil, err
 	}
-	if p.quality, err = normalizeLight(o.light); err != nil {
+	if p.quality, err = normalizeLight(o.Light); err != nil {
 		return nil, err
 	}
 	if p.dvars, err = gameDvars(o); err != nil {
@@ -185,36 +130,36 @@ func newBuildPlan(o *buildOpts, name string, stdout io.Writer) (*buildPlan, erro
 }
 
 // gdtStage runs gdtdb /update first, as the Launcher does before every build group.
-func (p *buildPlan) gdtStage() (stageResult, bool) {
+func (p *buildPlan) gdtStage() (StageResult, bool) {
 	usesAssets := p.stages["compile"] || p.stages["light"] || p.stages["link"]
-	if p.o.skipGDT || !usesAssets {
-		return stageResult{}, false
+	if p.o.SkipGDT || !usesAssets {
+		return StageResult{}, false
 	}
 	// Run gdtdb from its OWN directory, like the stock Launcher: it ties recorded asset paths to
 	// its cwd, so a different cwd makes a Launcher-built db flag every asset as a phantom duplicate.
 	gdtdbDir := filepath.Join(p.tools, "gdtdb")
 	arg := "/update"
-	if p.o.gdtRebuild {
+	if p.o.GDTRebuild {
 		arg = "/rebuild" // recovery: /update does index GDTs edited outside APE (verified); this is for a db that lost everything
 	}
-	return stageRunner("gdt", gdtdbDir, filepath.Join(gdtdbDir, "gdtdb.exe"), 10*time.Minute, p.o.verbose, p.stdout, arg), true
+	return stageRunner("gdt", gdtdbDir, filepath.Join(gdtdbDir, "gdtdb.exe"), 10*time.Minute, p.o.Verbose, p.stdout, arg), true
 }
 
 // compileStage runs cod2map (maps only).
-func (p *buildPlan) compileStage() (stageResult, bool) {
+func (p *buildPlan) compileStage() (StageResult, bool) {
 	if !p.stages["compile"] {
-		return stageResult{}, false
+		return StageResult{}, false
 	}
-	if p.o.isMod {
+	if p.o.Mod {
 		return stageSkipped("compile", "not applicable to a mod"), true
 	}
 	args := []string{"-platform", "pc", "-navmesh", "-navvolume"}
-	if p.o.onlyEnts {
+	if p.o.OnlyEnts {
 		args = []string{"-platform", "pc", "-onlyents"}
 	}
 	args = append(args, "-loadFrom", p.mapSrc, p.d3dbsp)
 	start := time.Now()
-	sr := stageRunner("compile", p.bin, filepath.Join(p.bin, "cod2map64.exe"), 15*time.Minute, p.o.verbose, p.stdout, args...)
+	sr := stageRunner("compile", p.bin, filepath.Join(p.bin, "cod2map64.exe"), 15*time.Minute, p.o.Verbose, p.stdout, args...)
 	switch {
 	case !sr.OK:
 	case !fileMTime(p.d3dbsp).After(start.Add(-2 * time.Second)): // cod2map exits 0 even when it skips navmesh; trust the .d3dbsp mtime
@@ -227,33 +172,33 @@ func (p *buildPlan) compileStage() (stageResult, bool) {
 }
 
 // lightStage bakes the lighting (maps only).
-func (p *buildPlan) lightStage() (stageResult, bool) {
+func (p *buildPlan) lightStage() (StageResult, bool) {
 	if !p.stages["light"] {
-		return stageResult{}, false
+		return StageResult{}, false
 	}
-	if p.o.isMod {
+	if p.o.Mod {
 		return stageSkipped("light", "not applicable to a mod"), true
 	}
 	return lightRunner(p.bin, p.mapSrc, p.led, p.quality), true
 }
 
 // gameStage starts the game on the build.
-func (p *buildPlan) gameStage() (stageResult, bool) {
+func (p *buildPlan) gameStage() (StageResult, bool) {
 	if !p.stages["run"] {
-		return stageResult{}, false
+		return StageResult{}, false
 	}
-	return gameRunner(p.game, append(dvarArgs(p.dvars), gameArgs(p.name, p.o.isMod)...)), true
+	return gameRunner(p.game, append(dvarArgs(p.dvars), gameArgs(p.name, p.o.Mod)...)), true
 }
 
 // gameDvars are the dvars the run stage starts the game with: the Launcher's
 // saved ones if asked, overridden by the explicit ones.
-func gameDvars(o *buildOpts) ([]dvar, error) {
-	extra, err := parseDvars(o.dvars)
+func gameDvars(o *Options) ([]dvar, error) {
+	extra, err := parseDvars(o.Dvars)
 	if err != nil {
 		return nil, err
 	}
 	var base []dvar
-	if o.launcherDvars {
+	if o.LauncherDvars {
 		if base, err = readLauncherDvars(); err != nil {
 			return nil, err
 		}
@@ -264,7 +209,7 @@ func gameDvars(o *buildOpts) ([]dvar, error) {
 // runStage runs one tool to completion, capturing combined output, and returns a
 // stageResult whose OK reflects the exit code and whose Errors hold any parsed
 // error lines. dir is the working directory (cwd=bin for the mod tools).
-func runStage(label, dir, exe string, timeout time.Duration, verbose bool, stdout io.Writer, args ...string) stageResult {
+func runStage(label, dir, exe string, timeout time.Duration, verbose bool, stdout io.Writer, args ...string) StageResult {
 	start := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -282,7 +227,7 @@ func runStage(label, dir, exe string, timeout time.Duration, verbose bool, stdou
 	}
 
 	err := c.Run()
-	sr := stageResult{Name: label, Seconds: round1(time.Since(start).Seconds())}
+	sr := StageResult{Name: label, Seconds: round1(time.Since(start).Seconds())}
 	switch {
 	case ctx.Err() == context.DeadlineExceeded:
 		sr.OK = false
@@ -299,30 +244,37 @@ func runStage(label, dir, exe string, timeout time.Duration, verbose bool, stdou
 	return sr
 }
 
+// How long runLight waits for the .led, and how often it looks; variables so
+// tests can wait less.
+var (
+	lightTimeout = 30 * time.Minute
+	lightPoll    = 2 * time.Second
+)
+
 // runLight launches the LED bake and waits by polling for the .led output — the
 // radiant_modtools GUI-subsystem process detaches and gives no usable exit code.
-func runLight(bin, mapSrc, led, quality string) stageResult {
+func runLight(bin, mapSrc, led, quality string) StageResult {
 	start := time.Now()
 	prior := fileMTime(led)
 	exe := filepath.Join(bin, "radiant_modtools.exe")
 	c := exec.Command(exe, "-ledSilent", "+"+quality, "+localprobes", "+forceclean", "+recompute", mapSrc)
 	c.Dir = bin
 	if err := c.Start(); err != nil {
-		return stageResult{Name: "light", OK: false, Seconds: round1(time.Since(start).Seconds()),
+		return StageResult{Name: "light", OK: false, Seconds: round1(time.Since(start).Seconds()),
 			Errors: []string{"could not launch radiant_modtools: " + err.Error()}}
 	}
 	go func() { _ = c.Wait() }() // reap; the worker bakes detached
 
-	deadline := time.Now().Add(30 * time.Minute)
+	deadline := time.Now().Add(lightTimeout)
 	for time.Now().Before(deadline) {
 		if mt := fileMTime(led); mt.After(prior) && mt.After(start) {
-			return stageResult{Name: "light", OK: true, Seconds: round1(time.Since(start).Seconds()),
+			return StageResult{Name: "light", OK: true, Seconds: round1(time.Since(start).Seconds()),
 				Note: "wrote " + filepath.Base(led)}
 		}
-		time.Sleep(2 * time.Second)
+		time.Sleep(lightPoll)
 	}
-	return stageResult{Name: "light", OK: false, Seconds: round1(time.Since(start).Seconds()),
-		Errors: []string{"no " + filepath.Base(led) + " after 30m — radiant may have failed silently or the map has no lighting"}}
+	return StageResult{Name: "light", OK: false, Seconds: round1(time.Since(start).Seconds()),
+		Errors: []string{"no " + filepath.Base(led) + " after " + lightTimeout.String() + " — radiant may have failed silently or the map has no lighting"}}
 }
 
 // runGame launches the game and returns immediately (fire-and-forget).
@@ -333,13 +285,13 @@ const bo3AppID = "311210"
 // without Steam attached it shows "you must launch Steam" and exits at once.
 var gameStartup = 8 * time.Second
 
-func runGame(game string, args []string) stageResult {
+func runGame(game string, args []string) StageResult {
 	exe := filepath.Join(game, "BlackOps3.exe")
 	c := exec.Command(exe, args...)
 	c.Dir = game
 	c.Env = gameEnv(os.Environ())
 	if err := c.Start(); err != nil {
-		return stageResult{Name: "run", OK: false, Errors: []string{"could not launch game: " + err.Error()}}
+		return StageResult{Name: "run", OK: false, Errors: []string{"could not launch game: " + err.Error()}}
 	}
 	exited := make(chan error, 1)
 	go func() { exited <- c.Wait() }()
@@ -349,9 +301,9 @@ func runGame(game string, args []string) stageResult {
 		if err != nil {
 			msg += " (" + err.Error() + ")"
 		}
-		return stageResult{Name: "run", OK: false, Errors: []string{msg + " — is Steam running and signed in? A game it shows \"you must launch Steam\" in closes at once"}}
+		return StageResult{Name: "run", OK: false, Errors: []string{msg + " — is Steam running and signed in? A game it shows \"you must launch Steam\" in closes at once"}}
 	case <-time.After(gameStartup):
-		return stageResult{Name: "run", OK: true, Note: "launched " + filepath.Base(exe)}
+		return StageResult{Name: "run", OK: true, Note: "launched " + filepath.Base(exe)}
 	}
 }
 
@@ -384,54 +336,8 @@ func gameEnv(env []string) []string {
 	return append(out, "SteamAppId="+bo3AppID, "SteamGameId="+bo3AppID)
 }
 
-func finishBuild(out io.Writer, asJSON bool, rep buildReport) error {
-	if asJSON {
-		enc := json.NewEncoder(out)
-		enc.SetIndent("", "  ")
-		_ = enc.Encode(rep)
-	} else {
-		printBuildReport(out, rep)
-	}
-	if !rep.OK {
-		return fmt.Errorf("build failed at %s", rep.FailedStage)
-	}
-	return nil
-}
-
-func printBuildReport(out io.Writer, rep buildReport) {
-	fmt.Fprintf(out, "build %s (%s)\n", rep.Target, rep.Kind)
-	for _, s := range rep.Stages {
-		status := "ok  "
-		if !s.OK {
-			status = "FAIL"
-		}
-		line := fmt.Sprintf("  %-8s %s  %5.1fs", s.Name, status, s.Seconds)
-		if s.Note != "" {
-			line += "  " + s.Note
-		}
-		fmt.Fprintln(out, line)
-		for _, e := range s.Errors {
-			fmt.Fprintf(out, "      %s\n", e)
-		}
-		for _, w := range s.Warnings {
-			fmt.Fprintf(out, "      warning: %s\n", w)
-		}
-		if len(s.Missing) > 0 {
-			fmt.Fprintln(out, "      linked without (looked up, found in no GDT):")
-			for _, m := range s.Missing {
-				fmt.Fprintf(out, "        %s\n", m)
-			}
-		}
-	}
-	if rep.OK {
-		fmt.Fprintln(out, "build OK")
-	} else {
-		fmt.Fprintf(out, "build FAILED at %s\n", rep.FailedStage)
-	}
-}
-
-func stageSkipped(name, why string) stageResult {
-	return stageResult{Name: name, OK: true, Note: "skipped (" + why + ")"}
+func stageSkipped(name, why string) StageResult {
+	return StageResult{Name: name, OK: true, Note: "skipped (" + why + ")"}
 }
 
 // extractErrors pulls the actionable error lines out of a tool's noisy output:

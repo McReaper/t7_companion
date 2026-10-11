@@ -1,4 +1,4 @@
-package cli
+package build
 
 import (
 	"io"
@@ -11,7 +11,7 @@ import (
 
 // xpakLink lays out a map's zone/ folder and replaces the link with one that
 // writes the given files there and then succeeds or fails.
-func xpakLink(t *testing.T, kind string, before, writes map[string]string, ok bool) (zone string, opts buildOpts) {
+func xpakLink(t *testing.T, kind string, before, writes map[string]string, ok bool) (zone string, opts Options) {
 	t.Helper()
 	t.Setenv("TA_GAME_PATH", "")
 	tools := fakeTools(t)
@@ -36,7 +36,7 @@ func xpakLink(t *testing.T, kind string, before, writes map[string]string, ok bo
 	}
 	prev := stageRunner
 	t.Cleanup(func() { stageRunner = prev })
-	stageRunner = func(label, _, _ string, _ time.Duration, _ bool, _ io.Writer, _ ...string) stageResult {
+	stageRunner = func(label, _, _ string, _ time.Duration, _ bool, _ io.Writer, _ ...string) StageResult {
 		if label == "link" {
 			for name, body := range writes {
 				if err := os.WriteFile(filepath.Join(zone, name), []byte(body), 0o644); err != nil {
@@ -44,9 +44,9 @@ func xpakLink(t *testing.T, kind string, before, writes map[string]string, ok bo
 				}
 			}
 		}
-		return stageResult{Name: label, OK: label != "link" || ok}
+		return StageResult{Name: label, OK: label != "link" || ok}
 	}
-	return zone, buildOpts{stages: "link", light: "medium", language: "english", freshXpak: true, skipGDT: true, isMod: kind == "mods"}
+	return zone, Options{Stages: "link", Light: "medium", Language: "english", FreshXpak: true, SkipGDT: true, Mod: kind == "mods"}
 }
 
 func zoneFiles(t *testing.T, zone string) map[string]string {
@@ -88,7 +88,7 @@ func TestFreshXpakKeepsWhatTheLinkWrote(t *testing.T) {
 	before := map[string]string{"zm_x.xpak": mb(3, "o"), "en_zm_x.xpak": mb(1, "e"), "fr_zm_x.xpak": "old-fr", "zm_x.ff": "ff"}
 	writes := map[string]string{"zm_x.xpak": mb(2, "n"), "en_zm_x.xpak": mb(0.5, "m")}
 	zone, o := xpakLink(t, "usermaps", before, writes, true)
-	rep, err := runBuildReport(&o, "zm_x", io.Discard)
+	rep, err := Run(&o, "zm_x", io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestFreshXpakKeepsWhatTheLinkWrote(t *testing.T) {
 func TestFreshXpakRestoresAfterAFailedLink(t *testing.T) {
 	before := map[string]string{"zm_x.xpak": "old", "en_zm_x.xpak": "old-en"}
 	zone, o := xpakLink(t, "usermaps", before, map[string]string{"zm_x.xpak": "partial"}, false)
-	rep, err := runBuildReport(&o, "zm_x", io.Discard)
+	rep, err := Run(&o, "zm_x", io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestFreshXpakRestoresAfterAFailedLink(t *testing.T) {
 func TestFreshXpakAfterAnInterruptedLink(t *testing.T) {
 	before := map[string]string{"zm_x.xpak" + asideSuffix: "orphan", "en_zm_x.xpak": "en-current", "en_zm_x.xpak" + asideSuffix: "en-stale"}
 	zone, o := xpakLink(t, "usermaps", before, map[string]string{"zm_x.xpak": "new"}, true)
-	if _, err := runBuildReport(&o, "zm_x", io.Discard); err != nil {
+	if _, err := Run(&o, "zm_x", io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	want := map[string]string{"zm_x.xpak": "new", "en_zm_x.xpak": "en-current"}
@@ -136,7 +136,7 @@ func TestFreshXpakAfterAnInterruptedLink(t *testing.T) {
 // A mod's .xpak files live in mods/<mod>/zone: they are the ones set aside.
 func TestFreshXpakForAMod(t *testing.T) {
 	zone, o := xpakLink(t, "mods", map[string]string{"zm_mod.xpak": "old"}, map[string]string{"zm_mod.xpak": "new"}, true)
-	rep, err := runBuildReport(&o, "zm_x", io.Discard)
+	rep, err := Run(&o, "zm_x", io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestFreshXpakWhenAFileCantBeSetAside(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(blocker, "x"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	rep, err := runBuildReport(&o, "zm_x", io.Discard)
+	rep, err := Run(&o, "zm_x", io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,8 +183,8 @@ func TestJoinNotes(t *testing.T) {
 // Without fresh_xpak the link leaves the .xpak to the linker.
 func TestNoFreshXpakLeavesTheFile(t *testing.T) {
 	zone, o := xpakLink(t, "usermaps", map[string]string{"zm_x.xpak": "old"}, nil, true)
-	o.freshXpak = false
-	if _, err := runBuildReport(&o, "zm_x", io.Discard); err != nil {
+	o.FreshXpak = false
+	if _, err := Run(&o, "zm_x", io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if got := zoneFiles(t, zone); !sameFiles(got, map[string]string{"zm_x.xpak": "old"}) {

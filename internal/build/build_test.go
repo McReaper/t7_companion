@@ -1,4 +1,4 @@
-package cli
+package build
 
 import (
 	"errors"
@@ -146,19 +146,19 @@ func TestRunBuildReport_Validation(t *testing.T) {
 
 	cases := []struct {
 		name    string
-		opts    *buildOpts
+		opts    *Options
 		target  string
 		wantErr string
 	}{
-		{"name too short", &buildOpts{toolsPath: tools, stages: "link", light: "medium"}, "z", "too short"},
-		{"no tools path", &buildOpts{stages: "link", light: "medium"}, "zm_test", "no mod-tools path"},
-		{"tools not found", &buildOpts{toolsPath: t.TempDir(), stages: "link", light: "medium"}, "zm_test", "mod tools not found"},
-		{"bad stage", &buildOpts{toolsPath: tools, stages: "bogus", light: "medium"}, "zm_test", "unknown stage"},
-		{"bad light", &buildOpts{toolsPath: tools, stages: "link", light: "ultra"}, "zm_test", "light quality"},
+		{"name too short", &Options{ToolsPath: tools, Stages: "link", Light: "medium"}, "z", "too short"},
+		{"no tools path", &Options{Stages: "link", Light: "medium"}, "zm_test", "no mod-tools path"},
+		{"tools not found", &Options{ToolsPath: t.TempDir(), Stages: "link", Light: "medium"}, "zm_test", "mod tools not found"},
+		{"bad stage", &Options{ToolsPath: tools, Stages: "bogus", Light: "medium"}, "zm_test", "unknown stage"},
+		{"bad light", &Options{ToolsPath: tools, Stages: "link", Light: "ultra"}, "zm_test", "light quality"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			rep, err := runBuildReport(tc.opts, tc.target, io.Discard)
+			rep, err := Run(tc.opts, tc.target, io.Discard)
 			if err == nil {
 				t.Fatalf("expected error, got report %+v", rep)
 			}

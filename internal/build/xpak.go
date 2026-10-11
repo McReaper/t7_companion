@@ -1,4 +1,4 @@
-package cli
+package build
 
 import (
 	"fmt"
@@ -76,7 +76,7 @@ func megabytes(n int64) string { return fmt.Sprintf("%.1f MB", float64(n)/1e6) }
 // zoneDir is the folder the link writes the target's fastfiles to.
 func (p *buildPlan) zoneDir() string {
 	kind := "usermaps"
-	if p.o.isMod {
+	if p.o.Mod {
 		kind = "mods"
 	}
 	return filepath.Join(p.game, kind, p.name, "zone")

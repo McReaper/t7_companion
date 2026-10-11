@@ -1,4 +1,4 @@
-package cli
+package build
 
 import (
 	"path/filepath"
@@ -7,24 +7,24 @@ import (
 )
 
 // linkStage links the fast files.
-func (p *buildPlan) linkStage() (stageResult, bool) {
+func (p *buildPlan) linkStage() (StageResult, bool) {
 	if !p.stages["link"] {
-		return stageResult{}, false
+		return StageResult{}, false
 	}
-	if !p.o.freshXpak {
+	if !p.o.FreshXpak {
 		return p.linkTarget(), true
 	}
 	aside, err := setXpaksAside(p.zoneDir())
 	if err != nil {
-		return stageResult{Name: "link", Errors: []string{err.Error()}}, true
+		return StageResult{Name: "link", Errors: []string{err.Error()}}, true
 	}
 	sr := p.linkTarget()
 	sr.Note = joinNotes(sr.Note, aside.settle(sr.OK))
 	return sr, true
 }
 
-func (p *buildPlan) linkTarget() stageResult {
-	if p.o.isMod {
+func (p *buildPlan) linkTarget() StageResult {
+	if p.o.Mod {
 		return p.linkMod()
 	}
 	start := time.Now()
@@ -37,18 +37,18 @@ func (p *buildPlan) linkTarget() stageResult {
 	return sr
 }
 
-func (p *buildPlan) link(args ...string) stageResult {
-	args = append([]string{"-language", p.o.language}, args...)
+func (p *buildPlan) link(args ...string) StageResult {
+	args = append([]string{"-language", p.o.Language}, args...)
 	// 60 min: a map's first link converts every image it packs (~23 min for the ZM Advanced template)
-	return stageRunner("link", p.bin, filepath.Join(p.bin, "linker_modtools.exe"), 60*time.Minute, p.o.verbose, p.stdout, args...)
+	return stageRunner("link", p.bin, filepath.Join(p.bin, "linker_modtools.exe"), 60*time.Minute, p.o.Verbose, p.stdout, args...)
 }
 
 // modZones are the zones a mod can have, linked one by one in this order, as
 // the Launcher does (`-fs_game <mod> -modsource <zone>` for each present).
 var modZones = []string{"core_mod", "mp_mod", "cp_mod", "zm_mod"}
 
-func (p *buildPlan) linkMod() stageResult {
-	total := stageResult{Name: "link", OK: true}
+func (p *buildPlan) linkMod() StageResult {
+	total := StageResult{Name: "link", OK: true}
 	var linked []string
 	zoneSource := filepath.Join(p.game, "mods", p.name, "zone_source")
 	for _, z := range modZones {

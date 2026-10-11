@@ -1,9 +1,7 @@
-package cli
+package build
 
 import (
 	"fmt"
-	"sort"
-	"strconv"
 	"strings"
 )
 
@@ -76,37 +74,4 @@ func launcherValue(v string) string {
 		return "0"
 	}
 	return v
-}
-
-// dvarPairs turns the MCP dvars object into sorted "name=value" pairs; numbers
-// and booleans are accepted as values (true -> 1, false -> 0).
-func dvarPairs(v any) ([]string, error) {
-	if v == nil {
-		return nil, nil
-	}
-	m, ok := v.(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("dvars must be an object of name: value")
-	}
-	names := make([]string, 0, len(m))
-	for k := range m {
-		names = append(names, k)
-	}
-	sort.Strings(names)
-	var out []string
-	for _, k := range names {
-		var s string
-		switch x := m[k].(type) {
-		case string:
-			s = x
-		case bool:
-			s = map[bool]string{true: "1", false: "0"}[x]
-		case float64:
-			s = strconv.FormatFloat(x, 'f', -1, 64)
-		default:
-			return nil, fmt.Errorf("dvar %q: value must be a string, number or boolean", k)
-		}
-		out = append(out, k+"="+s)
-	}
-	return out, nil
 }
