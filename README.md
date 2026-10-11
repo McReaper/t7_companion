@@ -32,9 +32,11 @@ https://github.com/user-attachments/assets/0d533897-fd35-4f0d-9774-948546c0af6b
 flowchart LR
     S["Skills<br/>(Claude Code plugin)"] -. "how each craft works,<br/>where it fails silently" .-> A([Your AI agent])
     A <-->|MCP| T["t7kb<br/>one local binary"]
-    T --> K[("Knowledge base<br/>search · get")]
-    T --> G["Your GDTs<br/>find · read · check · edit"]
-    T --> B["BO3 mod tools<br/>create · build · run"]
+    T --> K[("Knowledge base")]
+    T --> G["Your GDTs"]
+    T --> B["Headless build"]
+    T --> Z["What the build packed"]
+    T --> H["Game shaders"]
 ```
 
 ## 📥 Install
@@ -71,7 +73,7 @@ The database: a ~0.9 GB download, unpacked to ~3.8 GB on first run.
 - **Skills for each craft** — scripting, mapping, compiling, assets, animation, zombies AI, HUD, FX, atmosphere…: the method and its silent traps (the callback that never fires, the wallbuy that shows *Cost: 0*). Claude Code only.
 - **GDT tools** — find, read, check and edit APE's GDTs against the install's own schema, as a dry run unless told to write. `gdt_check` catches broken references, missing files and duplicates before the linker does.
 - **What the build packed** — why an asset is in your fastfile, what each zone line weighs, and which of your stock overrides won't ship.
-- **A headless build** — create, compile, light, link and launch your map, with a short report and the first real error instead of hundreds of lines: *"Relink zm_mymap"*. Windows only.
+- **A headless build** — create, compile, light, link and launch your map, with a short report of every linker error and warning instead of hundreds of lines: *"Relink zm_mymap"*. Windows only.
 - **Shader decompilation** — the game's compiled shaders back to HLSL, to start a custom shader from a stock one.
 
 ## ⌨️ CLI
