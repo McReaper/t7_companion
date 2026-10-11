@@ -58,8 +58,12 @@ Move-Item "$dbZip.part" $dbZip -Force
 
 # The zip stays: unpack-db compares the database with it, and unpacks it only
 # when they differ, staging it as t7kb.db.new while a running t7kb holds t7kb.db.
-& $exe unpack-db --db $db
-if ($LASTEXITCODE -ne 0) { throw "unpacking the database failed (t7kb exit $LASTEXITCODE)" }
+# This script comes from main, the binary from the latest release: one older than
+# unpack-db would take it for a browse query and wait on stdin, so ask first.
+if ((& $exe --help | Out-String) -match 'unpack-db') {
+    & $exe unpack-db --db $db
+    if ($LASTEXITCODE -ne 0) { throw "unpacking the database failed (t7kb exit $LASTEXITCODE)" }
+}
 
 # No exit here: piped into iex, it would close the user's PowerShell.
 if (Test-Path "$db.new") {
