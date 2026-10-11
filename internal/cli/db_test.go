@@ -103,3 +103,26 @@ func TestPickDBEntry(t *testing.T) {
 		t.Errorf("got %v, want nil", got)
 	}
 }
+
+// Every command that opens the database (search, get, mcp, browse) unpacks it
+// first when only the zip is there.
+func TestOpenStoreUnpacksFirst(t *testing.T) {
+	path := dbPath(t)
+	writeDBZip(t, path, "")
+	old := dbFlag
+	t.Cleanup(func() { dbFlag = old })
+	dbFlag = path
+	st, err := openStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+	if _, err := os.Stat(path); err != nil {
+		t.Errorf("not unpacked before opening: %v", err)
+	}
+
+	dbFlag = dbPath(t)
+	if _, err := openStore(); err == nil || !strings.Contains(err.Error(), "database not found") {
+		t.Errorf("neither database nor zip: %v", err)
+	}
+}
