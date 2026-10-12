@@ -102,12 +102,10 @@ func (e *Entity) lines() []string {
 	return out
 }
 
-// keyLine reads `"key" "value"`.
+// keyLine reads `"key" "value"`. A line that does not open with a quote
+// leaves rest empty, which the second read refuses.
 func keyLine(l string) (KeyValue, bool) {
-	k, rest, ok := quoted(l)
-	if !ok {
-		return KeyValue{}, false
-	}
+	k, rest, _ := quoted(l)
 	v, tail, ok := quoted(rest)
 	if !ok || tail != "" {
 		return KeyValue{}, false
