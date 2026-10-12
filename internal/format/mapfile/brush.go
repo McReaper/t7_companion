@@ -241,9 +241,9 @@ func parseVertex(l string) (Vertex, error) {
 	if err := floats(t[1:4], v.Pos[:]); err != nil {
 		return v, err
 	}
-	t = t[4:]
+	t = t[4:] // at least five tokens left
 	if t[0] == "c" {
-		if len(t) < 5 || colors(t[1:5], &v.Color) != nil {
+		if colors(t[1:5], &v.Color) != nil {
 			return v, bad
 		}
 		v.HasColor, t = true, t[5:]

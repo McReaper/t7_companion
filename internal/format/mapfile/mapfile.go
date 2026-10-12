@@ -167,7 +167,8 @@ func (p *parser) inEntity(line, t string) {
 	case "{":
 		items := p.entity.Items
 		k := len(items)
-		for k > 0 && items[k-1].Brush == nil && strings.HasPrefix(trim(items[k-1].Line), "//") {
+		// a brush item's Line is empty, so the walk back stops at it
+		for k > 0 && strings.HasPrefix(trim(items[k-1].Line), "//") {
 			k--
 		}
 		p.brush = &Brush{Open: line}
