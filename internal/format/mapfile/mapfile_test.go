@@ -302,6 +302,7 @@ func TestPatchErrors(t *testing.T) {
 		"columns count":      head + "1 2 0 0\n" + row + "}\n",
 		"unclosed row":       head + "1 1 0 0\n(\nv 0 0 0 t 0 0 0 0\n}\n",
 		"short vertex":       head + "1 1 0 0\n(\nv 0 0 0 t 0 0\n)\n}\n",
+		"colour, 8 fields":   head + "1 1 0 0\n(\nv 0 0 0 c 1 2 3\n)\n}\n",
 		"bare v":             head + "1 1 0 0\n(\nv 0\n)\n}\n",
 		"colour, then t 0":   head + "1 1 0 0\n(\nv 0 0 0 c 1 2 3 4 t 0\n)\n}\n",
 		"colour, then t 3":   head + "1 1 0 0\n(\nv 0 0 0 c 1 2 3 4 t 0 0 0\n)\n}\n",
@@ -378,6 +379,10 @@ func TestStructure(t *testing.T) {
 	f := parse(t, "// entity 0\n{\nguid  \"{G}\"\n}\n")
 	if len(f.Header) != 0 || len(f.Entities[0].Lead) != 1 || f.Entities[0].Guid() != "{G}" {
 		t.Errorf("fragment header %q lead %q guid %q", f.Header, f.Entities[0].Lead, f.Entities[0].Guid())
+	}
+	first := parse(t, "{\n// brush 0\n{\n guid \"{B}\"\n}\n}\n").Entities[0]
+	if bs := first.Brushes(); len(first.Items) != 1 || len(bs) != 1 || len(bs[0].Lead) != 1 {
+		t.Errorf("a brush comment first in its entity: %d items", len(first.Items))
 	}
 	b := brushOf(t, "curve\n{\nmat\nlm\n1 1 0 0\n(\nv 0 0 0 t 0 0 0 0\n)\n}\nguid \"{AFTER}\"\n")
 	if b.Guid() != "{AFTER}" {
