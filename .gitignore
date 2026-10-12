@@ -18,3 +18,4 @@ Thumbs.db
 plugin/evals/results/
 plugin/evals-holdout/results/
 docs/media/*.mp4
+__pycache__/

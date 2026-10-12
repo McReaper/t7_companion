@@ -85,6 +85,30 @@ def body_of(text: str) -> tuple[str, int]:
     return text, 1
 
 
+def unquoted(line: str) -> str:
+    """line without its blockquote markers: a fence inside a GitHub alert
+    (> [!NOTE]) is still a fence."""
+    return re.sub(r"^\s*(?:>\s?)+", "", line)
+
+
+def prose(body: str) -> str:
+    """body without its ```mermaid blocks: diagram syntax (node ids, arrows,
+    config) that a reader sees only as the rendered labels, so it isn't counted.
+    Other code blocks are content the reader reads, and count."""
+    out, in_mermaid = [], False
+    for line in body.splitlines():
+        fence = unquoted(line).strip()
+        if not in_mermaid and fence.startswith("```mermaid"):
+            in_mermaid = True
+            continue
+        if in_mermaid:
+            if fence.startswith("```"):
+                in_mermaid = False
+            continue
+        out.append(line)
+    return "\n".join(out)
+
+
 def largest_sections(body: str, first: int, n: int = 3) -> list[tuple[int, int, str]]:
     """The n largest ##/### sections (or, without headings, top-level list items
     and paragraphs) as (words, line, title)."""
@@ -92,7 +116,7 @@ def largest_sections(body: str, first: int, n: int = 3) -> list[tuple[int, int, 
     cur = None
     in_code = False
     for i, line in enumerate(body.splitlines()):
-        if line.lstrip().startswith("```"):
+        if unquoted(line).lstrip().startswith("```"):
             in_code = not in_code
         m = None if in_code else HEADING.match(line)
         if m:
@@ -113,6 +137,7 @@ def check_budget(rel: str, body: str, first: int) -> None:
     budget, home = budget_for(rel)
     if budget is None:
         return
+    body = prose(body)
     words = len(body.split())
     if words > budget:
         biggest = "; ".join(f"line {line} \"{title}\" ({w} words)" for w, line, title in largest_sections(body, first))
@@ -137,7 +162,7 @@ def check(rel: str) -> None:
         return  # a release page is about what changed: the history check doesn't apply
     in_code = False
     for n, line in enumerate(text.splitlines(), 1):
-        if line.lstrip().startswith("```"):
+        if unquoted(line).lstrip().startswith("```"):
             in_code = not in_code
             continue
         m = None if in_code else HISTORY.search(line)

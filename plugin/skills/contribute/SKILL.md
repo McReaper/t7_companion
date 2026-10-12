@@ -100,7 +100,7 @@ A wrong skill is worse than a missing one — it's confidently wrong at the top 
 
 1. **`knowledge-base`'s description** names every other domain skill to route around trigger overlap — add the new one (the validator checks this).
 2. **`.claude-plugin/marketplace.json`** — the plugin description enumerates the domains; add it there.
-3. **Leave `README.md` alone** — its diagram deliberately lists no skill names.
+3. **`README.md`'s detailed diagram** — its "Modding skills" box lists every domain skill, its node id the skill's directory (`-` as `_`): add, rename or remove it there. CI's `TestREADMEDiagramMatchesTheCode` says so if you forget.
 4. **`CLAUDE.md`** — only if the change alters how a contributor works on the repo.
 5. **The skill that owns a workflow, whenever the tool surface changes** — in the same commit, or agents keep using the old route (a new MCP tool the owning skill doesn't mention goes unused).
 6. **Commit** as `feat(skills):` for a new skill, `docs(skills):` for an edit. The manifest version is bumped at release, not per edit.
