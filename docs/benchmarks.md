@@ -69,12 +69,14 @@ Measured on the stock ZM Mod Level template's map (33 entities, 20 world brushes
 | `map_view` | 3D, framed, `render fake`: JSON + 768×405 image | 52 + 414 | 129 + 2610 |
 | `map_view` | 3D as it is, `size 1568`: JSON + 1568×827 image | 84 + 1728 | 190 + 8402 |
 | `map_edit` | the ops an agent writes for a room (floor, 4 walls, ceiling, a light) | 254 | 643 |
-| `map_edit` | the answer to them | 212 | 507 |
+| `map_edit` | the answer to them, with each material's tile | 269 | 699 |
+| `map_edit` | the ops for a floor, two walls caulked top and bottom, a pillar copied three times | 238 | 556 |
+| `map_edit` | the answer to them (7 made, 5 materials' tiles) | 375 | 949 |
 | `map_edit` | moving a point entity | 49 | 140 |
 | `map_command` | listing `Selection/CSG` | 32 | 111 |
 | `map_command` | `CSG Hollow` on a box | 206 | 579 |
 
-A room costs about a thousand tokens: its ops (254), the answer (212), a top view to check it (515). The whole map's `map_find` is the dearest call, about 48 tokens an entity, so `class`, `near` or `ids` narrow it; the default image, 768 pixels on the long side, stays near 450 tokens, and `size 1568` quadruples it.
+A room costs about a thousand tokens: its ops (254), the answer (269), a top view to check it (515). The whole map's `map_find` is the dearest call, about 48 tokens an entity, so `class`, `near` or `ids` narrow it; the default image, 768 pixels on the long side, stays near 450 tokens, and `size 1568` quadruples it.
 
 ## Retrieval quality
 
