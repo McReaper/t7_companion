@@ -28,7 +28,11 @@ var (
 // in: the tile the install's maps have it at most, else its GDT's tiling at
 // texelsPerUnit. Nil when the map is in no install.
 func mapTiles(mapPath string) level.Tiles {
-	root := installOf(mapPath)
+	return tilesIn(installOf(mapPath))
+}
+
+// tilesIn sizes a material's tile in an install; nil for no install.
+func tilesIn(root string) level.Tiles {
 	if root == "" {
 		return nil
 	}

@@ -13,7 +13,41 @@ import (
 // mapToolset edits the map open in the user's Radiant, through the
 // T7RadiantBridge plugin: internal/radiant has the connection's rules.
 func mapToolset() toolset {
-	return toolset{name: "map", tools: []server.ServerTool{radiantOpenTool(), mapFindTool(), mapViewTool(), mapEditTool(), mapCommandTool()}}
+	return toolset{name: "map", tools: []server.ServerTool{radiantOpenTool(), mapFindTool(), mapViewTool(), mapEditTool(), mapCommandTool(), mapMaterialsTool()}}
+}
+
+func mapMaterialsTool() server.ServerTool {
+	return server.ServerTool{Tool: mcp.NewTool("map_materials",
+		mcp.WithDescription("Find materials to texture with: the ones Radiant's texture browser shows (a usage other than "+
+			"<not in editor>), filtered by usage (floor, ceiling, roof, door, window, decal, interior wall, interior trim, "+
+			"exterior wall, exterior trim, terrain, foliage, water, sky, background, tools, clip; \"wall\" takes both walls), "+
+			"surface (brick, wood, concrete, metal, plaster, glass…: the surfaceType footsteps and impacts use) and name "+
+			"words; comma-separated alternatives. Most used by the install's maps first: faces is how many of their faces "+
+			"have it, and tile the world units one repeat spans as map_edit lays it. Materials marked DO NOT USE "+
+			"(Radiant crosses them out; script_wall and script_floor_ceiling among them) only with all. show lays the "+
+			"first 16 out in Radiant, a slab each above the map, shoots them from above fullbright and takes them off "+
+			"the map again (Radiant's redo holds them): the image, then board says which label is which material."),
+		mcp.WithString("usage", mcp.Description("Radiant's filter: floor, interior wall, exterior trim…, comma-separated alternatives.")),
+		mcp.WithString("surface", mcp.Description("The surfaceType: brick, wood, concrete…, comma-separated alternatives.")),
+		mcp.WithString("name", mcp.Description("Words the name holds, all of them; comma-separated alternatives (\"brick red, plaster\").")),
+		mcp.WithNumber("limit", mcp.Description("How many to list (default 20, at most 200).")),
+		mcp.WithBoolean("all", mcp.Description("Include materials marked DO NOT USE (default false).")),
+		mcp.WithBoolean("show", mcp.Description("Lay the first 16 out in Radiant and answer their image too (default false).")),
+		mcp.WithString("tools_path", mcp.Description("BO3 mod-tools root (default $TA_TOOLS_PATH, else the running Radiant's).")),
+		mcp.WithNumber("pid", mcp.Description("With show: the Radiant to use when several run."))),
+		Handler: func(ctx context.Context, r mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			out, png, err := mapMaterials(ctx, mapMaterialsArgs{Usage: r.GetString("usage", ""), Surface: r.GetString("surface", ""),
+				Name: r.GetString("name", ""), Limit: r.GetInt("limit", 0), All: r.GetBool("all", false), Show: r.GetBool("show", false),
+				ToolsPath: r.GetString("tools_path", ""), PID: r.GetInt("pid", 0)})
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			res := jsonResult(out)
+			if png != nil {
+				res.Content = append(res.Content, mcp.NewImageContent(base64.StdEncoding.EncodeToString(png), "image/png"))
+			}
+			return res, nil
+		}}
 }
 
 func mapCommandTool() server.ServerTool {

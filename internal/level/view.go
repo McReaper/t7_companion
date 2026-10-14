@@ -25,6 +25,7 @@ type ViewOptions struct {
 	Render string // the 3D view's render method for the shot, put back after
 	Labels bool   // write ids on the image
 	Hide   string // "volumes": hide the map's volumes and triggers for the shot
+	Look   *Pose  // the way a framed 3D target is looked at (default Looking)
 }
 
 // Shot is what View saw.
@@ -326,16 +327,20 @@ func (s *session) view3D(ctx context.Context, target *Box, o ViewOptions, pts []
 	}
 	pose := o.Camera
 	var corners []mapfile.Vec3
+	look := Looking
+	if o.Look != nil {
+		look = *o.Look
+	}
 	if pose == nil && target != nil {
 		corners = target.Corners()
-		p := FrameBox(s.lens(), Looking, *target)
+		p := FrameBox(s.lens(), look, *target)
 		pose = &p
 	}
 	f, err := shoot(ctx, s.c, "3d", pose, append(corners, pts...))
 	if err == nil && corners != nil && !fits(f.At[:len(corners)], f.W, f.H) {
 		if l := (Lens{f.W, f.H, FocalFrom(f.W, f.H, f.Pose, corners, f.At[:len(corners)])}); l.F > 0 {
 			s.remember(l)
-			p := FrameBox(l, Looking, *target)
+			p := FrameBox(l, look, *target)
 			f, err = shoot(ctx, s.c, "3d", &p, append(corners, pts...))
 		}
 	}

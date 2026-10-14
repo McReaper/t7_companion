@@ -83,6 +83,14 @@
 // box's, is what Tiles gives: map_edit's is the size the install's maps use the
 // material at most, else its GDT's tiling at 16 texels a unit.
 //
+// # Boards
+//
+// ShowMaterials shows materials as Radiant draws them: a 256-unit slab of
+// each, at its tile, in rows 512 units above the map, framed from straight
+// above, fullbright, volumes hidden; then the edit that built them is undone
+// when the undo menu's last entry is still it, else the slabs are deleted
+// (one more undo entry). Radiant's redo holds the board.
+//
 // # Commands
 //
 // Command runs a Radiant menu entry (a CSG, a patch tool) on what the ids

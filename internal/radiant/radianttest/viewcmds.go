@@ -123,6 +123,13 @@ func command(f *Fake, args string, _ []byte) Reply {
 		f.Hidden, f.Selection = append([]string(nil), f.Selection...), nil
 	case path == "View/Show Last Hidden":
 		f.Hidden = nil
+	case path == "Edit/Undo":
+		if len(f.history) == 0 {
+			return Err("disabled", "Edit/Undo is disabled")
+		}
+		u := f.history[len(f.history)-1]
+		f.history = f.history[:len(f.history)-1]
+		f.Text, f.Modified, f.UndoLabel = u.text, u.modified, u.label
 	default:
 		return Err("missing", "no menu entry "+path)
 	}
@@ -136,6 +143,13 @@ func action(f *Fake, args string, _ []byte) Reply {
 	}
 	copy(f.Centre2D[:], f.Camera[:3])
 	return OK("checkable=0 checked=0 enabled=1", nil)
+}
+
+// undoStep is the map as an edit found it.
+type undoStep struct {
+	text     string
+	modified bool
+	label    string
 }
 
 // frame is a capture's pixels: white when the fake's views draw nothing.

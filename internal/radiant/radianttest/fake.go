@@ -55,6 +55,7 @@ type Fake struct {
 	Blank       bool              // the views draw nothing: a capture is white, as when Windows stops composing them
 	Menus       map[string]string // menus' entries by path, as menus gives them: "label	enabled	submenu" lines
 	UndoLabel   string            // the undo menu's entry: what the last edit was labelled
+	history     []undoStep        // the map before each edit, for Edit/Undo
 	views
 
 	mu       sync.Mutex

@@ -16,6 +16,7 @@ t7kb map find [id…]          the open map's entities, ids and bounds  (--class
 t7kb map view [id…]          an image of a view, ids on it  (--view top · --render fake · --out)
 t7kb map edit --ops <file|->  a batch of edits, one undo step  (--label)
 t7kb map command <path> [id…] a Radiant menu entry on what the ids name  (--menu)
+t7kb map materials           materials to texture with, most used first  (--usage · --surface · --name · --show)
 t7kb mcp                     run the MCP server
 t7kb update-check            is a newer release out? is the plugin behind?
 ```

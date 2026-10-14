@@ -110,6 +110,7 @@ func edit(f *Fake, args string, body []byte) Reply {
 			rows = append(rows, f.addEntity(m, ent, guid))
 		}
 	}
+	f.history = append(f.history, undoStep{f.Text, f.Modified, f.UndoLabel})
 	f.Text, f.Modified, f.UndoLabel = string(m.Bytes()), true, strings.TrimSpace(args)
 	return OK(fmt.Sprintf("deleted=%d", deleted), []byte(strings.Join(rows, "")))
 }
