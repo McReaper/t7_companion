@@ -40,6 +40,7 @@ func toolsets(st *store.Store, emb *embed.Embedder) []toolset {
 		zoneToolset(),
 		createToolset(),
 		shaderToolset(),
+		mapToolset(),
 	}
 }
 
