@@ -40,18 +40,39 @@ var update = flag.Bool("update", false, "rewrite testdata/labels.golden from the
 func TestLabelsAreDrawnWhereTheyShould(t *testing.T) {
 	img := image.NewRGBA(image.Rect(0, 0, 64, 44))
 	DrawLabels(img, []Label{{"a1", 30, 21}, {"b2", 30, 21}, {"c3", 30, 21}, {"d4", 30, 21}, {"e5", 30, 21}, {"f", 63, 0}})
-	got := art(img)
+	golden(t, "testdata/labels.golden", art(img))
+}
+
+// A one-digit label's plate is 10 wide and 14 high: a second label 9 to the
+// right, or 13 below, of the first moves to its next place; 10 and 14 leave
+// room. Points left of and below the image get their text pulled inside it.
+// testdata/labels_room.golden was read pair by pair when written.
+func TestLabelsMakeRoomAtTheirThreshold(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 100, 120))
+	DrawLabels(img, []Label{
+		{"1", 5, 20}, {"2", 14, 20}, // 9 apart: the second goes below right
+		{"3", 50, 20}, {"4", 60, 20}, // 10 apart: both above right
+		{"5", 5, 60}, {"6", 5, 73}, // 13 apart: the second goes below right
+		{"7", 50, 60}, {"8", 50, 74}, // 14 apart: both above right
+		{"9", -10, 100}, {"a", 70, 300}, // off the image, left and below
+	})
+	golden(t, "testdata/labels_room.golden", art(img))
+}
+
+// golden compares a drawing with its golden file, rewritten under -update.
+func golden(t *testing.T, path, got string) {
+	t.Helper()
 	if *update {
-		if err := os.WriteFile("testdata/labels.golden", []byte(got), 0o644); err != nil {
+		if err := os.WriteFile(path, []byte(got), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
-	want, err := os.ReadFile("testdata/labels.golden")
+	want, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got != string(want) {
-		t.Errorf("labels drawn:\n%s\nwant:\n%s", got, want)
+		t.Errorf("drawn:\n%s\nwant:\n%s", got, want)
 	}
 }
 

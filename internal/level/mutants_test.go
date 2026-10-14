@@ -30,6 +30,18 @@ func TestTheFocalComesFromThePointFarthestOffCentre(t *testing.T) {
 	if f := FocalFrom(200, 100, pose, []mapfile.Vec3{near, far}, [][2]float64{{150, 50}, {fx, 50}}); math.Abs(f-150) > 1e-6 {
 		t.Errorf("focal = %v: taken from the near point", f)
 	}
+	// a point far off but little off centre, projected wrongly, is not the one used: it is the
+	// least off centre (x/z), though the farthest (x·z)
+	deep, wide := mapfile.Vec3{10, 1000, 0}, mapfile.Vec3{40, 100, 0}
+	wx, _, _ := l.Project(pose, wide)
+	if f := FocalFrom(200, 100, pose, []mapfile.Vec3{deep, wide}, [][2]float64{{190, 50}, {wx, 50}}); math.Abs(f-150) > 1e-6 {
+		t.Errorf("focal = %v: taken from the deep point", f)
+	}
+	deepUp, high := mapfile.Vec3{0, 1000, 10}, mapfile.Vec3{0, 100, 40}
+	_, hy, _ := l.Project(pose, high)
+	if f := FocalFrom(200, 100, pose, []mapfile.Vec3{deepUp, high}, [][2]float64{{100, 5}, {100, hy}}); math.Abs(f-150) > 1e-6 {
+		t.Errorf("focal = %v: taken from the deep point above", f)
+	}
 	// fewer projections than points
 	if f := FocalFrom(200, 100, pose, []mapfile.Vec3{far, near}, [][2]float64{{fx, 50}}); math.Abs(f-150) > 1e-6 {
 		t.Errorf("focal with a projection missing = %v", f)
@@ -38,7 +50,7 @@ func TestTheFocalComesFromThePointFarthestOffCentre(t *testing.T) {
 
 func TestZoomFitsATallBox(t *testing.T) {
 	tall := box(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{100, 0, 1000}) // front view: 100 across, 1000 up
-	// a 400×400 view: 400/1150 = 0.348 px/unit, 4 steps out from 100%
+	// a 400×400 view: 400/1150 = 0.348 px/unit, 5 steps out from 100% (0.328)
 	if n := ZoomSteps(Axes[1], 400, 400, tall); n != -5 {
 		t.Errorf("ZoomSteps(front, tall) = %d, want -5", n)
 	}
@@ -89,6 +101,9 @@ func TestShortIDsOfTheFirstGUIDsAndOfShortOnes(t *testing.T) {
 	ids := NewIDs([]string{"{00000000-1111-0000-0000-000000000000}", "{00000000-2222-0000-0000-000000000000}", "{A}", "{AB}"})
 	if s := ids.Short("{00000000-1111-0000-0000-000000000000}"); s != "000000001" {
 		t.Errorf("the first sorted shares 8 digits with the second: %q", s)
+	}
+	if s := ids.Short("{00000000-2222-0000-0000-000000000000}"); s != "000000002" {
+		t.Errorf("the second sorted shares 8 digits with the first: %q", s)
 	}
 	if ids.Short("{A}") != "a" || ids.Short("{AB}") != "ab" {
 		t.Errorf("a GUID that starts another: %q, %q", ids.Short("{A}"), ids.Short("{AB}"))
@@ -237,6 +252,30 @@ func TestComposeScalesTheProjectionAndOrdersTheLabels(t *testing.T) {
 	// distances² to the centre (50,25): right and left 144 each, below 225, the corner 2977, the edge 3125
 	if want := []string{"right 62,25", "left 38,25", "below 50,40", "corner 99,49", "edge 0,0"}; !slices.Equal(got, want) {
 		t.Errorf("labels %q\nwant %q", got, want)
+	}
+}
+
+func TestLabelsComeInIDOrderAndByDistance(t *testing.T) {
+	m := testMap(t)
+	snap := &Snapshot{Map: m, IDs: NewIDs(GUIDs(m))}
+	pts := labelPoints(snap, ViewOptions{}, nil)
+	ids := make([]string, len(pts))
+	for i, p := range pts {
+		ids[i] = p.id
+	}
+	if !slices.IsSorted(ids) || len(ids) != 4 {
+		t.Errorf("label points %q: in id order, so ties at one distance keep it", ids)
+	}
+	// the nearer point first, whichever came first
+	fr := &frame{W: 100, H: 50, Pixels: make([]byte, 100*50*4), At: [][2]float64{{62, 25}, {50, 40}}}
+	shot, err := compose(fr, "3d", []labelPoint{{id: "right"}, {id: "below"}}, 100)
+	if err != nil || len(shot.Labels) != 2 || shot.Labels[0].ID != "right" {
+		t.Errorf("labels %+v, %v", shot.Labels, err)
+	}
+	fr.At = [][2]float64{{50, 40}, {62, 25}}
+	shot, _ = compose(fr, "3d", []labelPoint{{id: "below"}, {id: "right"}}, 100)
+	if shot.Labels[0].ID != "right" {
+		t.Errorf("labels %+v", shot.Labels)
 	}
 }
 
