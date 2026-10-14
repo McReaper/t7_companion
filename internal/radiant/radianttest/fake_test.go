@@ -72,3 +72,14 @@ func TestTheFakeGivesEntitiesAndTheSelection(t *testing.T) {
 		{"4 selection\n", "4 ok\n{b1} {E1} 0 0 0 0 0 0\n"},
 	})
 }
+
+func TestTheFakeNamesNothingMissingWhenAllIsFound(t *testing.T) {
+	f := New(1, "")
+	f.Text = "{\nguid \"{E1}\"\n\"classname\" \"worldspawn\"\n}\n"
+	rw := f.Dial()
+	defer rw.Close()
+	exchange(t, rw, [][2]string{
+		{"1 hello 1\n", "1 ok 1 plugin=1.0.0 host=1.1.0 pid=1\n"},
+		{"2 entities {E1}\n", "2 ok\n" + f.Text},
+	})
+}
