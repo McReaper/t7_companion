@@ -60,7 +60,7 @@ A `box` takes one material on all six faces, at the material's own tile; a `text
 - **Trims**: `fit` `[0, 1]` makes one repeat span the face's height, the length scaled to keep the texture's shape — a baseboard or a beam's band.
 - `rotate` turns planks and stripes (90 to run them the other way), `flip` mirrors, `scale` 2 doubles the tile. `material` alone swaps a material and keeps each face's tile, as Radiant's Find/Replace does.
 
-Look at the result with `t7kb:map_view` `render` `fullbright` from a `camera` inside the room. The template's volumes (`volume_fpstool`, the start zone, sun and umbra volumes) cover ±1536 and draw their tool textures over the shot from inside them too (verified in a test Radiant): `t7kb:map_command` `View/Hide Entities/Hide Selected` on their ids before the shot, `View/Show Last Hidden` after.
+Look at the result with `t7kb:map_view` `render` `fullbright` and `hide` `volumes` from a `camera` inside the room: the template's volumes (`volume_fpstool`, the start zone, sun and umbra volumes) cover ±1536 and draw their tool textures over a shot from inside them too (verified in a test Radiant: half a room's shot was `volume_fpstool`'s face), and `hide` hides every volume and trigger for the shot alone.
 
 ## Build one, then copy it
 
@@ -76,7 +76,7 @@ Look at the result with `t7kb:map_view` `render` `fullbright` from a `camera` in
 
 ## Look from the top first
 
-`t7kb:map_view` with `view` `top` is the layout: outlines, entity names, the ids written on it, and the `scale` (image pixels per unit) to measure with. The 3D view shows the shapes: an unbaked map is black under real lighting, so pass `render` `fake`; and a camera outside a volume brush's bounds (the `volume_sun`, the sky box) sees that brush's texture over everything (verified: sun icons covering the shot) — frame what is inside the map, or shoot from a `camera` inside it. Every view puts the user's camera, render method, 2D axis, zoom and centre back, but they see them move: take the views the work needs.
+`t7kb:map_view` with `view` `top` is the layout: outlines, entity names, the ids written on it, and the `scale` (image pixels per unit) to measure with. The 3D view shows the shapes: an unbaked map is black under real lighting, so pass `render` `fake`; and a volume's brush (the `volume_sun`, the start zone) draws its tool texture over everything behind it, from outside it or inside (verified: sun icons covering the shot), so pass `hide` `volumes`; the sky box still walls in a framed shot from outside the map — shoot from a `camera` inside it. Every view puts the user's camera, render method, 2D axis, zoom and centre back, but they see them move: take the views the work needs.
 
 ## Save before building: the build compiles the file, not Radiant's memory
 
