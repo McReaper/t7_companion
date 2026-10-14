@@ -1,6 +1,9 @@
 package cli
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/spf13/cobra"
 )
 
@@ -47,6 +50,36 @@ func newMapCmd() *cobra.Command {
 	fl.StringVar(&a.Keys, "keys", "", "which keys to show: all, or a comma list (default the naming keys)")
 	fl.IntVar(&a.Limit, "limit", 0, "how many entities at most (default 50)")
 	fl.IntVar(&a.PID, "pid", 0, "the Radiant to read when several run")
-	root.AddCommand(find)
+	root.AddCommand(find, newMapViewCmd())
 	return root
+}
+
+func newMapViewCmd() *cobra.Command {
+	var a mapViewArgs
+	var out string
+	view := &cobra.Command{Use: "view [id…]",
+		Short: "Save an image of a view of the map, with ids on it, and print its projection",
+		RunE: func(c *cobra.Command, ids []string) error {
+			a.IDs = ids
+			res, png, err := mapView(c.Context(), a)
+			if err != nil {
+				return err
+			}
+			if err := os.WriteFile(out, png, 0o644); err != nil {
+				return err
+			}
+			fmt.Fprintf(c.ErrOrStderr(), "t7kb: wrote %s\n", out)
+			return printIndented(c.OutOrStdout())(res, nil)
+		}}
+	fl := view.Flags()
+	fl.StringVar(&a.View, "view", "", "3d (default), top, front or side")
+	fl.StringVar(&a.At, "at", "", "a point x,y,z to frame")
+	fl.Float64Var(&a.Radius, "radius", 0, "with --at: how far around it to show (default 256)")
+	fl.StringVar(&a.Camera, "camera", "", "3d: shoot from x,y,z,pitch,yaw,roll")
+	fl.StringVar(&a.Render, "render", "", "3d: fake, fullbright, wireframe, real, view or density for this shot")
+	fl.IntVar(&a.Size, "size", 0, "the image's longer side in pixels (default 768)")
+	fl.BoolVar(&a.NoLabels, "no-labels", false, "leave the ids off the image")
+	fl.IntVar(&a.PID, "pid", 0, "the Radiant to see when several run")
+	fl.StringVar(&out, "out", "map_view.png", "where to write the image")
+	return view
 }

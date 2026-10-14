@@ -54,6 +54,17 @@ func pick(bit int, lo, hi float64) float64 {
 	return lo
 }
 
+// Grown is the box widened, about its middle, to at least size on each axis.
+func (b Box) Grown(size float64) Box {
+	for i := range 3 {
+		if b.Max[i]-b.Min[i] < size {
+			mid := (b.Min[i] + b.Max[i]) / 2
+			b.Min[i], b.Max[i] = mid-size/2, mid+size/2
+		}
+	}
+	return b
+}
+
 // Distance is how far p is from the box, 0 inside it.
 func (b Box) Distance(p mapfile.Vec3) float64 {
 	var d2 float64

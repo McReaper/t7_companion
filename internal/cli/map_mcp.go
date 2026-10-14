@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/base64"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -11,7 +12,39 @@ import (
 // mapToolset edits the map open in the user's Radiant, through the
 // T7RadiantBridge plugin: internal/radiant has the connection's rules.
 func mapToolset() toolset {
-	return toolset{name: "map", tools: []server.ServerTool{radiantOpenTool(), mapFindTool()}}
+	return toolset{name: "map", tools: []server.ServerTool{radiantOpenTool(), mapFindTool(), mapViewTool()}}
+}
+
+func mapViewTool() server.ServerTool {
+	return server.ServerTool{Tool: mcp.NewTool("map_view",
+		mcp.WithDescription("See the map open in Radiant: an image of its 3D view or one of its 2D views (top, front, side), "+
+			"as Radiant draws it, with the short ids of what is in it written where their origin or centre is (labels "+
+			"gives the same as id: [x, y] in the image). Frame entities or brushes by ids, or a point by at (and radius); "+
+			"shoot the 3D view from camera; or take the view as it is. A framed 3D shot looks down from the south-west. "+
+			"Top shows the layout best (outlines, entity names); an unbaked map is black under real lighting, so pass "+
+			"render fake to see a blockout's shapes. A 2D answer gives its centre and scale (image pixels per unit). "+
+			"The user's camera, render method, 2D axis, zoom and centre are put back (notes says what could not be); "+
+			"Radiant must not be minimised. size is the image's longer side (default 768: about 400 tokens)."),
+		mcp.WithString("view", mcp.Description("3d (default), top, front or side.")),
+		mcp.WithString("ids", mcp.Description("Entities or brushes to frame, by id, comma- or space-separated.")),
+		mcp.WithString("at", mcp.Description("A point x y z to frame, with radius around it.")),
+		mcp.WithNumber("radius", mcp.Description("With at: how far around the point to show (default 256).")),
+		mcp.WithString("camera", mcp.Description("3d: shoot from x y z pitch yaw roll (degrees; positive pitch looks up, yaw 90 faces +y).")),
+		mcp.WithString("render", mcp.Description("3d: the render method for this shot: fake, fullbright, wireframe, real, view or density.")),
+		mcp.WithNumber("size", mcp.Description("The image's longer side in pixels (default 768, at most 1568).")),
+		mcp.WithBoolean("no_labels", mcp.Description("Leave the ids off the image (default false).")),
+		mcp.WithNumber("pid", mcp.Description("The Radiant to see when several run."))),
+		Handler: func(ctx context.Context, r mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			out, png, err := mapView(ctx, mapViewArgs{View: r.GetString("view", ""), IDs: splitIDs(r.GetString("ids", "")),
+				At: r.GetString("at", ""), Radius: r.GetFloat("radius", 0), Camera: r.GetString("camera", ""),
+				Render: r.GetString("render", ""), Size: r.GetInt("size", 0), NoLabels: r.GetBool("no_labels", false), PID: r.GetInt("pid", 0)})
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			res := jsonResult(out)
+			res.Content = append(res.Content, mcp.NewImageContent(base64.StdEncoding.EncodeToString(png), "image/png"))
+			return res, nil
+		}}
 }
 
 func mapFindTool() server.ServerTool {

@@ -13,6 +13,7 @@ t7kb zone <command>          explain | contents | check
 t7kb shader decompile <name> a stock shader's HLSL  (--stage · --json)
 t7kb radiant open <map>      open a map in Radiant, or start it  (--pid · --discard)
 t7kb map find [id…]          the open map's entities, ids and bounds  (--class · --near · --brushes)
+t7kb map view [id…]          an image of a view, ids on it  (--view top · --render fake · --out)
 t7kb mcp                     run the MCP server
 t7kb update-check            is a newer release out? is the plugin behind?
 ```

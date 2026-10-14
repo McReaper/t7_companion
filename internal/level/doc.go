@@ -27,4 +27,28 @@
 // bridge's entities, which Radiant writes as it saves, prefabs as misc_prefab
 // entities) and the selection. Under a modal dialog the entities can't be read
 // and Read says which dialog to close.
+//
+// # Views
+//
+// View shoots a view through the bridge's capture and writes ids on it at the
+// points the bridge projected, so the image and the map agree without knowing
+// Radiant's lens. A target framed by ids spans at least 256 units, so a point
+// entity shows with the room around it.
+//
+//   - 3D: a framed target is shot from the south-west, above (Looking), from
+//     where its bounding sphere fills the view. Radiant's lens is a pinhole,
+//     px = w/2 + f·x/z, and its focal length isn't given: View guesses it, checks
+//     that the target's corners landed in the frame and fill it, and if not
+//     recovers f from where they landed (FocalFrom) and shoots again; the lens is
+//     kept per Radiant, so the next view takes one shot.
+//   - 2D: the view shows one axis; a capture of another fails naming the axis
+//     shown, and View/Layout/Next turns it XY, XZ, YZ. Zooming moves the
+//     view's centre (towards the mouse), so a frame sets the zoom first, from
+//     XY 100% in steps of 1.25, then centres: the camera goes to the target,
+//     Center 2D On Camera, the camera comes back.
+//
+// Everything View changes of the user's views (render method, 2D axis, zoom
+// and centre, camera) is put back, last change first, even when the shot
+// failed; the zoom comes back to the nearest step of 1.25, and what could not
+// be put back is noted in the answer.
 package level
