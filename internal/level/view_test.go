@@ -256,3 +256,46 @@ func TestTheIDsOnAnImageStopAtForty(t *testing.T) {
 		t.Errorf("%d labels, %v", len(shot.Labels), err)
 	}
 }
+
+// Hiding the volumes for a shot: the map's volume_sun hidden, shot, shown
+// again; the user's selection as it was.
+func TestAViewCanHideTheVolumesForTheShot(t *testing.T) {
+	f, c, _ := viewing(t, 106)
+	f.Update(func(f *radianttest.Fake) { f.Selection = []string{"{5EC8DE49-C58E-11F1-B542-00155DD185EA}"} })
+	snap, err := Read(context.Background(), c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := View(context.Background(), c, snap, ViewOptions{View: "top", Hide: "Volumes"}); err != nil {
+		t.Fatal(err)
+	}
+	var seq []string
+	for _, r := range f.Requests() {
+		if strings.HasPrefix(r, "command View/") && !strings.HasPrefix(r, "command View/Zoom") && !strings.HasPrefix(r, "command View/Layout") || strings.HasPrefix(r, "capture") || strings.HasPrefix(r, "select ") {
+			seq = append(seq, r)
+		}
+	}
+	want := []string{"select {6E73936D-", "command View/Hide Entities/Hide Selected", "select {5EC8DE49-", "capture xy", "command View/Show Last Hidden"}
+	for i, w := range want {
+		if len(seq) != len(want) || !strings.HasPrefix(seq[i], w) {
+			t.Fatalf("requests %q, want them to start %q", seq, want)
+		}
+	}
+	if seq[0] != "select {6E73936D-C58E-11F1-B542-00155DD185EA}" {
+		t.Errorf("hid %q: the volume_sun alone (the probes are no volumes)", seq[0])
+	}
+	f.Update(func(f *radianttest.Fake) {
+		if f.Hidden != nil || len(f.Selection) != 1 {
+			t.Errorf("after: hidden %v, selection %v", f.Hidden, f.Selection)
+		}
+	})
+	if _, err := View(context.Background(), c, snap, ViewOptions{Hide: "lights"}); err == nil || !strings.Contains(err.Error(), `hide "lights": volumes`) {
+		t.Errorf("hide lights: %v", err)
+	}
+	f.Handle("command", func(*radianttest.Fake, string, []byte) radianttest.Reply {
+		return radianttest.Err("missing", "no menu entry")
+	})
+	if _, err := View(context.Background(), c, snap, ViewOptions{View: "top", Hide: "volumes"}); err == nil || !strings.Contains(err.Error(), "hiding the volumes: ") {
+		t.Errorf("a Radiant without the menu: %v", err)
+	}
+}

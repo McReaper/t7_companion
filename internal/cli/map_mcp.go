@@ -87,13 +87,14 @@ func mapViewTool() server.ServerTool {
 		mcp.WithNumber("radius", mcp.Description("With at: how far around the point to show (default 256).")),
 		mcp.WithString("camera", mcp.Description("3d: shoot from x y z pitch yaw roll (degrees; positive pitch looks up, yaw 90 faces +y).")),
 		mcp.WithString("render", mcp.Description("3d: the render method for this shot: fake, fullbright, wireframe, real, view or density.")),
+		mcp.WithString("hide", mcp.Description("volumes: hide the map's volumes and triggers for this shot (their tool textures cover a view from inside them too); shown again after.")),
 		mcp.WithNumber("size", mcp.Description("The image's longer side in pixels (default 768, at most 1568).")),
 		mcp.WithBoolean("no_labels", mcp.Description("Leave the ids off the image (default false).")),
 		mcp.WithNumber("pid", mcp.Description("The Radiant to see when several run."))),
 		Handler: func(ctx context.Context, r mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			out, png, err := mapView(ctx, mapViewArgs{View: r.GetString("view", ""), IDs: splitIDs(r.GetString("ids", "")),
 				At: r.GetString("at", ""), Radius: r.GetFloat("radius", 0), Camera: r.GetString("camera", ""),
-				Render: r.GetString("render", ""), Size: r.GetInt("size", 0), NoLabels: r.GetBool("no_labels", false), PID: r.GetInt("pid", 0)})
+				Render: r.GetString("render", ""), Hide: r.GetString("hide", ""), Size: r.GetInt("size", 0), NoLabels: r.GetBool("no_labels", false), PID: r.GetInt("pid", 0)})
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}

@@ -18,6 +18,7 @@ type mapViewArgs struct {
 	Camera   string // "x y z pitch yaw roll"
 	Size     int
 	Render   string
+	Hide     string
 	NoLabels bool
 	PID      int
 }
@@ -41,7 +42,7 @@ const maxViewSize = 1568
 
 // mapView shoots a view of the map open in Radiant: its answer and the PNG.
 func mapView(ctx context.Context, a mapViewArgs) (*mapViewOut, []byte, error) {
-	o := level.ViewOptions{View: a.View, IDs: a.IDs, Radius: a.Radius, Size: a.Size, Render: a.Render, Labels: !a.NoLabels}
+	o := level.ViewOptions{View: a.View, IDs: a.IDs, Radius: a.Radius, Size: a.Size, Render: a.Render, Labels: !a.NoLabels, Hide: a.Hide}
 	if a.Size < 0 || a.Size > maxViewSize {
 		return nil, nil, fmt.Errorf("size %d: at most %d pixels", a.Size, maxViewSize)
 	}

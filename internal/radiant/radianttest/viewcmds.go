@@ -118,6 +118,10 @@ func command(f *Fake, args string, _ []byte) Reply {
 		copy(f.Centre2D[:], f.Camera[:3])
 	case strings.HasPrefix(path, "View/Render Method/"):
 		f.Render = strings.TrimPrefix(path, "View/Render Method/")
+	case path == "View/Hide Entities/Hide Selected": // what is hidden is no longer selected
+		f.Hidden, f.Selection = append([]string(nil), f.Selection...), nil
+	case path == "View/Show Last Hidden":
+		f.Hidden = nil
 	default:
 		return Err("missing", "no menu entry "+path)
 	}

@@ -24,6 +24,7 @@ type ViewOptions struct {
 	Size   int    // the image's longer side, at most
 	Render string // the 3D view's render method for the shot, put back after
 	Labels bool   // write ids on the image
+	Hide   string // "volumes": hide the map's volumes and triggers for the shot
 }
 
 // Shot is what View saw.
@@ -71,11 +72,19 @@ func View(ctx context.Context, c *radiant.Client, snap *Snapshot, o ViewOptions)
 	if o.Render != "" && view != "3d" {
 		return nil, fmt.Errorf("render is the 3d view's: a 2D view draws outlines")
 	}
+	if h := strings.ToLower(o.Hide); h != "" && h != "volumes" {
+		return nil, fmt.Errorf("hide %q: volumes, or nothing", o.Hide)
+	}
 	s := &session{c: c, pid: c.Hello.PID}
 	var f *frame
-	if view == "3d" {
+	if o.Hide != "" {
+		err = s.hideVolumes(ctx, snap)
+	}
+	switch {
+	case err != nil:
+	case view == "3d":
 		f, err = s.view3D(ctx, target, o, points(pts))
-	} else {
+	default:
 		axis, _ := AxisNamed(view)
 		f, err = s.view2D(ctx, axis, target, points(pts))
 	}
@@ -211,6 +220,35 @@ type session struct {
 	pid      int
 	restores []restore
 	notes    []string
+}
+
+// hideVolumes hides, for the shot, the entities whose tool textures draw
+// over a view from inside them as well as from outside: volumes and triggers
+// (a volume_decal stays, as it draws its decal). View/Show Last Hidden shows
+// them again, and only them: what the user had hidden stays hidden.
+func (s *session) hideVolumes(ctx context.Context, snap *Snapshot) error {
+	var guids []string
+	for _, e := range snap.Map.Entities {
+		if c := e.Class(); c != "volume_decal" && (strings.Contains(c, "volume") || strings.HasPrefix(c, "trigger_")) {
+			guids = append(guids, e.Guid())
+		}
+	}
+	if len(guids) == 0 {
+		return nil
+	}
+	err := s.call(ctx, "deselect")
+	if err == nil {
+		err = s.call(ctx, "select "+strings.Join(guids, " "))
+	}
+	if err == nil {
+		err = s.call(ctx, "command View/Hide Entities/Hide Selected")
+	}
+	restoreSelection(ctx, s.c, snap.Sel.GUIDs)
+	if err != nil {
+		return fmt.Errorf("hiding the volumes: %w", err)
+	}
+	s.restores = append(s.restores, restore{what: "hidden volumes", lines: []string{"command View/Show Last Hidden"}})
+	return nil
 }
 
 // restore is the calls that put one thing back as the user had it.
