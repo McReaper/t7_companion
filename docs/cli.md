@@ -9,6 +9,7 @@ Every tool your agent calls is also a terminal command that does the same thing:
 | [GDT assets](cli/gdt.md) | `gdt find`, `get`, `schema`, `edit`, `check`, `refs` | reading, writing and checking assets without APE |
 | [What a build packs](cli/zone.md) | `zone explain`, `contents`, `check` | why an asset is in your map, what each zone line weighs, what won't ship |
 | [Shaders](cli/shader.md) | `shader decompile` | a stock shader's HLSL, to start a custom one from |
+| [Radiant](cli/radiant.md) | `radiant open` | opening a map in your Radiant, where every map edit happens |
 
 ## Options every command shares
 

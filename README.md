@@ -74,6 +74,7 @@ T7 Companion gives your AI agent everything ten years of the BO3 modding communi
 >             t4["build"]
 >             t5["zone_explain<br/>zone_contents<br/>zone_check"]
 >             t6["shader_decompile"]
+>             t7["radiant_open"]
 >         end
 >         K[("10 years of BO3<br/>modding knowledge")]
 >     end
@@ -85,12 +86,12 @@ T7 Companion gives your AI agent everything ten years of the BO3 modding communi
 >             m[".map sources"]
 >         end
 >         subgraph MTB["Treyarch's mod tools"]
+>             radiant_modtools["Radiant"]
 >             gdtdb["gdtdb"]
 >             cod2map64["cod2map"]
->             radiant_modtools["Radiant light bake"]
 >             linker_modtools["Linker"]
 >             BlackOps3["Black Ops III"]
->             gdtdb ~~~ cod2map64 ~~~ radiant_modtools ~~~ linker_modtools ~~~ BlackOps3
+>             radiant_modtools ~~~ gdtdb ~~~ cod2map64 ~~~ linker_modtools ~~~ BlackOps3
 >         end
 >         subgraph OUT["What they write"]
 >             o1[".d3dbsp map"]
@@ -110,6 +111,7 @@ T7 Companion gives your AI agent everything ten years of the BO3 modding communi
 >     MTB -->|"write"| OUT
 >     t5 -.->|"reads"| OUT
 >     t6 -.->|"decompiles"| o5
+>     t7 -->|"drives"| radiant_modtools
 > ```
 >
 > Solid arrows change something, dotted ones only read, and the thick one runs Treyarch's tools.
