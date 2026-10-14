@@ -45,7 +45,8 @@ func TestLabelsAreDrawnWhereTheyShould(t *testing.T) {
 
 // A one-digit label's plate is 10 wide and 14 high: a second label 9 to the
 // right, or 13 below, of the first moves to its next place; 10 and 14 leave
-// room. Points left of and below the image get their text pulled inside it.
+// room, and the same above. Points left of and below the image get their
+// text pulled inside it.
 // testdata/labels_room.golden was read pair by pair when written.
 func TestLabelsMakeRoomAtTheirThreshold(t *testing.T) {
 	img := image.NewRGBA(image.Rect(0, 0, 100, 120))
@@ -55,6 +56,8 @@ func TestLabelsMakeRoomAtTheirThreshold(t *testing.T) {
 		{"5", 5, 60}, {"6", 5, 73}, // 13 apart: the second goes below right
 		{"7", 50, 60}, {"8", 50, 74}, // 14 apart: both above right
 		{"9", -10, 100}, {"a", 70, 300}, // off the image, left and below
+		{"b", 80, 60}, {"c", 80, 47}, // 13 above: the second moves on, to above left (below right overlaps too)
+		{"d", 80, 100}, {"e", 80, 86}, // 14 above: both above right
 	})
 	golden(t, "testdata/labels_room.golden", art(img))
 }
