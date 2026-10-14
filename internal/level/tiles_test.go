@@ -32,6 +32,7 @@ func TestScanTilesFindsTheTileEachMaterialHasMost(t *testing.T) {
 		" ( 0 0 0 ) ( 1 0 0 ) ( 0 1 0 ) short17 64", f("after", "16", "16"),
 		" ( 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 )", f("after", "16", "16"),
 		" ( 0 0 0 ) x x x x x x x x x x unclosed 64 32 0 0 0 0", f("after", "16", "16"),
+		" ( 0 0 0 0 0 0 0 0 0 0 0 0 0 ) unopened 64 32 0 0 0 0", f("after", "16", "16"),
 		f("flat", "16", "0"), f("after", "16", "16"),
 		f("nan", "16", "x"), f("after", "16", "16"),
 		"// " + strings.Repeat("x", 600_000), f("after", "16", "16"),
@@ -51,7 +52,7 @@ func TestScanTilesFindsTheTileEachMaterialHasMost(t *testing.T) {
 	for m, want := range map[string]TileUse{
 		"brick":  {W: 64, H: 32, N: 3, Faces: 4},
 		"wood":   {W: 64, H: 64, N: 1, Faces: 2},
-		"after":  {W: 16, H: 16, N: 6, Faces: 6},
+		"after":  {W: 16, H: 16, N: 7, Faces: 7},
 		"edge18": {W: 64, H: 32, N: 1, Faces: 1},
 	} {
 		if got[m] != want {

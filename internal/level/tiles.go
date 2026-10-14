@@ -2,10 +2,13 @@ package level
 
 import (
 	"bufio"
+	"cmp"
 	"io/fs"
+	"maps"
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -45,11 +48,14 @@ func ScanTiles(root string) map[string]TileUse {
 	})
 	out := make(map[string]TileUse, len(counts))
 	for m, c := range counts {
+		sizes := slices.SortedFunc(maps.Keys(c), func(a, b [2]float64) int { // a tie goes to the smaller tile
+			return cmp.Or(cmp.Compare(a[0], b[0]), cmp.Compare(a[1], b[1]))
+		})
 		var u TileUse
-		for wh, n := range c {
-			u.Faces += n
-			if n > u.N || (n == u.N && (wh[0] < u.W || (wh[0] == u.W && wh[1] < u.H))) {
-				u.W, u.H, u.N = wh[0], wh[1], n
+		for _, wh := range sizes {
+			u.Faces += c[wh]
+			if c[wh] > u.N {
+				u.W, u.H, u.N = wh[0], wh[1], c[wh]
 			}
 		}
 		out[m] = u

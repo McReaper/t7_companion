@@ -126,11 +126,15 @@ func TestATextureLaysTheMaterialsTileFromTheWorldsOrigin(t *testing.T) {
 	if y := faceTex(t, trim)["-y"]; y.Tex[0] != 64 || y.Tex[1] != 8 || y.Tex[2] != 0 || y.Tex[3] != 5 {
 		t.Errorf("trim: %v: 8 high, so 64 across from the world's origin, from z = 3 (5 into a tile)", y.Tex)
 	}
-	// Two repeats across a beam's length, its height sized to keep the shape;
-	// mirrored both ways, at half the tile.
-	textured(t, trim, &TextureOp{Faces: "+y", Material: "plank", Fit: &[2]float64{2, 0}}, tile)
-	if y := faceTex(t, trim)["+y"]; y.Tex[0] != 128 || y.Tex[1] != 16 || y.Tex[2] != wrap(266, 128) || y.Tex[3] != 0 {
-		t.Errorf("beam: %v: 256 long in two repeats of 128, so 16 down, from its end", y.Tex)
+	// Four repeats across a beam's length, its height sized to keep the shape;
+	// two down the trim's end; mirrored both ways, at half the tile.
+	textured(t, trim, &TextureOp{Faces: "+y", Material: "plank", Fit: &[2]float64{4, 0}}, tile)
+	if y := faceTex(t, trim)["+y"]; y.Tex[0] != 64 || y.Tex[1] != 8 || y.Tex[2] != wrap(266, 64) || y.Tex[3] != 0 {
+		t.Errorf("beam: %v: 256 long in four repeats of 64, so 8 down, from its end", y.Tex)
+	}
+	textured(t, trim, &TextureOp{Faces: "+x", Material: "plank", Fit: &[2]float64{0, 2}}, tile)
+	if x := faceTex(t, trim)["+x"]; x.Tex[0] != 32 || x.Tex[1] != 4 || x.Tex[3] != wrap(-3, 4) {
+		t.Errorf("trim's end: %v: 8 high in two repeats of 4, so 32 across, from z = 3", x.Tex)
 	}
 	textured(t, trim, &TextureOp{Faces: "top", Material: "plank", Scale: 0.5, Flip: "uv"}, tile)
 	if z := faceTex(t, trim)["+z"]; z.Tex[0] != -64 || z.Tex[1] != -8 {
