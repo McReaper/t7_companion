@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/radiant/radianttest"
 )
 
 // boxOf is a box brush, parsed.
@@ -241,6 +242,73 @@ func TestATextureOpNamesWhatAnEarlierOpMade(t *testing.T) {
 		if _, err := Edit(context.Background(), c, snap, ops(t, js), "", nil); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: %v, want %q", js, err, want)
 		}
+	}
+}
+
+// A batch asks for a material's tile once; a size of 0 is no size, while a
+// trim's half unit is one.
+func TestTilesAreAskedOnceAndASizeOfZeroIsNone(t *testing.T) {
+	_, c, snap := viewing(t, 304)
+	asked := map[string]int{}
+	tiles := func(m string) (Tile, error) {
+		asked[m]++
+		switch m {
+		case "flat":
+			return Tile{W: 0, H: 64}, nil
+		case "low":
+			return Tile{W: 64, H: 0}, nil
+		}
+		return Tile{W: 0.5, H: 1, From: "a trim"}, nil
+	}
+	d, err := Edit(context.Background(), c, snap, ops(t, `[
+		{"box": {"min": [0, 0, 0], "max": [8, 8, 8], "material": "edge"}},
+		{"box": {"min": [0, 0, 8], "max": [8, 8, 16], "material": "edge"}},
+		{"box": {"min": [0, 0, 16], "max": [8, 8, 24], "material": "flat"}},
+		{"box": {"min": [0, 0, 24], "max": [8, 8, 32], "material": "low"}}
+	]`), "", tiles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if asked["edge"] != 1 || d.Tiles["edge"] != (Tile{W: 0.5, H: 1, From: "a trim"}) {
+		t.Errorf("asked %v, tiles %+v", asked, d.Tiles)
+	}
+	if d.Tiles["flat"] != assumed || d.Tiles["low"] != assumed {
+		t.Errorf("a zero size: %+v", d.Tiles)
+	}
+}
+
+// A texture op on one brush of an entity leaves its other brushes; a fit on a
+// face with no area refuses the batch.
+func TestATextureOnOneBrushOfAnEntity(t *testing.T) {
+	f, c, _ := viewing(t, 305)
+	two := EntityText("trigger_multiple", nil,
+		strings.Replace(BoxBrush(box(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{8, 8, 8}), "trigger", ""), "{\n", "{\n guid \"{0C000000-0000-0000-0000-000000000002}\"\n", 1),
+		strings.Replace(BoxBrush(box(mapfile.Vec3{16, 0, 0}, mapfile.Vec3{24, 8, 8}), "trigger", ""), "{\n", "{\n guid \"{0C000000-0000-0000-0000-000000000003}\"\n", 1))
+	edge := "{\n guid \"{0C000000-0000-0000-0000-000000000004}\"\n" +
+		" " + face(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{1, 0, 0}, mapfile.Vec3{0, 1, 0}) + " caulk 64 64 0 0 0 0 lightmap_gray 16384 16384 0 0 0 0\n" +
+		" " + face(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{0, 1, 0}, mapfile.Vec3{0, 0, 1}) + " caulk 64 64 0 0 0 0 lightmap_gray 16384 16384 0 0 0 0\n" +
+		" " + face(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{0, 0, 1}, mapfile.Vec3{1, 0, 0}) + " caulk 64 64 0 0 0 0 lightmap_gray 16384 16384 0 0 0 0\n" +
+		" " + face(mapfile.Vec3{0, 64, 0}, mapfile.Vec3{1, 64, 0}, mapfile.Vec3{0, 64, 1}) + " caulk 64 64 0 0 0 0 lightmap_gray 16384 16384 0 0 0 0\n" +
+		" " + face(mapfile.Vec3{128, 0, 0}, mapfile.Vec3{128, 0, 64}, mapfile.Vec3{128, 1, 0}) + " caulk 64 64 0 0 0 0 lightmap_gray 16384 16384 0 0 0 0\n" +
+		" " + face(mapfile.Vec3{0, 0, 64}, mapfile.Vec3{0, 1, 64}, mapfile.Vec3{128, 0, 0}) + " caulk 64 64 0 0 0 0 lightmap_gray 16384 16384 0 0 0 0\n}\n"
+	f.Update(func(f *radianttest.Fake) {
+		f.Text = strings.Replace(f.Text, "\"classname\" \"worldspawn\"\n", "\"classname\" \"worldspawn\"\n"+edge, 1)
+		f.Text += strings.Replace(two, "{\n", "{\nguid \"{0C000000-0000-0000-0000-000000000001}\"\n", 1)
+	})
+	snap, err := Read(context.Background(), c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := Edit(context.Background(), c, snap, ops(t, `[{"texture": {"ids": ["0c000000-0000-0000-0000-000000000003"], "material": "clip"}}]`), "", nil)
+	if err != nil || d.Faces[0] != 6 {
+		t.Fatalf("%+v, %v", d, err)
+	}
+	hits, _ := Find(d.After.Map, d.After.IDs, Query{Class: "trigger_multiple"}, Selection{})
+	if len(hits) != 1 || Material(hits[0].Entity.Brushes()[0]) != "trigger" || Material(hits[0].Entity.Brushes()[1]) != "clip" {
+		t.Errorf("the trigger after: %+v", hits)
+	}
+	if _, err := Edit(context.Background(), c, snap, ops(t, `[{"texture": {"ids": ["0c000000-0000-0000-0000-000000000004"], "fit": [1, 1]}}]`), "", nil); err == nil || !strings.Contains(err.Error(), "its +x face: too thin to fit") {
+		t.Errorf("a face that is an edge: %v", err)
 	}
 }
 
