@@ -146,6 +146,24 @@ func TestEntityText(t *testing.T) {
 	}
 }
 
+// An entity's Bytes is its part of the map's text: the header, each entity's
+// Bytes and the trailer make the map again.
+func TestEntityBytes(t *testing.T) {
+	m := parse(t, sample+"// end\n")
+	var b bytes.Buffer
+	b.WriteString(strings.Join(m.Header, ""))
+	for _, e := range m.Entities {
+		b.Write(e.Bytes())
+	}
+	b.WriteString(strings.Join(m.Trailer, ""))
+	if b.String() != sample+"// end\n" {
+		t.Errorf("the parts make\n%s", b.String())
+	}
+	if first := string(m.Entities[0].Bytes()); !strings.HasPrefix(first, "// entity 0\n{\n") || !strings.HasSuffix(first, "}\n") {
+		t.Errorf("entity 0's text:\n%s", first)
+	}
+}
+
 // Lines that only look like keys are not keys.
 func TestNotKeys(t *testing.T) {
 	e := parse(t, "{\n\"a\" \"b\" c\n\"unterminated\n\"x\" y\n\"k\" \"v\"\n}\n").Entities[0]
