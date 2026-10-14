@@ -133,6 +133,12 @@ func (f *Fake) serve(c *conn) {
 		}
 		head, body, _ := strings.Cut(string(payload), "\n")
 		id, line, _ := strings.Cut(head, " ")
+		if why := badID(id); why != "" { // the plugin answers with id 0, having none to answer with
+			if c.send("0 err bad-request "+why+"\n") != nil {
+				return
+			}
+			continue
+		}
 		command, args, _ := strings.Cut(line, " ")
 		r := f.run(c, greeted, command, args, []byte(body), line)
 		greeted = greeted || (command == "hello" && r.Code == "")
@@ -146,6 +152,17 @@ func (f *Fake) serve(c *conn) {
 			return
 		}
 	}
+}
+
+// badID is why the plugin can't read a request's id: 1 to 18 digits, not 0.
+func badID(id string) string {
+	if id == "" || len(id) > 18 || strings.Trim(id, "0123456789") != "" {
+		return "a request starts with its id"
+	}
+	if strings.Trim(id, "0") == "" {
+		return "request ids start at 1 (0 is for events)"
+	}
+	return ""
 }
 
 func (f *Fake) run(c *conn, greeted bool, command, args string, body []byte, line string) Reply {
