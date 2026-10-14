@@ -311,9 +311,9 @@ func TestABlankCaptureIsRefused(t *testing.T) {
 	}
 	for i := range 3 {
 		fr := &frame{Pixels: bytes.Repeat([]byte{7, 7, 7, 255}, 4)}
-		fr.Pixels[8+i]++ // the third pixel's blue, green or red
+		fr.Pixels[12+i]++ // the last pixel's blue, green or red
 		if blank(fr) {
-			t.Errorf("a frame whose third pixel differs in channel %d is blank", i)
+			t.Errorf("a frame whose last pixel differs in channel %d is blank", i)
 		}
 	}
 	if !blank(&frame{Pixels: []byte{1, 2, 3, 255, 1, 2, 3, 0}}) || !blank(&frame{}) {
