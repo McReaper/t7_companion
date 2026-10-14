@@ -6,6 +6,8 @@ Contents:
 - [A new map is the template's room in a sky box: build inside it](#a-new-map-is-the-templates-room-in-a-sky-box-build-inside-it)
 - [One batch per step the user would undo](#one-batch-per-step-the-user-would-undo)
 - [An edited world brush or brush entity comes back under a new id](#an-edited-world-brush-or-brush-entity-comes-back-under-a-new-id)
+- [Texture faces, not brushes: caulk what nobody sees](#texture-faces-not-brushes-caulk-what-nobody-sees)
+- [Build one, then copy it](#build-one-then-copy-it)
 - [Cut doors by building around the hole, not with CSG Subtract](#cut-doors-by-building-around-the-hole-not-with-csg-subtract)
 - [CSG Hollow walls are as thick as the grid](#csg-hollow-walls-are-as-thick-as-the-grid)
 - [Look from the top first](#look-from-the-top-first)
@@ -48,6 +50,21 @@ Build the blockout inside the sky box and the start zone first: it seals and pla
 ## An edited world brush or brush entity comes back under a new id
 
 A point entity (`light`, `script_struct`, `info_player_start`) keeps its id through `set` and `move`. A world brush moved or retextured, and any entity that owns brushes (`volume_sun`, triggers, `script_brushmodel`), is deleted and imported anew, and gets a **new id**: the answer's `made` gives it, with `was` the old one. So are a `reflection_probe` and a `misc_prefab`. Use the new ids from then on; when unsure, `t7kb:map_find` again. Why: Radiant's undo brings a replaced brush entity back as world brushes only (MTPlugins' notes), while a delete and an import undo exactly (verified in a test Radiant).
+
+## Texture faces, not brushes: caulk what nobody sees
+
+A `box` takes one material on all six faces, at the material's own tile; a `texture` op then lays materials face by face — `faces` `top`, `bottom`, `sides` or directions (`+x,-y`) — in the same batch, naming the box `@n` (the op that made it). The tile defaults to the size the install's maps use the material at most (the answer's `tiles` says which and from how many faces; a material they hardly use gets its GDT's tiling at 16 texels a unit), so bricks and planks come out at the scale Treyarch's maps have them. Then:
+
+- **Caulk every face nobody sees** — wall tops and bottoms against a floor or ceiling, backs against the sky box: `caulk` draws nothing and costs nothing, a visible material there still draws.
+- **Keep one `origin` for faces that meet**: tiles start on it (the world's 0 0 0 by default), so walls of one room given the same tile run on without a seam across brushes. Set it to the floor's corner when a texture must start at the floor (a wainscot, a tile row).
+- **Trims**: `fit` `[0, 1]` makes one repeat span the face's height, the length scaled to keep the texture's shape — a baseboard or a beam's band.
+- `rotate` turns planks and stripes (90 to run them the other way), `flip` mirrors, `scale` 2 doubles the tile. `material` alone swaps a material and keeps each face's tile, as Radiant's Find/Replace does.
+
+Look at the result with `t7kb:map_view` `render` `fullbright` from a `camera` inside the room. The template's volumes (`volume_fpstool`, the start zone, sun and umbra volumes) cover ±1536 and draw their tool textures over the shot from inside them too (verified in a test Radiant): `t7kb:map_command` `View/Hide Entities/Hide Selected` on their ids before the shot, `View/Show Last Hidden` after.
+
+## Build one, then copy it
+
+`copy` repeats ids — `by` the step, `count` how many — as a row of pillars, wall panels or lamps from one: `{"copy": {"ids": ["@3"], "by": [112, 0, 0], "count": 3}}`. A copy keeps the original's keys and materials as they are at that point of the batch, `targetname` included (rename a copy with `set`); `@n` on a copy op names every copy, so a following `texture` or `move` takes them all. Copy the entity, not one brush of it.
 
 ## Cut doors by building around the hole, not with CSG Subtract
 
