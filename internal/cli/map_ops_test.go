@@ -51,8 +51,9 @@ func TestMapFileNamesTheMapLikeTheLauncher(t *testing.T) {
 		{arg: "zm_b", want: zm},
 		{arg: " zm_b ", want: zm},
 		{arg: "test.map", want: filepath.Join(root, "map_source", "test.map")},
-		{arg: `zm\zm_b.MAP`, want: filepath.Join(root, "map_source", "zm", "zm_b.MAP")},
+		{arg: filepath.Join("zm", "zm_b.map"), want: zm},
 		{arg: zm, want: zm},
+		{arg: "other.MAP", err: "no map at " + filepath.Join(root, "map_source", "other.MAP")}, // a path, not a name
 		{arg: "zm_none", err: "no map at " + filepath.Join(root, "map_source", "zm", "zm_none.map")},
 		{arg: "", err: "no map: pass"},
 		{arg: "zm", err: "is no map name"},
