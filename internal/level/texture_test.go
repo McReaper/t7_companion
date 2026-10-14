@@ -114,6 +114,11 @@ func TestATextureLaysTheMaterialsTileFromTheWorldsOrigin(t *testing.T) {
 	if z := f["+z"]; z.Material != "caulk" || z.Tex[0] != -128 || z.Tex[2] != 0 || z.Tex[3] != 0 {
 		t.Errorf("top: %s %v: the origin is on its tile corners already", z.Material, z.Tex)
 	}
+	// A tile given outright, mirrored down.
+	textured(t, b, &TextureOp{Faces: "+y", Tile: &[2]float64{32, 16}, Flip: "v"}, tile)
+	if y := faceTex(t, b)["+y"]; y.Tex[0] != 32 || y.Tex[1] != -16 || y.Tex[3] != 0 {
+		t.Errorf("+y: %v: 32 across, 16 down mirrored", y.Tex)
+	}
 	// A fit of one repeat down a trim's height keeps the tile's shape across.
 	trim := boxOf(t, mapfile.Vec3{0, 0, 3}, mapfile.Vec3{256, 8, 11}, "caulk")
 	textured(t, trim, &TextureOp{Faces: "-y", Material: "plank", Fit: &[2]float64{0, 1}}, tile)
@@ -220,6 +225,10 @@ func TestATextureOpNamesWhatAnEarlierOpMade(t *testing.T) {
 				t.Errorf("faces %+v", got)
 			}
 		}
+	}
+	one, err := Edit(context.Background(), c, snap, ops(t, `[{"texture": {"ids": ["6e73936c"], "faces": "bottom", "material": "clip"}}]`), "", nil)
+	if err != nil || len(one.Made) != 1 || one.Made[0].Class != "volume_sun" || one.Faces[0] != 1 {
+		t.Errorf("one brush of an entity, its bottom: %+v, %v", one, err)
 	}
 	for js, want := range map[string]string{
 		`[{"texture": {"ids": ["@0"]}}]`: "no earlier op 0 made",
