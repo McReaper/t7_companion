@@ -292,12 +292,12 @@ func TestBatchesThatCountedToNothing(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := Edit(context.Background(), c, snap, ops(t, js), ""); err != nil {
+		if _, err := Edit(context.Background(), c, snap, ops(t, js), "", nil); err != nil {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
 	snap, _ := Read(context.Background(), c)
-	b := newBatch(snap)
+	b := newBatch(snap, nil)
 	if err := b.apply(ops(t, `[{"delete": ["f2d51a52"]}]`)); err != nil {
 		t.Fatal(err)
 	}
@@ -320,7 +320,7 @@ func TestMovingAnEntityMovesAllItsBrushes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, err := Edit(context.Background(), c, snap, ops(t, `[{"move": {"ids": ["{0B100000-0000-0000-0000-000000000000}"], "by": [100, 0, 0]}}]`), "")
+	d, err := Edit(context.Background(), c, snap, ops(t, `[{"move": {"ids": ["{0B100000-0000-0000-0000-000000000000}"], "by": [100, 0, 0]}}]`), "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

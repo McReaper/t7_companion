@@ -105,6 +105,20 @@ func mapSamples(t *testing.T, root string, add func(key, s string), addImage fun
 	moved, _ := decodeOps([]byte(`[{"move": {"ids": ["` + start + `"], "by": [0, 64, 0]}}]`))
 	v, err = mapEdit(ctx, moved, "", 0)
 	run("map_edit|move the player start (a point entity, in place)", v, err)
+	textured := `[` +
+		`{"box": {"min": [900, -1400, -16], "max": [1400, -900, 0], "material": "t7_wood_plank_floor_02"}},` +
+		`{"box": {"min": [900, -1400, 0], "max": [908, -900, 112], "material": "t7_brick_worn_dirty_red_wet"}},` +
+		`{"box": {"min": [1392, -1400, 0], "max": [1400, -900, 112], "material": "t7_brick_worn_dirty_red_wet"}},` +
+		`{"texture": {"ids": ["@1", "@2"], "faces": "top,bottom", "material": "caulk"}},` +
+		`{"box": {"min": [1000, -1150, 0], "max": [1032, -1118, 112], "material": "t7_concrete_poured_bunker_dirty_01_wet"}},` +
+		`{"copy": {"ids": ["@4"], "by": [96, 0, 0], "count": 3}}]`
+	add("map_edit|the ops sent: a floor, 2 walls caulked top and bottom, a pillar copied 3 times", textured)
+	tops, err := decodeOps([]byte(textured))
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err = mapEdit(ctx, tops, "textures and copies", 0)
+	run("map_edit|its answer (with each material's tile)", v, err)
 
 	v, err = mapCommand(ctx, "", nil, "Selection/CSG", 0)
 	run("map_command|list Selection/CSG", v, err)

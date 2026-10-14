@@ -41,10 +41,20 @@ func mapEditTool() server.ServerTool {
 			"\"class\"?: c, \"keys\"?: {…}}} a box brush, in worldspawn or as a new brush entity of class (volume_sun, "+
 			"trigger_multiple); {\"entity\": {\"class\": c, \"origin\": [x,y,z], \"angles\"?: [p,y,r], \"keys\"?: {…}}} a "+
 			"point entity; {\"delete\": [ids]}; {\"set\": {\"id\": id, \"keys\": {k: v, k2: null}}} (null removes); "+
-			"{\"move\": {\"ids\": [ids], \"by\": [dx,dy,dz]}}; {\"material\": {\"ids\": [ids], \"material\": m}}. "+
-			"Ids are map_find's. A point entity keeps its id; a world brush or an entity that owns brushes is rebuilt and "+
-			"gets a new one (was gives the old). The answer reads the map back: each op's id, class, origin or bounds. "+
-			"Edits go through Radiant, never the .map file, and the user's selection is kept."),
+			"{\"move\": {\"ids\": [ids], \"by\": [dx,dy,dz]}}; {\"copy\": {\"ids\": [ids], \"by\": [dx,dy,dz], "+
+			"\"count\"?: n}} n copies, each by further than the last (a row of pillars or wall panels from one); "+
+			"{\"material\": {\"ids\": [ids], \"material\": m}} swaps the material, each face keeping its tile; "+
+			"{\"texture\": {\"ids\": [ids], \"faces\"?: \"top\"|\"bottom\"|\"sides\"|\"+x,-y\"…, \"material\"?: m, "+
+			"\"tile\"?: [u,v], \"scale\"?: s, \"origin\"?: [x,y,z], \"fit\"?: [nu,nv], \"rotate\"?: deg, \"flip\"?: "+
+			"\"u\"|\"v\"|\"uv\"}} lays a material on faces (all by default): tile is the world units one repeat spans "+
+			"(default the material's own, as the install's maps use it), tiles start on origin (default 0 0 0, so faces "+
+			"given the same tile line up across brushes), fit makes nu repeats span each face (0 sizes that axis as the "+
+			"other) starting at its edge. New boxes get their material's own tile too. Ids are map_find's, or @n: what op "+
+			"n of this batch made (every copy of a copy op), so a box built, textured and copied is one undo step. A point "+
+			"entity keeps its id; a world brush or an entity that owns brushes is rebuilt and gets a new one (was gives "+
+			"the old). The answer reads the map back: each op's id, class, origin or bounds, the tile each material got "+
+			"and where it came from, the faces each texture op textured. Edits go through Radiant, never the .map file, "+
+			"and the user's selection is kept."),
 		mcp.WithArray("ops", mcp.Required(), mcp.Description("The ops, in order."), mcp.Items(map[string]any{"type": "object"})),
 		mcp.WithString("label", mcp.Description("What the batch does, for Radiant's undo menu (default: the ops counted).")),
 		mcp.WithNumber("pid", mcp.Description("The Radiant to edit when several run."))),

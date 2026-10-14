@@ -54,9 +54,10 @@
 //
 // # Editing
 //
-// Edit applies a batch of ops (box, entity, delete, set, move, material) in
-// order to a copy of the snapshot, unit by unit (a world brush, or an entity
-// with its brushes), and sends what changed as the bridge's one edit: one
+// Edit applies a batch of ops (box, entity, delete, set, move, material,
+// texture, copy) in order to a copy of the snapshot, unit by unit (a world
+// brush, or an entity with its brushes; "@n" names what op n made, every copy
+// of a copy op), and sends what changed as the bridge's one edit: one
 // undo step, applied whole or not at all. A point entity of the map is
 // replaced in place and keeps its GUID; a world brush or an entity that owns
 // brushes is deleted and imported anew, under a new GUID, as that is what
@@ -66,6 +67,21 @@
 // order is not the text's. The text is Radiant's own format, without GUIDs
 // (the import gives them); the plugin refuses any line Radiant can't read,
 // which Radiant itself would take for a fatal error.
+//
+// # Textures
+//
+// A face line's texture is "material W H u v rotation 0": Radiant projects it
+// along the world axis the face's normal is closest to (z, then x, then y on a
+// tie), u = (p·U + u)/W and v = (p·V + v)/H, with U, V = -x, +y on floors and
+// ceilings, -y, +z on x walls, -x, +z on y walls, turned by the rotation (at
+// 90, U runs where -V ran). So W and H are the world units one repeat spans (a
+// negative one mirrors it), the offsets are world units, and faces given the
+// same W, H and offsets line up across brushes. Radiant's own Fit Texture on a
+// test box at 0, 90 and 30 degrees pins these (TestAFitLands…, TestAt30…); at
+// 30 it sizes v along the face's bounding box's diagonal, so a fit here, over
+// the face's corners, is the true one. A texture op's default tile, and a new
+// box's, is what Tiles gives: map_edit's is the size the install's maps use the
+// material at most, else its GDT's tiling at 16 texels a unit.
 //
 // # Commands
 //

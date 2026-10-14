@@ -29,7 +29,9 @@ func (b *batch) plan() (*plan, error) {
 	for _, u := range b.units {
 		switch u.state {
 		case deleted:
-			p.deletes = append(p.deletes, u.guid)
+			if u.guid != "" { // what the batch made and deleted again is not sent
+				p.deletes = append(p.deletes, u.guid)
+			}
 		case changed:
 			switch {
 			case u.world:
@@ -89,10 +91,7 @@ func (p *plan) body() string {
 }
 
 func (u *unit) blockText() string {
-	switch {
-	case u.text != "":
-		return u.text
-	case u.world:
+	if u.world {
 		return brushText(u.brush)
 	}
 	return string(u.ent.Bytes())
@@ -112,13 +111,17 @@ type Done struct {
 	Label   string
 	Deleted int // brushes, a point entity's own one included
 	Made    []Made
-	After   *Snapshot // the map as Radiant has it afterwards
+	Tiles   map[string]Tile // the tile each material sized by the batch was given
+	Faces   map[int]int     // texture op -> how many faces it textured
+	After   *Snapshot       // the map as Radiant has it afterwards
 }
 
 // Edit applies the ops to the map open in the Radiant as one undo step
 // labelled label, then reads the map back and finds in it what each op made.
-func Edit(ctx context.Context, c *radiant.Client, snap *Snapshot, ops []Op, label string) (*Done, error) {
-	b := newBatch(snap)
+// tiles sizes the materials of new boxes and texture ops (nil assumes 64
+// units).
+func Edit(ctx context.Context, c *radiant.Client, snap *Snapshot, ops []Op, label string, tiles Tiles) (*Done, error) {
+	b := newBatch(snap, tiles)
 	if err := b.apply(ops); err != nil {
 		return nil, err
 	}
@@ -137,7 +140,7 @@ func Edit(ctx context.Context, c *radiant.Client, snap *Snapshot, ops []Op, labe
 	if err != nil {
 		return nil, fmt.Errorf("the edit is done (one Ctrl+Z undoes it), but the map could not be read back: %w", err)
 	}
-	d := &Done{Label: "t7kb: " + label, After: after}
+	d := &Done{Label: "t7kb: " + label, After: after, Tiles: b.used, Faces: b.faces}
 	d.Deleted, _ = strconv.Atoi(strings.TrimPrefix(r.Summary, "deleted="))
 	d.Made = p.match(fresh(string(r.Body)), after)
 	sort.SliceStable(d.Made, func(i, j int) bool { return d.Made[i].Op < d.Made[j].Op })
@@ -146,16 +149,14 @@ func Edit(ctx context.Context, c *radiant.Client, snap *Snapshot, ops []Op, labe
 
 // summary names a batch for Radiant's undo menu: its ops, counted.
 func summary(ops []Op) string {
-	var n [6]int
+	n := make([]int, len(opKinds))
 	for _, op := range ops {
-		for i, set := range []bool{op.Box != nil, op.Entity != nil, op.Delete != nil, op.Set != nil, op.Move != nil, op.Material != nil} {
-			if set {
-				n[i]++
-			}
+		for _, k := range op.kinds() {
+			n[k]++
 		}
 	}
 	var parts []string
-	for i, name := range []string{"box", "entity", "delete", "set", "move", "material"} {
+	for i, name := range opKinds {
 		if n[i] > 0 {
 			parts = append(parts, fmt.Sprintf("%d %s", n[i], name))
 		}
@@ -198,24 +199,9 @@ func (p *plan) match(got map[string]bool, after *Snapshot) []Made {
 // shape is a unit's class ("" for a world brush) and box, from the text sent.
 func (u *unit) shape() (string, Box) {
 	if u.world {
-		if u.brush != nil {
-			return "", BrushBox(u.brush)
-		}
-		m, err := mapfile.Parse([]byte("{\n\"classname\" \"worldspawn\"\n" + u.text + "}\n"))
-		if err != nil || len(m.Entities) == 0 || len(m.Entities[0].Brushes()) == 0 {
-			return "", Box{}
-		}
-		return "", BrushBox(m.Entities[0].Brushes()[0])
+		return "", BrushBox(u.brush)
 	}
-	e := u.ent
-	if e == nil {
-		m, err := mapfile.Parse([]byte(u.text))
-		if err != nil || len(m.Entities) == 0 {
-			return "", Box{}
-		}
-		e = m.Entities[0]
-	}
-	return e.Class(), EntityBox(e)
+	return u.ent.Class(), EntityBox(u.ent)
 }
 
 // findShape is the GUID of the first thing read back, among those imported and
