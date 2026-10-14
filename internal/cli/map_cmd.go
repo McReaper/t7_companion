@@ -51,8 +51,28 @@ func newMapCmd() *cobra.Command {
 	fl.StringVar(&a.Keys, "keys", "", "which keys to show: all, or a comma list (default the naming keys)")
 	fl.IntVar(&a.Limit, "limit", 0, "how many entities at most (default 50)")
 	fl.IntVar(&a.PID, "pid", 0, "the Radiant to read when several run")
-	root.AddCommand(find, newMapViewCmd(), newMapEditCmd())
+	root.AddCommand(find, newMapViewCmd(), newMapEditCmd(), newMapCommandCmd())
 	return root
+}
+
+func newMapCommandCmd() *cobra.Command {
+	var menu string
+	var pid int
+	command := &cobra.Command{Use: "command <menu path> [id…]",
+		Short: "Run a Radiant menu entry on the entities and brushes named, or list a menu (--menu)",
+		RunE: func(c *cobra.Command, a []string) error {
+			path, ids := "", a
+			if menu == "" {
+				if len(a) == 0 {
+					return fmt.Errorf("give a menu path (Selection/CSG/CSG Hollow), or --menu to list one")
+				}
+				path, ids = a[0], a[1:]
+			}
+			return printIndented(c.OutOrStdout())(mapCommand(c.Context(), path, ids, menu, pid))
+		}}
+	command.Flags().StringVar(&menu, "menu", "", "list this menu's entries instead (\"\" for the menu bar is --menu /)")
+	command.Flags().IntVar(&pid, "pid", 0, "the Radiant to use when several run")
+	return command
 }
 
 func newMapEditCmd() *cobra.Command {

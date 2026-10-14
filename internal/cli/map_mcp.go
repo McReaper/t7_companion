@@ -13,7 +13,24 @@ import (
 // mapToolset edits the map open in the user's Radiant, through the
 // T7RadiantBridge plugin: internal/radiant has the connection's rules.
 func mapToolset() toolset {
-	return toolset{name: "map", tools: []server.ServerTool{radiantOpenTool(), mapFindTool(), mapViewTool(), mapEditTool()}}
+	return toolset{name: "map", tools: []server.ServerTool{radiantOpenTool(), mapFindTool(), mapViewTool(), mapEditTool(), mapCommandTool()}}
+}
+
+func mapCommandTool() server.ServerTool {
+	return server.ServerTool{Tool: mcp.NewTool("map_command",
+		mcp.WithDescription("Run one of Radiant's own menu entries on entities and brushes of the open map: they are "+
+			"selected alone for it, then the user's selection comes back. For what map_edit has no op for: CSG "+
+			"(Selection/CSG/CSG Hollow, CSG Subtract, CSG Merge), patches, textures, prefabs. The answer reads the map "+
+			"back: the undo entry the command made (one Ctrl+Z), what it created (id, class or material, bounds), what it "+
+			"deleted, what it left selected. A command that opens a dialog waits on the user. menu instead of command "+
+			"lists a menu's entries (\"Selection/CSG\"; \"\" the menu bar), \" >\" marking a submenu."),
+		mcp.WithString("command", mcp.Description("The menu path, labels from the menu bar: Selection/CSG/CSG Hollow.")),
+		mcp.WithString("ids", mcp.Description("What to select for it, comma- or space-separated (default nothing selected).")),
+		mcp.WithString("menu", mcp.Description("List this menu's entries instead of running a command.")),
+		mcp.WithNumber("pid", mcp.Description("The Radiant to use when several run."))),
+		Handler: jsonHandler(func(ctx context.Context, r mcp.CallToolRequest) (any, error) {
+			return mapCommand(ctx, r.GetString("command", ""), splitIDs(r.GetString("ids", "")), r.GetString("menu", ""), r.GetInt("pid", 0))
+		})}
 }
 
 func mapEditTool() server.ServerTool {

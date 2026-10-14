@@ -66,4 +66,12 @@
 // order is not the text's. The text is Radiant's own format, without GUIDs
 // (the import gives them); the plugin refuses any line Radiant can't read,
 // which Radiant itself would take for a fatal error.
+//
+// # Commands
+//
+// Command runs a Radiant menu entry (a CSG, a patch tool) on what the ids
+// name, selected alone, then selects the user's selection again, whatever
+// happened. What it did is read from the map before and after (GUIDs
+// created and deleted), and from the undo menu, reported whenever the map
+// changed, as two commands alike leave the same label.
 package level

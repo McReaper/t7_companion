@@ -48,9 +48,11 @@ type Fake struct {
 	Dialog      string // a modal dialog's title: every command but hello, state and menus is busy
 	Render      string
 	View2D      string
-	LoadAfter   time.Duration // how long reload takes to show the new map in state
-	Text        string        // the map's entities, as entities gives them
-	Selection   []string      // the selected brushes' GUIDs
+	LoadAfter   time.Duration     // how long reload takes to show the new map in state
+	Text        string            // the map's entities, as entities gives them
+	Selection   []string          // the selected brushes' GUIDs
+	Menus       map[string]string // menus' entries by path, as menus gives them: "label	enabled	submenu" lines
+	UndoLabel   string            // the undo menu's entry: what the last edit was labelled
 	views
 
 	mu       sync.Mutex
@@ -72,7 +74,7 @@ func New(pid int, mapPath string) *Fake {
 		views: views{W3: 160, H3: 90, Focal: 120, W2: 90, H2: 160, Scale2D: 1}, conns: map[*conn]bool{}}
 	f.handlers = map[string]Handler{"hello": hello, "state": state, "reload": reload, "subscribe": subscribe,
 		"entities": entities, "selection": selection, "camera": camera, "capture": capture, "command": command, "action": action,
-		"edit": edit}
+		"edit": edit, "select": selectCmd, "deselect": deselect, "menus": menus}
 	return f
 }
 

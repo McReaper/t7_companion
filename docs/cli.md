@@ -15,6 +15,7 @@ t7kb radiant open <map>      open a map in Radiant, or start it  (--pid · --dis
 t7kb map find [id…]          the open map's entities, ids and bounds  (--class · --near · --brushes)
 t7kb map view [id…]          an image of a view, ids on it  (--view top · --render fake · --out)
 t7kb map edit --ops <file|->  a batch of edits, one undo step  (--label)
+t7kb map command <path> [id…] a Radiant menu entry on what the ids name  (--menu)
 t7kb mcp                     run the MCP server
 t7kb update-check            is a newer release out? is the plugin behind?
 ```

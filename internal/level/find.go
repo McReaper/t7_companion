@@ -20,6 +20,7 @@ type Query struct {
 // Selection is what Radiant has selected: brush GUIDs and their entities'.
 type Selection struct {
 	Brushes, Entities map[string]bool
+	GUIDs             []string // the selected brushes' GUIDs, in Radiant's order
 }
 
 // ParseSelection reads the bridge's selection lines, "<brush guid> <entity
@@ -29,6 +30,7 @@ func ParseSelection(body string) Selection {
 	for _, line := range strings.Split(body, "\n") {
 		if f := strings.Fields(line); len(f) >= 2 {
 			s.Brushes[hexOf(f[0])], s.Entities[hexOf(f[1])] = true, true
+			s.GUIDs = append(s.GUIDs, f[0])
 		}
 	}
 	return s

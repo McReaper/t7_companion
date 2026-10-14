@@ -1,0 +1,108 @@
+package cli
+
+import (
+	"context"
+	"encoding/json"
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/McReaper/t7_companion/internal/radiant/radianttest"
+)
+
+// splitFloor is a fake command that makes a light and turns the floor brush
+// into two, leaving the light selected.
+func splitFloor(f *radianttest.Fake, args string, _ []byte) radianttest.Reply {
+	if args != "Selection/CSG/CSG Subtract" {
+		return radianttest.Err("missing", "no menu entry "+args)
+	}
+	f.Text = strings.Replace(f.Text, "{5EC8DE49-C58E-11F1-B542-00155DD185EA}", "{0C000001-0000-0000-0000-000000000000}", 1)
+	f.Text += "{\nguid \"{0C000009-0000-0000-0000-000000000000}\"\n\"classname\" \"light\"\n\"origin\" \"1 2 3\"\n}\n"
+	f.Selection, f.UndoLabel = []string{"{0C000001-0000-0000-0000-000000000000}"}, "subtract"
+	return radianttest.OK("", nil)
+}
+
+func TestMapCommandAnswersWhatTheCommandDid(t *testing.T) {
+	f := testRadiant(t)
+	f.Handle("command", splitFloor)
+	out, err := mapCommand(context.Background(), "Selection/CSG/CSG Subtract", []string{"5ec8de49"}, "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Command != "Selection/CSG/CSG Subtract" || out.Undo != "subtract" || !slices.Equal(out.Deleted, []string{"5ec8de49"}) || len(out.Created) != 2 {
+		t.Fatalf("answer = %+v", out)
+	}
+	floor, light := out.Created[0], out.Created[1]
+	if floor.ID != "0c000001" || floor.Material != "aac_wood_mahogany_01" || floor.Class != "" || floor.Bounds[2] != -64 {
+		t.Errorf("the floor = %+v", floor)
+	}
+	if light.ID != "0c000009" || light.Class != "light" || light.Material != "" || light.Bounds[0] != 1 {
+		t.Errorf("the light = %+v", light)
+	}
+	if !slices.Equal(out.Selected, []string{"0c000001"}) {
+		t.Errorf("selected %q: not all it made, so said", out.Selected)
+	}
+}
+
+func TestMapCommandSaysTheSelectionOnceWhenItIsWhatWasMade(t *testing.T) {
+	f := testRadiant(t)
+	f.Handle("command", func(f *radianttest.Fake, _ string, _ []byte) radianttest.Reply {
+		f.Text = strings.Replace(f.Text, "{5EC8DE49-C58E-11F1-B542-00155DD185EA}", "{0D000001-0000-0000-0000-000000000000}", 1)
+		f.Selection = []string{"{0d000001-0000-0000-0000-000000000000}"}
+		return radianttest.OK("", nil)
+	})
+	out, err := mapCommand(context.Background(), "Brush/Anything", []string{"5ec8de49"}, "", 0)
+	if err != nil || len(out.Created) != 1 || out.Selected != nil {
+		t.Errorf("answer = %+v, %v", out, err)
+	}
+	if !sameSet([]string{"{A}", "{b}"}, []string{"{B}", "{a}"}) || sameSet([]string{"{A}"}, []string{"{B}"}) || sameSet([]string{"{A}"}, nil) {
+		t.Error("sameSet")
+	}
+}
+
+func TestMapCommandListsAMenu(t *testing.T) {
+	f := testRadiant(t)
+	f.Menus = map[string]string{"Selection/CSG": "CSG Hollow\t1\t0\nCSG Merge\t0\t0\nMore\t1\t1\n"}
+	out, err := mapCommand(context.Background(), "", nil, "Selection/CSG", 0)
+	if err != nil || out.Menu != "Selection/CSG" || !slices.Equal(out.Entries, []string{"CSG Hollow", "CSG Merge (disabled)", "More >"}) || out.Command != "" {
+		t.Errorf("menu = %+v, %v", out, err)
+	}
+	if _, err := mapCommand(context.Background(), "", nil, "Nope", 0); err == nil {
+		t.Error("an unknown menu")
+	}
+	onMachine(t)
+	if _, err := mapCommand(context.Background(), "", nil, "Selection/CSG", 0); err == nil {
+		t.Error("a menu with no Radiant")
+	}
+}
+
+func TestMapCommandToolAndCommand(t *testing.T) {
+	f := testRadiant(t)
+	f.Handle("command", splitFloor)
+	res, err := mapCommandTool().Handler(context.Background(), mcpRequest("map_command",
+		map[string]any{"command": "Selection/CSG/CSG Subtract", "ids": "5ec8de49"}))
+	if err != nil || res.IsError || !strings.Contains(resultText(res), `"undo":"subtract"`) {
+		t.Errorf("tool: %v %s", err, resultText(res))
+	}
+	run := func(args ...string) (string, error) {
+		cmd := newMapCmd()
+		var out strings.Builder
+		cmd.SetOut(&out)
+		cmd.SetErr(&out)
+		cmd.SetArgs(append([]string{"command"}, args...))
+		err := cmd.Execute()
+		return out.String(), err
+	}
+	if _, err := run(); err == nil || !strings.Contains(err.Error(), "give a menu path") {
+		t.Errorf("no path: %v", err)
+	}
+	f.Update(func(f *radianttest.Fake) { f.Menus = map[string]string{"Brush": "Rotate\t1\t0\n"} })
+	out, err := run("--menu", "Brush")
+	var answer mapCommandOut
+	if err != nil || json.Unmarshal([]byte(out), &answer) != nil || !slices.Equal(answer.Entries, []string{"Rotate"}) {
+		t.Errorf("--menu: %v\n%s", err, out)
+	}
+	if _, err := run("Nope/Nothing", "f2d51a52"); err == nil || !strings.Contains(err.Error(), "no menu entry") {
+		t.Errorf("a missing entry: %v", err)
+	}
+}

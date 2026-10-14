@@ -74,7 +74,7 @@ T7 Companion gives your AI agent everything ten years of the BO3 modding communi
 >             t4["build"]
 >             t5["zone_explain<br/>zone_contents<br/>zone_check"]
 >             t6["shader_decompile"]
->             t7["radiant_open<br/>map_find<br/>map_view<br/>map_edit"]
+>             t7["radiant_open<br/>map_find<br/>map_view<br/>map_edit<br/>map_command"]
 >         end
 >         K[("10 years of BO3<br/>modding knowledge")]
 >     end

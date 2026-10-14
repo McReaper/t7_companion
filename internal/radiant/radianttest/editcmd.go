@@ -70,7 +70,7 @@ func readable(text string) (*mapfile.Map, error) {
 // step: deletes, point entities replaced keeping their GUIDs, one import
 // whose objects get fresh GUIDs. Its rows list what the import made, world
 // brushes first, then each entity (a point entity with one placeholder brush).
-func edit(f *Fake, _ string, body []byte) Reply {
+func edit(f *Fake, args string, body []byte) Reply {
 	e, err := parseEditBody(string(body))
 	if err != nil {
 		return Err("bad-request", err.Error())
@@ -110,7 +110,7 @@ func edit(f *Fake, _ string, body []byte) Reply {
 			rows = append(rows, f.addEntity(m, ent, guid))
 		}
 	}
-	f.Text = string(m.Bytes())
+	f.Text, f.Modified, f.UndoLabel = string(m.Bytes()), true, strings.TrimSpace(args)
 	return OK(fmt.Sprintf("deleted=%d", deleted), []byte(strings.Join(rows, "")))
 }
 
