@@ -75,6 +75,24 @@ func TestACommandThatChangesNothingMadeNoUndoStep(t *testing.T) {
 	if slices.ContainsFunc(f.Requests(), func(r string) bool { return strings.HasPrefix(r, "select ") }) {
 		t.Errorf("nothing to select, and no user selection to give back: %q", f.Requests())
 	}
+	// a save clears the modified flag and makes no undo step; an edit that sets it does
+	f.Update(func(f *radianttest.Fake) { f.Modified = true })
+	f.Handle("command", func(f *radianttest.Fake, _ string, _ []byte) radianttest.Reply {
+		f.Modified = false
+		return radianttest.OK("", nil)
+	})
+	snap, _ = Read(context.Background(), c)
+	if ran, err := Command(context.Background(), c, snap, nil, "File/Save"); err != nil || ran.Undo != "" {
+		t.Errorf("save: %+v, %v", ran, err)
+	}
+	f.Handle("command", func(f *radianttest.Fake, _ string, _ []byte) radianttest.Reply {
+		f.Modified = true
+		return radianttest.OK("", nil)
+	})
+	snap, _ = Read(context.Background(), c)
+	if ran, err := Command(context.Background(), c, snap, nil, "Textures/Fit Texture"); err != nil || ran.Undo != "something earlier" {
+		t.Errorf("an edit that adds or removes nothing: %+v, %v", ran, err)
+	}
 }
 
 func TestACommandThatFailsStillGivesTheSelectionBack(t *testing.T) {

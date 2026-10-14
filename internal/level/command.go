@@ -61,8 +61,9 @@ func Command(ctx context.Context, c *radiant.Client, snap *Snapshot, ids []strin
 		return nil, fmt.Errorf("%s ran, but the map could not be read back: %w", path, err)
 	}
 	ran.Created, ran.Deleted = diff(GUIDs(snap.Map), GUIDs(ran.After.Map))
-	// two commands alike in a row leave the same label: the map's change tells it too
-	if u := undoEntry(ctx, c); u != before || len(ran.Created)+len(ran.Deleted) > 0 || ran.After.State.Modified != snap.State.Modified {
+	// two commands alike in a row leave the same label: the map's change tells it too (a
+	// save clears the modified flag and makes no undo step)
+	if u := undoEntry(ctx, c); u != before || len(ran.Created)+len(ran.Deleted) > 0 || (!snap.State.Modified && ran.After.State.Modified) {
 		ran.Undo = u
 	}
 	return ran, nil
