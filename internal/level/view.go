@@ -89,6 +89,9 @@ func View(ctx context.Context, c *radiant.Client, snap *Snapshot, o ViewOptions)
 		f, err = s.view2D(ctx, axis, target, points(pts))
 	}
 	s.undo(ctx)
+	if err == nil && blank(f) {
+		err = fmt.Errorf("the capture is all one colour: Radiant drew nothing in the view (asleep screen, or a window Windows no longer draws); try again once Radiant is on screen")
+	}
 	if err != nil {
 		if len(s.notes) > 0 {
 			return nil, fmt.Errorf("%w; and %s", err, strings.Join(s.notes, "; "))
@@ -220,6 +223,18 @@ type session struct {
 	pid      int
 	restores []restore
 	notes    []string
+}
+
+// blank tells a capture of one colour: no view Radiant draws is, as its
+// statistics line alone has text in it.
+func blank(f *frame) bool {
+	p := f.Pixels
+	for i := 4; i+3 < len(p); i += 4 {
+		if p[i] != p[0] || p[i+1] != p[1] || p[i+2] != p[2] {
+			return false
+		}
+	}
+	return true
 }
 
 // hideVolumes hides, for the shot, the entities whose tool textures draw

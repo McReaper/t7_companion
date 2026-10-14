@@ -52,6 +52,7 @@ type Fake struct {
 	Text        string            // the map's entities, as entities gives them
 	Selection   []string          // the selected brushes' GUIDs
 	Hidden      []string          // what View/Hide Entities/Hide Selected hid, until View/Show Last Hidden
+	Blank       bool              // the views draw nothing: a capture is white, as when Windows stops composing them
 	Menus       map[string]string // menus' entries by path, as menus gives them: "label	enabled	submenu" lines
 	UndoLabel   string            // the undo menu's entry: what the last edit was labelled
 	views

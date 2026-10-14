@@ -1,6 +1,7 @@
 package level
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -297,5 +298,25 @@ func TestAViewCanHideTheVolumesForTheShot(t *testing.T) {
 	})
 	if _, err := View(context.Background(), c, snap, ViewOptions{View: "top", Hide: "volumes"}); err == nil || !strings.Contains(err.Error(), "hiding the volumes: ") {
 		t.Errorf("a Radiant without the menu: %v", err)
+	}
+}
+
+// A view Radiant drew nothing in comes back white: no image to reason from,
+// whichever pixel tells it.
+func TestABlankCaptureIsRefused(t *testing.T) {
+	f, c, snap := viewing(t, 107)
+	f.Update(func(f *radianttest.Fake) { f.Blank = true })
+	if _, err := View(context.Background(), c, snap, ViewOptions{View: "top"}); err == nil || !strings.Contains(err.Error(), "the capture is all one colour") {
+		t.Errorf("a white capture: %v", err)
+	}
+	for i := range 3 {
+		fr := &frame{Pixels: bytes.Repeat([]byte{7, 7, 7, 255}, 4)}
+		fr.Pixels[8+i]++ // the third pixel's blue, green or red
+		if blank(fr) {
+			t.Errorf("a frame whose third pixel differs in channel %d is blank", i)
+		}
+	}
+	if !blank(&frame{Pixels: []byte{1, 2, 3, 255, 1, 2, 3, 0}}) || !blank(&frame{}) {
+		t.Error("one colour, alpha aside, is blank, as is no pixel")
 	}
 }

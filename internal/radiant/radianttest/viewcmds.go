@@ -1,6 +1,7 @@
 package radianttest
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"strconv"
@@ -63,7 +64,7 @@ func capture(f *Fake, args string, body []byte) Reply {
 		return Err("not-found", "the 2D view shows "+f.View2D+": command View/Layout/Next (XY, YZ, XY) turns it XY, XZ, YZ")
 	}
 	u, v := axes[axis][0], axes[axis][1]
-	out := pixels(f.W2, f.H2)
+	out := f.frame(f.W2, f.H2)
 	for _, p := range pts {
 		out = fmt.Appendf(out, "%s %s\n", num(float64(f.W2)/2+(p[u]-f.Centre2D[u])*f.Scale2D), num(float64(f.H2)/2-(p[v]-f.Centre2D[v])*f.Scale2D))
 	}
@@ -83,7 +84,7 @@ func (f *Fake) capture3D(pose []string, pts [][3]float64) Reply {
 	fwd := [3]float64{math.Cos(pr) * math.Cos(yr), math.Cos(pr) * math.Sin(yr), math.Sin(pr)}
 	right := [3]float64{math.Sin(yr), -math.Cos(yr), 0}
 	up := [3]float64{right[1]*fwd[2] - right[2]*fwd[1], right[2]*fwd[0] - right[0]*fwd[2], right[0]*fwd[1] - right[1]*fwd[0]}
-	out := pixels(f.W3, f.H3)
+	out := f.frame(f.W3, f.H3)
 	for _, p := range pts {
 		d := [3]float64{p[0] - cam[0], p[1] - cam[1], p[2] - cam[2]}
 		x, y, z := dot3(d, right), dot3(d, up), dot3(d, fwd)
@@ -135,6 +136,14 @@ func action(f *Fake, args string, _ []byte) Reply {
 	}
 	copy(f.Centre2D[:], f.Camera[:3])
 	return OK("checkable=0 checked=0 enabled=1", nil)
+}
+
+// frame is a capture's pixels: white when the fake's views draw nothing.
+func (f *Fake) frame(w, h int) []byte {
+	if f.Blank {
+		return bytes.Repeat([]byte{255}, w*h*4)
+	}
+	return pixels(w, h)
 }
 
 // pixels is a w×h BGRA frame: a gradient, so a scaled copy can be told from the original.

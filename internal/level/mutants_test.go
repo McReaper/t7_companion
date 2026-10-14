@@ -209,7 +209,8 @@ func TestAShotWhoseCornersAllFellBehindIsNotRetaken(t *testing.T) {
 	f, c, snap := viewing(t, 404)
 	f.Handle("capture", func(_ *radianttest.Fake, _ string, body []byte) radianttest.Reply {
 		n := strings.Count(string(body), "\n")
-		return radianttest.OK("w=2 h=2 origin=0,0,0 angles=0,0,0 game_view=0", append(make([]byte, 16), strings.Repeat("-\n", n)...))
+		frame := []byte{0, 0, 0, 255, 9, 9, 9, 255, 0, 0, 0, 255, 0, 0, 0, 255}
+		return radianttest.OK("w=2 h=2 origin=0,0,0 angles=0,0,0 game_view=0", append(frame, strings.Repeat("-\n", n)...))
 	})
 	if _, err := View(context.Background(), c, snap, ViewOptions{IDs: []string{"5ec8de49"}}); err != nil {
 		t.Fatal(err)
