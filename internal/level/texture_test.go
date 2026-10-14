@@ -121,10 +121,20 @@ func TestATextureLaysTheMaterialsTileFromTheWorldsOrigin(t *testing.T) {
 		t.Errorf("+y: %v: 32 across, 16 down mirrored", y.Tex)
 	}
 	// A fit of one repeat down a trim's height keeps the tile's shape across.
-	trim := boxOf(t, mapfile.Vec3{0, 0, 3}, mapfile.Vec3{256, 8, 11}, "caulk")
+	trim := boxOf(t, mapfile.Vec3{10, 0, 3}, mapfile.Vec3{266, 8, 11}, "caulk")
 	textured(t, trim, &TextureOp{Faces: "-y", Material: "plank", Fit: &[2]float64{0, 1}}, tile)
 	if y := faceTex(t, trim)["-y"]; y.Tex[0] != 64 || y.Tex[1] != 8 || y.Tex[2] != 0 || y.Tex[3] != 5 {
-		t.Errorf("trim: %v: 8 high, so 64 across, from z = 3 (5 into a tile)", y.Tex)
+		t.Errorf("trim: %v: 8 high, so 64 across from the world's origin, from z = 3 (5 into a tile)", y.Tex)
+	}
+	// Two repeats across a beam's length, its height sized to keep the shape;
+	// mirrored both ways, at half the tile.
+	textured(t, trim, &TextureOp{Faces: "+y", Material: "plank", Fit: &[2]float64{2, 0}}, tile)
+	if y := faceTex(t, trim)["+y"]; y.Tex[0] != 128 || y.Tex[1] != 16 || y.Tex[2] != wrap(266, 128) || y.Tex[3] != 0 {
+		t.Errorf("beam: %v: 256 long in two repeats of 128, so 16 down, from its end", y.Tex)
+	}
+	textured(t, trim, &TextureOp{Faces: "top", Material: "plank", Scale: 0.5, Flip: "uv"}, tile)
+	if z := faceTex(t, trim)["+z"]; z.Tex[0] != -64 || z.Tex[1] != -8 {
+		t.Errorf("top: %v: half of 128 by 16, mirrored both ways", z.Tex)
 	}
 }
 
@@ -147,9 +157,34 @@ func TestTexturingAtAnAngle(t *testing.T) {
 		face(mapfile.Vec3{0, 64, 0}, mapfile.Vec3{1, 64, 0}, mapfile.Vec3{0, 64, 1}),
 		face(mapfile.Vec3{0, 0, 64}, mapfile.Vec3{0, 1, 64}, mapfile.Vec3{128, 0, 0}),
 	)
-	tx := textured(t, wedge, &TextureOp{Faces: "top", Fit: &[2]float64{1, 1}}, nil)
-	if f := faceTex(t, wedge)["+z"]; tx.n != 1 || f.Tex[0] != 128 || f.Tex[1] != 64 {
+	tx := textured(t, wedge, &TextureOp{Faces: "top,+y", Fit: &[2]float64{1, 1}}, nil)
+	if f := faceTex(t, wedge)["+z"]; tx.n != 2 || f.Tex[0] != 128 || f.Tex[1] != 64 {
 		t.Errorf("the slope, %d faces: %v spans 128 by 64 seen from above", tx.n, f.Tex)
+	}
+	if f := faceTex(t, wedge)["+y"]; f.Tex[0] != 128 || f.Tex[1] != 64 {
+		t.Errorf("the wedge's +y side, a triangle: %v spans 128 by 64", f.Tex)
+	}
+	// A bevel along a box's top +x edge: the box's corner there lies outside the
+	// brush, so the top spans 96, not 128.
+	bevel := brushOf(t,
+		face(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{1, 0, 0}, mapfile.Vec3{0, 1, 0}),
+		face(mapfile.Vec3{0, 0, 64}, mapfile.Vec3{0, 1, 64}, mapfile.Vec3{1, 0, 64}),
+		face(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{0, 1, 0}, mapfile.Vec3{0, 0, 1}),
+		face(mapfile.Vec3{128, 0, 0}, mapfile.Vec3{128, 0, 1}, mapfile.Vec3{128, 1, 0}),
+		face(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{0, 0, 1}, mapfile.Vec3{1, 0, 0}),
+		face(mapfile.Vec3{0, 64, 0}, mapfile.Vec3{1, 64, 0}, mapfile.Vec3{0, 64, 1}),
+		face(mapfile.Vec3{96, 0, 64}, mapfile.Vec3{96, 1, 64}, mapfile.Vec3{128, 0, 32}),
+	)
+	textured(t, bevel, &TextureOp{Faces: "top", Fit: &[2]float64{1, 1}}, nil)
+	faces, _ := bevel.Faces()
+	if f := faces[1]; f.Tex[0] != 96 || f.Tex[1] != 64 {
+		t.Errorf("the bevelled top: %v spans 96 by 64", f.Tex)
+	}
+	// On a tie the normal goes to z, then x, then y.
+	for n, want := range map[mapfile.Vec3]string{{1, 0, 1}: "+z", {0, -1, 1}: "+z", {1, 1, 0}: "+x", {-1, 1, 0}: "-x", {0, 1, -1}: "-z"} {
+		if got, _, _ := texAxes(n); got != want {
+			t.Errorf("texAxes(%v) = %s, want %s", n, got, want)
+		}
 	}
 }
 
@@ -161,6 +196,12 @@ func TestTextureRefusals(t *testing.T) {
 		{TextureOp{Faces: "front"}, `faces "front"`},
 		{TextureOp{Material: "two words"}, "one word"},
 		{TextureOp{Tile: &[2]float64{64, 0}}, "two sizes above 0"},
+		{TextureOp{Tile: &[2]float64{0, 64}}, "two sizes above 0"},
+		{TextureOp{Tile: &[2]float64{-0.5, 64}}, "two sizes above 0"},
+		{TextureOp{Fit: &[2]float64{1, -1}}, "one of them above 0"},
+		{TextureOp{Fit: &[2]float64{-1, 2}}, "one of them above 0"},
+		{TextureOp{Fit: &[2]float64{-0.5, 1}}, "one of them above 0"},
+		{TextureOp{Fit: &[2]float64{1, -0.5}}, "one of them above 0"},
 		{TextureOp{Scale: -1}, "scale -1"},
 		{TextureOp{Fit: &[2]float64{0, 0}}, "one of them above 0"},
 		{TextureOp{Fit: &[2]float64{-1, 1}}, "one of them above 0"},
@@ -175,13 +216,38 @@ func TestTextureRefusals(t *testing.T) {
 			t.Errorf("flip %q: %v", f, err)
 		}
 	}
+	for _, tl := range [][2]float64{{1, 64}, {64, 1}, {0.25, 0.25}} {
+		if _, err := newTexturing(&TextureOp{Tile: &tl}, nil); err != nil {
+			t.Errorf("tile %v: %v", tl, err)
+		}
+	}
 	thin := boxOf(t, mapfile.Vec3{0, 0, 0}, mapfile.Vec3{64, 64, 64}, "caulk")
 	tx, _ := newTexturing(&TextureOp{Fit: &[2]float64{1, 0}}, func(string) Tile { return Tile{W: 64, H: 64} })
-	if _, _, _, _, err := tx.fitted(nil, mapfile.Vec3{1, 0, 0}, mapfile.Vec3{0, 1, 0}, 64, 64, 0, 0); err == nil {
-		t.Error("a face with no corners has no area to fit")
+	for _, pts := range [][]mapfile.Vec3{nil, {{0, 0, 0}, {8, 8, 0}}} {
+		if _, _, _, _, err := tx.fitted(pts, mapfile.Vec3{1, 0, 0}, mapfile.Vec3{0, 1, 0}, 64, 64, 0, 0); err == nil || err.Error() != "no area to fit" {
+			t.Errorf("%d corners: %v, no area to fit", len(pts), err)
+		}
 	}
-	if _, _, _, _, err := tx.fitted([]mapfile.Vec3{{0, 0, 0}, {0, 1, 0}, {0, 0, 1}}, mapfile.Vec3{1, 0, 0}, mapfile.Vec3{0, 1, 0}, 64, 64, 0, 0); err == nil {
-		t.Error("a face with no width along u is too thin to fit")
+	if _, _, _, _, err := tx.fitted([]mapfile.Vec3{{0, 0, 0}, {0, 1, 0}, {0, 0, 1}}, mapfile.Vec3{1, 0, 0}, mapfile.Vec3{0, 1, 0}, 64, 64, 0, 0); err == nil || err.Error() != "too thin to fit" {
+		t.Errorf("a face with no width along u is too thin to fit: %v", err)
+	}
+	both, _ := newTexturing(&TextureOp{Fit: &[2]float64{1, 1}}, nil)
+	square := []mapfile.Vec3{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}}
+	for _, c := range []struct {
+		pts  []mapfile.Vec3
+		fail bool
+	}{
+		{[]mapfile.Vec3{{0, 0, 0}, {0, 1, 0}, {0, 1, 0}}, true}, // no width along u, height along v
+		{[]mapfile.Vec3{{0, 0, 0}, {1, 0, 0}, {1, 0, 0}}, true}, // no height along v
+		{square, false}, // a unit's tiles are tiles
+	} {
+		if nw, nh, _, _, err := both.fitted(c.pts, mapfile.Vec3{1, 0, 0}, mapfile.Vec3{0, 1, 0}, 64, 64, 0, 0); (err != nil) != c.fail || (!c.fail && (nw != 1 || nh != 1)) {
+			t.Errorf("%v: %v by %v, %v", c.pts, nw, nh, err)
+		}
+	}
+	short := brushOf(t, " ( 0 0 0 ) short")
+	if err := tx.brush(short); err == nil {
+		t.Error("a face line Radiant can't have written")
 	}
 	if err := tx.brush(thin); err != nil || tx.n != 6 {
 		t.Errorf("%d faces, %v", tx.n, err)
@@ -272,7 +338,7 @@ func TestTilesAreAskedOnceAndASizeOfZeroIsNone(t *testing.T) {
 	if asked["edge"] != 1 || d.Tiles["edge"] != (Tile{W: 0.5, H: 1, From: "a trim"}) {
 		t.Errorf("asked %v, tiles %+v", asked, d.Tiles)
 	}
-	if d.Tiles["flat"] != assumed || d.Tiles["low"] != assumed {
+	if none := (Tile{W: 64, H: 64, From: "assumed, no install to size it"}); d.Tiles["flat"] != none || d.Tiles["low"] != none {
 		t.Errorf("a zero size: %+v", d.Tiles)
 	}
 }
@@ -313,7 +379,8 @@ func TestATextureOnOneBrushOfAnEntity(t *testing.T) {
 }
 
 func TestWrapKeepsTheSameTilesInSmallerNumbers(t *testing.T) {
-	for _, c := range [][3]float64{{-24, 256, 232}, {1256, 256, 232}, {0, 64, 0}, {64, 64, 0}, {-64, 64, 0}, {63.9999999, 64, 0}, {12, 128, 12}} {
+	for _, c := range [][3]float64{{-24, 256, 232}, {1256, 256, 232}, {0, 64, 0}, {64, 64, 0}, {-64, 64, 0}, {63.9999999, 64, 0}, {12, 128, 12},
+		{-0.5, 64, 63.5}, {0.5, 64, 0.5}, {63.5, 64, 63.5}} {
 		if got := wrap(c[0], c[1]); got != c[2] {
 			t.Errorf("wrap(%v, %v) = %v, want %v", c[0], c[1], got, c[2])
 		}
