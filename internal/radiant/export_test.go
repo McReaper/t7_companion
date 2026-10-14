@@ -9,4 +9,9 @@ func SetPollEvery(d time.Duration) func() {
 	return func() { pollEvery = old }
 }
 
-const MaxFrame = maxFrame
+// SetMaxFrame lowers the frame cap for a test, and returns what restores it.
+func SetMaxFrame(n uint32) func() {
+	old := maxFrame
+	maxFrame = n
+	return func() { maxFrame = old }
+}
