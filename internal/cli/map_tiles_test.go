@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/McReaper/t7_companion/internal/level"
 	"github.com/McReaper/t7_companion/internal/radiant/radianttest"
 )
 
@@ -66,6 +67,25 @@ func TestMapEditSizesTilesFromTheInstall(t *testing.T) {
 	}
 	if len(out.Tiles) != 3 || len(out.Textured) != 1 || out.Textured[0] != (texturedOut{Op: 2, Faces: 1}) || len(out.Made) != 2 {
 		t.Errorf("answer %+v", out)
+	}
+}
+
+// The install's maps are read once per install; an install whose GDTs can't be
+// opened sizes nothing, and says why.
+func TestTileUsesAreReadOnceAndAnUnopenableInstallSaysWhy(t *testing.T) {
+	t.Setenv("LOCALAPPDATA", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "deffiles"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	tileUses(root)["sentinel"] = level.TileUse{W: 1}
+	if tileUses(root)["sentinel"].W != 1 {
+		t.Error("the install's maps were read again")
+	}
+	_, err := mapTiles(filepath.Join(root, "map_source", "x.map"))("brick")
+	if err == nil || !strings.Contains(err.Error(), "techsetdefs") {
+		t.Errorf("an install with no techsets: %v", err)
 	}
 }
 
