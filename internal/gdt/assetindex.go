@@ -25,6 +25,21 @@ type hit struct {
 	Name   string
 	Type   string
 	Parent string
+	Mat    *matFields // a material's, or a derived asset's, fields the catalog reads
+}
+
+// matFields are the fields of a material the catalog of Radiant's materials
+// shows, as its own lines set them ("" when they don't).
+type matFields struct {
+	Usage, Surface, Color, DoNotUse string
+}
+
+// matKeys are the lines matFields keeps, by the key's quoted name.
+var matKeys = map[string]func(*matFields, string){
+	`"usage"`:       func(m *matFields, v string) { m.Usage = v },
+	`"surfaceType"`: func(m *matFields, v string) { m.Surface = v },
+	`"colorMap"`:    func(m *matFields, v string) { m.Color = v },
+	`"doNotUse"`:    func(m *matFields, v string) { m.DoNotUse = v },
 }
 
 type fileEntry struct {
@@ -40,8 +55,8 @@ type index struct {
 }
 
 // indexVersion 2: gob instead of JSON — the cache of a full install decodes in
-// ~40 ms instead of ~270 ms, on every CLI call.
-const indexVersion = 2
+// ~40 ms instead of ~270 ms, on every CLI call. 3: materials' catalog fields.
+const indexVersion = 3
 
 type indexDisk struct {
 	Version int
@@ -187,7 +202,8 @@ func walkParallel(roots []string, visit func(path string, d fs.DirEntry)) {
 	wg.Wait()
 }
 
-// scanHeaders reads only the asset header lines of a GDT (fast; no full parse).
+// scanHeaders reads only the asset header lines of a GDT (fast; no full parse),
+// and a material's or a derived asset's few catalog fields.
 func scanHeaders(path, rel string) []hit {
 	f, err := os.Open(path)
 	if err != nil {
@@ -198,9 +214,13 @@ func scanHeaders(path, rel string) []hit {
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 1<<20), 1<<24)
 	line := 0
+	var mat *matFields // the asset being read, when it may be a material
 	for sc.Scan() {
 		line++
 		b := sc.Bytes()
+		if mat != nil {
+			matLine(mat, b)
+		}
 		// a header has no second quoted pair; cheap reject of "key" "value" lines
 		if len(b) == 0 || (b[len(b)-1] != ')' && b[len(b)-1] != ']' && b[len(b)-1] != '\r') {
 			continue
@@ -209,9 +229,37 @@ func scanHeaders(path, rel string) []hit {
 		if m == nil {
 			continue
 		}
-		out = append(out, hit{File: rel, Line: line, Name: string(m[1]), Type: string(m[2]), Parent: string(m[3])})
+		h := hit{File: rel, Line: line, Name: string(m[1]), Type: string(m[2]), Parent: string(m[3])}
+		mat = nil
+		if h.Type == "material" || h.Parent != "" {
+			mat = &matFields{}
+			h.Mat = mat
+		}
+		out = append(out, h)
+	}
+	for i := range out { // a derived asset of no material, or a material that sets none, keeps nothing
+		if m := out[i].Mat; m != nil && *m == (matFields{}) {
+			out[i].Mat = nil
+		}
 	}
 	return out
+}
+
+// matLine keeps a catalog field of a material's line.
+func matLine(m *matFields, b []byte) {
+	b = bytes.TrimLeft(b, " \t")
+	k := bytes.IndexByte(b[min(1, len(b)):], '"') + 1
+	if k <= 0 {
+		return
+	}
+	set, ok := matKeys[string(b[:k+1])]
+	if !ok {
+		return
+	}
+	v := bytes.TrimSpace(b[k+1:])
+	if len(v) >= 2 && v[0] == '"' && v[len(v)-1] == '"' {
+		set(m, Unquote(string(v[1:len(v)-1])))
+	}
 }
 
 func (idx *index) rebuildNames() {
