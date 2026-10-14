@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -68,6 +69,10 @@ func TestCallReturnsTheSummaryAndBodyOrAnErrorWithItsCode(t *testing.T) {
 	r, err := c.Call(ctx(t), "echo two words", []byte("x\ny"))
 	if err != nil || r.Summary != "got two words" || string(r.Body) != "body:x\ny" {
 		t.Errorf("echo = %+v, %v", r, err)
+	}
+	long := strings.Repeat("map text ", 200) // a body much longer than its header line
+	if r, err := c.Call(ctx(t), "echo long", []byte(long)); err != nil || string(r.Body) != "body:"+long {
+		t.Errorf("echo of %d bytes = %d bytes, %v", len(long), len(r.Body), err)
 	}
 	_, err = c.Call(ctx(t), "echo fail", nil)
 	var e *radiant.Error
@@ -241,10 +246,14 @@ func TestABrokenBridgeEndsTheConnectionWithTheReason(t *testing.T) {
 		"neither":        {func(w io.Writer, id string) { frame(w, id+" maybe\n") }, "neither ok nor err"},
 		"okay is not ok": {func(w io.Writer, id string) { frame(w, id+" okay\n") }, "neither ok nor err"},
 		"huge frame": {func(w io.Writer, _ string) {
-			_, _ = w.Write(binary.LittleEndian.AppendUint32(nil, radiant.MaxFrame+1))
-		}, "-byte frame"},
+			_, _ = w.Write(binary.LittleEndian.AppendUint32(nil, 1<<20+1))
+		}, "a 1048577-byte frame, more than 1048576"},
+		"unreadable request": {func(w io.Writer, _ string) {
+			frame(w, "0 err bad-request a request starts with its id\n")
+		}, "the bridge could not read a request: bad-request a request starts with its id"},
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Cleanup(radiant.SetMaxFrame(1 << 20))
 			c, err := radiant.NewClient(ctx(t), rawBridge(t, helloThen(func(w io.Writer, id, _ string) bool {
 				tc.send(w, id)
 				return false
@@ -260,6 +269,41 @@ func TestABrokenBridgeEndsTheConnectionWithTheReason(t *testing.T) {
 				t.Error("the connection still serves after it broke")
 			}
 		})
+	}
+}
+
+func TestAFrameAtTheCapIsRead(t *testing.T) {
+	t.Cleanup(radiant.SetMaxFrame(64))
+	c, err := radiant.NewClient(ctx(t), rawBridge(t, helloThen(func(w io.Writer, id, _ string) bool {
+		head := id + " ok "
+		frame(w, head+strings.Repeat("s", 64-len(head)))
+		return true
+	})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if r, err := c.Call(ctx(t), "state", nil); err != nil || len(r.Summary) != 64-len("2 ok ") {
+		t.Errorf("a 64-byte frame under a 64-byte cap = %q, %v", r.Summary, err)
+	}
+}
+
+func TestRequestIDsCountFromOne(t *testing.T) {
+	var ids []string
+	c, err := radiant.NewClient(ctx(t), rawBridge(t, func(w io.Writer, id, _ string) bool {
+		ids = append(ids, id)
+		frame(w, id+" ok\n")
+		return true
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if _, err := c.Call(ctx(t), "state", nil); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(ids, []string{"1", "2"}) {
+		t.Errorf("ids = %q, want 1 then 2 (the plugin reads 1 to 18 digits)", ids)
 	}
 }
 

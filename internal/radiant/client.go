@@ -16,7 +16,7 @@ const Protocol = 1
 
 // maxFrame bounds a frame from the bridge: a capture of a large view or a
 // whole map's text is tens of MiB, a corrupt length is not.
-const maxFrame = 512 << 20
+var maxFrame uint32 = 512 << 20
 
 // Reply is an ok reply: its summary (the header after "ok") and its body.
 type Reply struct {
@@ -180,6 +180,10 @@ func (c *Client) read() {
 		}
 		if id == 0 {
 			name, args, _ := strings.Cut(rest, " ")
+			if name == "err" { // the reply to a request whose id the plugin couldn't read: no caller to give it to
+				c.fail(fmt.Errorf("the bridge could not read a request: %s", args))
+				return
+			}
 			select {
 			case c.events <- Event{name, args}:
 			default:
