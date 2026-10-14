@@ -33,7 +33,7 @@ SECOND_PERSON_RE = re.compile(r"\b(you|your|you're|I|I'm|we)\b")
 REF_LINK_RE = re.compile(r"references/[\w.-]+\.md")
 PERSONAL_PATH_RE = re.compile(r"(?i)(?:[A-Z]:\\+Users\\+|/Users/|/home/)(?!<)[A-Za-z0-9._-]+")
 CROSS_REF_RE = re.compile(r"\bt7kb:([a-z0-9_-]+)")
-TOOL_NAMES = {"search", "get", "build", "setup-or-update", "gdt_find", "gdt_get", "gdt_schema", "gdt_edit", "gdt_check", "gdt_refs", "zone_explain", "zone_contents", "zone_check", "create", "shader_decompile", "radiant_open", "map_find", "map_view"}   # t7kb:search etc. are MCP tools / the setup-or-update skill
+TOOL_NAMES = {"search", "get", "build", "setup-or-update", "gdt_find", "gdt_get", "gdt_schema", "gdt_edit", "gdt_check", "gdt_refs", "zone_explain", "zone_contents", "zone_check", "create", "shader_decompile", "radiant_open", "map_find", "map_view", "map_edit"}   # t7kb:search etc. are MCP tools / the setup-or-update skill
 
 findings: list[tuple[str, int, str, str]] = []
 

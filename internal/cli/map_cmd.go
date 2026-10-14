@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -50,8 +51,37 @@ func newMapCmd() *cobra.Command {
 	fl.StringVar(&a.Keys, "keys", "", "which keys to show: all, or a comma list (default the naming keys)")
 	fl.IntVar(&a.Limit, "limit", 0, "how many entities at most (default 50)")
 	fl.IntVar(&a.PID, "pid", 0, "the Radiant to read when several run")
-	root.AddCommand(find, newMapViewCmd())
+	root.AddCommand(find, newMapViewCmd(), newMapEditCmd())
 	return root
+}
+
+func newMapEditCmd() *cobra.Command {
+	var file, label string
+	var pid int
+	edit := &cobra.Command{Use: "edit --ops <file|->",
+		Short: "Apply a batch of ops (a JSON array, as map_edit takes) as one undo step",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			var raw []byte
+			var err error
+			if file == "-" {
+				raw, err = io.ReadAll(c.InOrStdin())
+			} else {
+				raw, err = os.ReadFile(file)
+			}
+			if err != nil {
+				return err
+			}
+			ops, err := decodeOps(raw)
+			if err != nil {
+				return err
+			}
+			return printIndented(c.OutOrStdout())(mapEdit(c.Context(), ops, label, pid))
+		}}
+	edit.Flags().StringVar(&file, "ops", "-", "the ops' JSON file, - for stdin")
+	edit.Flags().StringVar(&label, "label", "", "what the batch does, for Radiant's undo menu")
+	edit.Flags().IntVar(&pid, "pid", 0, "the Radiant to edit when several run")
+	return edit
 }
 
 func newMapViewCmd() *cobra.Command {

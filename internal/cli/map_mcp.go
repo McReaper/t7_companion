@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -12,7 +13,35 @@ import (
 // mapToolset edits the map open in the user's Radiant, through the
 // T7RadiantBridge plugin: internal/radiant has the connection's rules.
 func mapToolset() toolset {
-	return toolset{name: "map", tools: []server.ServerTool{radiantOpenTool(), mapFindTool(), mapViewTool()}}
+	return toolset{name: "map", tools: []server.ServerTool{radiantOpenTool(), mapFindTool(), mapViewTool(), mapEditTool()}}
+}
+
+func mapEditTool() server.ServerTool {
+	return server.ServerTool{Tool: mcp.NewTool("map_edit",
+		mcp.WithDescription("Edit the map open in Radiant: a batch of ops, applied in order, lands as ONE undo step "+
+			"(the answer's undo names it; one Ctrl+Z in Radiant takes it all back) or not at all. Ops, each an object with "+
+			"one key: {\"box\": {\"min\": [x,y,z], \"max\": [x,y,z], \"material\": m, \"contents\"?: \"detail\", "+
+			"\"class\"?: c, \"keys\"?: {…}}} a box brush, in worldspawn or as a new brush entity of class (volume_sun, "+
+			"trigger_multiple); {\"entity\": {\"class\": c, \"origin\": [x,y,z], \"angles\"?: [p,y,r], \"keys\"?: {…}}} a "+
+			"point entity; {\"delete\": [ids]}; {\"set\": {\"id\": id, \"keys\": {k: v, k2: null}}} (null removes); "+
+			"{\"move\": {\"ids\": [ids], \"by\": [dx,dy,dz]}}; {\"material\": {\"ids\": [ids], \"material\": m}}. "+
+			"Ids are map_find's. A point entity keeps its id; a world brush or an entity that owns brushes is rebuilt and "+
+			"gets a new one (was gives the old). The answer reads the map back: each op's id, class, origin or bounds. "+
+			"Edits go through Radiant, never the .map file, and the user's selection is kept."),
+		mcp.WithArray("ops", mcp.Required(), mcp.Description("The ops, in order."), mcp.Items(map[string]any{"type": "object"})),
+		mcp.WithString("label", mcp.Description("What the batch does, for Radiant's undo menu (default: the ops counted).")),
+		mcp.WithNumber("pid", mcp.Description("The Radiant to edit when several run."))),
+		Handler: jsonHandler(func(ctx context.Context, r mcp.CallToolRequest) (any, error) {
+			raw, err := json.Marshal(r.GetArguments()["ops"])
+			if err != nil {
+				return nil, err
+			}
+			ops, err := decodeOps(raw)
+			if err != nil {
+				return nil, err
+			}
+			return mapEdit(ctx, ops, r.GetString("label", ""), r.GetInt("pid", 0))
+		})}
 }
 
 func mapViewTool() server.ServerTool {

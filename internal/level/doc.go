@@ -51,4 +51,19 @@
 // and centre, camera) is put back, last change first, even when the shot
 // failed; the zoom comes back to the nearest step of 1.25, and what could not
 // be put back is noted in the answer.
+//
+// # Editing
+//
+// Edit applies a batch of ops (box, entity, delete, set, move, material) in
+// order to a copy of the snapshot, unit by unit (a world brush, or an entity
+// with its brushes), and sends what changed as the bridge's one edit: one
+// undo step, applied whole or not at all. A point entity of the map is
+// replaced in place and keeps its GUID; a world brush or an entity that owns
+// brushes is deleted and imported anew, under a new GUID, as that is what
+// Radiant's undo brings back exactly (a replaced brush entity comes back as
+// world brushes). Then the map is read back, and each import found by its
+// class and box among the GUIDs the edit's reply lists: Radiant's selection
+// order is not the text's. The text is Radiant's own format, without GUIDs
+// (the import gives them); the plugin refuses any line Radiant can't read,
+// which Radiant itself would take for a fatal error.
 package level
