@@ -1,6 +1,6 @@
 ---
 name: mapping
-description: How to build Black Ops 3 maps in Radiant — grid/brushwork discipline, structural vs detail brushes, sealing against BSP leaks (`.lin` leakfile, sky brush box), CSG/patches for terrain and curves, prefab-then-rotate ordering, zombies zones (`info_volume` coverage, respawn points, door/debris clips), and clip textures (`clip_player`, `weaponClip`, `clip_nosight`) vs caulk and a `dyn_model`'s collmap/physpreset. Use when creating a new map (`t7kb:create`), a compile hits `WROTE BSP LEAKFILE`, `MAX_MAP_TRIANGLES`, a hang on "coalescing coincident windings" or an `-onlyents` brush-count mismatch; a prefab distorts after rotating the source brush; a player dies standing still; power-ups never drop in an area or land out of reach; zombies won't path through an opened door; or the assert `You must specify a script noteworthy with the zone name`. Distinct from t7kb:compiling (running the build) and t7kb:zombies-ai (spawners, navmesh) — this is the geometry and placement behind those failures.
+description: How to build Black Ops 3 maps in Radiant, by hand or through t7kb's map tools (`t7kb:map_edit`) — grid discipline, structural vs detail brushes, sealing BSP leaks (`.lin` leakfile, sky box), CSG/patches for terrain and curves, zombies zones (`info_volume` coverage, respawn points, door/debris clips), clip textures (`clip_player`, `weaponClip`, `clip_nosight`) vs caulk and a `dyn_model`'s collmap. Use when creating or blocking out a map (`t7kb:create`), a compile hits `WROTE BSP LEAKFILE`, `MAX_MAP_TRIANGLES`, a hang on "coalescing coincident windings" or an `-onlyents` brush-count mismatch; a prefab distorts after rotating the source brush; a player dies standing still; power-ups never drop in an area or land out of reach; zombies won't path through an opened door; or the assert `You must specify a script noteworthy with the zone name`. Distinct from t7kb:compiling (running the build) and t7kb:zombies-ai (spawners, navmesh) — this is the geometry behind those failures.
 ---
 
 # Building BO3 maps in Radiant
@@ -9,7 +9,20 @@ Radiant is brush/patch geometry, not code — the craft here is grid discipline,
 
 ## Start a new map from a template, not from an empty `.map`
 
-A usermap is more than its `.map`: the build also needs the map's `.zone`, scripts and sound config. The Launcher's File > New copies `rex/templates/<template>` onto the install — `map_source/zm/<name>.map` plus `usermaps/<name>/` (`scripts/`, `zone_source/<name>.zone`, `sound/zoneconfig/<name>.szc`, loading and preview images) — renaming `template` everywhere and giving every Radiant `guid` a fresh one (verified in the install's templates). **`t7kb:create` does the same from the agent**: a dry run first, and it never overwrites a file. The name must start with `zm_` or `mp_`, matching the template. `ZM Mod Level` is the plain one; `ZM Basic Level` and `ZM Advanced Level` add a starter HUD, a weapons table and, under `share/raw/sound/`, sound aliases that are shared across maps. Then open the `.map` in Radiant, and build with **t7kb:compiling**.
+A usermap is more than its `.map`: the build also needs the map's `.zone`, scripts and sound config. The Launcher's File > New copies `rex/templates/<template>` onto the install — `map_source/zm/<name>.map` plus `usermaps/<name>/` (`scripts/`, `zone_source/<name>.zone`, `sound/zoneconfig/<name>.szc`, loading and preview images) — renaming `template` everywhere and giving every Radiant `guid` a fresh one (verified in the install's templates). **`t7kb:create` does the same from the agent**: a dry run first, and it never overwrites a file. The name must start with `zm_` or `mp_`, matching the template. `ZM Mod Level` is the plain one; `ZM Basic Level` and `ZM Advanced Level` add a starter HUD, a weapons table and, under `share/raw/sound/`, sound aliases that are shared across maps. Then open the `.map` in Radiant (`t7kb:radiant_open` from the agent), and build with **t7kb:compiling**.
+
+## Build in the user's Radiant through the map tools, never in the `.map`
+
+t7kb's map tools edit the map open in the user's Radiant, through the T7RadiantBridge plugin: the user watches the work land and takes it back from Radiant's own undo menu. Don't write the `.map` file instead — Radiant keeps the map in memory, and its next save overwrites the file. The loop:
+
+1. `t7kb:radiant_open` the map: the Radiant that has it open, or a new one started on it.
+2. `t7kb:map_find` what is there: short ids, bounds, the naming keys; `class`, `key` and `near` narrow it.
+3. `t7kb:map_edit` a batch of ops (boxes, entities, deletes, keys, moves, materials) for one step the user would undo as a whole.
+4. `t7kb:map_view` the result: `top` for the layout, `3d` with `render` `fake` for the shapes of an unbaked map.
+5. `t7kb:map_command` for Radiant's own tools (`Selection/CSG/CSG Hollow`, patch and texture tools) on the ids given.
+6. Before `t7kb:build`, `t7kb:map_command` `File/Save`: the build compiles the file on disk, not Radiant's memory.
+
+The sizes to build to (Treyarch's scale standards), what a new map already holds, which edits change an id, and the traps — **CSG Subtract carves the zone and sun volumes too** — are in `references/map-tools.md`.
 
 ## Grid discipline and brush basics
 
