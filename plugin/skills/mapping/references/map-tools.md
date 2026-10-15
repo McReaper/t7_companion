@@ -60,7 +60,7 @@ Pick materials with `t7kb:map_materials`: the ones Radiant's browser shows, by `
 - **Trims**: `fit` `[0, 1]` makes one repeat span the face's height, the length scaled to keep the texture's shape — a baseboard or a beam's band.
 - `rotate` turns planks and stripes (90 to run them the other way), `flip` mirrors, `scale` 2 doubles the tile. `material` alone swaps a material and keeps each face's tile, as Radiant's Find/Replace does.
 
-Look at the result with `t7kb:map_view` `render` `fullbright` and `hide` `volumes` from a `camera` inside the room: the template's volumes (`volume_fpstool`, the start zone, sun and umbra volumes) cover ±1536 and draw their tool textures over a shot from inside them too (verified in a test Radiant: half a room's shot was `volume_fpstool`'s face), and `hide` hides every volume and trigger for the shot alone.
+Then `t7kb:map_check` the brushes: it lists faces left uncaulked where nothing can see them, seams where one material's tiles don't meet across brushes, stretched tiles and unknown materials, each by brush id and face, for a `texture` op to fix. Look at the result with `t7kb:map_view` `render` `fullbright` and `hide` `volumes` from a `camera` inside the room: the template's volumes (`volume_fpstool`, the start zone, sun and umbra volumes) cover ±1536 and draw their tool textures over a shot from inside them too (verified in a test Radiant: half a room's shot was `volume_fpstool`'s face), and `hide` hides every volume and trigger for the shot alone.
 
 ## Build one, then copy it
 
