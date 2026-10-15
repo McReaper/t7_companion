@@ -25,6 +25,7 @@ type ViewOptions struct {
 	Render string // the 3D view's render method for the shot, put back after
 	Labels bool   // write ids on the image
 	Hide   string // "volumes": hide the map's volumes and triggers for the shot
+	Bake   bool   // bake Radiant's lighting first and shoot under real lighting
 	Look   *Pose  // the way a framed 3D target is looked at (default Looking)
 	Marks  []Mark // with Labels, these labels instead of ids
 }
@@ -45,6 +46,7 @@ type Shot struct {
 	Scale  float64       // a 2D shot's image pixels per unit
 	Labels []Label       // the ids in the image, where their points landed
 	Notes  []string      // what View could not put back as it was
+	Baked  string        // the bake's end, as Radiant's console said it: "All Probes Done (1.61 s)"
 }
 
 // views are the names View takes, by bridge name.
@@ -99,7 +101,7 @@ func View(ctx context.Context, c *radiant.Client, snap *Snapshot, o ViewOptions)
 	if err != nil {
 		return nil, err
 	}
-	shot.Notes = s.notes
+	shot.Notes, shot.Baked = s.notes, s.baked
 	return shot, nil
 }
 
@@ -114,6 +116,10 @@ func (o ViewOptions) check() (string, error) {
 		return "", fmt.Errorf("a camera pose is for the 3d view")
 	case o.Render != "" && view != "3d":
 		return "", fmt.Errorf("render is the 3d view's: a 2D view draws outlines")
+	case o.Bake && view != "3d":
+		return "", fmt.Errorf("a bake shows in the 3d view: a 2D view draws outlines")
+	case o.Bake && o.Render != "" && renders[strings.ToLower(o.Render)] != "Real Lighting" && !strings.EqualFold(o.Render, "Real Lighting"):
+		return "", fmt.Errorf("render %q: a bake shows under real lighting, the render a bake shoots with", o.Render)
 	}
 	if h := strings.ToLower(o.Hide); h != "" && h != "volumes" {
 		return "", fmt.Errorf("hide %q: volumes, or nothing", o.Hide)
@@ -253,6 +259,7 @@ type session struct {
 	pid      int
 	restores []restore
 	notes    []string
+	baked    string // the console line that ended the bake
 }
 
 // blank tells a capture of one colour: no view Radiant draws is, as its
@@ -354,8 +361,17 @@ func (s *session) remember(l Lens) {
 // view3D shoots the 3D view: from the pose given, framed on the target (a
 // second shot when the lens it assumed was off), or as it is.
 func (s *session) view3D(ctx context.Context, target *Box, o ViewOptions, pts []mapfile.Vec3) (*frame, error) {
-	if err := s.setRender(ctx, o.Render); err != nil {
+	render := o.Render
+	if o.Bake {
+		render = "real"
+	}
+	if err := s.setRender(ctx, render); err != nil {
 		return nil, err
+	}
+	if o.Bake {
+		if err := s.bake(ctx); err != nil {
+			return nil, err
+		}
 	}
 	pose := o.Camera
 	var corners []mapfile.Vec3
@@ -381,6 +397,40 @@ func (s *session) view3D(ctx context.Context, target *Box, o ViewOptions, pts []
 	}
 	f.At = f.At[len(corners):]
 	return f, nil
+}
+
+// bakeTimeout bounds the wait on Radiant's bake; a variable so tests wait
+// less.
+var bakeTimeout = 10 * time.Minute
+
+// bake runs Radiant's own lighting bake, the lighting toolbar's bolt at its
+// L/M/H setting, and waits for the console's "All Probes Done" that ends it.
+// It lights Radiant's view only: the game's .led is the build's light stage.
+// The console is read from before the bake starts, as the client drops what
+// it can't hold.
+func (s *session) bake(ctx context.Context) error {
+	if err := s.call(ctx, "subscribe console"); err != nil {
+		return err
+	}
+	if err := s.call(ctx, "bake"); err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(ctx, bakeTimeout)
+	defer cancel()
+	for {
+		select {
+		case e, ok := <-s.c.Events():
+			switch {
+			case !ok:
+				return fmt.Errorf("bake: the bridge closed before the bake ended")
+			case e.Name == "console" && strings.HasPrefix(e.Args, "All Probes Done"):
+				s.baked = e.Args
+				return nil
+			}
+		case <-ctx.Done():
+			return fmt.Errorf("bake: Radiant said no \"All Probes Done\" in %s", bakeTimeout)
+		}
+	}
 }
 
 // setRender switches the 3D view's render method for the shot; the session

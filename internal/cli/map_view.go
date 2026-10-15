@@ -19,6 +19,7 @@ type mapViewArgs struct {
 	Size     int
 	Render   string
 	Hide     string
+	Bake     bool
 	NoLabels bool
 	PID      int
 }
@@ -34,6 +35,7 @@ type mapViewOut struct {
 	Scale  float64           `json:"scale,omitempty"`  // a 2D view's image pixels per unit
 	Labels map[string][2]int `json:"labels,omitempty"` // id: where its label's point is in the image
 	Notes  []string          `json:"notes,omitempty"`
+	Baked  string            `json:"baked,omitempty"` // the bake's end, as Radiant's console said it
 }
 
 // maxViewSize is the longest side an image may ask for: what an agent's
@@ -42,7 +44,7 @@ const maxViewSize = 1568
 
 // mapView shoots a view of the map open in Radiant: its answer and the PNG.
 func mapView(ctx context.Context, a mapViewArgs) (*mapViewOut, []byte, error) {
-	o := level.ViewOptions{View: a.View, IDs: a.IDs, Radius: a.Radius, Size: a.Size, Render: a.Render, Labels: !a.NoLabels, Hide: a.Hide}
+	o := level.ViewOptions{View: a.View, IDs: a.IDs, Radius: a.Radius, Size: a.Size, Render: a.Render, Labels: !a.NoLabels, Hide: a.Hide, Bake: a.Bake}
 	if a.Size < 0 || a.Size > maxViewSize {
 		return nil, nil, fmt.Errorf("size %d: at most %d pixels", a.Size, maxViewSize)
 	}
@@ -79,7 +81,7 @@ func mapView(ctx context.Context, a mapViewArgs) (*mapViewOut, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	out := &mapViewOut{Map: baseName(snap.State.Map), View: shot.View, W: shot.Image.Rect.Dx(), H: shot.Image.Rect.Dy(), Notes: shot.Notes}
+	out := &mapViewOut{Map: baseName(snap.State.Map), View: shot.View, W: shot.Image.Rect.Dx(), H: shot.Image.Rect.Dy(), Notes: shot.Notes, Baked: shot.Baked}
 	if shot.Pose != nil {
 		out.Camera = append(vec(shot.Pose.Origin), vec([3]float64{shot.Pose.Pitch, shot.Pose.Yaw, shot.Pose.Roll})...)
 	}

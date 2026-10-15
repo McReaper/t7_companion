@@ -50,7 +50,11 @@
 // Everything View changes of the user's views (render method, 2D axis, zoom
 // and centre, camera) is put back, last change first, even when the shot
 // failed; the zoom comes back to the nearest step of 1.25, and what could not
-// be put back is noted in the answer.
+// be put back is noted in the answer. A bake (ViewOptions.Bake) runs
+// Radiant's own, the lighting toolbar's bolt, under real lighting, and waits
+// for the console's "All Probes Done": the console is subscribed to before
+// the bake starts, as the client drops the events it can't hold. It lights
+// Radiant's view only; the game's .led is the build's light stage.
 //
 // # Editing
 //

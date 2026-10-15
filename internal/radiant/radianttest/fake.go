@@ -55,7 +55,10 @@ type Fake struct {
 	Blank       bool              // the views draw nothing: a capture is white, as when Windows stops composing them
 	Menus       map[string]string // menus' entries by path, as menus gives them: "label	enabled	submenu" lines
 	UndoLabel   string            // the undo menu's entry: what the last edit was labelled
-	history     []undoStep        // the map before each edit, for Edit/Undo
+	Baked       int               // bakes started; each ends with the console's "All Probes Done" unless BakeSilent
+	BakeSilent  bool
+	BakeRefused string     // why the plugin refuses a bake, under real lighting too
+	history     []undoStep // the map before each edit, for Edit/Undo
 	views
 
 	mu       sync.Mutex
@@ -77,7 +80,7 @@ func New(pid int, mapPath string) *Fake {
 		views: views{W3: 160, H3: 90, Focal: 120, W2: 90, H2: 160, Scale2D: 1}, conns: map[*conn]bool{}}
 	f.handlers = map[string]Handler{"hello": hello, "state": state, "reload": reload, "subscribe": subscribe,
 		"entities": entities, "selection": selection, "camera": camera, "capture": capture, "command": command, "action": action,
-		"edit": edit, "select": selectCmd, "deselect": deselect, "menus": menus}
+		"edit": edit, "select": selectCmd, "deselect": deselect, "menus": menus, "bake": bake}
 	return f
 }
 

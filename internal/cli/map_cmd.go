@@ -174,6 +174,7 @@ func newMapViewCmd() *cobra.Command {
 	fl.StringVar(&a.Camera, "camera", "", "3d: shoot from x,y,z,pitch,yaw,roll")
 	fl.StringVar(&a.Render, "render", "", "3d: fake, fullbright, wireframe, real, view or density for this shot")
 	fl.StringVar(&a.Hide, "hide", "", "volumes: hide the map's volumes and triggers for this shot")
+	fl.BoolVar(&a.Bake, "bake", false, "3d: bake Radiant's lighting first (its toolbar's bolt, at its L/M/H) and shoot under real lighting")
 	fl.IntVar(&a.Size, "size", 0, "the image's longer side in pixels (default 768)")
 	fl.BoolVar(&a.NoLabels, "no-labels", false, "leave the ids off the image")
 	fl.IntVar(&a.PID, "pid", 0, "the Radiant to see when several run")

@@ -136,8 +136,10 @@ func mapViewTool() server.ServerTool {
 			"as Radiant draws it, with the short ids of what is in it written where their origin or centre is (labels "+
 			"gives the same as id: [x, y] in the image). Frame entities or brushes by ids, or a point by at (and radius); "+
 			"shoot the 3D view from camera; or take the view as it is. A framed 3D shot looks down from the south-west. "+
-			"Top shows the layout best (outlines, entity names); an unbaked map is black under real lighting, so pass "+
-			"render fake to see a blockout's shapes. A 2D answer gives its centre and scale (image pixels per unit). "+
+			"Top shows the layout best (outlines, entity names). Pick the render by the question: fullbright for "+
+			"textures, fake for shapes, bake for light (sun leaks, dark rooms): it bakes Radiant's lighting (its toolbar's "+
+			"bolt, its view only; the game's is build's light stage) and shoots under real lighting, black on an unbaked "+
+			"map. A 2D answer gives its centre and scale (image pixels per unit). "+
 			"The user's camera, render method, 2D axis, zoom and centre are put back (notes says what could not be); "+
 			"Radiant must not be minimised. size is the image's longer side (default 768: about 400 tokens)."),
 		mcp.WithString("view", mcp.Description("3d (default), top, front or side.")),
@@ -147,13 +149,14 @@ func mapViewTool() server.ServerTool {
 		mcp.WithString("camera", mcp.Description("3d: shoot from x y z pitch yaw roll (degrees; positive pitch looks up, yaw 90 faces +y).")),
 		mcp.WithString("render", mcp.Description("3d: the render method for this shot: fake, fullbright, wireframe, real, view or density.")),
 		mcp.WithString("hide", mcp.Description("volumes: hide the map's volumes and triggers for this shot (their tool textures cover a view from inside them too); shown again after.")),
+		mcp.WithBoolean("bake", mcp.Description("3d: bake Radiant's lighting first, at its toolbar's L/M/H, and shoot under real lighting (default false); after an edit, bake again to see its light.")),
 		mcp.WithNumber("size", mcp.Description("The image's longer side in pixels (default 768, at most 1568).")),
 		mcp.WithBoolean("no_labels", mcp.Description("Leave the ids off the image (default false).")),
 		mcp.WithNumber("pid", mcp.Description("The Radiant to see when several run."))),
 		Handler: func(ctx context.Context, r mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			out, png, err := mapView(ctx, mapViewArgs{View: r.GetString("view", ""), IDs: splitIDs(r.GetString("ids", "")),
 				At: r.GetString("at", ""), Radius: r.GetFloat("radius", 0), Camera: r.GetString("camera", ""),
-				Render: r.GetString("render", ""), Hide: r.GetString("hide", ""), Size: r.GetInt("size", 0), NoLabels: r.GetBool("no_labels", false), PID: r.GetInt("pid", 0)})
+				Render: r.GetString("render", ""), Hide: r.GetString("hide", ""), Bake: r.GetBool("bake", false), Size: r.GetInt("size", 0), NoLabels: r.GetBool("no_labels", false), PID: r.GetInt("pid", 0)})
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}

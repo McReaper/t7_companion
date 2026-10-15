@@ -6,6 +6,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // The fake's views: a pinhole 3D view and one 2D view, as PROTOCOL.md's
@@ -196,4 +197,25 @@ func join(v []float64, sep string) string {
 		s[i] = num(x)
 	}
 	return strings.Join(s, sep)
+}
+
+// bake starts Radiant's bake, refused unless the 3D view draws real lighting;
+// as the plugin does, it answers at once and the console says when it ends,
+// after lines of its own.
+func bake(f *Fake, _ string, _ []byte) Reply {
+	if f.Render != "Real Lighting" {
+		return Err("refused", "the bake runs only under real lighting: command View/Render Method/Real Lighting")
+	}
+	if f.BakeRefused != "" {
+		return Err("refused", f.BakeRefused)
+	}
+	f.Baked++
+	if !f.BakeSilent {
+		time.AfterFunc(20*time.Millisecond, func() {
+			f.Event("console", "Sun bake Done")
+			f.Event("console", "Probe 1 of 1")
+			f.Event("console", "All Probes Done (0.02 s)")
+		})
+	}
+	return OK("", nil)
 }
