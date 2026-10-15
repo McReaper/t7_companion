@@ -64,7 +64,7 @@ func ShowMaterials(ctx context.Context, c *radiant.Client, snap *Snapshot, mater
 		}
 		board.Union(m.Box)
 		label := fmt.Sprint(m.Op + 1)
-		marks = append(marks, Mark{label, mapfile.Vec3{m.Box.Min[0] + 20, m.Box.Max[1] - 20, m.Box.Max[2]}})
+		marks = append(marks, Mark{label, cornerOf(m.Box)})
 		b.Swatches = append(b.Swatches, Swatch{Material: materials[m.Op], Label: label, Tile: done.Tiles[materials[m.Op]]})
 	}
 	if board.Ok {
@@ -81,6 +81,12 @@ func ShowMaterials(ctx context.Context, c *radiant.Client, snap *Snapshot, mater
 		return nil, err
 	}
 	return b, nil
+}
+
+// cornerOf is where a slab's label goes: inside its upper-left corner (-x,
+// +y, the image's), on its top, clear of most of its texture.
+func cornerOf(b Box) mapfile.Vec3 {
+	return mapfile.Vec3{b.Min[0] + 20, b.Max[1] - 20, b.Max[2]}
 }
 
 // overhead is the pose that looks straight down on a flat box, from where
