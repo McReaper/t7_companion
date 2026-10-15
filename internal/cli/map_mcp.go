@@ -108,10 +108,10 @@ func mapEditTool() server.ServerTool {
 			"other) starting at its edge. New boxes get their material's own tile too. {\"room\": {\"min\": [x,y,z], "+
 			"\"max\": [x,y,z], \"material\": m, \"floor\"?: m, \"ceiling\"?: m, \"wall\"?: 8, \"slab\"?: 16, \"open\"?: "+
 			"[\"+x\"…, \"top\", \"bottom\"], \"holes\"?: [{\"side\": \"-y\", \"at\": u, \"width\"?: 56, \"height\"?: 96, "+
-			"\"sill\"?: 0}]}} builds a room around the inside box min..max (where a player walks): a floor slab under it, "+
+			"\"sill\"?: 0}], \"probe\"?: true}} builds a room around the inside box min..max (where a player walks): a floor slab under it, "+
 			"a ceiling over it, a wall on each side not open (a corridor is open at its ends), doors and windows (sill 32) "+
-			"left as holes the walls are built around, at u units along the wall from the inside's lower corner; the "+
-			"faces its pieces hide of each other are caulk. Ids are map_find's, or @n: what op "+
+			"left as holes the walls are built around, their middle u units along the wall from the inside's lower corner, "+
+			"and a reflection_probe in its middle (probe false: none); the faces its pieces hide of each other are caulk. Ids are map_find's, or @n: what op "+
 			"n of this batch made (every copy of a copy op), so a box built, textured and copied is one undo step. A point "+
 			"entity keeps its id; a world brush or an entity that owns brushes is rebuilt and gets a new one (was gives "+
 			"the old). The answer reads the map back: each op's id, class, origin or bounds, the tile each material got "+

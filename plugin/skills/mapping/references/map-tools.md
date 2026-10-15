@@ -41,7 +41,7 @@ So a room's floor is a 16-unit slab, its walls 8 thick and 112 high above it, it
 - the **start zone**, an `info_volume` (`targetname` `start_zone`, `script_noteworthy` `player_volume`) over x and y ±1536, z 0 to 320, with its rising-zombie structs (`start_zone_spawners`) and the player spawns (`initial_spawn_points`, one `player_respawn_point`);
 - a `volume_sun` (±1920, up to 896), an `umbra_volume`, a `volume_fpstool`, a `reflection_probe`, an `info_player_start`, the perk machines and box as `misc_prefab`s.
 
-Build the blockout inside the sky box and the start zone first: it seals and plays with nothing else moved. A room outside the start zone is a new zone (the parent skill's zones section: an `info_volume`, its spawners, `add_adjacent_zone` in the map's GSC). A map larger than the box needs the six `sky` brushes rebuilt around it and the three volumes grown with it — there is no resize op: delete and add boxes in one batch.
+Build the blockout inside the sky box and the start zone first: it seals and plays with nothing else moved. Replacing the start room moves its contents too: its spawners, player spawns and prefabs stand where its floor was, and zombies need a floor from their structs to the player (the navmesh is compiled from floors) — a blockout run that deleted the room and built beside it left them floating, and its zombies had no path in game. A room outside the start zone is a new zone (the parent skill's zones section: an `info_volume`, its spawners, `add_adjacent_zone` in the map's GSC). A map larger than the box needs the six `sky` brushes rebuilt around it and the three volumes grown with it — there is no resize op: delete and add boxes in one batch.
 
 ## One batch per step the user would undo
 
@@ -80,7 +80,7 @@ Then `t7kb:map_check` the brushes: it lists faces left uncaulked where nothing c
 
 ## Light every space and block the sun: probes, overlaps, sun-shadow caps
 
-Sunlight showing through a wall is fixed in Radiant, not in GDTs: a `reflection_probe` in every space (the template has one, in its start room), walls that overlap where they meet rather than touch edge to edge, and brushes all of `caulk_sun_shadow` outside what must stay in shade — Treyarch's `zm_giant_light.map` holds 12 such brushes, 8-unit sheets over roofs among them (verified in the install; the leak fixes themselves community, t7kb modme 0.60). Then `bake` and look from inside each space.
+Sunlight showing through a wall is fixed in Radiant, not in GDTs: a `reflection_probe` in every space (the template has one, in its start room; a `room` op puts one in its middle), walls that overlap where they meet rather than touch edge to edge, and brushes all of `caulk_sun_shadow` outside what must stay in shade — Treyarch's `zm_giant_light.map` holds 12 such brushes, 8-unit sheets over roofs among them (verified in the install; the leak fixes themselves community, t7kb modme 0.60). Then `bake` and look from inside each space.
 
 ## Save before building: the build compiles the file, not Radiant's memory
 

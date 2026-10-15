@@ -109,13 +109,26 @@ func TestARoomOpLandsAsOneStepWithItsHiddenFacesCaulked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.Label != "t7kb: 1 move, 1 room" || len(d.Made) != 8 {
-		t.Fatalf("done %q, %d made: floor, ceiling, three walls and the door's three pieces", d.Label, len(d.Made))
+	if d.Label != "t7kb: 1 move, 1 room" || len(d.Made) != 9 {
+		t.Fatalf("done %q, %d made: floor, ceiling, three walls, the door's three pieces and a probe", d.Label, len(d.Made))
 	}
-	caulked, faces := 0, 0
+	caulked, faces, probes := 0, 0, 0
 	for _, m := range d.Made {
 		if m.Op != 0 || m.ID == "" || m.Box.Min[2] < -8 {
 			t.Errorf("made %+v: the room's, moved up 8", m)
+		}
+		if m.Class == "reflection_probe" {
+			for _, e := range d.After.Map.Entities {
+				if hexOf(e.Guid()) != hexOf(m.ID) {
+					continue
+				}
+				probes++
+				origin, _ := e.Key("origin")
+				radius, _ := e.Key("radius")
+				if origin != "1256 192 64" || radius != "328" {
+					t.Errorf("probe at %q radius %q: the inside's middle, moved up 8; reaching its corners", origin, radius)
+				}
+			}
 		}
 		for _, e := range d.After.Map.Entities {
 			for _, br := range e.Brushes() {
@@ -136,10 +149,36 @@ func TestARoomOpLandsAsOneStepWithItsHiddenFacesCaulked(t *testing.T) {
 	// door's sides, its top, bottom and its end against an x wall (6); the
 	// lintel's top and its two ends against the door's sides (3). The lintel's
 	// underside and the sides' faces at the door show.
-	if faces != 48 || caulked != 17 {
-		t.Errorf("%d faces, %d caulk", faces, caulked)
+	if faces != 48 || caulked != 17 || probes != 1 {
+		t.Errorf("%d faces, %d caulk, %d probes found back", faces, caulked, probes)
 	}
 	if d.Tiles["caulk"].W != 64 || d.Tiles["wood"].From != "test" {
 		t.Errorf("tiles %+v", d.Tiles)
+	}
+}
+
+// "probe": false leaves a room without one, for a space a probe already
+// covers.
+func TestARoomWithoutItsProbe(t *testing.T) {
+	_, c, snap := viewing(t, 602)
+	d, err := Edit(context.Background(), c, snap, ops(t, `[{"room": {"min": [1000, 0, 0], "max": [1512, 384, 112], "material": "brick", "probe": false}}]`), "", nil)
+	if err != nil || len(d.Made) != 6 {
+		t.Fatalf("%v, %d made: floor, ceiling, four walls", err, len(d.Made))
+	}
+	for _, m := range d.Made {
+		if m.Class != "" {
+			t.Errorf("made %+v", m)
+		}
+	}
+}
+
+// A label the agent already marked keeps one mark in the undo menu.
+func TestAnEditsLabelIsMarkedOnce(t *testing.T) {
+	_, c, snap := viewing(t, 603)
+	for label, want := range map[string]string{"my room": "t7kb: my room", "t7kb: my room": "t7kb: my room", "t7kb:x": "t7kb: t7kb:x"} {
+		d, err := Edit(context.Background(), c, snap, ops(t, `[{"room": {"min": [1000, 0, 0], "max": [1512, 384, 112], "material": "brick"}}]`), label, nil)
+		if err != nil || d.Label != want {
+			t.Errorf("%q: %q, %v, want %q", label, d.Label, err, want)
+		}
 	}
 }

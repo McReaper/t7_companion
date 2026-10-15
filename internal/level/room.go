@@ -6,6 +6,7 @@ import (
 	"math"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
@@ -26,6 +27,7 @@ type RoomOp struct {
 	Slab     float64    `json:"slab,omitempty"`    // floor and ceiling thickness; none, Treyarch's 16
 	Open     []string   `json:"open,omitempty"`    // sides with no wall, +x … -y, top (no ceiling), bottom (no floor)
 	Holes    []HoleOp   `json:"holes,omitempty"`
+	Probe    *bool      `json:"probe,omitempty"` // a reflection_probe in its middle; none, true
 }
 
 // HoleOp is a door or a window in one of a room's walls.
@@ -73,7 +75,25 @@ func (b *batch) room(i int, o *RoomOp) error {
 	for _, br := range brushes {
 		b.units = append(b.units, &unit{brush: br, world: true, state: created, op: i})
 	}
-	return nil
+	if o.Probe != nil && !*o.Probe {
+		return nil
+	}
+	return b.entity(i, roomProbe(o))
+}
+
+// roomProbe is a room's reflection probe: in the middle of its inside, its
+// radius reaching the corners, so the room's surfaces take their reflections
+// and bounce light from inside it, not from the sky beyond its walls (a space
+// with no probe of its own shows the sun through them: community, t7kb modme
+// 0.60).
+func roomProbe(o *RoomOp) *EntityOp {
+	var c mapfile.Vec3
+	var r float64
+	for k := range 3 {
+		c[k] = (o.Min[k] + o.Max[k]) / 2
+		r += (o.Max[k] - o.Min[k]) * (o.Max[k] - o.Min[k]) / 4
+	}
+	return &EntityOp{Class: "reflection_probe", Origin: c, Keys: map[string]string{"radius": strconv.Itoa(int(math.Ceil(math.Sqrt(r)/8) * 8))}}
 }
 
 // roomPieces are a room's boxes: floor, ceiling, then each wall's.
