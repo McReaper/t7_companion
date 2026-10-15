@@ -70,6 +70,9 @@ func TestMapCheckFindsTheWorstFirst(t *testing.T) {
 	if len(few.Findings) != 2 || few.More != 5 || few.Counts["unknown"] != 0 || few.Findings[0].Kind != "seam" {
 		t.Errorf("two of the seams and hidden faces: %+v", few)
 	}
+	if most, err := mapCheck(context.Background(), nil, "", 200, 0); err != nil || len(most.Findings) != 13 {
+		t.Errorf("the most a list takes: %v", err)
+	}
 	one, _ := mapCheck(context.Background(), []string{"0e000002"}, "", 0, 0)
 	if one.Counts["seam"] != 3 || one.Counts["hidden"] != 2 || one.Counts["unknown"] != 0 {
 		t.Errorf("the second wall's findings: %v", one.Counts)

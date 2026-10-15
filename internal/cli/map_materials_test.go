@@ -95,7 +95,10 @@ func TestMapMaterialsListsTheBrowsersMaterialsMostUsedFirst(t *testing.T) {
 		out.Materials[1] != (materialOut{Name: "old_script_wall", Usage: "tools", Surface: "concrete", Tile: [2]float64{64, 32}, DoNotUse: true}) {
 		t.Errorf("answer %+v: the maps' tile for one they use 10 times or more, its GDT's tiling at 16 a unit else", out)
 	}
-	for _, a := range []mapMaterialsArgs{{ToolsPath: root, Limit: -1}, {ToolsPath: root, Limit: 201}, {ToolsPath: root, Size: 2000}} {
+	if _, _, err := mapMaterials(context.Background(), mapMaterialsArgs{ToolsPath: root, Limit: 200, Size: maxViewSize}); err != nil {
+		t.Errorf("the most a list and an image take: %v", err)
+	}
+	for _, a := range []mapMaterialsArgs{{ToolsPath: root, Limit: -1}, {ToolsPath: root, Limit: 201}, {ToolsPath: root, Size: 2000}, {ToolsPath: root, Size: -1}} {
 		if _, _, err := mapMaterials(context.Background(), a); err == nil {
 			t.Errorf("%+v: no error", a)
 		}
@@ -151,6 +154,10 @@ func TestMapMaterialsShowsTheFirstSixteenInRadiant(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout.String()), &many2); err != nil || len(many2.Board) != 16 || len(many2.Materials) != 18 ||
 		!strings.Contains(strings.Join(many2.Notes, " "), "the board shows the first 16") {
 		t.Errorf("%v %+v", err, many2)
+	}
+	if sixteen, _, err := mapMaterials(context.Background(), mapMaterialsArgs{Name: "m0, m1", Usage: "floor", Limit: 16, Show: true}); err != nil ||
+		len(sixteen.Board) != 16 || len(sixteen.Notes) != 0 {
+		t.Errorf("sixteen listed, all on the board, nothing to say: %+v, %v", sixteen, err)
 	}
 	if _, err := os.Stat(png); err != nil || !strings.Contains(stderr.String(), "wrote "+png) {
 		t.Errorf("the image: %v, %s", err, stderr.String())
