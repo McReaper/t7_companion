@@ -228,6 +228,11 @@ func TestGameEnvAttachesToSteam(t *testing.T) {
 	if got != "PATH=/bin HOME=/h SteamAppId=311210 SteamGameId=311210" {
 		t.Fatalf("the game gets BO3's app id, whatever the parent had (the mod tools are another app): %s", got)
 	}
+	for _, parent := range [][]string{nil, {"SteamAppId=1"}} {
+		if got := strings.Join(gameEnv(parent), " "); got != "SteamAppId=311210 SteamGameId=311210" {
+			t.Errorf("from %q: %s", parent, got)
+		}
+	}
 }
 
 func TestGameArgsMatchTheLauncher(t *testing.T) {
