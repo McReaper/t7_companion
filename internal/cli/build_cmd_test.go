@@ -152,7 +152,7 @@ func TestBuildCLIAndMCPAskForTheSameBuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	callBuildTool(t, map[string]any{"name": "zm_x"})
-	defaults := build.Options{Stages: "compile,light,link", Light: "medium", Language: "english"}
+	defaults := build.Options{Stages: "compile,light,link", Light: "medium"}
 	for i, o := range got {
 		if !reflect.DeepEqual(o, defaults) {
 			t.Errorf("surface %d defaults: %+v", i, o)

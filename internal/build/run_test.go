@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -42,6 +43,9 @@ func TestMain(m *testing.M) {
 		_ = os.WriteFile(os.Getenv("T7KB_FAKE_LED"), []byte("led"), 0o644)
 	case "quit": // a game Steam refused
 		os.Exit(1)
+	case "late": // a game that crashed, or someone quit, while it loaded
+		time.Sleep(600 * time.Millisecond)
+		os.Exit(2)
 	}
 	os.Exit(0)
 }
@@ -203,9 +207,11 @@ func TestRunLight(t *testing.T) {
 }
 
 func TestRunGame(t *testing.T) {
-	old := gameStartup
-	t.Cleanup(func() { gameStartup = old })
-	gameStartup = 500 * time.Millisecond
+	oldStartup, oldWatch, oldPoll, oldWindows := gameStartup, gameWatch, gamePoll, gameWindows
+	t.Cleanup(func() { gameStartup, gameWatch, gamePoll, gameWindows = oldStartup, oldWatch, oldPoll, oldWindows })
+	gameStartup, gameWatch, gamePoll = 300*time.Millisecond, time.Second, 20*time.Millisecond
+	var asked []int
+	gameWindows = func(pid int) []window { asked = append(asked, pid); return nil }
 
 	game := t.TempDir()
 	fakeTool(t, game, "BlackOps3.exe")
@@ -213,11 +219,14 @@ func TestRunGame(t *testing.T) {
 	t.Setenv("T7KB_FAKE_OUT", out)
 	t.Setenv("SteamAppId", "1") // Steam set something else: the game's own id wins
 
-	t.Run("a game still up after the startup window launched", func(t *testing.T) {
+	t.Run("a game still up and showing no dialog after the watch launched", func(t *testing.T) {
 		t.Setenv("T7KB_FAKE_TOOL", "stay")
 		sr := runGame(game, []string{"+set", "fs_game", "zm_test", "+devmap", "zm_test"})
-		if !sr.OK || sr.Name != "run" || sr.Note != "launched BlackOps3.exe" {
+		if !sr.OK || sr.Name != "run" || sr.Note != "launched BlackOps3.exe: no dialog in its first 1s" || sr.Errors != nil || sr.Seconds < 1 || sr.Seconds > 2 {
 			t.Errorf("%+v", sr)
+		}
+		if len(asked) < 10 || asked[0] == os.Getpid() || asked[0] != asked[len(asked)-1] {
+			t.Errorf("looked for the game's windows %d times, in %v: every %s, in the game's process", len(asked), asked, gamePoll)
 		}
 		rec := record(t, out)
 		if rec["args"] != "+set fs_game zm_test +devmap zm_test" || rec["SteamAppId"] != bo3AppID || rec["SteamGameId"] != bo3AppID {
@@ -227,6 +236,32 @@ func TestRunGame(t *testing.T) {
 			t.Errorf("cwd %q, want the game's directory %q", rec["cwd"], game)
 		}
 		time.Sleep(3 * time.Second) // the fake game exits, so its directory can be removed
+	})
+
+	t.Run("a dialog fails the stage at once, and says what it says", func(t *testing.T) {
+		t.Setenv("T7KB_FAKE_TOOL", "stay")
+		polls := 0
+		gameWindows = func(int) []window {
+			if polls++; polls < 3 {
+				return []window{{Class: "CoDBlackOps", Title: "Call of Duty"}}
+			}
+			return []window{{Class: dialogClass, Title: "Erreur fatale", Controls: []control{{"Button", "OK"}, {"Static", "ERROR: Could not find zone 'fr_zm_test'\n"}}}}
+		}
+		sr := runGame(game, nil)
+		want := []string{`the game opened a dialog, "Erreur fatale": ERROR: Could not find zone 'fr_zm_test' [OK]`}
+		if sr.OK || sr.Name != "run" || !slices.Equal(sr.Errors, want) || polls != 3 || sr.Seconds > 0.5 {
+			t.Errorf("%+v after %d looks", sr, polls)
+		}
+		gameWindows = func(int) []window { return nil }
+		time.Sleep(3 * time.Second) // the fake game exits, so its directory can be removed
+	})
+
+	t.Run("a game that closes while it loads failed", func(t *testing.T) {
+		t.Setenv("T7KB_FAKE_TOOL", "late")
+		sr := runGame(game, nil)
+		if sr.OK || len(sr.Errors) != 1 || sr.Errors[0] != "the game closed 1s after starting (exit status 2)" {
+			t.Errorf("%+v", sr)
+		}
 	})
 
 	t.Run("a game that exits at once failed", func(t *testing.T) {
