@@ -57,7 +57,7 @@
 // indexed, gob-cached in the user cache dir and refreshed incrementally by
 // mtime/size; the MCP server warms it at start and refresh (index.go) keeps it
 // fresh in a long session. Beside each asset's header it keeps a material's
-// usage, surfaceType, colorMap and doNotUse lines, which is all
+// usage, surfaceType, colorMap, doNotUse and materialType lines, which is all
 // EditorMaterials needs to list the 6,832 materials Radiant's browser shows
 // (of 67,114) without parsing 2,004 GDTs (9 s). The techsetdef tree stays fresh too (techset.go): a
 // material type it doesn't know rescans it, it is rescanned once it is two

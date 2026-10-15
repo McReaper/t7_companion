@@ -33,9 +33,9 @@ func TestEditorMaterialsAreTheOnesRadiantsBrowserShows(t *testing.T) {
 	sort.Strings(names)
 	want := map[string]EditorMaterial{
 		"st_brick":     {Name: "st_brick", Usage: "exterior wall", Surface: "brick", File: "source_data/stock_mats.gdt", Stock: true},
-		"m_floor":      {Name: "m_floor", Usage: "floor", Surface: "wood", ColorMap: "i_planks", File: "source_data/mats.gdt"},
-		"m_child":      {Name: "m_child", Usage: "floor", Surface: "brick", ColorMap: "i_planks", File: "source_data/mats.gdt"},
-		"m_grandchild": {Name: "m_grandchild", Usage: "floor", Surface: "brick", ColorMap: "i_planks", File: "source_data/mats.gdt"},
+		"m_floor":      {Name: "m_floor", Usage: "floor", Surface: "wood", ColorMap: "i_planks", File: "source_data/mats.gdt", Type: "lit"},
+		"m_child":      {Name: "m_child", Usage: "floor", Surface: "brick", ColorMap: "i_planks", File: "source_data/mats.gdt", Type: "lit"},
+		"m_grandchild": {Name: "m_grandchild", Usage: "floor", Surface: "brick", ColorMap: "i_planks", File: "source_data/mats.gdt", Type: "lit"},
 		"m_dnu":        {Name: "m_dnu", Usage: "tools", File: "source_data/mats.gdt", DoNotUse: true},
 		"m_used":       {Name: "m_used", Usage: "tools", File: "source_data/mats.gdt"},
 	}

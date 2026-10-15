@@ -31,15 +31,16 @@ type hit struct {
 // matFields are the fields of a material the catalog of Radiant's materials
 // shows, as its own lines set them ("" when they don't).
 type matFields struct {
-	Usage, Surface, Color, DoNotUse string
+	Usage, Surface, Color, DoNotUse, Type string
 }
 
 // matKeys are the lines matFields keeps, by the key's quoted name.
 var matKeys = map[string]func(*matFields, string){
-	`"usage"`:       func(m *matFields, v string) { m.Usage = v },
-	`"surfaceType"`: func(m *matFields, v string) { m.Surface = v },
-	`"colorMap"`:    func(m *matFields, v string) { m.Color = v },
-	`"doNotUse"`:    func(m *matFields, v string) { m.DoNotUse = v },
+	`"usage"`:        func(m *matFields, v string) { m.Usage = v },
+	`"surfaceType"`:  func(m *matFields, v string) { m.Surface = v },
+	`"colorMap"`:     func(m *matFields, v string) { m.Color = v },
+	`"doNotUse"`:     func(m *matFields, v string) { m.DoNotUse = v },
+	`"materialType"`: func(m *matFields, v string) { m.Type = v },
 }
 
 type fileEntry struct {
@@ -55,8 +56,9 @@ type index struct {
 }
 
 // indexVersion 2: gob instead of JSON — the cache of a full install decodes in
-// ~40 ms instead of ~270 ms, on every CLI call. 3: materials' catalog fields.
-const indexVersion = 3
+// ~40 ms instead of ~270 ms, on every CLI call. 3: materials' catalog fields;
+// 4: their materialType.
+const indexVersion = 4
 
 type indexDisk struct {
 	Version int

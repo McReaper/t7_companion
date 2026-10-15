@@ -16,6 +16,7 @@ type EditorMaterial struct {
 	File     string // its GDT, relative to the root
 	Stock    bool   // a GDT Treyarch shipped
 	DoNotUse bool   // marked DO NOT USE: Radiant crosses it out (script_wall among them)
+	Type     string // its materialType: lit…, tools_replace for caulk, tools_blend for clip
 }
 
 // EditorMaterials lists the materials Radiant's texture browser shows, read
@@ -59,6 +60,7 @@ func editorMaterial(h *hit, byName map[string]*hit) (EditorMaterial, bool) {
 			f.Surface = cmp.Or(f.Surface, cur.Mat.Surface)
 			f.Color = cmp.Or(f.Color, cur.Mat.Color)
 			f.DoNotUse = cmp.Or(f.DoNotUse, cur.Mat.DoNotUse)
+			f.Type = cmp.Or(f.Type, cur.Mat.Type)
 		}
 		if cur.Type != "" {
 			typ = cur.Type
@@ -68,5 +70,5 @@ func editorMaterial(h *hit, byName map[string]*hit) (EditorMaterial, bool) {
 	if typ != "material" || f.Usage == "" || f.Usage == "<not in editor>" {
 		return EditorMaterial{}, false
 	}
-	return EditorMaterial{Name: h.Name, Usage: f.Usage, Surface: f.Surface, ColorMap: f.Color, DoNotUse: f.DoNotUse == "1"}, true
+	return EditorMaterial{Name: h.Name, Usage: f.Usage, Surface: f.Surface, ColorMap: f.Color, DoNotUse: f.DoNotUse == "1", Type: f.Type}, true
 }
