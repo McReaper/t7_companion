@@ -130,7 +130,7 @@ func TestMapMaterialsShowsTheFirstSixteenInRadiant(t *testing.T) {
 		t.Fatalf("answer %+v, %v", out, err)
 	}
 	for i, s := range out.Board {
-		if s.Material != out.Materials[i].Name || len(s.ID) < 8 || s.At == [2]int{} {
+		if s.Material != out.Materials[i].Name || s.Label != fmt.Sprint(i+1) || s.At == [2]int{} {
 			t.Errorf("board %d: %+v", i, s)
 		}
 	}

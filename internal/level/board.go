@@ -15,11 +15,11 @@ import (
 // the edit that built it is undone, so the map is as it was (Radiant's redo
 // holds the board).
 
-// Swatch is one material of a board: the slab that shows it, by the short id
-// its label has in the shot, and the tile it was laid at.
+// Swatch is one material of a board: the label of its slab in the shot (1,
+// 2…, in its upper-left corner), and the tile it was laid at.
 type Swatch struct {
 	Material string
-	ID       string
+	Label    string
 	Tile     Tile
 }
 
@@ -39,7 +39,10 @@ const (
 )
 
 // above is the direction a board is shot from: straight down, +y up the image.
-var above = Pose{Pitch: -89, Yaw: 90}
+var above = Pose{Pitch: -89, Yaw: 90} // at -90 Radiant drops the yaw: the board comes out turned
+
+// boardMargin is the room a board's shot leaves around it.
+const boardMargin = 1.1
 
 // ShowMaterials lays the materials out on a board above the map, shoots it,
 // and takes the board off the map again.
@@ -53,17 +56,20 @@ func ShowMaterials(ctx context.Context, c *radiant.Client, snap *Snapshot, mater
 		return nil, err
 	}
 	b := &Board{}
-	ids := make([]string, 0, len(done.Made))
+	var marks []Mark
+	var board Box
 	for _, m := range done.Made {
-		if m.ID == "" {
+		if !m.Box.Ok {
 			continue
 		}
-		id := done.After.IDs.Short(m.ID)
-		ids = append(ids, id)
-		b.Swatches = append(b.Swatches, Swatch{Material: materials[m.Op], ID: id, Tile: done.Tiles[materials[m.Op]]})
+		board.Union(m.Box)
+		label := fmt.Sprint(m.Op + 1)
+		marks = append(marks, Mark{label, mapfile.Vec3{m.Box.Min[0] + 20, m.Box.Max[1] - 20, m.Box.Max[2]}})
+		b.Swatches = append(b.Swatches, Swatch{Material: materials[m.Op], Label: label, Tile: done.Tiles[materials[m.Op]]})
 	}
-	if len(ids) > 0 {
-		b.Shot, err = View(ctx, c, done.After, ViewOptions{IDs: ids, Look: &above, Render: "fullbright", Labels: true, Hide: "volumes", Size: size})
+	if board.Ok {
+		pose := overhead(lensOf(c.Hello.PID), board)
+		b.Shot, err = View(ctx, c, done.After, ViewOptions{Camera: &pose, Render: "fullbright", Labels: true, Marks: marks, Hide: "volumes", Size: size})
 	} else {
 		err = fmt.Errorf("the board's slabs were not found in the map read back")
 	}
@@ -75,6 +81,19 @@ func ShowMaterials(ctx context.Context, c *radiant.Client, snap *Snapshot, mater
 		return nil, err
 	}
 	return b, nil
+}
+
+// overhead is the pose that looks straight down on a flat box, from where
+// it fills the view: the lens's field of view fits its width or its depth.
+func overhead(l Lens, b Box) Pose {
+	c := b.Centre()
+	ex, ey := (b.Max[0]-b.Min[0])/2, (b.Max[1]-b.Min[1])/2
+	d := math.Max(ex*l.F/(float64(l.W)/2), ey*l.F/(float64(l.H)/2)) * boardMargin
+	p := above
+	fwd, _, _ := p.basis()
+	t := d / -fwd[2] // the view's centre on the board's middle, the tilt aside
+	p.Origin = mapfile.Vec3{c[0] - fwd[0]*t, c[1] - fwd[1]*t, b.Max[2] + d}
+	return p
 }
 
 // boardOps are a slab for each material, in rows, centred over the map and

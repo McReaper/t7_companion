@@ -46,9 +46,9 @@ type materialOut struct {
 }
 
 type swatchOut struct {
-	ID       string `json:"id"`
+	Label    string `json:"label"` // its slab's label in the image, in the slab's upper-left corner
 	Material string `json:"material"`
-	At       [2]int `json:"at"` // its label's pixel in the image
+	At       [2]int `json:"at"` // the label's pixel
 }
 
 // Limits of a list: the default, and the most one answer holds.
@@ -140,7 +140,7 @@ func showMaterials(ctx context.Context, c *radiant.Client, snap *level.Snapshot,
 		at[l.ID] = [2]int{l.X, l.Y}
 	}
 	for _, s := range b.Swatches {
-		out.Board = append(out.Board, swatchOut{ID: s.ID, Material: s.Material, At: at[s.ID]})
+		out.Board = append(out.Board, swatchOut{Label: s.Label, Material: s.Material, At: at[s.Label]})
 	}
 	if len(out.Materials) > len(names) {
 		out.Notes = append(out.Notes, fmt.Sprintf("the board shows the first %d", len(names)))

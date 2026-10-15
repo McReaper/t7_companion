@@ -26,6 +26,14 @@ type ViewOptions struct {
 	Labels bool   // write ids on the image
 	Hide   string // "volumes": hide the map's volumes and triggers for the shot
 	Look   *Pose  // the way a framed 3D target is looked at (default Looking)
+	Marks  []Mark // with Labels, these labels instead of ids
+}
+
+// Mark is a label of the caller's: its text (hex digits, as ids are) and the
+// point it marks.
+type Mark struct {
+	Text string
+	At   mapfile.Vec3
 }
 
 // Shot is what View saw.
@@ -55,27 +63,15 @@ const maxLabels = 40
 // back what it changed of the user's views (render method, 2D axis, zoom and
 // centre, camera) and notes what it could not.
 func View(ctx context.Context, c *radiant.Client, snap *Snapshot, o ViewOptions) (*Shot, error) {
-	view, ok := views[strings.ToLower(strings.TrimSpace(o.View))]
-	if !ok {
-		return nil, fmt.Errorf("view %q: 3d, top, front or side", o.View)
-	}
-	if o.Camera != nil && view != "3d" {
-		return nil, fmt.Errorf("a camera pose is for the 3d view")
+	view, err := o.check()
+	if err != nil {
+		return nil, err
 	}
 	target, err := targetBox(snap, o)
 	if err != nil {
 		return nil, err
 	}
-	var pts []labelPoint
-	if o.Labels {
-		pts = labelPoints(snap, o, target)
-	}
-	if o.Render != "" && view != "3d" {
-		return nil, fmt.Errorf("render is the 3d view's: a 2D view draws outlines")
-	}
-	if h := strings.ToLower(o.Hide); h != "" && h != "volumes" {
-		return nil, fmt.Errorf("hide %q: volumes, or nothing", o.Hide)
-	}
+	pts := o.marks(snap, target)
 	s := &session{c: c, pid: c.Hello.PID}
 	var f *frame
 	if o.Hide != "" {
@@ -105,6 +101,39 @@ func View(ctx context.Context, c *radiant.Client, snap *Snapshot, o ViewOptions)
 	}
 	shot.Notes = s.notes
 	return shot, nil
+}
+
+// check is the view the options name, its bridge name, or why they can't
+// be shot.
+func (o ViewOptions) check() (string, error) {
+	view, ok := views[strings.ToLower(strings.TrimSpace(o.View))]
+	switch {
+	case !ok:
+		return "", fmt.Errorf("view %q: 3d, top, front or side", o.View)
+	case o.Camera != nil && view != "3d":
+		return "", fmt.Errorf("a camera pose is for the 3d view")
+	case o.Render != "" && view != "3d":
+		return "", fmt.Errorf("render is the 3d view's: a 2D view draws outlines")
+	}
+	if h := strings.ToLower(o.Hide); h != "" && h != "volumes" {
+		return "", fmt.Errorf("hide %q: volumes, or nothing", o.Hide)
+	}
+	return view, nil
+}
+
+// marks are the points the shot labels: the caller's, else the ids'.
+func (o ViewOptions) marks(snap *Snapshot, target *Box) []labelPoint {
+	if !o.Labels {
+		return nil
+	}
+	if len(o.Marks) == 0 {
+		return labelPoints(snap, o, target)
+	}
+	pts := make([]labelPoint, len(o.Marks))
+	for i, m := range o.Marks {
+		pts[i] = labelPoint{m.Text, m.At}
+	}
+	return pts
 }
 
 // targetBox is what the shot frames, nil for the view as it is.
@@ -304,10 +333,13 @@ var (
 	guess  = Lens{W: 1648, H: 869, F: 1212.4}
 )
 
-func (s *session) lens() Lens {
+func (s *session) lens() Lens { return lensOf(s.pid) }
+
+// lensOf is a Radiant's 3D lens as last measured, else the guess.
+func lensOf(pid int) Lens {
 	lensMu.Lock()
 	defer lensMu.Unlock()
-	if l, ok := lenses[s.pid]; ok {
+	if l, ok := lenses[pid]; ok {
 		return l
 	}
 	return guess

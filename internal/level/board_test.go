@@ -2,6 +2,8 @@ package level
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"strings"
 	"testing"
 
@@ -24,7 +26,7 @@ func TestABoardShowsMaterialsAndLeavesTheMapAsItWas(t *testing.T) {
 		t.Fatalf("board %+v", b)
 	}
 	for i, s := range b.Swatches {
-		if s.Material != []string{"brick", "wood", "caulk"}[i] || s.Tile.W != 128 || len(s.ID) < 8 {
+		if s.Material != []string{"brick", "wood", "caulk"}[i] || s.Tile.W != 128 || s.Label != fmt.Sprint(i+1) {
 			t.Errorf("swatch %d: %+v", i, s)
 		}
 	}
@@ -86,12 +88,31 @@ func TestABoardIsDeletedWhenItCannotBeUndone(t *testing.T) {
 		t.Errorf("edits %q", got)
 	}
 	after, _ := Read(context.Background(), c)
-	if _, err := after.IDs.Resolve(b.Swatches[0].ID); err == nil {
-		t.Error("the slab is still on the map")
+	if len(GUIDs(after.Map)) != len(GUIDs(snap.Map)) {
+		t.Errorf("%d GUIDs after, %d before: the slab is still on the map", len(GUIDs(after.Map)), len(GUIDs(snap.Map)))
 	}
 	for _, n := range []int{0, 17} {
 		if _, err := ShowMaterials(context.Background(), c, snap, make([]string, n), nil, 0); err == nil || !strings.Contains(err.Error(), "a board shows 1 to 16") {
 			t.Errorf("%d materials: %v", n, err)
 		}
+	}
+}
+
+// The board fills the view and sits in its middle, the tilt aside.
+func TestOverheadCentresAFlatBoxInTheView(t *testing.T) {
+	l := Lens{W: 1648, H: 869, F: 1212.4}
+	b := box(mapfile.Vec3{-400, 100, 500}, mapfile.Vec3{400, 600, 508})
+	p := overhead(l, b)
+	x, y, ok := l.Project(p, b.Centre())
+	if !ok || math.Abs(x-824) > 1 || math.Abs(y-434.5) > 1 {
+		t.Errorf("the board's middle at %v, %v", x, y)
+	}
+	for _, c := range b.Corners() {
+		if x, y, ok := l.Project(p, c); !ok || x < 0 || x > 1648 || y < 0 || y > 869 {
+			t.Errorf("corner %v at %v, %v: out of the view", c, x, y)
+		}
+	}
+	if p.Pitch != -89 || p.Yaw != 90 {
+		t.Errorf("pose %+v", p)
 	}
 }
