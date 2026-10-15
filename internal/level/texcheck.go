@@ -59,7 +59,8 @@ type checker struct {
 }
 
 // CheckTextures looks at the world brushes' faces (all of them, or those of
-// the brushes and entities ids names) for what draws badly: a drawn face
+// the brushes and entities ids names), in the map's order, for what draws
+// badly: a drawn face
 // hidden by an opaque brush (caulk it), touching coplanar faces of a material
 // whose tiles don't meet (a seam), a tile stretched from the material's
 // shape, a material no GDT defines.
@@ -83,7 +84,6 @@ func CheckTextures(snap *Snapshot, ids []string, info func(material string) Mate
 			out = append(out, c.check(f, checked)...)
 		}
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].Kind < out[j].Kind })
 	return out, nil
 }
 
@@ -249,7 +249,7 @@ func stretch(f *cface, own Tile) string {
 		return ""
 	}
 	r := (w / h) / (own.W / own.H)
-	if r > 1/1.5 && r < 1.5 {
+	if r >= 1/1.5-1e-9 && r <= 1.5+1e-9 { // half again longer, and no more, is no stretch
 		return ""
 	}
 	return num(w) + "x" + num(h) + ", the material's " + num(own.W) + "x" + num(own.H)
@@ -308,19 +308,23 @@ func convexHull(pts []pt2) []pt2 {
 	}
 	pts = append([]pt2(nil), pts...)
 	sort.Slice(pts, func(i, j int) bool { return pts[i].x < pts[j].x || pts[i].x == pts[j].x && pts[i].y < pts[j].y })
+	lower := chain(pts)
+	slices.Reverse(pts)
+	return append(lower, chain(pts)...)
+}
+
+// chain is one half of a hull, the points taken in order, its last point
+// left for the other half to start from. Its loops run over the points, so
+// no counter can run away (a mutant that did ran CI's runner out of memory).
+func chain(pts []pt2) []pt2 {
 	var h []pt2
-	for pass := 0; pass < 2; pass++ {
-		start := len(h)
-		for _, p := range pts {
-			for len(h) >= start+2 && cross2(h[len(h)-2], h[len(h)-1], p) <= 1e-9 {
-				h = h[:len(h)-1]
-			}
-			h = append(h, p)
+	for _, p := range pts {
+		for len(h) >= 2 && cross2(h[len(h)-2], h[len(h)-1], p) <= 1e-9 {
+			h = h[:len(h)-1]
 		}
-		h = h[:len(h)-1]
-		slices.Reverse(pts)
+		h = append(h, p)
 	}
-	return h
+	return h[:len(h)-1]
 }
 
 func cross2(o, a, b pt2) float64 { return (a.x-o.x)*(b.y-o.y) - (a.y-o.y)*(b.x-o.x) }

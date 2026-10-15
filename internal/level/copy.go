@@ -54,8 +54,9 @@ func (b *batch) copies(i int, o *CopyOp) error {
 	if n*len(from) > maxCopies {
 		return fmt.Errorf("copy: %d copies of %d things is over %d in one batch", n, len(from), maxCopies)
 	}
-	for k := 1; k <= n; k++ {
-		by := mapfile.Vec3{o.By[0] * float64(k), o.By[1] * float64(k), o.By[2] * float64(k)}
+	for k := range n { // over a range, as a counter a mutant turned around would make copies until memory ran out
+		s := float64(k + 1)
+		by := mapfile.Vec3{o.By[0] * s, o.By[1] * s, o.By[2] * s}
 		for _, t := range from {
 			if err := b.copyOf(i, t.u, by); err != nil {
 				return err
