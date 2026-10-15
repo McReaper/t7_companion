@@ -76,7 +76,7 @@ func watchGame(pid int, exited <-chan error, start time.Time) StageResult {
 	for {
 		select {
 		case err := <-exited:
-			return StageResult{Errors: []string{gameExit(err, time.Since(start))}}
+			return gameExit(err, time.Since(start))
 		case <-deadline:
 			return StageResult{OK: true, Note: fmt.Sprintf("launched BlackOps3.exe: no dialog in its first %s", gameWatch)}
 		case <-tick.C:
@@ -87,17 +87,21 @@ func watchGame(pid int, exited <-chan error, start time.Time) StageResult {
 	}
 }
 
-// gameExit says how the game ended: at once is Steam refusing it, later is a
-// crash or someone quitting it.
-func gameExit(err error, after time.Duration) string {
+// gameExit says how the game ended: at once is Steam refusing it; later with
+// an exit code a crash (0xc0000005), and without one someone quitting it,
+// which is no failure.
+func gameExit(err error, after time.Duration) StageResult {
 	how := ""
 	if err != nil {
 		how = " (" + err.Error() + ")"
 	}
-	if after < gameStartup {
-		return "the game exited right after starting" + how + " — is Steam running and signed in? A game it shows \"you must launch Steam\" in closes at once"
+	switch {
+	case after < gameStartup:
+		return StageResult{Errors: []string{"the game exited right after starting" + how + " — is Steam running and signed in? A game it shows \"you must launch Steam\" in closes at once"}}
+	case err != nil:
+		return StageResult{Errors: []string{fmt.Sprintf("the game closed %s after starting%s", after.Round(time.Second), how)}}
 	}
-	return fmt.Sprintf("the game closed %s after starting%s", after.Round(time.Second), how)
+	return StageResult{OK: true, Note: fmt.Sprintf("launched BlackOps3.exe: it showed no dialog and quit cleanly %s after starting", after.Round(time.Second))}
 }
 
 // dialogErrors is what the game's dialogs say, nil when it shows none: each
