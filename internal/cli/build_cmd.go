@@ -36,7 +36,7 @@ func newBuildCmd() *cobra.Command {
 	f.StringVar(&o.Stages, "stages", "compile,light,link", "comma list of stages: compile,light,link,run")
 	f.BoolVar(&o.OnlyEnts, "onlyents", false, "fast entity-only compile (-onlyents; invalid after brush edits)")
 	f.StringVar(&o.Light, "light", "medium", "light quality: low|medium|high")
-	f.StringVar(&o.Language, "language", "english", "linker language")
+	f.StringVar(&o.Language, "language", "", "linker language (default: the Launcher's Build Language, else english)")
 	f.BoolVar(&o.SkipGDT, "skip-gdt", false, "skip the gdtdb /update pass before building")
 	f.BoolVar(&o.GDTRebuild, "gdt-rebuild", false, "run gdtdb /rebuild instead of /update (only if /update reports 0 GDTs and the linker then misses an edited asset)")
 	f.BoolVar(&o.FreshXpak, "fresh-xpak", false, "link: write the .xpak from scratch, dropping the data earlier links replaced (it only grows otherwise, and uploads with zone/); use before publishing")
