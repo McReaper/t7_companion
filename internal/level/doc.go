@@ -95,6 +95,14 @@
 // modulo a tile): faces meeting at a corner alone show none. Coplanar faces
 // are found by their rounded plane, so the checks scale with a map.
 //
+// # Rooms
+//
+// A room op builds around its inside box: a floor and a ceiling slab over the
+// walls' whole footprint, the x walls the room's whole length (its corners),
+// the y walls between them, a wall with holes in strips around them, a sill
+// under a hole and a lintel over it. Its pieces' faces that the others hide
+// (selfHidden, the checks' own test) are caulk; the faces at a hole show.
+//
 // # Boards
 //
 // ShowMaterials shows materials as Radiant draws them: a 256-unit slab of

@@ -119,6 +119,15 @@ func mapSamples(t *testing.T, root string, add func(key, s string), addImage fun
 	}
 	v, err = mapEdit(ctx, tops, "textures and copies", 0)
 	run("map_edit|its answer (with each material's tile)", v, err)
+	roomOp := `[{"room": {"min": [-1400, 900, 0], "max": [-888, 1284, 112], "material": "t7_brick_worn_dirty_red_wet", ` +
+		`"floor": "t7_wood_plank_floor_02", "holes": [{"side": "+x", "at": 192}]}}]`
+	add("map_edit|the op sent: a room with a door", roomOp)
+	rooms, err := decodeOps([]byte(roomOp))
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err = mapEdit(ctx, rooms, "a room", 0)
+	run("map_edit|its answer (8 pieces)", v, err)
 	v, err = mapCheck(ctx, nil, "", 0, 0)
 	run("map_check|the template and the rooms above (50 listed)", v, err)
 	v, err = mapCheck(ctx, nil, "seam,stretched,unknown", 0, 0)

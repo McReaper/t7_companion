@@ -17,15 +17,16 @@ type Op struct {
 	Material *MaterialOp `json:"material,omitempty"`
 	Texture  *TextureOp  `json:"texture,omitempty"`
 	Copy     *CopyOp     `json:"copy,omitempty"`
+	Room     *RoomOp     `json:"room,omitempty"`
 }
 
 // opKinds are the names of an op's fields, in Op's order.
-var opKinds = []string{"box", "entity", "delete", "set", "move", "material", "texture", "copy"}
+var opKinds = []string{"box", "entity", "delete", "set", "move", "material", "texture", "copy", "room"}
 
 // kinds are which of its fields an op sets, by their index in opKinds.
 func (op Op) kinds() []int {
 	var out []int
-	for i, set := range []bool{op.Box != nil, op.Entity != nil, op.Delete != nil, op.Set != nil, op.Move != nil, op.Material != nil, op.Texture != nil, op.Copy != nil} {
+	for i, set := range []bool{op.Box != nil, op.Entity != nil, op.Delete != nil, op.Set != nil, op.Move != nil, op.Material != nil, op.Texture != nil, op.Copy != nil, op.Room != nil} {
 		if set {
 			out = append(out, i)
 		}
@@ -131,7 +132,7 @@ func newBatch(snap *Snapshot, tiles Tiles) *batch {
 // apply runs the ops in order over the batch.
 func (b *batch) apply(ops []Op) error {
 	if len(ops) == 0 {
-		return fmt.Errorf("no ops: give box, entity, delete, set, move, material, texture or copy ops")
+		return fmt.Errorf("no ops: give box, entity, delete, set, move, material, texture, copy or room ops")
 	}
 	for i, op := range ops {
 		if err := b.applyOne(i, op); err != nil {
@@ -160,6 +161,8 @@ func (b *batch) applyOne(i int, op Op) error {
 		return b.texture(i, op.Texture)
 	case op.Copy != nil:
 		return b.copies(i, op.Copy)
+	case op.Room != nil:
+		return b.room(i, op.Room)
 	default:
 		if !word(op.Material.Material) {
 			return fmt.Errorf("material %q: one word, a material's name", op.Material.Material)

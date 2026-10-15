@@ -72,6 +72,8 @@ Measured on the stock ZM Mod Level template's map (33 entities, 20 world brushes
 | `map_edit` | the answer to them, with each material's tile | 269 | 699 |
 | `map_edit` | the ops for a floor, two walls caulked top and bottom, a pillar copied three times | 238 | 556 |
 | `map_edit` | the answer to them (7 made, 5 materials' tiles) | 375 | 949 |
+| `map_edit` | a `room` op: a room with a door | 76 | 178 |
+| `map_edit` | the answer to it (8 pieces) | 343 | 846 |
 | `map_edit` | moving a point entity | 49 | 140 |
 | `map_command` | listing `Selection/CSG` | 32 | 111 |
 | `map_command` | `CSG Hollow` on a box | 206 | 579 |
@@ -80,7 +82,7 @@ Measured on the stock ZM Mod Level template's map (33 entities, 20 world brushes
 | `map_check` | the template and the rooms above, 50 findings listed | 1618 | 5158 |
 | `map_check` | seams, stretch and unknown materials only | 210 | 608 |
 
-A room costs about a thousand tokens: its ops (254), the answer (269), a top view to check it (515). The whole map's `map_find` is the dearest call, about 48 tokens an entity, so `class`, `near` or `ids` narrow it; the default image, 768 pixels on the long side, stays near 450 tokens, and `size 1568` quadruples it. A list of materials costs about 33 tokens a material, a finding of `map_check` about 32: `kinds` narrows a long one.
+A room costs about a thousand tokens: its ops (254), the answer (269), a top view to check it (515); as one `room` op, door and caulk included, the ops are 76. The whole map's `map_find` is the dearest call, about 48 tokens an entity, so `class`, `near` or `ids` narrow it; the default image, 768 pixels on the long side, stays near 450 tokens, and `size 1568` quadruples it. A list of materials costs about 33 tokens a material, a finding of `map_check` about 32: `kinds` narrows a long one.
 
 ## Retrieval quality
 

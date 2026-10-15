@@ -50,7 +50,7 @@ type pt2 struct{ x, y float64 }
 
 // checker holds a map's world brushes for CheckTextures.
 type checker struct {
-	snap    *Snapshot
+	short   func(guid string) string // a brush's id in a finding
 	info    func(string) MaterialInfo
 	faces   []*cface
 	byPlane map[planeKey][]*cface
@@ -68,7 +68,7 @@ func CheckTextures(snap *Snapshot, ids []string, info func(material string) Mate
 	if err != nil {
 		return nil, err
 	}
-	c := &checker{snap: snap, info: info, byPlane: map[planeKey][]*cface{}, hid: map[*cface]string{}}
+	c := newChecker(snap.IDs.Short, info)
 	for _, e := range snap.Map.Entities {
 		if e.Class() == "worldspawn" { // what the compiler draws and seals with: a brush entity's brushes move or don't draw
 			for _, b := range e.Brushes() {
@@ -85,6 +85,26 @@ func CheckTextures(snap *Snapshot, ids []string, info func(material string) Mate
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Kind < out[j].Kind })
 	return out, nil
+}
+
+func newChecker(short func(string) string, info func(string) MaterialInfo) *checker {
+	return &checker{short: short, info: info, byPlane: map[planeKey][]*cface{}, hid: map[*cface]string{}}
+}
+
+// selfHidden is, by brush index, the directions of the faces of each brush
+// the others hide, every brush taken as opaque.
+func selfHidden(brushes []*mapfile.Brush) map[int][]string {
+	c := newChecker(func(g string) string { return g }, func(string) MaterialInfo { return MaterialInfo{Known: true, Opaque: true, Drawn: true} })
+	for _, b := range brushes {
+		c.add(b)
+	}
+	out := map[int][]string{}
+	for _, f := range c.faces {
+		if c.hidden(f) != "" {
+			out[f.bi] = append(out[f.bi], f.dir)
+		}
+	}
+	return out
 }
 
 // check is one face's findings.
@@ -105,13 +125,13 @@ func (c *checker) check(f *cface, checked func(string) bool) []Finding {
 		out = append(out, c.finding(f, "stretched", s))
 	}
 	if g := c.seamWith(f); g != nil && (!checked(g.brush) || f.bi < g.bi) { // a pair once
-		out = append(out, c.finding(f, "seam", c.snap.IDs.Short(g.brush)+" "+g.dir))
+		out = append(out, c.finding(f, "seam", c.short(g.brush)+" "+g.dir))
 	}
 	return out
 }
 
 func (c *checker) finding(f *cface, kind, detail string) Finding {
-	return Finding{Kind: kind, ID: c.snap.IDs.Short(f.brush), Face: f.dir, Material: f.material, Detail: detail}
+	return Finding{Kind: kind, ID: c.short(f.brush), Face: f.dir, Material: f.material, Detail: detail}
 }
 
 // add takes a classic brush's faces with their corners; a face with no area
@@ -168,12 +188,12 @@ func (c *checker) hiddenBy(f *cface) string {
 	back := plane{mapfile.Vec3{-f.pl.n[0], -f.pl.n[1], -f.pl.n[2]}, -f.pl.d}
 	for _, g := range c.byPlane[keyOf(back)] {
 		if g.bi != f.bi && c.info(g.material).Opaque && covers(g.poly, f.poly) {
-			return "against " + c.snap.IDs.Short(g.brush) + " " + g.dir
+			return "against " + c.short(g.brush) + " " + g.dir
 		}
 	}
 	for i, s := range c.solids {
 		if i != f.bi && s.box.overlaps(f.box) && c.buriedIn(f, s) {
-			return "inside " + c.snap.IDs.Short(s.faces[0].brush)
+			return "inside " + c.short(s.faces[0].brush)
 		}
 	}
 	return ""
