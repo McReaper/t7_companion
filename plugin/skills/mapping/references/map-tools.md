@@ -68,7 +68,7 @@ Then `t7kb:map_check` the brushes: it lists faces left uncaulked where nothing c
 
 ## Cut doors by building around the hole, not with CSG Subtract
 
-**`Selection/CSG/CSG Subtract` carves the selected brush out of every brush it touches, volumes included**, with no warning: a door cutter through a wall of the template's start room also split the start zone's `info_volume`, the `volume_sun`, the `umbra_volume` and the `volume_fpstool` six ways each (verified in a test Radiant). A zone or sun volume in pieces no longer covers what it did. Build a wall with a door as boxes around the hole instead — the wall's two sides and the lintel above, each a box of the same batch. Done by mistake, one Ctrl+Z (`t7kb:map_command` with `Edit/Undo`) takes the whole subtract back.
+**`Selection/CSG/CSG Subtract` carves the selected brush out of every brush it touches, volumes included**, with no warning: a door cutter through a wall of the template's start room also split the start zone's `info_volume`, the `volume_sun`, the `umbra_volume` and the `volume_fpstool` six ways each (verified in a test Radiant). A zone or sun volume in pieces no longer covers what it did. Build a wall with a door as boxes around the hole instead — the wall's two sides and the lintel above, each a box of the same batch: `t7kb:map_edit`'s `room` op does it for a room's doors and windows (`holes`), and caulks the faces its pieces hide of each other. Done by mistake, one Ctrl+Z (`t7kb:map_command` with `Edit/Undo`) takes the whole subtract back.
 
 ## CSG Hollow walls are as thick as the grid
 
