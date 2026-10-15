@@ -208,17 +208,16 @@ func trailingComments(lines []string) []string {
 	return lines[k:]
 }
 
-// splitLines cuts b after each '\n', keeping the line ends.
+// splitLines cuts b after each '\n', keeping the line ends. It loops over
+// what bytes.SplitAfter gives, so no index of its own can stall it (a mutant
+// of a hand-advanced one appended the same line until CI's runner ran out of
+// memory).
 func splitLines(b []byte) []string {
 	var out []string
-	for len(b) > 0 {
-		i := bytes.IndexByte(b, '\n')
-		if i < 0 {
-			out = append(out, string(b))
-			break
+	for _, l := range bytes.SplitAfter(b, []byte{'\n'}) {
+		if len(l) > 0 {
+			out = append(out, string(l))
 		}
-		out = append(out, string(b[:i+1]))
-		b = b[i+1:]
 	}
 	return out
 }
