@@ -78,7 +78,8 @@ Measured on the stock ZM Mod Level template's map (33 entities, 20 world brushes
 | `map_command` | listing `Selection/CSG` | 32 | 111 |
 | `map_command` | `CSG Hollow` on a box | 206 | 579 |
 | `map_materials` | brick walls, 20 listed | 656 | 2122 |
-| `map_materials` | six wood floors shown: JSON + 768×405 image | 362 + 414 | 1077 + 3585 |
+| `map_materials` | six wood floors on a sheet (`show`): JSON + 768×384 image | 272 + 393 | 813 + 320718 |
+| `map_materials` | the same on a board in Radiant (`board`): JSON + 768×405 image | 350 + 414 | 1050 + 3096 |
 | `map_check` | the template and the rooms above, 50 findings listed | 1618 | 5158 |
 | `map_check` | seams, stretch and unknown materials only | 210 | 608 |
 

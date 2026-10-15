@@ -73,7 +73,7 @@ func newMapMaterialsCmd() *cobra.Command {
 	var a mapMaterialsArgs
 	var out string
 	materials := &cobra.Command{Use: "materials",
-		Short: "Find materials to texture with, most used by the install's maps first; --show lays them out in Radiant",
+		Short: "Find materials to texture with, most used by the install's maps first; --show writes a sheet of their images",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			res, png, err := mapMaterials(c.Context(), a)
@@ -94,10 +94,12 @@ func newMapMaterialsCmd() *cobra.Command {
 	fl.StringVar(&a.Name, "name", "", "words the name holds, all of them; comma-separated alternatives")
 	fl.IntVar(&a.Limit, "limit", 0, "how many to list (default 20, at most 200)")
 	fl.BoolVar(&a.All, "all", false, "include materials marked DO NOT USE")
-	fl.BoolVar(&a.Show, "show", false, "lay the first 16 out in Radiant and write their image")
+	fl.BoolVar(&a.Show, "show", false, "write a sheet of the first 16's color images, read from the install")
+	fl.BoolVar(&a.Board, "board", false, "lay the first 16 out in Radiant instead and write that shot")
+	fl.IntVar(&a.Size, "size", 0, "the image's longer side in pixels (default 768)")
 	fl.StringVar(&a.ToolsPath, "tools-path", "", "BO3 mod-tools root (default: $TA_TOOLS_PATH, else the running Radiant's)")
-	fl.IntVar(&a.PID, "pid", 0, "with --show: the Radiant to use when several run")
-	fl.StringVar(&out, "out", "map_materials.png", "with --show: where to write the image")
+	fl.IntVar(&a.PID, "pid", 0, "with --board: the Radiant to use when several run")
+	fl.StringVar(&out, "out", "map_materials.png", "with --show or --board: where to write the image")
 	return materials
 }
 

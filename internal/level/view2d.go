@@ -124,8 +124,8 @@ func poseArgs(p Pose) string {
 	return strings.Join([]string{num(p.Origin[0]), num(p.Origin[1]), num(p.Origin[2]), num(p.Pitch), num(p.Yaw), num(p.Roll)}, " ")
 }
 
-// defaultSize is an image's longer side unless asked otherwise.
-const defaultSize = 768
+// DefaultSize is an image's longer side unless asked otherwise.
+const DefaultSize = 768
 
 // compose scales the frame to the size asked and writes the ids whose points
 // landed in it, nearest the centre first.
@@ -135,7 +135,7 @@ func compose(f *frame, view string, pts []labelPoint, size int) (*Shot, error) {
 		return nil, err
 	}
 	if size <= 0 {
-		size = defaultSize
+		size = DefaultSize
 	}
 	w, h := Fit(f.W, f.H, size)
 	img = Shrink(img, w, h)

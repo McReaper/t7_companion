@@ -135,11 +135,19 @@ func mapSamples(t *testing.T, root string, add func(key, s string), addImage fun
 
 	v, err = mapMaterials0(ctx, mapMaterialsArgs{ToolsPath: root, Usage: "wall", Surface: "brick"})
 	run("map_materials|brick walls (20 listed)", v, err)
-	if out, png, err := mapMaterials(ctx, mapMaterialsArgs{Usage: "floor", Name: "wood", Limit: 6, Show: true}); err == nil {
-		add("map_materials|6 wood floors shown: the JSON", mcpJSON(t, out))
-		addImage(fmt.Sprintf("map_materials|6 wood floors shown: the %d×%d image", out.W, out.H), out.W, out.H, len(png))
-	} else {
-		t.Logf("map_materials show: %v", err)
+	for _, how := range []struct {
+		name string
+		a    mapMaterialsArgs
+	}{
+		{"on a sheet", mapMaterialsArgs{Usage: "floor", Name: "wood", Limit: 6, Show: true}},
+		{"on a board", mapMaterialsArgs{Usage: "floor", Name: "wood", Limit: 6, Board: true}},
+	} {
+		if out, png, err := mapMaterials(ctx, how.a); err == nil {
+			add("map_materials|6 wood floors "+how.name+": the JSON", mcpJSON(t, out))
+			addImage(fmt.Sprintf("map_materials|6 wood floors %s: the %d×%d image", how.name, out.W, out.H), out.W, out.H, len(png))
+		} else {
+			t.Logf("map_materials %s: %v", how.name, err)
+		}
 	}
 
 	v, err = mapCommand(ctx, "", nil, "Selection/CSG", 0)

@@ -113,7 +113,9 @@
 // each, at its tile, in rows 512 units above the map, framed from straight
 // above, fullbright, volumes hidden; then the edit that built them is undone
 // when the undo menu's last entry is still it, else the slabs are deleted
-// (one more undo entry). Radiant's redo holds the board.
+// (one more undo entry). Radiant's redo holds the board. Sheet shows them
+// as Radiant's texture browser does instead, without Radiant: their color
+// images, read from the install's files (Thumb), four across, numbered.
 //
 // # Commands
 //

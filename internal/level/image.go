@@ -95,25 +95,31 @@ func DrawLabels(img *image.RGBA, labels []Label) {
 		if !ok {
 			continue
 		}
-		tw, th := len(l.ID)*4*px-px, 5*px
-		r := image.Rect(x-2, y-2, x+tw+2, y+th+2)
-		plates = append(plates, r)
-		fill(img, r, plate)
-		for i, r := range l.ID {
-			g, ok := glyphs[r]
-			if !ok {
-				continue
-			}
-			for row, bits := range g {
-				for col := range 3 {
-					if bits&(4>>col) != 0 {
-						gx, gy := x+i*4*px+col*px, y+row*px
-						fill(img, image.Rect(gx, gy, gx+px, gy+px), ink)
-					}
+		plates = append(plates, writeText(img, x, y, l.ID))
+	}
+}
+
+// writeText writes hex digits white on a black plate, the text's upper left
+// at x, y, and returns the plate.
+func writeText(img *image.RGBA, x, y int, text string) image.Rectangle {
+	tw, th := len(text)*4*px-px, 5*px
+	r := image.Rect(x-2, y-2, x+tw+2, y+th+2)
+	fill(img, r, plate)
+	for i, c := range text {
+		g, ok := glyphs[c]
+		if !ok {
+			continue
+		}
+		for row, bits := range g {
+			for col := range 3 {
+				if bits&(4>>col) != 0 {
+					gx, gy := x+i*4*px+col*px, y+row*px
+					fill(img, image.Rect(gx, gy, gx+px, gy+px), ink)
 				}
 			}
 		}
 	}
+	return r
 }
 
 // placeLabel is where a label's text goes: the first of its four places that

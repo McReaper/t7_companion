@@ -105,9 +105,9 @@ func TestMapMaterialsListsTheBrowsersMaterialsMostUsedFirst(t *testing.T) {
 	}
 }
 
-// show lays the first 16 out in the Radiant running, its image beside the
+// board lays the first 16 out in the Radiant running, its image beside the
 // answer; with no install named, the Radiant's own is read.
-func TestMapMaterialsShowsTheFirstSixteenInRadiant(t *testing.T) {
+func TestMapMaterialsBoardsTheFirstSixteenInRadiant(t *testing.T) {
 	root := materialsInstall(t)
 	b, err := os.ReadFile("../level/testdata/test_claude.map")
 	if err != nil {
@@ -124,7 +124,7 @@ func TestMapMaterialsShowsTheFirstSixteenInRadiant(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "source_data", "many.gdt"), []byte("{\r\n"+many.String()+"}\r\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	res, err := mapMaterialsTool().Handler(context.Background(), mcpRequest("map_materials", map[string]any{"usage": "wall", "show": true}))
+	res, err := mapMaterialsTool().Handler(context.Background(), mcpRequest("map_materials", map[string]any{"usage": "wall", "board": true}))
 	if err != nil || res.IsError || len(res.Content) != 2 {
 		t.Fatalf("%v %s", err, resultText(res))
 	}
@@ -146,7 +146,7 @@ func TestMapMaterialsShowsTheFirstSixteenInRadiant(t *testing.T) {
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 	png := filepath.Join(t.TempDir(), "m.png")
-	cmd.SetArgs([]string{"materials", "--name", "m0, m1", "--usage", "floor", "--limit", "30", "--show", "--out", png})
+	cmd.SetArgs([]string{"materials", "--name", "m0, m1", "--usage", "floor", "--limit", "30", "--board", "--out", png})
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func TestMapMaterialsShowsTheFirstSixteenInRadiant(t *testing.T) {
 		!strings.Contains(strings.Join(many2.Notes, " "), "the board shows the first 16") {
 		t.Errorf("%v %+v", err, many2)
 	}
-	if sixteen, _, err := mapMaterials(context.Background(), mapMaterialsArgs{Name: "m0, m1", Usage: "floor", Limit: 16, Show: true}); err != nil ||
+	if sixteen, _, err := mapMaterials(context.Background(), mapMaterialsArgs{Name: "m0, m1", Usage: "floor", Limit: 16, Board: true}); err != nil ||
 		len(sixteen.Board) != 16 || len(sixteen.Notes) != 0 {
 		t.Errorf("sixteen listed, all on the board, nothing to say: %+v, %v", sixteen, err)
 	}

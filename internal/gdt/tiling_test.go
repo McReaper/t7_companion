@@ -1,6 +1,7 @@
 package gdt
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -40,6 +41,7 @@ func TestMaterialTilingIsItsTilingOrItsLargestImage(t *testing.T) {
 		mat("m_tiny", "colorMap", "i_tiny")+
 		mat("m_mixed", "colorMap", "$white_diffuse", "specColorMap", "i_wide")+
 		mat("m_gonefirst", "colorMap", "i_gone", "specColorMap", "i_wide")+
+		"\t\"i_nobase\" ( \"image.gdf\" )\r\n\t{\r\n\t}\r\n"+
 		"\t\"m_child\" [ \"m_set\" ]\r\n\t{\r\n\t}\r\n}\r\n"))
 	for name, want := range map[string]Tiling{
 		"m_set":       {1024, 128, "tiling"},
@@ -70,5 +72,18 @@ func TestMaterialTilingIsItsTilingOrItsLargestImage(t *testing.T) {
 	}
 	if _, _, err := w.imageTexels("i_none"); err == nil {
 		t.Error("an image no GDT defines has no size")
+	}
+	// the file an image shows, whether it is there or not
+	for name, want := range map[string]string{"i_tall": "texture_assets/t/tall.tif", "i_gone": "texture_assets/t/gone.tif"} {
+		got, err := w.ImageFile(name)
+		if err != nil || got != w.Abs(want) || !filepath.IsAbs(got) {
+			t.Errorf("%s: %q, %v, want %q", name, got, err, w.Abs(want))
+		}
+	}
+	if _, err := w.ImageFile("i_none"); err == nil || !strings.Contains(err.Error(), `no GDT defines image "i_none"`) {
+		t.Errorf("an image no GDT defines: %v", err)
+	}
+	if _, err := w.ImageFile("i_nobase"); err == nil || !strings.Contains(err.Error(), `image "i_nobase" has no baseImage`) {
+		t.Errorf("an image with no baseImage: %v", err)
 	}
 }
