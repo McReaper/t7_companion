@@ -43,9 +43,11 @@ func TestMain(m *testing.M) {
 		_ = os.WriteFile(os.Getenv("T7KB_FAKE_LED"), []byte("led"), 0o644)
 	case "quit": // a game Steam refused
 		os.Exit(1)
-	case "late": // a game that crashed, or someone quit, while it loaded
+	case "late": // a game that crashed while it loaded
 		time.Sleep(600 * time.Millisecond)
 		os.Exit(2)
+	case "quit-later": // a game someone quit while it was watched
+		time.Sleep(600 * time.Millisecond)
 	}
 	os.Exit(0)
 }
@@ -256,10 +258,18 @@ func TestRunGame(t *testing.T) {
 		time.Sleep(3 * time.Second) // the fake game exits, so its directory can be removed
 	})
 
-	t.Run("a game that closes while it loads failed", func(t *testing.T) {
+	t.Run("a game that crashes while it loads failed", func(t *testing.T) {
 		t.Setenv("T7KB_FAKE_TOOL", "late")
 		sr := runGame(game, nil)
 		if sr.OK || len(sr.Errors) != 1 || sr.Errors[0] != "the game closed 1s after starting (exit status 2)" {
+			t.Errorf("%+v", sr)
+		}
+	})
+
+	t.Run("a game quit cleanly while it was watched launched", func(t *testing.T) {
+		t.Setenv("T7KB_FAKE_TOOL", "quit-later")
+		sr := runGame(game, nil)
+		if !sr.OK || sr.Errors != nil || sr.Note != "launched BlackOps3.exe: it showed no dialog and quit cleanly 1s after starting" {
 			t.Errorf("%+v", sr)
 		}
 	})
