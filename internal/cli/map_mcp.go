@@ -13,7 +13,26 @@ import (
 // mapToolset edits the map open in the user's Radiant, through the
 // T7RadiantBridge plugin: internal/radiant has the connection's rules.
 func mapToolset() toolset {
-	return toolset{name: "map", tools: []server.ServerTool{radiantOpenTool(), mapFindTool(), mapViewTool(), mapEditTool(), mapCommandTool(), mapMaterialsTool()}}
+	return toolset{name: "map", tools: []server.ServerTool{radiantOpenTool(), mapFindTool(), mapViewTool(), mapEditTool(), mapCommandTool(), mapMaterialsTool(), mapCheckTool()}}
+}
+
+func mapCheckTool() server.ServerTool {
+	return server.ServerTool{Tool: mcp.NewTool("map_check",
+		mcp.WithDescription("Check the textures of the map open in Radiant, its world brushes (all, or those ids names), "+
+			"for what draws badly, the worst kinds first: unknown (a material no GDT defines: the missing-texture pattern); "+
+			"seam (faces of one material on one plane, both seen, sharing an edge, whose tiles don't meet; detail is the "+
+			"other face: give both the same tile, rotation and origin); stretched (a tile more than half again longer one way "+
+			"than the material's; detail is both tiles); hidden (a drawn face against an opaque brush's face, or inside an "+
+			"opaque brush; detail says which: texture it caulk, as it can't be seen and still draws). Each finding names the "+
+			"brush's id, the face (+x … -z, as map_edit's texture op takes faces) and the material; counts has every kind's "+
+			"total. Run it after texturing, and fix with map_edit."),
+		mcp.WithString("ids", mcp.Description("The brushes or entities to check, comma- or space-separated (default every world brush).")),
+		mcp.WithString("kinds", mcp.Description("Only these kinds, comma-separated: unknown, seam, stretched, hidden.")),
+		mcp.WithNumber("limit", mcp.Description("How many findings to list (default 50, at most 200); counts has them all.")),
+		mcp.WithNumber("pid", mcp.Description("The Radiant to use when several run."))),
+		Handler: jsonHandler(func(ctx context.Context, r mcp.CallToolRequest) (any, error) {
+			return mapCheck(ctx, splitIDs(r.GetString("ids", "")), r.GetString("kinds", ""), r.GetInt("limit", 0), r.GetInt("pid", 0))
+		})}
 }
 
 func mapMaterialsTool() server.ServerTool {

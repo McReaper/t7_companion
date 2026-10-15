@@ -83,6 +83,18 @@
 // box's, is what Tiles gives: map_edit's is the size the install's maps use the
 // material at most, else its GDT's tiling at 16 texels a unit.
 //
+// # Checks
+//
+// CheckTextures reads the world brushes' faces for what draws badly. A drawn
+// face is hidden when an opaque brush's face on its plane, facing it, covers
+// it whole, or when it lies inside an opaque brush; on the stock prefabs'
+// geometry 85% of the faces it calls hidden are caulk or another tool
+// material, against 56% of all faces (TestHiddenFacesAreTheOnesTreyarchCaulked).
+// A seam is two faces of one material on one plane, both seen, sharing an
+// edge or overlapping, whose tiles differ (size, rotation, mirror, or offset
+// modulo a tile): faces meeting at a corner alone show none. Coplanar faces
+// are found by their rounded plane, so the checks scale with a map.
+//
 // # Boards
 //
 // ShowMaterials shows materials as Radiant draws them: a 256-unit slab of

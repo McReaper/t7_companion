@@ -119,6 +119,10 @@ func mapSamples(t *testing.T, root string, add func(key, s string), addImage fun
 	}
 	v, err = mapEdit(ctx, tops, "textures and copies", 0)
 	run("map_edit|its answer (with each material's tile)", v, err)
+	v, err = mapCheck(ctx, nil, "", 0, 0)
+	run("map_check|the template and the rooms above (50 listed)", v, err)
+	v, err = mapCheck(ctx, nil, "seam,stretched,unknown", 0, 0)
+	run("map_check|seams, stretch and unknown materials only", v, err)
 
 	v, err = mapMaterials0(ctx, mapMaterialsArgs{ToolsPath: root, Usage: "wall", Surface: "brick"})
 	run("map_materials|brick walls (20 listed)", v, err)
