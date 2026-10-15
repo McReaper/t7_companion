@@ -85,15 +85,23 @@ func TestGameExitSaysWhenItEnded(t *testing.T) {
 	for _, c := range []struct {
 		err   error
 		after time.Duration
-		want  string
+		ok    bool
+		want  string // the error, or the note of a clean quit
 	}{
-		{errors.New("exit status 1"), time.Second, "the game exited right after starting (exit status 1) — is Steam running"},
-		{nil, 7999 * time.Millisecond, "the game exited right after starting — is Steam running"},
-		{nil, 8 * time.Second, "the game closed 8s after starting"},
-		{errors.New("exit status 3221225477"), 41600 * time.Millisecond, "the game closed 42s after starting (exit status 3221225477)"},
+		{errors.New("exit status 1"), time.Second, false, "the game exited right after starting (exit status 1) — is Steam running"},
+		{nil, 7999 * time.Millisecond, false, "the game exited right after starting — is Steam running"},
+		{nil, 8 * time.Second, true, "launched BlackOps3.exe: it showed no dialog and quit cleanly 8s after starting"},
+		{nil, 71300 * time.Millisecond, true, "launched BlackOps3.exe: it showed no dialog and quit cleanly 1m11s after starting"},
+		{errors.New("exit status 0xc0000005"), 8 * time.Second, false, "the game closed 8s after starting (exit status 0xc0000005)"},
+		{errors.New("exit status 3221225477"), 41600 * time.Millisecond, false, "the game closed 42s after starting (exit status 3221225477)"},
 	} {
-		if got := gameExit(c.err, c.after); !strings.HasPrefix(got, c.want) {
-			t.Errorf("%v after %s: %q, want %q", c.err, c.after, got, c.want)
+		sr := gameExit(c.err, c.after)
+		got := sr.Note
+		if !c.ok {
+			got = strings.Join(sr.Errors, "; ")
+		}
+		if sr.OK != c.ok || !strings.HasPrefix(got, c.want) || (c.ok && sr.Errors != nil) || (!c.ok && sr.Note != "") {
+			t.Errorf("%v after %s: %+v, want ok=%v %q", c.err, c.after, sr, c.ok, c.want)
 		}
 	}
 }
