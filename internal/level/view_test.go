@@ -62,7 +62,7 @@ func TestA3DViewFramesItsTargetMeasuringTheLensOnce(t *testing.T) {
 	if shot.View != "3d" || shot.Pose == nil || shot.Pose.Pitch != -35 || shot.Pose.Yaw != 45 || shot.Image.Rect.Dx() != 160 {
 		t.Errorf("shot = %+v", shot)
 	}
-	if len(shot.Labels) != 1 || shot.Labels[0].ID != "5ec8de49" || shot.Labels[0].X != 80 || shot.Labels[0].Y != 45 {
+	if len(shot.Labels) != 1 || shot.Labels[0].ID != "5ec8de49" || abs(shot.Labels[0].X-80) > 1 || abs(shot.Labels[0].Y-45) > 1 { // the centre, within the pixel it falls in
 		t.Errorf("labels = %+v: the floor's centre, at the view's", shot.Labels)
 	}
 	if _, err := View(context.Background(), c, snap, ViewOptions{IDs: []string{"af3c9c64"}}); err != nil {
@@ -320,3 +320,5 @@ func TestABlankCaptureIsRefused(t *testing.T) {
 		t.Error("one colour, alpha aside, is blank, as is no pixel")
 	}
 }
+
+func abs(n int) int { return max(n, -n) }

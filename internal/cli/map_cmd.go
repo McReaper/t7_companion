@@ -51,7 +51,7 @@ func newMapCmd() *cobra.Command {
 	fl.StringVar(&a.Keys, "keys", "", "which keys to show: all, or a comma list (default the naming keys)")
 	fl.IntVar(&a.Limit, "limit", 0, "how many entities at most (default 50)")
 	fl.IntVar(&a.PID, "pid", 0, "the Radiant to read when several run")
-	root.AddCommand(find, newMapViewCmd(), newMapEditCmd(), newMapCommandCmd(), newMapMaterialsCmd(), newMapCheckCmd())
+	root.AddCommand(find, newMapViewCmd(), newMapEditCmd(), newMapCommandCmd(), newMapMaterialsCmd(), newMapModelsCmd(), newMapCheckCmd())
 	return root
 }
 
@@ -175,7 +175,7 @@ func newMapViewCmd() *cobra.Command {
 	fl.Float64Var(&a.Radius, "radius", 0, "with --at: how far around it to show (default 256)")
 	fl.StringVar(&a.Camera, "camera", "", "3d: shoot from x,y,z,pitch,yaw,roll")
 	fl.StringVar(&a.Render, "render", "", "3d: fake, fullbright, wireframe, real, view or density for this shot")
-	fl.StringVar(&a.Hide, "hide", "", "volumes: hide the map's volumes and triggers for this shot")
+	fl.StringVar(&a.Hide, "hide", "", "volumes, sky or both comma-separated: hide them for this shot")
 	fl.BoolVar(&a.Bake, "bake", false, "3d: bake Radiant's lighting first (its toolbar's bolt, at its L/M/H) and shoot under real lighting")
 	fl.IntVar(&a.Size, "size", 0, "the image's longer side in pixels (default 768)")
 	fl.BoolVar(&a.NoLabels, "no-labels", false, "leave the ids off the image")

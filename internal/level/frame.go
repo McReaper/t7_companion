@@ -75,14 +75,20 @@ var Looking = Pose{Pitch: -35, Yaw: 45}
 // margin is how much room a framed target leaves around it.
 const margin = 1.15
 
-// FrameBox is the pose, looking the way look does, from which the box fills
-// the view: its bounding sphere just fits the narrower field of view.
+// FrameBox is the pose, looking the way look does at the box's centre, from
+// which its corners just fill the view, margin around: a corner x across, y
+// up and z ahead of the centre fits at a distance d once |x|·f/(w/2) ≤ d+z,
+// and so for y; and it stays ahead of the camera.
 func FrameBox(l Lens, look Pose, b Box) Pose {
-	half := math.Atan(math.Min(float64(l.W), float64(l.H)) / 2 / l.F)
-	r := math.Max(math.Sqrt(dot(sub(b.Max, b.Min), sub(b.Max, b.Min)))/2, 1)
-	d := r * margin / math.Sin(half)
-	fwd, _, _ := look.basis()
+	fwd, right, up := look.basis()
 	c := b.Centre()
+	d := 1.0
+	for _, k := range b.Corners() {
+		p := sub(k, c)
+		x, y, z := dot(p, right), dot(p, up), dot(p, fwd)
+		d = math.Max(d, math.Max(math.Max(math.Abs(x)*l.F/(float64(l.W)/2), math.Abs(y)*l.F/(float64(l.H)/2)), 1)-z)
+	}
+	d *= margin
 	look.Origin = mapfile.Vec3{c[0] - fwd[0]*d, c[1] - fwd[1]*d, c[2] - fwd[2]*d}
 	return look
 }

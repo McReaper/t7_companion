@@ -13,7 +13,7 @@ import (
 // mapToolset edits the map open in the user's Radiant, through the
 // T7RadiantBridge plugin: internal/radiant has the connection's rules.
 func mapToolset() toolset {
-	return toolset{name: "map", tools: []server.ServerTool{radiantOpenTool(), mapFindTool(), mapViewTool(), mapEditTool(), mapCommandTool(), mapMaterialsTool(), mapCheckTool()}}
+	return toolset{name: "map", tools: []server.ServerTool{radiantOpenTool(), mapFindTool(), mapViewTool(), mapEditTool(), mapCommandTool(), mapMaterialsTool(), mapModelsTool(), mapCheckTool()}}
 }
 
 func mapCheckTool() server.ServerTool {
@@ -151,7 +151,7 @@ func mapViewTool() server.ServerTool {
 		mcp.WithNumber("radius", mcp.Description("With at: how far around the point to show (default 256).")),
 		mcp.WithString("camera", mcp.Description("3d: shoot from x y z pitch yaw roll (degrees; positive pitch looks up, yaw 90 faces +y).")),
 		mcp.WithString("render", mcp.Description("3d: the render method for this shot: fake, fullbright, wireframe, real, view or density.")),
-		mcp.WithString("hide", mcp.Description("volumes: hide the map's volumes and triggers for this shot (their tool textures cover a view from inside them too); shown again after.")),
+		mcp.WithString("hide", mcp.Description("volumes, sky or both comma-separated: hide for this shot the map's volumes and triggers (their tool textures cover a view from inside them too) or its sky brushes (a skybox covers a view from outside it); shown again after.")),
 		mcp.WithBoolean("bake", mcp.Description("3d: bake Radiant's lighting first, at its toolbar's L/M/H, and shoot under real lighting (default false); after an edit, bake again to see its light.")),
 		mcp.WithNumber("size", mcp.Description("The image's longer side in pixels (default 768, at most 1568).")),
 		mcp.WithBoolean("no_labels", mcp.Description("Leave the ids off the image (default false).")),

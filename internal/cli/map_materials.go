@@ -151,7 +151,7 @@ func showMaterials(ctx context.Context, c *radiant.Client, snap *level.Snapshot,
 		at[l.ID] = [2]int{l.X, l.Y}
 	}
 	for _, s := range b.Swatches {
-		out.Board = append(out.Board, swatchOut{Label: s.Label, Material: s.Material, At: at[s.Label]})
+		out.Board = append(out.Board, swatchOut{Label: s.Label, Material: s.Name, At: at[s.Label]})
 	}
 	if len(out.Materials) > len(names) {
 		out.Notes = append(out.Notes, fmt.Sprintf("the board shows the first %d", len(names)))

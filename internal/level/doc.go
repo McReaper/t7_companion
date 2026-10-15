@@ -36,11 +36,13 @@
 // entity shows with the room around it.
 //
 //   - 3D: a framed target is shot from the south-west, above (Looking), from
-//     where its bounding sphere fills the view. Radiant's lens is a pinhole,
-//     px = w/2 + f·x/z, and its focal length isn't given: View guesses it, checks
-//     that the target's corners landed in the frame and fill it, and if not
-//     recovers f from where they landed (FocalFrom) and shoots again; the lens is
-//     kept per Radiant, so the next view takes one shot.
+//     where its corners just fill the view (FrameBox). Radiant's lens is a
+//     pinhole, px = w/2 + f·x/z, and its focal length isn't given: View guesses
+//     it, recovers f from where the target's corners landed (FocalFrom), and
+//     shoots again when it is off by more than lensSlack or the corners overflow
+//     the frame: a frame from a lens 5% off fills the view 5% off, which the
+//     corners filling more than half of it doesn't catch. The lens is kept per
+//     Radiant, so the next view takes one shot.
 //   - 2D: the view shows one axis; a capture of another fails naming the axis
 //     shown, and View/Layout/Next turns it XY, XZ, YZ. Zooming moves the
 //     view's centre (towards the mouse), so a frame sets the zoom first, from
@@ -111,7 +113,9 @@
 //
 // ShowMaterials shows materials as Radiant draws them: a 256-unit slab of
 // each, at its tile, in rows 512 units above the map, framed from straight
-// above, fullbright, volumes hidden; then the edit that built them is undone
+// above, fullbright. ShowModels places a misc_model of each, four to a row
+// 128 units apart, framed from the front under fake lighting. Both hide the
+// volumes and the sky's brushes for the shot; then the edit that built them is undone
 // when the undo menu's last entry is still it, else the slabs are deleted
 // (one more undo entry). Radiant's redo holds the board. Sheet shows them
 // as Radiant's texture browser does instead, without Radiant: their color

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -18,13 +19,14 @@ import (
 type ViewOptions struct {
 	View   string        // 3d (default), top, front or side; xy, xz and yz too
 	IDs    []string      // frame these entities or brushes
+	Frame  *Box          // or frame this box
 	At     *mapfile.Vec3 // or frame the box of Radius around this point
 	Radius float64
 	Camera *Pose  // or shoot the 3D view from here
 	Size   int    // the image's longer side, at most
 	Render string // the 3D view's render method for the shot, put back after
 	Labels bool   // write ids on the image
-	Hide   string // "volumes": hide the map's volumes and triggers for the shot
+	Hide   string // "volumes", "sky" or both, comma-separated: hidden for the shot
 	Bake   bool   // bake Radiant's lighting first and shoot under real lighting
 	Look   *Pose  // the way a framed 3D target is looked at (default Looking)
 	Marks  []Mark // with Labels, these labels instead of ids
@@ -77,7 +79,7 @@ func View(ctx context.Context, c *radiant.Client, snap *Snapshot, o ViewOptions)
 	s := &session{c: c, pid: c.Hello.PID}
 	var f *frame
 	if o.Hide != "" {
-		err = s.hideVolumes(ctx, snap)
+		err = s.hide(ctx, snap, o.Hide)
 	}
 	switch {
 	case err != nil:
@@ -121,8 +123,10 @@ func (o ViewOptions) check() (string, error) {
 	case o.Bake && o.Render != "" && renders[strings.ToLower(o.Render)] != "Real Lighting" && !strings.EqualFold(o.Render, "Real Lighting"):
 		return "", fmt.Errorf("render %q: a bake shows under real lighting, the render a bake shoots with", o.Render)
 	}
-	if h := strings.ToLower(o.Hide); h != "" && h != "volumes" {
-		return "", fmt.Errorf("hide %q: volumes, or nothing", o.Hide)
+	for _, h := range strings.Split(o.Hide, ",") {
+		if h = strings.ToLower(strings.TrimSpace(h)); h != "" && h != "volumes" && h != "sky" {
+			return "", fmt.Errorf("hide %q: volumes, sky, or both comma-separated", o.Hide)
+		}
 	}
 	return view, nil
 }
@@ -146,6 +150,8 @@ func (o ViewOptions) marks(snap *Snapshot, target *Box) []labelPoint {
 func targetBox(snap *Snapshot, o ViewOptions) (*Box, error) {
 	var b Box
 	switch {
+	case o.Frame != nil:
+		return o.Frame, nil
 	case len(o.IDs) > 0:
 		boxes, err := boxesOf(snap, o.IDs)
 		if err != nil {
@@ -274,17 +280,14 @@ func blank(f *frame) bool {
 	return true
 }
 
-// hideVolumes hides, for the shot, the entities whose tool textures draw
-// over a view from inside them as well as from outside: volumes and triggers
-// (a volume_decal stays, as it draws its decal). View/Show Last Hidden shows
-// them again, and only them: what the user had hidden stays hidden.
-func (s *session) hideVolumes(ctx context.Context, snap *Snapshot) error {
-	var guids []string
-	for _, e := range snap.Map.Entities {
-		if c := e.Class(); c != "volume_decal" && (strings.Contains(c, "volume") || strings.HasPrefix(c, "trigger_")) {
-			guids = append(guids, e.Guid())
-		}
-	}
+// hide hides, for the shot, what the hide option names: volumes and triggers,
+// whose tool textures draw over a view from inside them as well as from
+// outside (a volume_decal stays, as it draws its decal); the sky's brushes,
+// whose faces draw over a view from outside the skybox. View/Show Last
+// Hidden shows them again, and only them: what the user had hidden stays
+// hidden.
+func (s *session) hide(ctx context.Context, snap *Snapshot, what string) error {
+	guids := hiddenBy(snap, strings.ToLower(what))
 	if len(guids) == 0 {
 		return nil
 	}
@@ -297,10 +300,35 @@ func (s *session) hideVolumes(ctx context.Context, snap *Snapshot) error {
 	}
 	restoreSelection(ctx, s.c, snap.Sel.GUIDs)
 	if err != nil {
-		return fmt.Errorf("hiding the volumes: %w", err)
+		return fmt.Errorf("hiding the %s: %w", what, err)
 	}
-	s.restores = append(s.restores, restore{what: "hidden volumes", lines: []string{"command View/Show Last Hidden"}})
+	s.restores = append(s.restores, restore{what: "hidden " + what, lines: []string{"command View/Show Last Hidden"}})
 	return nil
+}
+
+// hiddenBy is the GUIDs a hide option names: entities for volumes, brushes
+// with a sky face for sky.
+func hiddenBy(snap *Snapshot, what string) []string {
+	volumes, sky := strings.Contains(what, "volumes"), strings.Contains(what, "sky")
+	var guids []string
+	for _, e := range snap.Map.Entities {
+		if c := e.Class(); volumes && c != "volume_decal" && (strings.Contains(c, "volume") || strings.HasPrefix(c, "trigger_")) {
+			guids = append(guids, e.Guid())
+			continue
+		}
+		for _, it := range e.Items {
+			if sky && it.Brush != nil && skyBrush(it.Brush) {
+				guids = append(guids, it.Brush.Guid())
+			}
+		}
+	}
+	return guids
+}
+
+// skyBrush tells a brush with a face of the sky's material, as a skybox is.
+func skyBrush(b *mapfile.Brush) bool {
+	faces, _ := b.Faces()
+	return slices.ContainsFunc(faces, func(f mapfile.Face) bool { return strings.EqualFold(f.Material, "sky") })
 }
 
 // restore is the calls that put one thing back as the user had it.
@@ -328,6 +356,10 @@ func (s *session) undo(ctx context.Context) {
 		}
 	}
 }
+
+// lensSlack is how far a measured focal length may be off the assumed one
+// before a framed shot is taken again: a view's fill shifts as much.
+const lensSlack = 0.05
 
 // restoreTimeout bounds putting the user's views back.
 const restoreTimeout = 10 * time.Second
@@ -385,11 +417,16 @@ func (s *session) view3D(ctx context.Context, target *Box, o ViewOptions, pts []
 		pose = &p
 	}
 	f, err := shoot(ctx, s.c, "3d", pose, append(corners, pts...))
-	if err == nil && corners != nil && !fits(f.At[:len(corners)], f.W, f.H) {
+	if err == nil && corners != nil {
+		// The lens the frame assumed is checked against where Radiant drew the
+		// corners: a frame from another lens is shot again with the one measured.
 		if l := (Lens{f.W, f.H, FocalFrom(f.W, f.H, f.Pose, corners, f.At[:len(corners)])}); l.F > 0 {
+			assumed := s.lens()
 			s.remember(l)
-			p := FrameBox(l, look, *target)
-			f, err = shoot(ctx, s.c, "3d", &p, append(corners, pts...))
+			if !fits(f.At[:len(corners)], f.W, f.H) || l.W != assumed.W || l.H != assumed.H || math.Abs(l.F/assumed.F-1) > lensSlack {
+				p := FrameBox(l, look, *target)
+				f, err = shoot(ctx, s.c, "3d", &p, append(corners, pts...))
+			}
 		}
 	}
 	if err != nil {
