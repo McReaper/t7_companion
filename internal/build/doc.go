@@ -50,7 +50,9 @@
 // shows its fatal errors, and asks its questions (safe mode after a crash), in
 // a message box, and waits on it, so a dialog of its process fails the stage
 // with what it says, and the last lines of the console the game opens beside a
-// fatal error; so does the game closing. The dialog is read with WM_GETTEXT
+// fatal error; so does a crash (an exit code), not a clean quit. Until a dialog
+// exists only the windows' classes are read, so nothing is sent to the game
+// while it loads, and no dialog is ever answered. It is read with WM_GETTEXT
 // (window_windows.go), as GetWindowText reads no other process's controls. The
 // game keeps running whatever the stage says.
 package build
