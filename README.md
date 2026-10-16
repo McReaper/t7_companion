@@ -59,13 +59,14 @@ T7 Companion gives your AI agent everything ten years of the BO3 modding communi
 >             fx_editing["FX editing"]
 >             shaders["Custom shaders"]
 >             atmosphere["Atmosphere & sound"]
+            lighting["Lighting & probes"]
 >             hud_lui["HUD & Lua"]
 >             localization["Localization"]
 >             moving_platforms["Moving platforms"]
 >             crossref["Porting from other CoDs"]
 >             scripting ~~~ mapping ~~~ zombies_ai ~~~ debugging ~~~ compiling
 >             assets ~~~ animation ~~~ anim_retarget ~~~ fx_editing ~~~ shaders
->             atmosphere ~~~ hud_lui ~~~ localization ~~~ moving_platforms ~~~ crossref
+>             atmosphere ~~~ lighting ~~~ hud_lui ~~~ localization ~~~ moving_platforms ~~~ crossref
 >         end
 >         subgraph SRV["t7kb MCP server"]
 >             t1["search<br/>get"]
