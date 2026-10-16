@@ -57,7 +57,7 @@ A zone is what the zone manager reads: every `info_volume` named for it, the ris
 
 ## An edited world brush or brush entity comes back under a new id
 
-A point entity (`light`, `script_struct`, `info_player_start`) keeps its id through `set` and `move`. A world brush moved or retextured, and any entity that owns brushes (`volume_sun`, triggers, `script_brushmodel`), is deleted and imported anew, and gets a **new id**: the answer's `made` gives it, with `was` the old one. So are a `reflection_probe` and a `misc_prefab`. Use the new ids from then on; when unsure, `t7kb:map_find` again. Why: Radiant's undo brings a replaced brush entity back as world brushes only (MTPlugins' notes), while a delete and an import undo exactly (verified in a test Radiant).
+A point entity (`light`, `script_struct`, `info_player_start`) keeps its id through `set` and `move`. A world brush moved or retextured, and any entity that owns brushes (`volume_sun`, triggers, `script_brushmodel`), is deleted and imported anew, and gets a **new id**: the answer's `made` gives it, with `was` the old one. So are a `reflection_probe` and a `misc_prefab`. Use the new ids from then on; when unsure, `t7kb:map_find` again. Why: Radiant's undo brings a replaced brush entity back as world brushes only (MTPlugins' notes), while an import undoes exactly (verified in a test Radiant). A deleted brush entity comes back from undo as world brushes too: undoing a batch that deleted the template's `start_zone` brought back a world brush of `volume`, the `info_volume` gone (verified live) — after such an undo, `t7kb:map_find` the volumes and rebuild the ones lost.
 
 ## Build one, then copy it
 
