@@ -57,6 +57,7 @@ type Fake struct {
 	UndoLabel   string            // the undo menu's entry: what the last edit was labelled
 	Baked       int               // bakes started; each ends with the console's "All Probes Done" unless BakeSilent
 	BakeSilent  bool
+	BakeConsole []string   // console lines a bake prints before the one that ends it
 	BakeRefused string     // why the plugin refuses a bake, under real lighting too
 	history     []undoStep // the map before each edit, for Edit/Undo
 	views
