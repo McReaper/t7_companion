@@ -99,7 +99,14 @@ func mapEditTool() server.ServerTool {
 			"one key: {\"box\": {\"min\": [x,y,z], \"max\": [x,y,z], \"material\": m, \"contents\"?: flags as Treyarch's brushes carry, \"weaponClip detail\" (only bullets hit it: trims, frames) or \"nonColliding\", "+
 			"\"class\"?: c, \"keys\"?: {…}}} a box brush, in worldspawn or as a new brush entity of class (volume_sun, "+
 			"trigger_multiple); {\"shape\": {\"outline\": [[x,y]…], \"z\": [z0,z1], \"material\": m, \"contents\"?: as box, \"class\"?: c, \"keys\"?: {…}}} a solid on any "+
-			"outline, concave too (cut into convex brushes): an angled wall, a hexagonal floor; {\"entity\": {\"class\": c, \"origin\": [x,y,z], \"angles\"?: [p,y,r], \"keys\"?: {…}}} a "+
+			"outline, concave too (cut into convex brushes): an angled wall, a hexagonal floor; "+
+			"{\"walls\": {\"lines\": [{\"points\": [[x,y]…], \"closed\"?: true}…], \"doors\"?: [{\"at\": [x,y], \"width\"?: 72, "+
+			"\"height\"?: 96, \"seen\"?: 56}…], \"material\": m, \"z\"?: [0,112], \"thickness\"?: 8, \"grid\"?: 8}} walls along "+
+			"a plan's lines, centrelines as drawn: corners snap to the grid, a line a few units off an axis runs on it, an end "+
+			"near another wall lands on it; corners are mitred, a wall ending on another's side stops on its face, walls "+
+			"crossing split, nothing overlaps; each door is cut in the wall nearest at: width clear for the AI, nonColliding "+
+			"jambs and clip_player narrowing it to seen for the eye and players only, a lintel, a weaponClip detail trim; "+
+			"{\"entity\": {\"class\": c, \"origin\": [x,y,z], \"angles\"?: [p,y,r], \"keys\"?: {…}}} a "+
 			"point entity; {\"delete\": [ids]}; {\"set\": {\"id\": id, \"keys\": {k: v, k2: null}}} (null removes); "+
 			"{\"move\": {\"ids\": [ids], \"by\": [dx,dy,dz]}}; {\"copy\": {\"ids\": [ids], \"by\": [dx,dy,dz], "+
 			"\"count\"?: n}} n copies, each by further than the last (a row of pillars or wall panels from one); "+
