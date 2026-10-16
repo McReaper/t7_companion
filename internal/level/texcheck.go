@@ -1,6 +1,8 @@
 package level
 
 import (
+	"cmp"
+	"fmt"
 	"math"
 	"slices"
 	"sort"
@@ -182,14 +184,24 @@ func (c *checker) hidden(f *cface) string {
 }
 
 // hiddenBy names what hides a face: an opaque brush's face against it, on
-// its plane, facing it, that covers it whole; or an opaque brush it lies
-// buried in. "" when it can be seen.
+// its plane, facing it, that covers it whole, or several that do together;
+// or an opaque brush it lies buried in. "" when it can be seen.
 func (c *checker) hiddenBy(f *cface) string {
 	back := plane{mapfile.Vec3{-f.pl.n[0], -f.pl.n[1], -f.pl.n[2]}, -f.pl.d}
+	var against [][]pt2
+	var first *cface
 	for _, g := range c.byPlane[keyOf(back)] {
-		if g.bi != f.bi && c.info(g.material).Opaque && covers(g.poly, f.poly) {
+		switch {
+		case g.bi == f.bi || !c.info(g.material).Opaque:
+		case covers(g.poly, f.poly):
 			return "against " + c.short(g.brush) + " " + g.dir
+		case touch(g.poly, f.poly):
+			against = append(against, g.poly)
+			first = cmp.Or(first, g)
 		}
+	}
+	if len(against) > 1 && coveredBy(against, f.poly) {
+		return fmt.Sprintf("against %s %s and %d more", c.short(first.brush), first.dir, len(against)-1)
 	}
 	for i, s := range c.solids {
 		if i != f.bi && s.box.overlaps(f.box) && c.buriedIn(f, s) {

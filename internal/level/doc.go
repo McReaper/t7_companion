@@ -92,10 +92,12 @@
 // # Checks
 //
 // CheckTextures reads the world brushes' faces for what draws badly. A drawn
-// face is hidden when an opaque brush's face on its plane, facing it, covers
-// it whole, or when it lies inside an opaque brush; on the stock prefabs'
-// geometry 85% of the faces it calls hidden are caulk or another tool
-// material, against 56% of all faces (TestHiddenFacesAreTheOnesTreyarchCaulked).
+// face is hidden when the opaque brushes' faces on its plane, facing it,
+// cover it whole, one alone or several together (what is left of it once
+// each is clipped away is nothing, slivers under eps aside), or when it lies
+// inside an opaque brush; on the stock prefabs' geometry 86% of the faces it
+// calls hidden are caulk or another tool material, against 56% of all faces
+// (TestHiddenFacesAreTheOnesTreyarchCaulked).
 // A seam is two faces of one material on one plane, both seen, sharing an
 // edge or overlapping, whose tiles differ (size, rotation, mirror, or offset
 // modulo a tile): faces meeting at a corner alone show none. Coplanar faces
