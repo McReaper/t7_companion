@@ -95,7 +95,7 @@ func TestALayoutsWallsFaceEachRoomWithItsMaterial(t *testing.T) {
 		{Name: "big", Min: [2]float64{0, 0}, Max: [2]float64{256, 512}, Material: "plaster"},
 		{Name: "a", Min: [2]float64{256, 0}, Max: [2]float64{512, 256}},
 		{Name: "b", Min: [2]float64{256, 256}, Max: [2]float64{512, 512}, Outdoor: true}},
-		Openings: []Opening{{Room: "a", To: "big"}, {Room: "a", Side: "+x", Sill: 32}}}
+		Openings: []Opening{{Room: "a", To: "big", Width: 56}, {Room: "a", Side: "+x", Sill: 32}}}
 	faces = map[string]string{}
 	for _, p := range layoutPieces(t, o) {
 		faces[p.part+" "+fmtVec(p.lo)+" "+fmtVec(p.hi)] = fmt.Sprint(p.faces)
@@ -183,7 +183,7 @@ func inPiece(ps []piece, p mapfile.Vec3) bool {
 
 func TestALayoutsWallsAreBuiltAroundItsOpenings(t *testing.T) {
 	o := twoRooms()
-	o.Openings = []Opening{{Room: "hall", To: "kitchen"}, {Room: "hall", Side: "-y", At: f64(128), Sill: 32}}
+	o.Openings = []Opening{{Room: "hall", To: "kitchen", Width: 56}, {Room: "hall", Side: "-y", At: f64(128), Sill: 32}}
 	got := strings.Join(layoutBoxes(t, o), "\n")
 	for _, want := range []string{
 		// the door, in the middle of the wall the rooms share: 56 wide, 96 high
@@ -206,7 +206,7 @@ func TestALayoutsWallsAreBuiltAroundItsOpenings(t *testing.T) {
 	}
 	// From the kitchen's side, a door up to the ceiling leaves only the slab
 	// over it, and one flush with the wall's end leaves no sliver before it.
-	o.Openings = []Opening{{Room: "kitchen", To: "hall", At: f64(32), Height: 112}}
+	o.Openings = []Opening{{Room: "kitchen", To: "hall", At: f64(32), Height: 112, Width: 56}}
 	got = strings.Join(layoutBoxes(t, o), "\n")
 	for _, want := range []string{"252 4 112 260 60 128 brick hall|kitchen wall", "252 60 -16 260 252 128 brick hall|kitchen wall"} {
 		if !strings.Contains(got, want) {
@@ -235,7 +235,7 @@ func TestALayoutsWallsAreBuiltAroundItsOpenings(t *testing.T) {
 // are in world units.
 func TestALayoutsOpeningsAreInWorldUnits(t *testing.T) {
 	o := LayoutOp{Material: "brick", Z: 128, Height: 144, Rooms: []PlanRoom{{Name: "attic", Min: [2]float64{1000, 2000}, Max: [2]float64{1256, 2128}}},
-		Openings: []Opening{{Room: "attic", Side: "+x", At: f64(2032)}}}
+		Openings: []Opening{{Room: "attic", Side: "+x", At: f64(2032), Width: 56}}}
 	got := strings.Join(layoutBoxes(t, o), "\n")
 	for _, want := range []string{
 		"1252 2004 112 1260 2004 288", // (none: the door starts flush, no strip before it)
@@ -273,27 +273,27 @@ func TestALayoutRefusesWhatItCantBuild(t *testing.T) {
 		"rooms hall and kitchen overlap":       func(o *LayoutOp) { o.Rooms[1].Min[0] = 128 },
 		"room kitchen: [1000 0] to [1006 256]": func(o *LayoutOp) { o.Rooms[1].Min[0], o.Rooms[1].Max[0] = 1000, 1006 },
 		"sizes above 0":                        func(o *LayoutOp) { o.Slab = -16 },
-		`opening 0: no room "attic"`:           func(o *LayoutOp) { o.Openings = []Opening{{Room: "attic", Side: "-x"}} },
-		`opening 0: no room "cellar"`:          func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall", To: "cellar"}} },
-		"or side, one of them":                 func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall"}} },
-		"one of them":                          func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall", To: "kitchen", Side: "+x"}} },
-		`side "up"`:                            func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall", Side: "up"}} },
+		`opening 0: no room "attic"`:           func(o *LayoutOp) { o.Openings = []Opening{{Room: "attic", Side: "-x", Width: 56}} },
+		`opening 0: no room "cellar"`:          func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall", To: "cellar", Width: 56}} },
+		"or side, one of them":                 func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall", Width: 56}} },
+		"one of them":                          func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall", To: "kitchen", Side: "+x", Width: 56}} },
+		`side "up"`:                            func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall", Side: "up", Width: 56}} },
 		"rooms hall and kitchen share no": func(o *LayoutOp) {
 			o.Rooms[1].Min[0], o.Rooms[1].Max[0] = 300, 600
-			o.Openings = []Opening{{Room: "hall", To: "kitchen"}}
+			o.Openings = []Opening{{Room: "hall", To: "kitchen", Width: 56}}
 		},
 		"rooms hall and c share no wall": func(o *LayoutOp) { // they meet at a corner only
 			o.Rooms = append(o.Rooms, PlanRoom{Name: "c", Min: [2]float64{256, 256}, Max: [2]float64{512, 512}})
-			o.Openings = []Opening{{Room: "hall", To: "c"}}
+			o.Openings = []Opening{{Room: "hall", To: "c", Width: 56}}
 		},
 		"taller than the storey's 112": func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall", Side: "-x", Sill: 32, Height: 96}} },
 		"can't be below 0":             func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall", Side: "-x", Width: -1}} },
 		"two openings in the hall wall": func(o *LayoutOp) {
-			o.Openings = []Opening{{Room: "hall", Side: "-x", At: f64(64)}, {Room: "hall", Side: "-x", At: f64(120)}}
+			o.Openings = []Opening{{Room: "hall", Side: "-x", At: f64(64), Width: 56}, {Room: "hall", Side: "-x", At: f64(120), Width: 56}}
 		},
-		"runs past the stretch": func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall", To: "kitchen", At: f64(20)}} },
+		"runs past the stretch": func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall", To: "kitchen", At: f64(20), Width: 56}} },
 		"two openings in the hall|kitchen": func(o *LayoutOp) {
-			o.Openings = []Opening{{Room: "hall", To: "kitchen"}, {Room: "kitchen", To: "hall", At: f64(150)}}
+			o.Openings = []Opening{{Room: "hall", To: "kitchen", Width: 56}, {Room: "kitchen", To: "hall", At: f64(150), Width: 56}}
 		},
 	} {
 		o := twoRooms()
@@ -307,20 +307,20 @@ func TestALayoutRefusesWhatItCantBuild(t *testing.T) {
 	o := twoRooms()
 	o.Rooms[1].Max[1] = 512
 	o.Rooms = append(o.Rooms, PlanRoom{Name: "c", Min: [2]float64{0, 256}, Max: [2]float64{256, 512}})
-	o.Openings = []Opening{{Room: "kitchen", To: "hall", At: f64(384)}}
+	o.Openings = []Opening{{Room: "kitchen", To: "hall", At: f64(384), Width: 56}}
 	if _, err := o.pieces(); err == nil || !strings.Contains(err.Error(), "between the walls that meet it: 4 to 252") {
 		t.Errorf("a door to the hall placed past the wall it shares with the kitchen: %v", err)
 	}
 	// A side the room shares with another takes a door as well, and one flush
 	// with the far end of its stretch fits.
 	o = twoRooms()
-	o.Openings = []Opening{{Room: "hall", Side: "+x", At: f64(224)}}
+	o.Openings = []Opening{{Room: "hall", Side: "+x", At: f64(224), Width: 56}}
 	got := strings.Join(layoutBoxes(t, o), "\n")
 	if !strings.Contains(got, "252 4 -16 260 196 128 brick hall|kitchen wall") || strings.Contains(got, "252 252 -16 260") {
 		t.Errorf("a door on the hall's +x side, flush with the wall's far end:\n%s", got)
 	}
 	o = twoRooms() // a door from each room's side of the wall, a wall's width apart
-	o.Openings = []Opening{{Room: "hall", To: "kitchen", At: f64(60)}, {Room: "kitchen", To: "hall", At: f64(124)}}
+	o.Openings = []Opening{{Room: "hall", To: "kitchen", At: f64(60), Width: 56}, {Room: "kitchen", To: "hall", At: f64(124), Width: 56}}
 	if _, err := o.pieces(); err != nil {
 		t.Errorf("two doors in a wall: %v", err)
 	}
@@ -422,6 +422,24 @@ func TestAnEditsLabelIsMarkedOnce(t *testing.T) {
 		d, err := Edit(context.Background(), c, snap, ops(t, `[{"box": {"min": [1000, 0, 0], "max": [1064, 64, 64], "material": "brick"}}]`), label, nil)
 		if err != nil || d.Label != want {
 			t.Errorf("%q: %q, %v, want %q", label, d.Label, err, want)
+		}
+	}
+}
+
+// A door lets two through abreast: 72 wide unless told; a window is the
+// standard's, 56 by 64 over its sill.
+func TestALayoutsOpeningsDefaultToTwoAbreast(t *testing.T) {
+	o := twoRooms()
+	o.Openings = []Opening{{Room: "hall", To: "kitchen"}, {Room: "hall", Side: "-y", Sill: 32}}
+	got := strings.Join(layoutBoxes(t, o), "\n")
+	for _, want := range []string{
+		"252 92 -16 260 164 0 wood hall|kitchen wall",   // the door: 72 wide, its middle at 128
+		"252 92 96 260 164 128 brick hall|kitchen wall", // 96 high
+		"100 -4 -16 156 4 32 brick hall wall",           // the window: 56 wide, over a sill at 32
+		"100 -4 96 156 4 128 brick hall wall",           // 64 high
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("lacks %s:\n%s", want, got)
 		}
 	}
 }

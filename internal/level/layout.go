@@ -54,7 +54,7 @@ type Opening struct {
 	To     string   `json:"to,omitempty"`
 	Side   string   `json:"side,omitempty"`   // +x, -x, +y or -y
 	At     *float64 `json:"at,omitempty"`     // its middle, the world x or y along the wall; none, the middle of the wall shared, or of the side
-	Width  float64  `json:"width,omitempty"`  // none: 56
+	Width  float64  `json:"width,omitempty"`  // none: 72 a door, 56 a window
 	Height float64  `json:"height,omitempty"` // none: 96 a door, 64 a window
 	Sill   float64  `json:"sill,omitempty"`   // its bottom above the floor: 0 a door, 32 a window
 }
@@ -337,6 +337,25 @@ func closeRun(s *seg) *seg {
 	return nil
 }
 
+// defaults sizes an opening given no size: a door lets two through
+// abreast, 72 (Treyarch's 56 and leeway for the AI's collision, t7kb: 64 to
+// 69 for two players), 96 high; a window is the standard's, 56 by 64.
+func (o *Opening) defaults() {
+	door := o.Sill == 0
+	switch {
+	case o.Width == 0 && door:
+		o.Width = 72
+	case o.Width == 0:
+		o.Width = 56
+	}
+	switch {
+	case o.Height == 0 && door:
+		o.Height = 96
+	case o.Height == 0:
+		o.Height = 64
+	}
+}
+
 // wallRef is the line an opening's wall stands on: the room on its + side
 // or not, the room across (-1: whichever), and the span to centre it on.
 type wallRef struct {
@@ -401,13 +420,7 @@ func (l *LayoutOp) place(k int, idx map[string]int, segs []*seg) error {
 	case o.Width < 0 || o.Height < 0 || o.Sill < 0:
 		return fmt.Errorf("opening %d: width, height and sill can't be below 0", k)
 	}
-	o.Width = cmp.Or(o.Width, 56)
-	if o.Height == 0 {
-		o.Height = 96
-		if o.Sill > 0 {
-			o.Height = 64
-		}
-	}
+	o.defaults()
 	if o.Sill+o.Height > l.Height+eps {
 		return fmt.Errorf("opening %d: a sill of %v and %v high is taller than the storey's %v", k, o.Sill, o.Height, l.Height)
 	}

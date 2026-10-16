@@ -106,18 +106,19 @@ func mapEditTool() server.ServerTool {
 			"{\"material\": {\"ids\": [ids], \"material\": m}} swaps the material, each face keeping its tile; "+
 			"{\"texture\": {\"ids\": [ids], \"faces\"?: \"top\"|\"bottom\"|\"sides\"|\"+x,-y\"…, \"material\"?: m, "+
 			"\"tile\"?: [u,v], \"scale\"?: s, \"origin\"?: [x,y,z], \"fit\"?: [nu,nv], \"rotate\"?: deg, \"flip\"?: "+
-			"\"u\"|\"v\"|\"uv\"}} lays a material on faces (all by default): tile is the world units one repeat spans "+
+			"\"u\"|\"v\"|\"uv\"}} lays a material on faces (all by default; \"hidden\": the faces other brushes hide, by face, caulk by "+
+			"default, the way to caulk what nobody sees): tile is the world units one repeat spans "+
 			"(default the material's own, as the install's maps use it), tiles start on origin (default 0 0 0, so faces "+
 			"given the same tile line up across brushes), fit makes nu repeats span each face (0 sizes that axis as the "+
 			"other) starting at its edge. New boxes get their material's own tile too. {\"layout\": {\"rooms\": [{\"name\": n, "+
 			"\"min\": [x,y], \"max\": [x,y], \"material\"?: m, \"floor\"?: m, \"ceiling\"?: m, \"outdoor\"?: true, \"zone\"?: z}], "+
-			"\"openings\"?: [{\"room\": n, \"to\": n2 | \"side\": \"-y\", \"at\"?: u, \"width\"?: 56, \"height\"?: 96, "+
+			"\"openings\"?: [{\"room\": n, \"to\": n2 | \"side\": \"-y\", \"at\"?: u, \"width\"?: 72, \"height\"?: 96, "+
 			"\"sill\"?: 0}], \"material\": m, \"floor\"?: m, \"ceiling\"?: m, \"exterior\"?: m, \"z\"?: 0, \"height\"?: 112, "+
 			"\"wall\"?: 8, \"slab\"?: 16, \"probes\"?: true, \"spawners\"?: 4}} builds a storey from its plan: rooms are rectangles meeting along "+
 			"their edges, from wall centre to wall centre (a room 256 wide is 248 inside); a wall stands on every edge, one where two "+
 			"rooms meet, each side of it in the material of the room it looks into (exterior outside, and in an outdoor room); each room gets a floor slab "+
 			"under z and a ceiling height above (outdoor: none) and a reflection_probe (probes false: none); an opening is a door to "+
-			"the room it opens on, or on a side of its room, a window with a sill (56 by 64 then), at the world x or y u of its middle "+
+			"the room it opens on, or on a side of its room, 72 wide (two abreast), a window with a sill (56 by 64 then), at the world x or y u of its middle "+
 			"(default the middle of the shared wall or side), the walls built around it; the faces the pieces hide of each other are "+
 			"caulk, and the answer's part names each piece (\"hall floor\", \"hall|kitchen wall\"); rooms naming a zone get it, its "+
 			"links through their doors. {\"zone\": {\"name\": z, \"areas\": [{\"min\": [x,y,z], \"max\": [x,y,z]} | {\"outline\": [[x,y]…], \"z\"?: 0, "+

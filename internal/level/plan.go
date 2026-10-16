@@ -124,7 +124,15 @@ type Done struct {
 // tiles sizes the materials of new boxes and texture ops (nil assumes 64
 // units).
 func Edit(ctx context.Context, c *radiant.Client, snap *Snapshot, ops []Op, label string, tiles Tiles) (*Done, error) {
+	return EditWith(ctx, c, snap, ops, label, tiles, nil)
+}
+
+// EditWith is Edit knowing the materials: which hide what is behind them,
+// for a texture op on the faces other brushes hide (nil takes every material
+// as opaque).
+func EditWith(ctx context.Context, c *radiant.Client, snap *Snapshot, ops []Op, label string, tiles Tiles, info func(string) MaterialInfo) (*Done, error) {
 	b := newBatch(snap, tiles)
+	b.info = info
 	if err := b.apply(ops); err != nil {
 		return nil, err
 	}

@@ -14,7 +14,7 @@ import (
 // brushes, seamless.
 type TextureOp struct {
 	IDs      []string    `json:"ids"`
-	Faces    string      `json:"faces,omitempty"`    // all (the default), top, bottom, sides, or +x, -x, +y, -y, +z, -z, comma separated
+	Faces    string      `json:"faces,omitempty"`    // all (the default), top, bottom, sides, or +x, -x, +y, -y, +z, -z, comma separated; or hidden
 	Material string      `json:"material,omitempty"` // none keeps each face's
 	Tile     *[2]float64 `json:"tile,omitempty"`     // world units one repeat spans, u then v; none: the material's own
 	Scale    float64     `json:"scale,omitempty"`    // multiplies the tile; none: 1
@@ -274,4 +274,53 @@ func wrap(x, size float64) float64 {
 		return 0
 	}
 	return x
+}
+
+// textureHidden lays a material, caulk by default, on the faces of the ids'
+// world brushes that other world brushes hide, as the batch leaves the map:
+// against an opaque face or inside an opaque brush, the checks' own test. A
+// face is named by its index, as faces at an angle can share a direction.
+func (b *batch) textureHidden(i int, o *TextureOp) error {
+	mat := o.Material
+	if mat == "" {
+		mat = "caulk"
+	}
+	switch {
+	case !word(mat):
+		return fmt.Errorf("texture: material %q: one word, a material's name", mat)
+	case o.Tile != nil || o.Scale != 0 || o.Origin != nil || o.Fit != nil || o.Rotate != 0 || o.Flip != "":
+		return fmt.Errorf("texture: faces hidden takes a material only: nobody sees how it lies")
+	}
+	info := b.info
+	if info == nil {
+		info = func(string) MaterialInfo { return MaterialInfo{Known: true, Opaque: true, Drawn: true} }
+	}
+	c := newChecker(func(g string) string { return g }, info)
+	index := map[*mapfile.Brush]int{}
+	for _, u := range b.units {
+		if u.world && u.state != deleted {
+			index[u.brush] = len(c.solids)
+			c.add(u.brush)
+		}
+	}
+	hidden := map[int][]int{}
+	for _, f := range c.faces {
+		if c.hidden(f) != "" {
+			hidden[f.bi] = append(hidden[f.bi], f.fi)
+		}
+	}
+	n := 0
+	err := b.each(i, o.IDs, func(u *unit, br *mapfile.Brush) error {
+		for _, x := range u.brushes(br) {
+			if k, ok := index[x]; ok {
+				if err := setFaces(x, hidden[k], mat, b.tile(mat)); err != nil {
+					return err
+				}
+				n += len(hidden[k])
+			}
+		}
+		return nil
+	})
+	b.faces[i] = n
+	return err
 }

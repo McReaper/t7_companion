@@ -104,6 +104,7 @@ type batch struct {
 	brush map[string]*mapfile.Brush // GUID hex -> the brush, for an entity's brush named alone
 	world string                    // worldspawn's GUID hex
 	tiles Tiles                     // sizes a material's tile; nil assumes one
+	info  func(string) MaterialInfo // which materials hide what is behind them; nil, all
 	used  map[string]Tile           // the tile each material was given
 	faces map[int]int               // texture op -> faces it textured
 	zones []madeZone                // the zones it made
@@ -243,6 +244,9 @@ func (b *batch) tile(material string) Tile {
 
 // texture runs a texture op over what its ids name.
 func (b *batch) texture(i int, o *TextureOp) error {
+	if strings.EqualFold(strings.TrimSpace(o.Faces), "hidden") {
+		return b.textureHidden(i, o)
+	}
 	t, err := newTexturing(o, b.tile)
 	if err != nil {
 		return fmt.Errorf("texture: %w", err)

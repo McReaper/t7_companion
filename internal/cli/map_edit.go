@@ -75,7 +75,13 @@ func mapEdit(ctx context.Context, ops []level.Op, label string, pid int) (*mapEd
 	if err != nil {
 		return nil, err
 	}
-	d, err := level.Edit(ctx, c, snap, ops, label, mapTiles(snap.State.Map))
+	var info func(string) level.MaterialInfo
+	if root := installOf(snap.State.Map); root != "" {
+		if w, err := workspace(root); err == nil {
+			info = materialInfo(w, tilesIn(root))
+		}
+	}
+	d, err := level.EditWith(ctx, c, snap, ops, label, mapTiles(snap.State.Map), info)
 	if err != nil {
 		return nil, err
 	}
