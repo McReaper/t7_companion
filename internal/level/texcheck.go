@@ -129,6 +129,11 @@ func (c *checker) check(f *cface, checked func(string) bool) []Finding {
 	if g := c.seamWith(f); g != nil && (!checked(g.brush) || f.bi < g.bi) { // a pair once
 		out = append(out, c.finding(f, "seam", c.short(g.brush)+" "+g.dir))
 	}
+	for _, g := range c.zfightsWith(f) {
+		if fi.Drawn && fi.Opaque && (!checked(g.brush) || f.bi < g.bi) { // a pair once
+			out = append(out, c.finding(f, "zfight", c.short(g.brush)+" "+g.dir))
+		}
+	}
 	return out
 }
 
@@ -225,6 +230,24 @@ func (c *checker) buriedIn(f *cface, s *solid) bool {
 		}
 	}
 	return len(s.faces) >= 4
+}
+
+// zfightsWith are the faces of other brushes on this one's plane, facing
+// its way, opaque, drawn and seen, that overlap it and draw otherwise (another
+// material, or tiles that don't meet): the two draw over each other and
+// flicker in game (z-fighting), as a floor laid inside another floor does.
+// Two faces drawing the same texels show nothing; a decal or a window is
+// meant to lie on a wall: not opaque, it is left out.
+func (c *checker) zfightsWith(f *cface) []*cface {
+	var out []*cface
+	for _, g := range c.byPlane[keyOf(f.pl)] {
+		gi := c.info(g.material)
+		differ := g.material != f.material || !sameTiles(f.tex, g.tex)
+		if g.bi != f.bi && differ && gi.Opaque && gi.Drawn && overlapping(f.poly, g.poly) && c.hidden(g) == "" {
+			out = append(out, g)
+		}
+	}
+	return out
 }
 
 // seamWith is a face of another brush touching this one on its plane, of the

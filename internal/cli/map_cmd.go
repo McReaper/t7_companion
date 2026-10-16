@@ -63,7 +63,7 @@ func newMapCheckCmd() *cobra.Command {
 		RunE: func(c *cobra.Command, ids []string) error {
 			return printIndented(c.OutOrStdout())(mapCheck(c.Context(), ids, kinds, limit, pid))
 		}}
-	check.Flags().StringVar(&kinds, "kinds", "", "only these kinds, comma-separated: unknown, seam, stretched, hidden")
+	check.Flags().StringVar(&kinds, "kinds", "", "only these kinds, comma-separated: unknown, zfight, seam, stretched, hidden")
 	check.Flags().IntVar(&limit, "limit", 0, "how many findings to list (default 50, at most 200)")
 	check.Flags().IntVar(&pid, "pid", 0, "the Radiant to use when several run")
 	return check

@@ -31,7 +31,7 @@ type findingOut struct {
 
 // findingOrder ranks the kinds, the worst first: what shows wrong in game,
 // then what costs for nothing.
-var findingOrder = map[string]int{"unknown": 0, "seam": 1, "stretched": 2, "hidden": 3}
+var findingOrder = map[string]int{"unknown": 0, "zfight": 1, "seam": 2, "stretched": 3, "hidden": 4}
 
 // seeThrough are the usages of drawn materials a player sees past: a face
 // behind one shows.
@@ -51,7 +51,7 @@ func mapCheck(ctx context.Context, ids []string, kinds string, limit, pid int) (
 			continue
 		}
 		if _, ok := findingOrder[k]; !ok {
-			return nil, fmt.Errorf("kind %q: unknown, seam, stretched or hidden", k)
+			return nil, fmt.Errorf("kind %q: unknown, zfight, seam, stretched or hidden", k)
 		}
 		want[k] = true
 	}

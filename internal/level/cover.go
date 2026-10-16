@@ -69,3 +69,15 @@ func sliver(poly []pt2) bool {
 	}
 	return math.Abs(area)/2 <= eps*perimeter
 }
+
+// overlapping tells whether two convex hulls share an area, not just an edge
+// or a corner: what is left of a cut down to inside each of b's edges.
+func overlapping(a, b []pt2) bool {
+	r := a
+	for i := range b {
+		if r = clip(r, b[i], b[(i+1)%len(b)]); sliver(r) {
+			return false
+		}
+	}
+	return true
+}

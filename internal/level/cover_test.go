@@ -75,3 +75,34 @@ func TestAFaceTwoBrushesCoverTogetherIsHidden(t *testing.T) {
 		t.Errorf("a corner of it shows:\n%s", got)
 	}
 }
+
+// Faces on one plane, facing one way, overlapping, fight when they draw
+// otherwise: another material or tiles that don't meet. The same texels
+// show nothing, a window on a wall is meant to be there, and touching edges
+// aren't an overlap.
+func TestOverlappingFacesThatDrawOtherwiseFight(t *testing.T) {
+	base := slab(mapfile.Vec3{0, 0, -16}, mapfile.Vec3{256, 256, 0}, "brick", plain)
+	for name, c := range map[string]struct {
+		other string
+		want  bool
+	}{
+		"wood laid in it":       {slab(mapfile.Vec3{64, 64, -16}, mapfile.Vec3{128, 128, 0}, "wood", "128 32 0 0 0 0"), true},
+		"brick, shifted tiles":  {slab(mapfile.Vec3{64, 64, -16}, mapfile.Vec3{128, 128, 0}, "brick", "64 64 8 0 0 0"), true},
+		"brick, the same tiles": {slab(mapfile.Vec3{64, 64, -16}, mapfile.Vec3{128, 128, 0}, "brick", plain), false},
+		"glass on it":           {slab(mapfile.Vec3{64, 64, -16}, mapfile.Vec3{128, 128, 0}, "glass", plain), false},
+		"wood beside it":        {slab(mapfile.Vec3{256, 0, -16}, mapfile.Vec3{320, 256, 0}, "wood", "128 32 0 0 0 0"), false},
+	} {
+		got := strings.Join(check(t, world(t, []string{base, c.other})), "\n")
+		if fight := strings.Contains(got, "zfight 0d000000 +z: 0d000001 +z"); fight != c.want {
+			t.Errorf("%s: %v\n%s", name, fight, got)
+		}
+	}
+	// a slab fighting two floors laid in it: both pairs
+	two := []string{base, slab(mapfile.Vec3{0, 0, -16}, mapfile.Vec3{64, 64, 0}, "wood", "128 32 0 0 0 0"), slab(mapfile.Vec3{128, 128, -16}, mapfile.Vec3{192, 192, 0}, "wood", "128 32 0 0 0 0")}
+	if got := strings.Join(check(t, world(t, two)), "\n"); !strings.Contains(got, "zfight 0d000000 +z: 0d000001 +z") || !strings.Contains(got, "zfight 0d000000 +z: 0d000002 +z") {
+		t.Errorf("two floors in a slab:\n%s", got)
+	}
+	if !overlapping(rect(0, 0, 10, 10), rect(5, 5, 20, 20)) || overlapping(rect(0, 0, 10, 10), rect(10, 0, 20, 10)) || overlapping(rect(0, 0, 10, 10), rect(10.005, 0, 20, 10)) {
+		t.Error("hulls overlap by an area, not an edge")
+	}
+}

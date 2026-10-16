@@ -68,11 +68,12 @@ func TestTrianglesAndSlopesAreCheckedToo(t *testing.T) {
 func TestWhatIsAndIsntBuried(t *testing.T) {
 	big := slab(mapfile.Vec3{100, 100, 100}, mapfile.Vec3{356, 356, 356}, "brick", plain)
 	// Flush with the big one's +x face from inside: that face is on the big
-	// one's surface, not in it, and shows; the others are buried.
+	// one's surface, not in it, and shows, over the big one's, the two
+	// flickering; the others are buried.
 	flush := slab(mapfile.Vec3{300, 200, 200}, mapfile.Vec3{356, 232, 232}, "wood", "128 32 0 0 0 0")
 	got := check(t, world(t, []string{big, flush}))
-	if len(got) != 5 || strings.Contains(strings.Join(got, "\n"), "0d000001 +x") {
-		t.Errorf("findings %q: five buried faces, not the flush one", got)
+	if len(got) != 6 || strings.Contains(strings.Join(got, "\n"), "hidden 0d000001 +x") || got[5] != "zfight 0d000000 +x: 0d000001 +x" {
+		t.Errorf("findings %q: five buried faces, the flush one fighting the big one's", got)
 	}
 	// A tetrahedron of four faces buries what it holds.
 	tet := prism("brick",
