@@ -129,6 +129,15 @@ func mapSamples(t *testing.T, root string, add func(key, s string), addImage fun
 	}
 	v, err = mapEdit(ctx, rooms, "two rooms", 0)
 	run("map_edit|its answer (17 pieces and 2 probes)", v, err)
+	zoneOp := `[{"zone": {"name": "house_zone", "areas": [{"outline": [[-1400, 900], [-888, 900], [-888, 1284], [-1144, 1284], ` +
+		`[-1144, 1092], [-1400, 1092]]}], "links": [{"zone": "start_zone"}]}}]`
+	add("map_edit|the op sent: a zone over an L outline, linked to the start zone", zoneOp)
+	zoned, err := decodeOps([]byte(zoneOp))
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err = mapEdit(ctx, zoned, "a zone", 0)
+	run("map_edit|its answer (a volume, 4 spawners, a pathnode, the script's call, a note)", v, err)
 	v, err = mapCheck(ctx, nil, "", 0, 0)
 	run("map_check|the template and the rooms above (50 listed)", v, err)
 	v, err = mapCheck(ctx, nil, "seam,stretched,unknown", 0, 0)

@@ -31,6 +31,7 @@ type LayoutOp struct {
 	Wall     float64    `json:"wall,omitempty"`     // wall thickness; none, Treyarch's 8
 	Slab     float64    `json:"slab,omitempty"`     // floor and ceiling thickness; none, Treyarch's 16
 	Probes   *bool      `json:"probes,omitempty"`   // a reflection_probe in each room; none, true
+	Spawners *int       `json:"spawners,omitempty"` // each zone's riser spawners; none, the zone op's
 }
 
 // PlanRoom is one room of a layout: its rectangle, from wall centre to wall
@@ -44,6 +45,7 @@ type PlanRoom struct {
 	Floor    string     `json:"floor,omitempty"`
 	Ceiling  string     `json:"ceiling,omitempty"`
 	Outdoor  bool       `json:"outdoor,omitempty"` // no ceiling: a courtyard
+	Zone     string     `json:"zone,omitempty"`    // the zone it is in: a zone op over its rooms
 }
 
 // Opening is a door or a window in a room's wall: to the room it opens on,
@@ -108,14 +110,63 @@ func (b *batch) layout(i int, o *LayoutOp) error {
 	for k, br := range brushes {
 		b.units = append(b.units, &unit{brush: br, world: true, state: created, op: i, part: pieces[k].part})
 	}
-	if l.Probes != nil && !*l.Probes {
-		return nil
-	}
 	for _, r := range l.Rooms {
+		if l.Probes != nil && !*l.Probes {
+			break
+		}
 		if err := b.entity(i, l.probe(r)); err != nil {
 			return err
 		}
 		b.units[len(b.units)-1].part = r.Name + " probe"
+	}
+	return b.layoutZones(i, &l)
+}
+
+// layoutZones makes the zones the layout's rooms name, as zone ops would:
+// one a name, a box over each of its rooms from the floor to the ceiling (an
+// outdoor room's to its walls' top), linked where a door joins two of them.
+// A room left in no zone while others are in one is noted: a player there
+// is killed.
+func (b *batch) layoutZones(i int, l *LayoutOp) error {
+	var order, unzoned []string
+	zones, zoneOf := map[string]*ZoneOp{}, map[string]string{}
+	for _, r := range l.Rooms {
+		if r.Zone == "" {
+			unzoned = append(unzoned, r.Name)
+			continue
+		}
+		z := zones[r.Zone]
+		if z == nil {
+			z = &ZoneOp{Name: r.Zone, Spawners: l.Spawners}
+			zones[r.Zone], order = z, append(order, r.Zone)
+		}
+		top := l.Z + l.Height
+		if r.Outdoor {
+			top += l.Slab
+		}
+		lo, hi := [3]float64{r.Min[0], r.Min[1], l.Z}, [3]float64{r.Max[0], r.Max[1], top}
+		z.Areas, zoneOf[r.Name] = append(z.Areas, ZoneArea{Min: &lo, Max: &hi}), r.Zone
+	}
+	if len(order) == 0 {
+		return nil
+	}
+	if len(unzoned) > 0 {
+		b.notes = append(b.notes, fmt.Sprintf("rooms %s are in no zone: a player there is killed within 3 seconds", strings.Join(unzoned, ", ")))
+	}
+	linked := map[[2]string]bool{}
+	for _, o := range l.Openings {
+		a, c := zoneOf[o.Room], zoneOf[o.To]
+		pair := [2]string{min(a, c), max(a, c)}
+		if a == "" || c == "" || a == c || linked[pair] {
+			continue
+		}
+		linked[pair] = true
+		zones[a].Links = append(zones[a].Links, ZoneLink{Zone: c})
+	}
+	for _, n := range order {
+		if err := b.zone(i, zones[n]); err != nil {
+			return fmt.Errorf("layout: %w", err)
+		}
 	}
 	return nil
 }

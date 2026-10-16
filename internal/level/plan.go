@@ -114,6 +114,8 @@ type Done struct {
 	Made    []Made
 	Tiles   map[string]Tile // the tile each material sized by the batch was given
 	Faces   map[int]int     // texture op -> how many faces it textured
+	Links   []Link          // the add_adjacent_zone calls the zones made need
+	Notes   []string        // what the batch's zones leave to see to
 	After   *Snapshot       // the map as Radiant has it afterwards
 }
 
@@ -141,7 +143,7 @@ func Edit(ctx context.Context, c *radiant.Client, snap *Snapshot, ops []Op, labe
 	if err != nil {
 		return nil, fmt.Errorf("the edit is done (one Ctrl+Z undoes it), but the map could not be read back: %w", err)
 	}
-	d := &Done{Label: "t7kb: " + strings.TrimPrefix(label, "t7kb: "), After: after, Tiles: b.used, Faces: b.faces} // a label already marked once
+	d := &Done{Label: "t7kb: " + strings.TrimPrefix(label, "t7kb: "), After: after, Tiles: b.used, Faces: b.faces, Links: b.links, Notes: b.notes} // a label already marked once
 	d.Deleted, _ = strconv.Atoi(strings.TrimPrefix(r.Summary, "deleted="))
 	d.Made = p.match(fresh(string(r.Body)), after)
 	sort.SliceStable(d.Made, func(i, j int) bool { return d.Made[i].Op < d.Made[j].Op })

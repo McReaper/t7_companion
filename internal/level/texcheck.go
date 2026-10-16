@@ -30,6 +30,7 @@ type Finding struct {
 // cface is a brush face as the checks see it.
 type cface struct {
 	bi       int    // its brush's index among the map's world brushes
+	fi       int    // its index among its brush's faces
 	brush    string // GUID
 	dir      string
 	material string
@@ -96,14 +97,33 @@ func newChecker(short func(string) string, info func(string) MaterialInfo) *chec
 // selfHidden is, by brush index, the directions of the faces of each brush
 // the others hide, every brush taken as opaque.
 func selfHidden(brushes []*mapfile.Brush) map[int][]string {
+	out := map[int][]string{}
+	for _, f := range hiddenAmong(brushes) {
+		out[f.bi] = append(out[f.bi], f.dir)
+	}
+	return out
+}
+
+// selfHiddenFaces is the same by face index: faces at an angle can share a
+// direction.
+func selfHiddenFaces(brushes []*mapfile.Brush) map[int][]int {
+	out := map[int][]int{}
+	for _, f := range hiddenAmong(brushes) {
+		out[f.bi] = append(out[f.bi], f.fi)
+	}
+	return out
+}
+
+// hiddenAmong are the faces of brushes the others hide.
+func hiddenAmong(brushes []*mapfile.Brush) []*cface {
 	c := newChecker(func(g string) string { return g }, func(string) MaterialInfo { return MaterialInfo{Known: true, Opaque: true, Drawn: true} })
 	for _, b := range brushes {
 		c.add(b)
 	}
-	out := map[int][]string{}
+	var out []*cface
 	for _, f := range c.faces {
 		if c.hidden(f) != "" {
-			out[f.bi] = append(out[f.bi], f.dir)
+			out = append(out, f)
 		}
 	}
 	return out
@@ -159,7 +179,7 @@ func (c *checker) add(b *mapfile.Brush) {
 	}
 	for i, f := range fs {
 		n := planes[i].n
-		fc := &cface{bi: len(c.solids) - 1, brush: b.Guid(), material: f.Material, tex: f.Tex, pl: plane{mapfile.Vec3{-n[0], -n[1], -n[2]}, -planes[i].d}}
+		fc := &cface{bi: len(c.solids) - 1, fi: i, brush: b.Guid(), material: f.Material, tex: f.Tex, pl: plane{mapfile.Vec3{-n[0], -n[1], -n[2]}, -planes[i].d}}
 		fc.dir, _, _ = texAxes(fc.pl.n)
 		fc.pts = faceVertices(planes, i)
 		if fc.poly = convexHull(project(fc.pts, dominant(fc.pl.n))); len(fc.poly) < 3 {

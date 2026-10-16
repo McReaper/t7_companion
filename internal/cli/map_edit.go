@@ -20,6 +20,10 @@ type mapEditOut struct {
 	// given, and Textured how many faces each texture op textured.
 	Tiles    map[string]tileOut `json:"tiles,omitempty"`
 	Textured []texturedOut      `json:"textured,omitempty"`
+	// Script is what the zones made need of the map's script, Notes what
+	// else they leave to see to.
+	Script *scriptOut `json:"script,omitempty"`
+	Notes  []string   `json:"notes,omitempty"`
 }
 
 // tileOut is a material's tile: world units across and down, and its source.
@@ -75,7 +79,10 @@ func mapEdit(ctx context.Context, ops []level.Op, label string, pid int) (*mapEd
 	if err != nil {
 		return nil, err
 	}
-	out := &mapEditOut{Map: baseName(d.After.State.Map), Undo: d.Label, Deleted: d.Deleted}
+	out := &mapEditOut{Map: baseName(d.After.State.Map), Undo: d.Label, Deleted: d.Deleted, Notes: d.Notes}
+	if len(d.Links) > 0 {
+		out.Script = zoneScript(d.After.State.Map, d.Links)
+	}
 	for m, t := range d.Tiles {
 		if out.Tiles == nil {
 			out.Tiles = map[string]tileOut{}

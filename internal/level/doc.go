@@ -125,6 +125,39 @@
 // into; the faces the pieces hide of each other (selfHidden, the checks' own
 // test) are caulk.
 //
+// # Shapes
+//
+// A shape op stands a solid on an outline, cut into convex pieces as a zone's
+// is (below), a prism brush each: faces wound as a box's, its sides left of
+// each edge of the counter-clockwise outline.
+//
+// # Zones
+//
+// A zone op builds what the stock zone manager (_zm_zonemgr.gsc, in the
+// install) reads: every info_volume whose targetname is the zone's name, the
+// spawner structs the first of them targets (riser_location and
+// spawn_location are zombies' spots; a zone the map has keeps its first
+// volume's target), and add_adjacent_zone links in the map's script under a
+// flag (always_on, which the template sets, for an open passage). An area is
+// a box, an outline (cleaned, wound counter-clockwise, cut by ear clipping
+// and merged back into convex pieces, one brush each: a brush is convex), or
+// floor brushes, each one's outline from above from the lowest point of its
+// top. Spawners stand on a 32-unit grid over each area's outline where the
+// ground (world and func_group brushes, exact along a vertical line; mesh
+// and curve patches as their control grids' triangles; never sky or brush
+// entities) has a floor within a step (18) of the area's bottom and a body's
+// room (72 high, 32 wide, tried every 8 units across) above it. A
+// node_pathnode stands 2 above the spot nearest the middle, for
+// the compiler to grow the navmesh from where the floor isn't joined to the
+// player's (community: a pathnode seeds it; cod2map prunes regions far from
+// its seed points); the spawners take the other spots, one in each area of
+// a room's size (128 × 128 or more, not a doorway's) first while there are
+// enough, each the farthest from those picked. A
+// nav_volume is for flying AI (cod2map's warning names
+// it), not the zombies' navmesh, so zones make none. Links are checked
+// against the zones of the map and the batch; zones whose bounds overlap are
+// noted.
+//
 // # Boards
 //
 // ShowMaterials shows materials as Radiant draws them: a 256-unit slab of

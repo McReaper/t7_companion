@@ -98,7 +98,8 @@ func mapEditTool() server.ServerTool {
 			"(the answer's undo names it; one Ctrl+Z in Radiant takes it all back) or not at all. Ops, each an object with "+
 			"one key: {\"box\": {\"min\": [x,y,z], \"max\": [x,y,z], \"material\": m, \"contents\"?: \"detail\", "+
 			"\"class\"?: c, \"keys\"?: {…}}} a box brush, in worldspawn or as a new brush entity of class (volume_sun, "+
-			"trigger_multiple); {\"entity\": {\"class\": c, \"origin\": [x,y,z], \"angles\"?: [p,y,r], \"keys\"?: {…}}} a "+
+			"trigger_multiple); {\"shape\": {\"outline\": [[x,y]…], \"z\": [z0,z1], \"material\": m, \"class\"?: c, \"keys\"?: {…}}} a solid on any "+
+			"outline, concave too (cut into convex brushes): an angled wall, a hexagonal floor; {\"entity\": {\"class\": c, \"origin\": [x,y,z], \"angles\"?: [p,y,r], \"keys\"?: {…}}} a "+
 			"point entity; {\"delete\": [ids]}; {\"set\": {\"id\": id, \"keys\": {k: v, k2: null}}} (null removes); "+
 			"{\"move\": {\"ids\": [ids], \"by\": [dx,dy,dz]}}; {\"copy\": {\"ids\": [ids], \"by\": [dx,dy,dz], "+
 			"\"count\"?: n}} n copies, each by further than the last (a row of pillars or wall panels from one); "+
@@ -109,16 +110,23 @@ func mapEditTool() server.ServerTool {
 			"(default the material's own, as the install's maps use it), tiles start on origin (default 0 0 0, so faces "+
 			"given the same tile line up across brushes), fit makes nu repeats span each face (0 sizes that axis as the "+
 			"other) starting at its edge. New boxes get their material's own tile too. {\"layout\": {\"rooms\": [{\"name\": n, "+
-			"\"min\": [x,y], \"max\": [x,y], \"material\"?: m, \"floor\"?: m, \"ceiling\"?: m, \"outdoor\"?: true}], "+
+			"\"min\": [x,y], \"max\": [x,y], \"material\"?: m, \"floor\"?: m, \"ceiling\"?: m, \"outdoor\"?: true, \"zone\"?: z}], "+
 			"\"openings\"?: [{\"room\": n, \"to\": n2 | \"side\": \"-y\", \"at\"?: u, \"width\"?: 56, \"height\"?: 96, "+
 			"\"sill\"?: 0}], \"material\": m, \"floor\"?: m, \"ceiling\"?: m, \"exterior\"?: m, \"z\"?: 0, \"height\"?: 112, "+
-			"\"wall\"?: 8, \"slab\"?: 16, \"probes\"?: true}} builds a storey from its plan: rooms are rectangles meeting along "+
+			"\"wall\"?: 8, \"slab\"?: 16, \"probes\"?: true, \"spawners\"?: 4}} builds a storey from its plan: rooms are rectangles meeting along "+
 			"their edges, from wall centre to wall centre (a room 256 wide is 248 inside); a wall stands on every edge, one where two "+
 			"rooms meet, each side of it in the material of the room it looks into (exterior outside, and in an outdoor room); each room gets a floor slab "+
 			"under z and a ceiling height above (outdoor: none) and a reflection_probe (probes false: none); an opening is a door to "+
 			"the room it opens on, or on a side of its room, a window with a sill (56 by 64 then), at the world x or y u of its middle "+
 			"(default the middle of the shared wall or side), the walls built around it; the faces the pieces hide of each other are "+
-			"caulk, and the answer's part names each piece (\"hall floor\", \"hall|kitchen wall\"). Ids are map_find's, or @n: what op "+
+			"caulk, and the answer's part names each piece (\"hall floor\", \"hall|kitchen wall\"); rooms naming a zone get it, its "+
+			"links through their doors. {\"zone\": {\"name\": z, \"areas\": [{\"min\": [x,y,z], \"max\": [x,y,z]} | {\"outline\": [[x,y]…], \"z\"?: 0, "+
+			"\"height\"?: 128} | {\"floors\": [ids], \"height\"?: 128}], \"spawners\"?: 4, \"pathnode\"?: true, \"links\"?: [{\"zone\": z2, "+
+			"\"flag\"?: \"always_on\", \"one_way\"?: false}]}} makes a zombies zone: an info_volume (player_volume) over each area, "+
+			"any outline (cut into convex brushes) or the floor brushes' own; riser spawners spread on the floor found under it, clear "+
+			"of walls; a node_pathnode for the navmesh to grow from; a zone the map has keeps its spawners' name. The answer's "+
+			"script lists the add_adjacent_zone calls the map's script lacks (map_edit writes no script), its notes overlapping "+
+			"zones and rooms in none. Ids are map_find's, or @n: what op "+
 			"n of this batch made (every copy of a copy op), so a box built, textured and copied is one undo step. A point "+
 			"entity keeps its id; a world brush or an entity that owns brushes is rebuilt and gets a new one (was gives "+
 			"the old). The answer reads the map back: each op's id, class, origin or bounds, the tile each material got "+
