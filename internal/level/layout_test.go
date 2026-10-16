@@ -263,23 +263,28 @@ func TestALayoutsOpeningsAreInWorldUnits(t *testing.T) {
 
 func TestALayoutRefusesWhatItCantBuild(t *testing.T) {
 	for want, edit := range map[string]func(*LayoutOp){
-		"no rooms":                       func(o *LayoutOp) { o.Rooms = nil },
-		`material ""`:                    func(o *LayoutOp) { o.Material, o.Floor = "", "wood" },
-		`material "two words"`:           func(o *LayoutOp) { o.Rooms[1].Ceiling = "two words" },
-		`room 1: name "hall": one word`:  func(o *LayoutOp) { o.Rooms[1].Name = "hall" },
-		`room 0: name "the hall"`:        func(o *LayoutOp) { o.Rooms[0].Name = "the hall" },
-		`room 0: name "a|b"`:             func(o *LayoutOp) { o.Rooms[0].Name = "a|b" },
-		"room hall: [0 0] to [8 256]":    func(o *LayoutOp) { o.Rooms[0].Max[0], o.Rooms[1].Min[0] = 8, 8 },
-		"rooms hall and kitchen overlap": func(o *LayoutOp) { o.Rooms[1].Min[0] = 128 },
-		"sizes above 0":                  func(o *LayoutOp) { o.Slab = -16 },
-		`opening 0: no room "attic"`:     func(o *LayoutOp) { o.Openings = []Opening{{Room: "attic", Side: "-x"}} },
-		`opening 0: no room "cellar"`:    func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall", To: "cellar"}} },
-		"or side, one of them":           func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall"}} },
-		"one of them":                    func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall", To: "kitchen", Side: "+x"}} },
-		`side "up"`:                      func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall", Side: "up"}} },
+		"no rooms":                             func(o *LayoutOp) { o.Rooms = nil },
+		`material ""`:                          func(o *LayoutOp) { o.Material, o.Floor = "", "wood" },
+		`material "two words"`:                 func(o *LayoutOp) { o.Rooms[1].Ceiling = "two words" },
+		`room 1: name "hall": one word`:        func(o *LayoutOp) { o.Rooms[1].Name = "hall" },
+		`room 0: name "the hall"`:              func(o *LayoutOp) { o.Rooms[0].Name = "the hall" },
+		`room 0: name "a|b"`:                   func(o *LayoutOp) { o.Rooms[0].Name = "a|b" },
+		"room hall: [0 0] to [8 256]":          func(o *LayoutOp) { o.Rooms[0].Max[0], o.Rooms[1].Min[0] = 8, 8 },
+		"rooms hall and kitchen overlap":       func(o *LayoutOp) { o.Rooms[1].Min[0] = 128 },
+		"room kitchen: [1000 0] to [1006 256]": func(o *LayoutOp) { o.Rooms[1].Min[0], o.Rooms[1].Max[0] = 1000, 1006 },
+		"sizes above 0":                        func(o *LayoutOp) { o.Slab = -16 },
+		`opening 0: no room "attic"`:           func(o *LayoutOp) { o.Openings = []Opening{{Room: "attic", Side: "-x"}} },
+		`opening 0: no room "cellar"`:          func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall", To: "cellar"}} },
+		"or side, one of them":                 func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall"}} },
+		"one of them":                          func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall", To: "kitchen", Side: "+x"}} },
+		`side "up"`:                            func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall", Side: "up"}} },
 		"rooms hall and kitchen share no": func(o *LayoutOp) {
 			o.Rooms[1].Min[0], o.Rooms[1].Max[0] = 300, 600
 			o.Openings = []Opening{{Room: "hall", To: "kitchen"}}
+		},
+		"rooms hall and c share no wall": func(o *LayoutOp) { // they meet at a corner only
+			o.Rooms = append(o.Rooms, PlanRoom{Name: "c", Min: [2]float64{256, 256}, Max: [2]float64{512, 512}})
+			o.Openings = []Opening{{Room: "hall", To: "c"}}
 		},
 		"taller than the storey's 112": func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall", Side: "-x", Sill: 32, Height: 96}} },
 		"can't be below 0":             func(o *LayoutOp) { o.Openings = []Opening{{Room: "hall", Side: "-x", Width: -1}} },
@@ -297,7 +302,24 @@ func TestALayoutRefusesWhatItCantBuild(t *testing.T) {
 			t.Errorf("%q: %v", want, err)
 		}
 	}
-	o := twoRooms() // a door from each room's side of the wall, a wall's width apart
+	// A door to the hall (the plan's first room) stays in the wall the rooms
+	// share: not in the next stretch along, which the kitchen shares with c.
+	o := twoRooms()
+	o.Rooms[1].Max[1] = 512
+	o.Rooms = append(o.Rooms, PlanRoom{Name: "c", Min: [2]float64{0, 256}, Max: [2]float64{256, 512}})
+	o.Openings = []Opening{{Room: "kitchen", To: "hall", At: f64(384)}}
+	if _, err := o.pieces(); err == nil || !strings.Contains(err.Error(), "between the walls that meet it: 4 to 252") {
+		t.Errorf("a door to the hall placed past the wall it shares with the kitchen: %v", err)
+	}
+	// A side the room shares with another takes a door as well, and one flush
+	// with the far end of its stretch fits.
+	o = twoRooms()
+	o.Openings = []Opening{{Room: "hall", Side: "+x", At: f64(224)}}
+	got := strings.Join(layoutBoxes(t, o), "\n")
+	if !strings.Contains(got, "252 4 -16 260 196 128 brick hall|kitchen wall") || strings.Contains(got, "252 252 -16 260") {
+		t.Errorf("a door on the hall's +x side, flush with the wall's far end:\n%s", got)
+	}
+	o = twoRooms() // a door from each room's side of the wall, a wall's width apart
 	o.Openings = []Opening{{Room: "hall", To: "kitchen", At: f64(60)}, {Room: "kitchen", To: "hall", At: f64(124)}}
 	if _, err := o.pieces(); err != nil {
 		t.Errorf("two doors in a wall: %v", err)

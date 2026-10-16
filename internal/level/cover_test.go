@@ -28,6 +28,12 @@ func TestHullsCoverTogetherOnlyWhatTheyLeaveNothingOf(t *testing.T) {
 			t.Errorf("%s: %v, want %v", name, got, c.want)
 		}
 	}
+	// Far from the origin a gap half a unit wide still shows: a sliver is
+	// judged by its own size, not by where it is.
+	far := rect(10000, 20000, 10100, 20050)
+	if coveredBy([][]pt2{rect(10000, 20000, 10049.75, 20050), rect(10050.25, 20000, 10100, 20050)}, far) {
+		t.Error("a gap half a unit wide, far from the origin")
+	}
 }
 
 func TestSubtractLeavesConvexPiecesOutsideTheHull(t *testing.T) {
