@@ -191,8 +191,8 @@ func (b *batch) box(i int, o *BoxOp) error {
 	if !word(o.Material) {
 		return fmt.Errorf("box: material %q: one word, a material's name", o.Material)
 	}
-	if o.Contents != "" && !cleanText(o.Contents) {
-		return fmt.Errorf("box: contents %q", o.Contents)
+	if err := checkContents(o.Contents); err != nil {
+		return fmt.Errorf("box: %w", err)
 	}
 	t := b.tile(o.Material)
 	brush := boxBrush(Box{Min: o.Min, Max: o.Max, Ok: true}, o.Material, o.Contents, texNumbers(t.W, t.H))

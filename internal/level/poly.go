@@ -196,6 +196,22 @@ func prismBrush(poly []pt2, z0, z1 float64, material, tex string) string {
 	return s.String()
 }
 
+// contentsFlags are the words of a brush's contents line Treyarch's own map
+// sources use (zm_giant, mp_combine, mp_sector): nonColliding draws a brush
+// nothing collides with, weaponClip one only bullets hit, detail keeps it out
+// of the portal structure, ai_nosight blocks the AI's sight.
+var contentsFlags = []string{"nonColliding", "weaponClip", "detail", "ai_nosight", "umbraTarget", "triangulatedWeaponClip"}
+
+// checkContents accepts a contents line of those words, in any order.
+func checkContents(contents string) error {
+	for _, w := range strings.Fields(strings.TrimSuffix(contents, ";")) {
+		if !slices.Contains(contentsFlags, w) {
+			return fmt.Errorf("contents %q: %q is not one of %s", contents, w, strings.Join(contentsFlags, ", "))
+		}
+	}
+	return nil
+}
+
 // withContents gives a brush's text a contents line, as Radiant writes
 // one: "contents nonColliding;" draws the brush and lets nothing collide with
 // it (Selection > Make Geo > Make Non-Colliding).
@@ -225,8 +241,8 @@ func (b *batch) shape(i int, o *ShapeOp) error {
 		return fmt.Errorf("shape: z %v: its top above its bottom", o.Z)
 	case !word(o.Material):
 		return fmt.Errorf("shape: material %q: one word, a material's name", o.Material)
-	case o.Contents != "" && !word(o.Contents):
-		return fmt.Errorf("shape: contents %q: one word, as detail or nonColliding", o.Contents)
+	case checkContents(o.Contents) != nil:
+		return fmt.Errorf("shape: %w", checkContents(o.Contents))
 	case o.Class == "" && len(o.Keys) > 0:
 		return fmt.Errorf("shape: keys belong to a brush entity: give its class")
 	}
