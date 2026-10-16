@@ -103,13 +103,22 @@
 // modulo a tile): faces meeting at a corner alone show none. Coplanar faces
 // are found by their rounded plane, so the checks scale with a map.
 //
-// # Rooms
+// # Layouts
 //
-// A room op builds around its inside box: a floor and a ceiling slab over the
-// walls' whole footprint, the x walls the room's whole length (its corners),
-// the y walls between them, a wall with holes in strips around them, a sill
-// under a hole and a lintel over it. Its pieces' faces that the others hide
-// (selfHidden, the checks' own test) are caulk; the faces at a hole show.
+// A layout op builds a storey from a plan of rooms, rectangles meeting along
+// their edges. Every line a room's edge lies on is cut where an edge on it
+// starts or ends, so each stretch of wall has one room, or the outside, on
+// either side, and a wall across it meets it at each end (a room's corner is
+// on both its edges). A stretch is a box centred on its line, through the
+// floor and ceiling slabs; the walls along x run on half a wall past the end
+// of their line's run and take the corners, the walls along y stop half a
+// wall short of every end, against them: no two pieces overlap, no corner is
+// left open. Slabs fill each room between its walls. An opening sits in the
+// stretch that holds it between those end walls, the stretch cut in strips
+// around it, a sill under it (a door's threshold, of its room's floor) and a
+// lintel over it. A stretch's sides take the material of the room each looks
+// into; the faces the pieces hide of each other (selfHidden, the checks' own
+// test) are caulk.
 //
 // # Boards
 //
@@ -120,7 +129,7 @@
 // volumes and the sky's brushes for the shot; then the edit that built them is undone
 // when the undo menu's last entry is still it, else the slabs are deleted
 // (one more undo entry). Radiant's redo holds the board. Sheet shows them
-// as Radiant's texture browser does instead, without Radiant: their color
+// as Radiant's Textures pane does instead, without Radiant: their color
 // images, read from the install's files (Thumb), four across, numbered.
 //
 // # Commands

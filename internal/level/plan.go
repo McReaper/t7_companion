@@ -104,6 +104,7 @@ type Made struct {
 	Was   string // its GUID before, when it was rebuilt under a new one
 	Class string // "" for a world brush
 	Box   Box
+	Part  string // what of a layout it is: "hall floor", "hall|kitchen wall"
 }
 
 // Done is a batch's outcome.
@@ -181,7 +182,7 @@ func (p *plan) match(got map[string]bool, after *Snapshot) []Made {
 	taken := map[string]bool{}
 	for _, u := range append(append(append([]*unit{}, p.world...), p.ents...), p.replace...) {
 		class, box := u.shape()
-		m := Made{Op: u.op, Class: class, Box: box}
+		m := Made{Op: u.op, Class: class, Box: box, Part: u.part}
 		if u.state == changed && u.point {
 			m.ID = u.guid
 		} else {

@@ -91,7 +91,7 @@ func (w *Workspace) imageTexels(name string) (int, int, error) {
 }
 
 // ImageFile is an image asset's texture on disk, its baseImage: what Radiant's
-// texture browser shows a material by, through its colorMap.
+// Textures pane shows a material by, through its colorMap.
 func (w *Workspace) ImageFile(name string) (string, error) {
 	path, _, err := w.imageFile(name)
 	return path, err

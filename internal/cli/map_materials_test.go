@@ -56,7 +56,7 @@ func materialsInstall(t *testing.T) string {
 	return root
 }
 
-func TestMapMaterialsListsTheBrowsersMaterialsMostUsedFirst(t *testing.T) {
+func TestMapMaterialsListsTheTexturesPanesMaterialsMostUsedFirst(t *testing.T) {
 	root := materialsInstall(t)
 	list := func(a mapMaterialsArgs) []string {
 		t.Helper()

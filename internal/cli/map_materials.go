@@ -62,7 +62,7 @@ const (
 	maxMaterialsLimit = 200
 )
 
-// mapMaterials lists the materials Radiant's browser shows that match; with
+// mapMaterials lists the materials Radiant's Textures pane shows that match; with
 // show, a sheet of the first 16's color images; with board, the first 16 laid
 // out in Radiant and shot.
 func mapMaterials(ctx context.Context, a mapMaterialsArgs) (*mapMaterialsOut, []byte, error) {
@@ -163,7 +163,7 @@ func showMaterials(ctx context.Context, c *radiant.Client, snap *level.Snapshot,
 const shownLimit = 16
 
 // sheetMaterials lays the first materials' color images out as Radiant's
-// texture browser shows them, read from the install's texture files: no
+// Textures pane shows them, read from the install's texture files: no
 // Radiant, nothing added to the map. The paths are resolved one by one (the
 // workspace caches as it reads), the images decoded at once.
 func sheetMaterials(w *gdt.Workspace, out *mapMaterialsOut, size int) (*mapMaterialsOut, []byte, error) {

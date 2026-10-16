@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// EditorMaterial is a material Radiant's texture browser shows: its usage,
+// EditorMaterial is a material Radiant's Textures pane shows: its usage,
 // the filter it is under there, is one other than <not in editor> (the
 // default).
 type EditorMaterial struct {
@@ -19,7 +19,7 @@ type EditorMaterial struct {
 	Type     string // its materialType: lit…, tools_replace for caulk, tools_blend for clip
 }
 
-// EditorMaterials lists the materials Radiant's texture browser shows, read
+// EditorMaterials lists the materials Radiant's Textures pane shows, read
 // from the index: a derived material's fields come from its parent chain in
 // its GDT, its own lines first.
 func (w *Workspace) EditorMaterials() []EditorMaterial {

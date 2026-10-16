@@ -39,14 +39,14 @@ func mapCheckTool() server.ServerTool {
 
 func mapMaterialsTool() server.ServerTool {
 	return server.ServerTool{Tool: mcp.NewTool("map_materials",
-		mcp.WithDescription("Find materials to texture with: the ones Radiant's texture browser shows (a usage other than "+
+		mcp.WithDescription("Find materials to texture with: the ones Radiant's Textures pane shows (a usage other than "+
 			"<not in editor>), filtered by usage (floor, ceiling, roof, door, window, decal, interior wall, interior trim, "+
 			"exterior wall, exterior trim, terrain, foliage, water, sky, background, tools, clip; \"wall\" takes both walls), "+
 			"surface (brick, wood, concrete, metal, plaster, glass…: the surfaceType footsteps and impacts use) and name "+
 			"words; comma-separated alternatives. Most used by the install's maps first: faces is how many of their faces "+
 			"have it, and tile the world units one repeat spans as map_edit lays it. Materials marked DO NOT USE "+
 			"(Radiant crosses them out; script_wall and script_floor_ceiling among them) only with all. show answers "+
-			"a sheet of the first 16's color images as Radiant's texture browser shows them, read from the install "+
+			"a sheet of the first 16's color images as Radiant's Textures pane shows them, read from the install "+
 			"(no Radiant needed, nothing added to the map): sheet names the material numbered 1, 2… board instead lays "+
 			"them out in Radiant, a slab each above the map, shoots them from above fullbright and takes them off the map "+
 			"again (Radiant's redo holds them): their look in the engine at map_edit's tile; board says which label is which."),
@@ -107,13 +107,17 @@ func mapEditTool() server.ServerTool {
 			"\"u\"|\"v\"|\"uv\"}} lays a material on faces (all by default): tile is the world units one repeat spans "+
 			"(default the material's own, as the install's maps use it), tiles start on origin (default 0 0 0, so faces "+
 			"given the same tile line up across brushes), fit makes nu repeats span each face (0 sizes that axis as the "+
-			"other) starting at its edge. New boxes get their material's own tile too. {\"room\": {\"min\": [x,y,z], "+
-			"\"max\": [x,y,z], \"material\": m, \"floor\"?: m, \"ceiling\"?: m, \"wall\"?: 8, \"slab\"?: 16, \"open\"?: "+
-			"[\"+x\"…, \"top\", \"bottom\"], \"holes\"?: [{\"side\": \"-y\", \"at\": u, \"width\"?: 56, \"height\"?: 96, "+
-			"\"sill\"?: 0}], \"probe\"?: true}} builds a room around the inside box min..max (where a player walks): a floor slab under it, "+
-			"a ceiling over it, a wall on each side not open (a corridor is open at its ends), doors and windows (sill 32) "+
-			"left as holes the walls are built around, their middle u units along the wall from the inside's lower corner, "+
-			"and a reflection_probe in its middle (probe false: none); the faces its pieces hide of each other are caulk. Ids are map_find's, or @n: what op "+
+			"other) starting at its edge. New boxes get their material's own tile too. {\"layout\": {\"rooms\": [{\"name\": n, "+
+			"\"min\": [x,y], \"max\": [x,y], \"material\"?: m, \"floor\"?: m, \"ceiling\"?: m, \"outdoor\"?: true}], "+
+			"\"openings\"?: [{\"room\": n, \"to\": n2 | \"side\": \"-y\", \"at\"?: u, \"width\"?: 56, \"height\"?: 96, "+
+			"\"sill\"?: 0}], \"material\": m, \"floor\"?: m, \"ceiling\"?: m, \"exterior\"?: m, \"z\"?: 0, \"height\"?: 112, "+
+			"\"wall\"?: 8, \"slab\"?: 16, \"probes\"?: true}} builds a storey from its plan: rooms are rectangles meeting along "+
+			"their edges, from wall centre to wall centre (a room 256 wide is 248 inside); a wall stands on every edge, one where two "+
+			"rooms meet, each side of it in the material of the room it looks into (exterior outside, and in an outdoor room); each room gets a floor slab "+
+			"under z and a ceiling height above (outdoor: none) and a reflection_probe (probes false: none); an opening is a door to "+
+			"the room it opens on, or on a side of its room, a window with a sill (56 by 64 then), at the world x or y u of its middle "+
+			"(default the middle of the shared wall or side), the walls built around it; the faces the pieces hide of each other are "+
+			"caulk, and the answer's part names each piece (\"hall floor\", \"hall|kitchen wall\"). Ids are map_find's, or @n: what op "+
 			"n of this batch made (every copy of a copy op), so a box built, textured and copied is one undo step. A point "+
 			"entity keeps its id; a world brush or an entity that owns brushes is rebuilt and gets a new one (was gives "+
 			"the old). The answer reads the map back: each op's id, class, origin or bounds, the tile each material got "+

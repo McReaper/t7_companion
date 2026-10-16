@@ -1,0 +1,26 @@
+Detail for **t7kb:mapping** (`plugin/skills/mapping/SKILL.md`) — how the map looks, through t7kb's map tools: the materials and props to pick, texturing face by face, the views to check them and the light. Read the parent skill first, and `map-tools.md` for building.
+
+Contents:
+
+- [Texture faces, not brushes: caulk what nobody sees](#texture-faces-not-brushes-caulk-what-nobody-sees)
+- [Look from the top first](#look-from-the-top-first)
+- [Light every space and block the sun: probes, overlaps, sun-shadow caps](#light-every-space-and-block-the-sun-probes-overlaps-sun-shadow-caps)
+
+## Texture faces, not brushes: caulk what nobody sees
+
+Pick materials with `t7kb:map_materials`: the ones Radiant's Textures pane shows, by `usage` (the pane's filter: `floor`, `interior wall`, `exterior trim`…), `surface` (`brick`, `wood`, `concrete`: what footsteps and impacts use) and name words, the ones the install's maps use most first, each with its tile; `show` answers a sheet of the first 16's color images as the Textures pane shows them, read from the install (no Radiant needed), and `board` lays them out in Radiant instead to see them in the engine at their tile, then takes them off the map. Find props the same way with `t7kb:map_models` (name words, the ones the install's maps place most first; `board` places 16 in Radiant and shoots them) and place one with an `entity` op, class `misc_model`, key `model`. A `box` takes one material on all six faces, at the material's own tile; a `texture` op then lays materials face by face — `faces` `top`, `bottom`, `sides` or directions (`+x,-y`) — in the same batch, naming the box `@n` (the op that made it). The tile defaults to the size the install's maps use the material at most (the answer's `tiles` says which and from how many faces; a material they hardly use gets its GDT's tiling at 16 texels a unit), so bricks and planks come out at the scale Treyarch's maps have them. Then:
+
+- **Caulk every face nobody sees** — wall tops and bottoms against a floor or ceiling, backs against the sky box: `caulk` draws nothing and costs nothing, a visible material there still draws.
+- **Keep one `origin` for faces that meet**: tiles start on it (the world's 0 0 0 by default), so walls of one room given the same tile run on without a seam across brushes. Set it to the floor's corner when a texture must start at the floor (a wainscot, a tile row).
+- **Trims**: `fit` `[0, 1]` makes one repeat span the face's height, the length scaled to keep the texture's shape — a baseboard or a beam's band.
+- `rotate` turns planks and stripes (90 to run them the other way), `flip` mirrors, `scale` 2 doubles the tile. `material` alone swaps a material and keeps each face's tile, as Radiant's Find/Replace does.
+
+Then `t7kb:map_check` the brushes: it lists faces left uncaulked where nothing can see them, seams where one material's tiles don't meet across brushes, stretched tiles and unknown materials, each by brush id and face, for a `texture` op to fix. Look at the result with `t7kb:map_view` `render` `fullbright` and `hide` `volumes` from a `camera` inside the room: the template's volumes (`volume_fpstool`, the start zone, sun and umbra volumes) cover ±1536 and draw their tool textures over a shot from inside them too (verified in a test Radiant: half a room's shot was `volume_fpstool`'s face), and `hide` hides every volume and trigger for the shot alone.
+
+## Look from the top first
+
+`t7kb:map_view` with `view` `top` is the layout: outlines, entity names, the ids written on it, and the `scale` (image pixels per unit) to measure with. In the 3D view pick the render by the question (Radiant's F5–F8): `fullbright` for textures, `fake` for shapes, `bake` for light: it runs Radiant's own bake (the lighting toolbar's bolt, at its L/M/H) and shoots under real lighting, where an unbaked map is black and a sun leak or a dark room shows. A volume's brush (the `volume_sun`, the start zone) draws its tool texture over everything behind it, from outside it or inside (verified: sun icons covering the shot), so pass `hide` `volumes`; `hide` `sky` takes the sky box's brushes away for a shot from outside the map. Every view puts the user's camera, render method, 2D axis, zoom and centre back, but they see them move: take the views the work needs.
+
+## Light every space and block the sun: probes, overlaps, sun-shadow caps
+
+Sunlight showing through a wall is fixed in Radiant, not in GDTs: a `reflection_probe` in every space (the template has one, in its start room; a `layout` op puts one in each room), walls that overlap where they meet rather than touch edge to edge, and brushes all of `caulk_sun_shadow` outside what must stay in shade — Treyarch's `zm_giant_light.map` holds 12 such brushes, 8-unit sheets over roofs among them (verified in the install; the leak fixes themselves community, t7kb modme 0.60). Then `bake` and look from inside each space.

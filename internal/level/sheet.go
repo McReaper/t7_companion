@@ -40,7 +40,7 @@ func Thumb(path string, side int) (*image.RGBA, error) {
 	return Shrink(rgba, w, h), nil
 }
 
-// Sheet lays thumbnails out as Radiant's texture browser does, sheetCols
+// Sheet lays thumbnails out as Radiant's Textures pane does, sheetCols
 // across in squares of cell pixels, each centred in its square and numbered
 // from 1 in its upper-left corner; a nil one leaves its square grey.
 func Sheet(thumbs []*image.RGBA, cell int) *image.RGBA {

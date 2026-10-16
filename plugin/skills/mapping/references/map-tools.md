@@ -1,16 +1,15 @@
-Detail for **t7kb:mapping** (`plugin/skills/mapping/SKILL.md`) — building in the user's running Radiant through t7kb's map tools. Read the parent skill first; come here for the sizes to build to, what a new map already holds, and the traps of each tool.
+Detail for **t7kb:mapping** (`plugin/skills/mapping/SKILL.md`) — building in the user's running Radiant through t7kb's map tools. Read the parent skill first; come here for the sizes to build to, what a new map already holds, the layout op, and the traps of each tool; materials, props, views and light are in `map-looks.md`.
 
 Contents:
 
 - [Build to the official scale standards](#build-to-the-official-scale-standards)
 - [A new map is the template's room in a sky box: build inside it](#a-new-map-is-the-templates-room-in-a-sky-box-build-inside-it)
 - [One batch per step the user would undo](#one-batch-per-step-the-user-would-undo)
+- [Block out a storey with one `layout` op: rooms on a plan, one wall where two meet](#block-out-a-storey-with-one-layout-op-rooms-on-a-plan-one-wall-where-two-meet)
 - [An edited world brush or brush entity comes back under a new id](#an-edited-world-brush-or-brush-entity-comes-back-under-a-new-id)
-- [Texture faces, not brushes: caulk what nobody sees](#texture-faces-not-brushes-caulk-what-nobody-sees)
 - [Build one, then copy it](#build-one-then-copy-it)
 - [Cut doors by building around the hole, not with CSG Subtract](#cut-doors-by-building-around-the-hole-not-with-csg-subtract)
 - [CSG Hollow walls are as thick as the grid](#csg-hollow-walls-are-as-thick-as-the-grid)
-- [Look from the top first](#look-from-the-top-first)
 - [Save before building: the build compiles the file, not Radiant's memory](#save-before-building-the-build-compiles-the-file-not-radiants-memory)
 - [When the bridge says busy](#when-the-bridge-says-busy)
 
@@ -47,20 +46,13 @@ Build the blockout inside the sky box and the start zone first: it seals and pla
 
 `t7kb:map_edit` lands a whole batch as one entry in Radiant's undo menu, its `label` the name the user reads there ("t7kb: kitchen"). Make a batch of what the user would take back together — a room's floor, walls and ceiling, a corridor, the lights of one space — not one call per brush: each call is its own undo step and its own read of the map. A batch lands whole or not at all: an op that fails refuses the batch before Radiant sees it.
 
+## Block out a storey with one `layout` op: rooms on a plan, one wall where two meet
+
+Draw the storey as a plan before any box: each room a named rectangle from wall centre to wall centre, rooms meeting along their edges (a `hall` from `[0, 0]` to `[512, 256]`, a `kitchen` from `[512, 0]` beside it), sent as one `t7kb:map_edit` `layout` op. A wall stands centred on every edge, 8 thick (so the hall is 504 by 248 inside), one wall where two rooms meet, every corner filled; each side of a wall takes the `material` of the room it looks into, `exterior` outside and in an outdoor room. Each room gets its floor slab under `z`, its ceiling `height` above (112 by default; none when `outdoor`, a courtyard) and a `reflection_probe`. An opening is a door `to` the next room, or on a `side` of its room; a `sill` makes it a window (56 × 64 then, the scale standard); `at` is its middle's world x or y, and left out it centres the opening on the shared wall. An opening stays within one stretch of wall, between the walls that meet it: the refusal lists the stretches. The answer's `part` names each piece (`hall floor`, `hall|kitchen wall`) for the `texture` ops after it. A layout is one storey: another over it would double the slab between them, so build upper floors and stairs with boxes. Then detail it — trims, frames, props — on the layout's pieces.
+
 ## An edited world brush or brush entity comes back under a new id
 
 A point entity (`light`, `script_struct`, `info_player_start`) keeps its id through `set` and `move`. A world brush moved or retextured, and any entity that owns brushes (`volume_sun`, triggers, `script_brushmodel`), is deleted and imported anew, and gets a **new id**: the answer's `made` gives it, with `was` the old one. So are a `reflection_probe` and a `misc_prefab`. Use the new ids from then on; when unsure, `t7kb:map_find` again. Why: Radiant's undo brings a replaced brush entity back as world brushes only (MTPlugins' notes), while a delete and an import undo exactly (verified in a test Radiant).
-
-## Texture faces, not brushes: caulk what nobody sees
-
-Pick materials with `t7kb:map_materials`: the ones Radiant's browser shows, by `usage` (the browser's filter: `floor`, `interior wall`, `exterior trim`…), `surface` (`brick`, `wood`, `concrete`: what footsteps and impacts use) and name words, the ones the install's maps use most first, each with its tile; `show` answers a sheet of the first 16's color images as the texture browser shows them, read from the install (no Radiant needed), and `board` lays them out in Radiant instead to see them in the engine at their tile, then takes them off the map. Find props the same way with `t7kb:map_models` (name words, the ones the install's maps place most first; `board` places 16 in Radiant and shoots them) and place one with an `entity` op, class `misc_model`, key `model`. A `box` takes one material on all six faces, at the material's own tile; a `texture` op then lays materials face by face — `faces` `top`, `bottom`, `sides` or directions (`+x,-y`) — in the same batch, naming the box `@n` (the op that made it). The tile defaults to the size the install's maps use the material at most (the answer's `tiles` says which and from how many faces; a material they hardly use gets its GDT's tiling at 16 texels a unit), so bricks and planks come out at the scale Treyarch's maps have them. Then:
-
-- **Caulk every face nobody sees** — wall tops and bottoms against a floor or ceiling, backs against the sky box: `caulk` draws nothing and costs nothing, a visible material there still draws.
-- **Keep one `origin` for faces that meet**: tiles start on it (the world's 0 0 0 by default), so walls of one room given the same tile run on without a seam across brushes. Set it to the floor's corner when a texture must start at the floor (a wainscot, a tile row).
-- **Trims**: `fit` `[0, 1]` makes one repeat span the face's height, the length scaled to keep the texture's shape — a baseboard or a beam's band.
-- `rotate` turns planks and stripes (90 to run them the other way), `flip` mirrors, `scale` 2 doubles the tile. `material` alone swaps a material and keeps each face's tile, as Radiant's Find/Replace does.
-
-Then `t7kb:map_check` the brushes: it lists faces left uncaulked where nothing can see them, seams where one material's tiles don't meet across brushes, stretched tiles and unknown materials, each by brush id and face, for a `texture` op to fix. Look at the result with `t7kb:map_view` `render` `fullbright` and `hide` `volumes` from a `camera` inside the room: the template's volumes (`volume_fpstool`, the start zone, sun and umbra volumes) cover ±1536 and draw their tool textures over a shot from inside them too (verified in a test Radiant: half a room's shot was `volume_fpstool`'s face), and `hide` hides every volume and trigger for the shot alone.
 
 ## Build one, then copy it
 
@@ -68,19 +60,11 @@ Then `t7kb:map_check` the brushes: it lists faces left uncaulked where nothing c
 
 ## Cut doors by building around the hole, not with CSG Subtract
 
-**`Selection/CSG/CSG Subtract` carves the selected brush out of every brush it touches, volumes included**, with no warning: a door cutter through a wall of the template's start room also split the start zone's `info_volume`, the `volume_sun`, the `umbra_volume` and the `volume_fpstool` six ways each (verified in a test Radiant). A zone or sun volume in pieces no longer covers what it did. Build a wall with a door as boxes around the hole instead — the wall's two sides and the lintel above, each a box of the same batch: `t7kb:map_edit`'s `room` op does it for a room's doors and windows (`holes`), and caulks the faces its pieces hide of each other. Done by mistake, one Ctrl+Z (`t7kb:map_command` with `Edit/Undo`) takes the whole subtract back.
+**`Selection/CSG/CSG Subtract` carves the selected brush out of every brush it touches, volumes included**, with no warning: a door cutter through a wall of the template's start room also split the start zone's `info_volume`, the `volume_sun`, the `umbra_volume` and the `volume_fpstool` six ways each (verified in a test Radiant). A zone or sun volume in pieces no longer covers what it did. Build a wall with a door as boxes around the hole instead — the wall's two sides and the lintel above, each a box of the same batch: a `layout` op does it for a plan's doors and windows (`openings`), and caulks the faces its pieces hide of each other. Done by mistake, one Ctrl+Z (`t7kb:map_command` with `Edit/Undo`) takes the whole subtract back.
 
 ## CSG Hollow walls are as thick as the grid
 
 `Selection/CSG/CSG Hollow` turns a box into six walls inside the box's bounds, as thick as the grid: 8 at grid 8, 16 at grid 16 (verified in a test Radiant). Set the grid with `t7kb:map_command` `Grid/Grid Sizes/Grid 16` before, and back to `Grid 8` after — it is the user's grid too. Hollow acts on the selection only, so it is safe beside volumes; its walls share one material, the box's.
-
-## Look from the top first
-
-`t7kb:map_view` with `view` `top` is the layout: outlines, entity names, the ids written on it, and the `scale` (image pixels per unit) to measure with. In the 3D view pick the render by the question (Radiant's F5–F8): `fullbright` for textures, `fake` for shapes, `bake` for light: it runs Radiant's own bake (the lighting toolbar's bolt, at its L/M/H) and shoots under real lighting, where an unbaked map is black and a sun leak or a dark room shows. A volume's brush (the `volume_sun`, the start zone) draws its tool texture over everything behind it, from outside it or inside (verified: sun icons covering the shot), so pass `hide` `volumes`; `hide` `sky` takes the sky box's brushes away for a shot from outside the map. Every view puts the user's camera, render method, 2D axis, zoom and centre back, but they see them move: take the views the work needs.
-
-## Light every space and block the sun: probes, overlaps, sun-shadow caps
-
-Sunlight showing through a wall is fixed in Radiant, not in GDTs: a `reflection_probe` in every space (the template has one, in its start room; a `room` op puts one in its middle), walls that overlap where they meet rather than touch edge to edge, and brushes all of `caulk_sun_shadow` outside what must stay in shade — Treyarch's `zm_giant_light.map` holds 12 such brushes, 8-unit sheets over roofs among them (verified in the install; the leak fixes themselves community, t7kb modme 0.60). Then `bake` and look from inside each space.
 
 ## Save before building: the build compiles the file, not Radiant's memory
 

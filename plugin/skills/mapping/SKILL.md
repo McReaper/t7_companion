@@ -17,12 +17,12 @@ t7kb's map tools edit the map open in the user's Radiant, through the T7RadiantB
 
 1. `t7kb:radiant_open` the map: the Radiant that has it open, or a new one started on it.
 2. `t7kb:map_find` what is there: short ids, bounds, the naming keys; `class`, `key` and `near` narrow it.
-3. `t7kb:map_edit` a batch of ops (boxes, entities, deletes, keys, moves, copies, materials and per-face textures, the materials found with `t7kb:map_materials`) for one step the user would undo as a whole.
+3. `t7kb:map_edit` a batch of ops (a storey's `layout` of rooms, boxes, entities, deletes, keys, moves, copies, materials and per-face textures, the materials found with `t7kb:map_materials`) for one step the user would undo as a whole.
 4. `t7kb:map_view` the result: `top` for the layout, `3d` with `render` `fake` for the shapes of an unbaked map.
 5. `t7kb:map_command` for Radiant's own tools (`Selection/CSG/CSG Hollow`, patch and texture tools) on the ids given.
 6. Before `t7kb:build`, `t7kb:map_command` `File/Save`: the build compiles the file on disk, not Radiant's memory.
 
-The sizes to build to (Treyarch's scale standards), what a new map already holds, which edits change an id, and the traps — **CSG Subtract carves the zone and sun volumes too** — are in `references/map-tools.md`.
+The sizes to build to (Treyarch's scale standards), what a new map already holds, the `layout` op, which edits change an id, and the traps — **CSG Subtract carves the zone and sun volumes too** — are in `references/map-tools.md`; picking materials and props, texturing face by face, the views and the light in `references/map-looks.md`.
 
 ## Grid discipline and brush basics
 

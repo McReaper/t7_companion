@@ -41,6 +41,7 @@ type madeOut struct {
 	Class  string    `json:"class,omitempty"` // none for a world brush
 	Origin []float64 `json:"origin,omitempty"`
 	Bounds []float64 `json:"bounds,omitempty"`
+	Part   string    `json:"part,omitempty"` // what of a layout it is
 	Note   string    `json:"note,omitempty"`
 }
 
@@ -87,7 +88,7 @@ func mapEdit(ctx context.Context, ops []level.Op, label string, pid int) (*mapEd
 		}
 	}
 	for _, m := range d.Made {
-		mo := madeOut{Op: m.Op, Class: m.Class}
+		mo := madeOut{Op: m.Op, Class: m.Class, Part: m.Part}
 		if m.ID == "" {
 			mo.Note = "not found in the map read back: map_find to see what Radiant made"
 		} else {

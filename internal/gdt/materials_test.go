@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestEditorMaterialsAreTheOnesRadiantsBrowserShows(t *testing.T) {
+func TestEditorMaterialsAreTheOnesRadiantsTexturesPaneShows(t *testing.T) {
 	w := fixture(t)
 	put(t, w, "stock.gdtdef", []byte("model_export/stock.gdt\nsource_data/stock_mats.gdt\n"))
 	put(t, w, "source_data/stock_mats.gdt", []byte("{\r\n"+
