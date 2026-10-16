@@ -6,7 +6,6 @@ import (
 	"maps"
 	"math"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
@@ -542,19 +541,18 @@ func (l *LayoutOp) part(s *seg) string {
 	return strings.Join(names, "|") + " wall"
 }
 
-// probe is a room's reflection probe: in the middle of its inside, its
-// radius reaching the corners, so the room's surfaces take their reflections
-// and bounce light from inside it, not from the sky beyond its walls (a space
-// with no probe of its own shows the sun through them: community, t7kb modme
-// 0.60).
+// probe is a room's reflection probe: in the middle of its inside, its box
+// its inside, so the room's surfaces take their reflections and bounce
+// light from inside it, not from the sky beyond its walls (a space with no
+// probe of its own shows the sun through them: community, t7kb modme 0.60).
+// A probe is a box, size_min and size_max its reach each way from its
+// origin, 72 by default (bin/t7.def.json): it has no radius.
 func (l *LayoutOp) probe(r PlanRoom) *EntityOp {
 	in := l.Wall / 2
 	lo, hi := mapfile.Vec3{r.Min[0] + in, r.Min[1] + in, l.Z}, mapfile.Vec3{r.Max[0] - in, r.Max[1] - in, l.Z + l.Height}
-	var c mapfile.Vec3
-	var reach float64
+	var c, half mapfile.Vec3
 	for k := range 3 {
-		c[k] = (lo[k] + hi[k]) / 2
-		reach += (hi[k] - lo[k]) * (hi[k] - lo[k]) / 4
+		c[k], half[k] = (lo[k]+hi[k])/2, (hi[k]-lo[k])/2
 	}
-	return &EntityOp{Class: "reflection_probe", Origin: c, Keys: map[string]string{"radius": strconv.Itoa(int(math.Ceil(math.Sqrt(reach)/8) * 8))}}
+	return &EntityOp{Class: "reflection_probe", Origin: c, Keys: map[string]string{"size_min": vecText(half), "size_max": vecText(half)}}
 }

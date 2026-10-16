@@ -358,8 +358,9 @@ func TestALayoutLandsAsOneStepWithItsHiddenFacesCaulked(t *testing.T) {
 		for _, m := range d.Made {
 			if m.Class == "reflection_probe" && hexOf(e.Guid()) == hexOf(m.ID) {
 				origin, _ := e.Key("origin")
-				radius, _ := e.Key("radius")
-				probes = append(probes, m.Part+" "+origin+" r"+radius)
+				lo, _ := e.Key("size_min")
+				hi, _ := e.Key("size_max")
+				probes = append(probes, m.Part+" "+origin+" "+lo+" "+hi)
 			}
 		}
 		for _, br := range e.Brushes() {
@@ -373,8 +374,8 @@ func TestALayoutLandsAsOneStepWithItsHiddenFacesCaulked(t *testing.T) {
 		}
 	}
 	sort.Strings(probes)
-	if fmt.Sprint(probes) != "[hall probe 1128 128 64 r192 yard probe 1384 128 64 r192]" {
-		t.Errorf("probes %v: each room's middle, moved up 8; reaching its corners", probes)
+	if fmt.Sprint(probes) != "[hall probe 1128 128 64 124 124 56 124 124 56 yard probe 1384 128 64 124 124 56 124 124 56]" {
+		t.Errorf("probes %v: each room's middle, moved up 8; its box the room's inside", probes)
 	}
 	if fmt.Sprint(materials) != "map[brick:38 caulk:28 plaster:6 wood:6]" {
 		t.Errorf("faces %v", materials)
