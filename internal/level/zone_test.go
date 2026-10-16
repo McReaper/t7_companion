@@ -379,3 +379,27 @@ func TestInOutlineIsInsideNotOnTheEdge(t *testing.T) {
 		}
 	}
 }
+
+// A point's distance to a segment: to its nearest point inside it, or to an
+// end; a segment of no length is its point. A volume's brush is a piece of
+// its zone, from its bottom to its top.
+func TestSegmentDistanceAndBrushParts(t *testing.T) {
+	for _, c := range []struct {
+		p, a, b pt2
+		want    float64
+	}{
+		{pt2{5, 3}, pt2{1, 1}, pt2{9, 1}, 2},  // over its middle
+		{pt2{3, 9}, pt2{3, 1}, pt2{3, 5}, 4},  // past its end
+		{pt2{-3, 1}, pt2{1, 1}, pt2{9, 1}, 4}, // before its start
+		{pt2{4, 5}, pt2{1, 1}, pt2{1, 1}, 5},  // no length
+		{pt2{7, 7}, pt2{2, 2}, pt2{12, 2}, 5}, // over it, off the origin
+	} {
+		if got := segmentDistance(c.p, c.a, c.b); math.Abs(got-c.want) > 1e-9 {
+			t.Errorf("%v to %v-%v: %v, want %v", c.p, c.a, c.b, got, c.want)
+		}
+	}
+	p, ok := brushPart(mustBrush(t, BoxBrush(Box{Min: mapfile.Vec3{10, 20, -30}, Max: mapfile.Vec3{40, 60, 50}, Ok: true}, "volume", "")))
+	if !ok || p.z0 != -30 || p.z1 != 50 || len(p.hull) != 4 {
+		t.Errorf("a box's piece: %+v, %v", p, ok)
+	}
+}
