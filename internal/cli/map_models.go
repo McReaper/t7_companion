@@ -19,19 +19,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// mapModelsArgs are map_models' filter, and whether to show the models found
-// in Radiant.
+// mapModelsArgs are map_models' filter, and whether to lay the models found
+// out on a board in Radiant.
 type mapModelsArgs struct {
 	Name      string // comma-separated alternatives; a name's words must all be in it
 	Limit     int
-	Show      bool
+	Board     bool
 	Size      int
 	ToolsPath string
 	PID       int
 }
 
 // mapModelsOut is a map_models answer: the models found, most placed by the
-// install's maps first, and with show, which label of the image is which.
+// install's maps first, and with board, which label of the image is which.
 type mapModelsOut struct {
 	Found  int          `json:"found"` // how many match, before the limit
 	Models []modelOut   `json:"models"`
@@ -71,7 +71,7 @@ func modelUses(root string) map[string]int {
 }
 
 // mapModels lists the models whose names match, most placed first, and with
-// show places the first 16 in Radiant and shoots them.
+// board places the first 16 in Radiant and shoots them.
 func mapModels(ctx context.Context, a mapModelsArgs) (*mapModelsOut, []byte, error) {
 	if a.Limit < 0 || a.Limit > maxMaterialsLimit {
 		return nil, nil, fmt.Errorf("limit %d: at most %d", a.Limit, maxMaterialsLimit)
@@ -82,7 +82,7 @@ func mapModels(ctx context.Context, a mapModelsArgs) (*mapModelsOut, []byte, err
 	root := toolsRoot(a.ToolsPath)
 	var c *radiant.Client
 	var snap *level.Snapshot
-	if a.Show || root == "" {
+	if a.Board || root == "" {
 		var err error
 		if c, err = radiant.Connect(ctx, radiantMachine, a.PID); err != nil {
 			return nil, nil, err
@@ -98,7 +98,7 @@ func mapModels(ctx context.Context, a mapModelsArgs) (*mapModelsOut, []byte, err
 		return nil, nil, err
 	}
 	out := listModels(w, root, a)
-	if !a.Show || len(out.Models) == 0 {
+	if !a.Board || len(out.Models) == 0 {
 		return out, nil, nil
 	}
 	return showModels(ctx, c, snap, out, a.Size)
@@ -149,19 +149,19 @@ func showModels(ctx context.Context, c *radiant.Client, snap *level.Snapshot, ou
 func mapModelsTool() server.ServerTool {
 	return server.ServerTool{Tool: mcp.NewTool("map_models",
 		mcp.WithDescription("Find models (xmodels) to place, a misc_model's model key: by name words (comma-separated "+
-			"alternatives), most placed by the install's maps first (uses: their entities that place it). show places "+
+			"alternatives), most placed by the install's maps first (uses: their entities that place it). board places "+
 			"the first 16 above the map in Radiant, a misc_model each 256 units apart, shoots them from the south-west "+
 			"under fake lighting and takes them off the map again (Radiant's redo holds them): the image, then board "+
 			"says which label is which model."),
 		mcp.WithString("name", mcp.Description("Words the name holds, all of them; comma-separated alternatives (\"chair wood, barrel\").")),
 		mcp.WithNumber("limit", mcp.Description("How many to list (default 20, at most 200).")),
-		mcp.WithBoolean("show", mcp.Description("Place the first 16 in Radiant and answer their image too (default false).")),
-		mcp.WithNumber("size", mcp.Description("With show: the image's longer side in pixels (default 768, at most 1568).")),
+		mcp.WithBoolean("board", mcp.Description("Place the first 16 in Radiant and answer their image too (default false).")),
+		mcp.WithNumber("size", mcp.Description("With board: the image's longer side in pixels (default 768, at most 1568).")),
 		mcp.WithString("tools_path", mcp.Description("BO3 mod-tools root (default $TA_TOOLS_PATH, else the running Radiant's).")),
-		mcp.WithNumber("pid", mcp.Description("With show: the Radiant to use when several run."))),
+		mcp.WithNumber("pid", mcp.Description("With board: the Radiant to use when several run."))),
 		Handler: func(ctx context.Context, r mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			out, png, err := mapModels(ctx, mapModelsArgs{Name: r.GetString("name", ""), Limit: r.GetInt("limit", 0),
-				Show: r.GetBool("show", false), Size: r.GetInt("size", 0), ToolsPath: r.GetString("tools_path", ""), PID: r.GetInt("pid", 0)})
+				Board: r.GetBool("board", false), Size: r.GetInt("size", 0), ToolsPath: r.GetString("tools_path", ""), PID: r.GetInt("pid", 0)})
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -177,7 +177,7 @@ func newMapModelsCmd() *cobra.Command {
 	var a mapModelsArgs
 	var out string
 	models := &cobra.Command{Use: "models",
-		Short: "Find models to place, most placed by the install's maps first; --show places them in Radiant",
+		Short: "Find models to place, most placed by the install's maps first; --board places them in Radiant",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			res, png, err := mapModels(c.Context(), a)
@@ -195,10 +195,10 @@ func newMapModelsCmd() *cobra.Command {
 	fl := models.Flags()
 	fl.StringVar(&a.Name, "name", "", "words the name holds, all of them; comma-separated alternatives")
 	fl.IntVar(&a.Limit, "limit", 0, "how many to list (default 20, at most 200)")
-	fl.BoolVar(&a.Show, "show", false, "place the first 16 in Radiant and write their image")
-	fl.IntVar(&a.Size, "size", 0, "with --show: the image's longer side in pixels (default 768)")
+	fl.BoolVar(&a.Board, "board", false, "place the first 16 in Radiant and write their image")
+	fl.IntVar(&a.Size, "size", 0, "with --board: the image's longer side in pixels (default 768)")
 	fl.StringVar(&a.ToolsPath, "tools-path", "", "BO3 mod-tools root (default: $TA_TOOLS_PATH, else the running Radiant's)")
-	fl.IntVar(&a.PID, "pid", 0, "with --show: the Radiant to use when several run")
-	fl.StringVar(&out, "out", "map_models.png", "with --show: where to write the image")
+	fl.IntVar(&a.PID, "pid", 0, "with --board: the Radiant to use when several run")
+	fl.StringVar(&out, "out", "map_models.png", "with --board: where to write the image")
 	return models
 }

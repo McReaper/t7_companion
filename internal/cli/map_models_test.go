@@ -11,6 +11,7 @@ import (
 
 	"github.com/McReaper/t7_companion/internal/radiant/radianttest"
 	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 // modelsInstall is materialsInstall with props: xmodels, and maps placing
@@ -75,7 +76,7 @@ func TestMapModelsListsTheModelsMostPlacedFirst(t *testing.T) {
 	}
 }
 
-// show places the models in the Radiant running and answers its shot, which
+// board places the models in the Radiant running and answers its shot, which
 // label is which model; the board is taken off the map again.
 func TestMapModelsShowsThemInRadiant(t *testing.T) {
 	root := modelsInstall(t)
@@ -87,7 +88,7 @@ func TestMapModelsShowsThemInRadiant(t *testing.T) {
 	f.Text = string(b)[strings.Index(string(b), "// entity 0"):]
 	onMachine(t, f)
 	t.Setenv("TA_TOOLS_PATH", "")
-	res, err := mapModelsTool().Handler(context.Background(), mcpRequest("map_models", map[string]any{"name": "chair", "show": true}))
+	res, err := mapModelsTool().Handler(context.Background(), mcpRequest("map_models", map[string]any{"name": "chair", "board": true}))
 	if err != nil || res.IsError || len(res.Content) != 2 {
 		t.Fatalf("%v %s", err, resultText(res))
 	}
@@ -103,7 +104,7 @@ func TestMapModelsShowsThemInRadiant(t *testing.T) {
 	if f.Text != string(b)[strings.Index(string(b), "// entity 0"):] {
 		t.Error("the board was left on the map")
 	}
-	if many, _, err := mapModels(context.Background(), mapModelsArgs{Name: "p7", Show: true}); err != nil || len(many.Board) != 5 || len(many.Notes) != 0 {
+	if many, _, err := mapModels(context.Background(), mapModelsArgs{Name: "p7", Board: true}); err != nil || len(many.Board) != 5 || len(many.Notes) != 0 {
 		t.Errorf("five shown, all on the board, nothing to say: %+v, %v", many, err)
 	}
 	// the CLI: the image written where --out says
@@ -112,11 +113,32 @@ func TestMapModelsShowsThemInRadiant(t *testing.T) {
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 	png := filepath.Join(t.TempDir(), "m.png")
-	cmd.SetArgs([]string{"models", "--name", "barrel", "--show", "--out", png})
+	cmd.SetArgs([]string{"models", "--name", "barrel", "--board", "--out", png})
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(png); err != nil || !strings.Contains(stderr.String(), "wrote "+png) || !strings.Contains(stdout.String(), `"model": "p7_barrel_red"`) {
 		t.Errorf("%v %s %s", err, stderr.String(), stdout.String())
+	}
+}
+
+// The map tools refuse an argument they don't take, naming the ones they do:
+// map_materials' show is a sheet, map_models has none, and a show sent to it
+// must not answer the list as if it had been heard.
+func TestMapToolsRefuseAnArgumentTheyDontTake(t *testing.T) {
+	root := modelsInstall(t)
+	var models server.ServerTool
+	for _, tool := range mapToolset().tools {
+		if tool.Tool.Name == "map_models" {
+			models = tool
+		}
+	}
+	res, err := models.Handler(context.Background(), mcpRequest("map_models", map[string]any{"name": "barrel", "show": true, "tools_path": root}))
+	if err != nil || !res.IsError || resultText(res) != `map_models takes no "show": it takes board, limit, name, pid, size, tools_path` {
+		t.Errorf("%v %s", err, resultText(res))
+	}
+	res, err = models.Handler(context.Background(), mcpRequest("map_models", map[string]any{"name": "barrel", "tools_path": root}))
+	if err != nil || res.IsError || !strings.Contains(resultText(res), `"p7_barrel_red"`) {
+		t.Errorf("the arguments it takes go through: %v %s", err, resultText(res))
 	}
 }
