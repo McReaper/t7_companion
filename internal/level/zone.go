@@ -385,83 +385,133 @@ type madeZone struct {
 }
 
 // checkZones checks a batch's zones once all its ops ran: each link names a
-// zone the batch made or the map has; and it notes zones whose bounds
-// overlap, where a player counts in both.
+// zone the batch made or the map has; and it notes zones that overlap,
+// where a player counts in both, and linked zones that don't meet, where a
+// player between them dies. Zones are their convex pieces, each an outline
+// from z0 to z1: their bounds would have zones that wind round each other
+// overlap.
 func (b *batch) checkZones() error {
-	have := map[string]Box{}
-	for _, e := range b.snap.Map.Entities {
-		if n, _ := e.Key("targetname"); e.Class() == "info_volume" && n != "" {
-			bx := have[n]
-			bx.Union(EntityBox(e))
-			have[n] = bx
-		}
-	}
-	made := map[string]Box{}
-	for _, z := range b.zones {
-		bx := made[z.name]
-		for _, a := range z.areas {
-			for _, p := range a.parts {
-				for _, q := range p {
-					bx.Add(mapfile.Vec3{q.x, q.y, a.z0})
-					bx.Add(mapfile.Vec3{q.x, q.y, a.z1})
-				}
-			}
-		}
-		made[z.name] = bx
-	}
+	made, all := b.zoneParts()
 	for _, l := range b.links {
-		other, ok := made[l.B]
-		if !ok {
-			if other, ok = have[l.B]; !ok {
-				return fmt.Errorf("zone %s: link to %s: no zone of that name in the map or the batch", l.A, l.B)
-			}
+		if _, ok := all[l.B]; !ok {
+			return fmt.Errorf("zone %s: link to %s: no zone of that name in the map or the batch", l.A, l.B)
 		}
-		if g := gap(made[l.A], other); g > eps {
-			b.notes = append(b.notes, fmt.Sprintf("zones %s and %s are linked but %s units apart: a player crossing between them is in neither, and dies there; grow one to meet the other", l.A, l.B, num(g)))
+		if g := apart(all[l.A], all[l.B]); g > eps {
+			b.notes = append(b.notes, fmt.Sprintf("zones %s and %s are linked but %s units apart: a player crossing between them is in neither, and dies there; grow one to meet the other", l.A, l.B, num(math.Round(g))))
 		}
 	}
-	b.notes = append(b.notes, overlapNotes(made, have)...)
+	for _, n := range slices.Sorted(maps.Keys(made)) {
+		for _, m := range slices.Sorted(maps.Keys(all)) {
+			if _, also := made[m]; m != n && (!also || m > n) && zonesOverlap(made[n], all[m]) {
+				b.notes = append(b.notes, fmt.Sprintf("zone %s overlaps zone %s: a player inside both counts in both; shrink or delete one's volumes", n, m))
+			}
+		}
+	}
 	return nil
 }
 
-// gap is how far apart two boxes are, 0 when they touch or overlap.
-func gap(a, b Box) float64 {
-	var d float64
-	for k := range 3 {
-		d = math.Max(d, math.Max(a.Min[k]-b.Max[k], b.Min[k]-a.Max[k]))
+// zoneParts are the pieces of the zones the batch made, and of every zone
+// as the batch leaves the map: the map's volumes it hasn't deleted, and its
+// own.
+func (b *batch) zoneParts() (made, all map[string][]zpart) {
+	all, made = map[string][]zpart{}, map[string][]zpart{}
+	for _, u := range b.units {
+		if u.ent == nil || u.guid == "" || u.state == deleted || u.ent.Class() != "info_volume" {
+			continue
+		}
+		n, _ := u.ent.Key("targetname")
+		for _, br := range u.ent.Brushes() {
+			if p, ok := brushPart(br); ok && n != "" {
+				all[n] = append(all[n], p)
+			}
+		}
+	}
+	for _, z := range b.zones {
+		for _, a := range z.areas {
+			for _, p := range a.parts {
+				made[z.name] = append(made[z.name], zpart{p, a.z0, a.z1})
+				all[z.name] = append(all[z.name], zpart{p, a.z0, a.z1})
+			}
+		}
+	}
+	return made, all
+}
+
+// zpart is a convex piece of a zone: its outline from above, from z0 to z1.
+type zpart struct {
+	hull   []pt2
+	z0, z1 float64
+}
+
+// brushPart is a volume's brush as a zone's piece.
+func brushPart(br *mapfile.Brush) (zpart, bool) {
+	faces, err := br.Faces()
+	if err != nil {
+		return zpart{}, false
+	}
+	planes := make([]plane, len(faces))
+	for i, f := range faces {
+		planes[i] = planeOf(f.Points)
+	}
+	p := zpart{z0: math.Inf(1), z1: math.Inf(-1)}
+	var pts []pt2
+	for _, v := range vertices(planes) {
+		pts = append(pts, pt2{v[0], v[1]})
+		p.z0, p.z1 = math.Min(p.z0, v[2]), math.Max(p.z1, v[2])
+	}
+	p.hull = convexHull(pts)
+	return p, len(p.hull) >= 3
+}
+
+// zonesOverlap tells two zones sharing room: two of their pieces overlapping by
+// an area from above and by a height.
+func zonesOverlap(a, b []zpart) bool {
+	for _, p := range a {
+		for _, q := range b {
+			if math.Min(p.z1, q.z1)-math.Max(p.z0, q.z0) > eps && overlapping(p.hull, q.hull) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// apart is how far two zones are from each other: between their nearest
+// pieces, across and up; 0 when two of them touch or overlap.
+func apart(a, b []zpart) float64 {
+	d := math.Inf(1)
+	for _, p := range a {
+		for _, q := range b {
+			up := math.Max(0, math.Max(p.z0-q.z1, q.z0-p.z1))
+			d = math.Min(d, math.Hypot(hullDistance(p.hull, q.hull), up))
+		}
 	}
 	return d
 }
 
-// overlapNotes are the zones made whose bounds overlap another zone's, its
-// volumes in the map and the batch together: each pair once.
-func overlapNotes(made, have map[string]Box) []string {
-	all := maps.Clone(have)
-	for n, bx := range made {
-		u := all[n]
-		u.Union(bx)
-		all[n] = u
+// hullDistance is how far apart two convex hulls are: 0 when they overlap,
+// else the nearest of a corner of one to an edge of the other.
+func hullDistance(a, b []pt2) float64 {
+	if overlapping(a, b) {
+		return 0
 	}
-	var out []string
-	for _, n := range slices.Sorted(maps.Keys(made)) {
-		for _, m := range slices.Sorted(maps.Keys(all)) {
-			if _, also := made[m]; m != n && (!also || m > n) && overlaps(made[n], all[m]) {
-				out = append(out, fmt.Sprintf("zone %s overlaps zone %s (their bounds): a player inside both counts in both; shrink or delete one's volumes", n, m))
+	d := math.Inf(1)
+	for _, h := range [2][2][]pt2{{a, b}, {b, a}} {
+		for _, p := range h[0] {
+			for i := range h[1] {
+				d = math.Min(d, segmentDistance(p, h[1][i], h[1][(i+1)%len(h[1])]))
 			}
 		}
 	}
-	return out
+	return d
 }
 
-// overlaps tells two boxes sharing room, not just a face.
-func overlaps(a, b Box) bool {
-	if !a.Ok || !b.Ok {
-		return false
+// segmentDistance is how far a point is from a segment.
+func segmentDistance(p, a, b pt2) float64 {
+	dx, dy := b.x-a.x, b.y-a.y
+	t := 0.0
+	if l := dx*dx + dy*dy; l > 0 {
+		t = math.Max(0, math.Min(1, ((p.x-a.x)*dx+(p.y-a.y)*dy)/l))
 	}
-	for k := range 3 {
-		if math.Min(a.Max[k], b.Max[k])-math.Max(a.Min[k], b.Min[k]) <= eps {
-			return false
-		}
-	}
-	return true
+	return math.Hypot(p.x-a.x-t*dx, p.y-a.y-t*dy)
 }

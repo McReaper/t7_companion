@@ -155,8 +155,9 @@
 // enough, each the farthest from those picked. A
 // nav_volume is for flying AI (cod2map's warning names
 // it), not the zombies' navmesh, so zones make none. Links are checked
-// against the zones of the map and the batch; zones whose bounds overlap are
-// noted.
+// against the zones of the map and the batch; zones are compared by their
+// convex pieces (their bounds would have two zones winding round each other
+// overlap), and those that overlap, or are linked and don't meet, are noted.
 //
 // # Boards
 //

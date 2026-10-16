@@ -95,3 +95,54 @@ func TestTerrainFromAPatchIsGround(t *testing.T) {
 		}
 	}
 }
+
+// The ground's edges: a brush of four faces is ground; a slope bounds a
+// line from below as from above; a point on a triangle's edge is on it; a
+// top right at the search's bounds is found; 72 of room is enough, and a
+// rise of one unit beside a body doesn't stop it.
+func TestTheFloorAtItsEdges(t *testing.T) {
+	tet := prism("brick",
+		[3]mapfile.Vec3{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}},
+		[3]mapfile.Vec3{{0, 0, 0}, {0, 1, 0}, {0, 0, 1}},
+		[3]mapfile.Vec3{{0, 0, 0}, {0, 0, 1}, {1, 0, 0}},
+		[3]mapfile.Vec3{{300, 0, 0}, {0, 0, 300}, {0, 300, 0}},
+	)
+	if g := groundOfText(t, tet); len(g.solids) != 1 {
+		t.Errorf("a tetrahedron: %d solids", len(g.solids))
+	}
+	// under an overhang, its slope bounds the line from below: z ≥ 0.5·x + 10
+	over := []plane{{n: mapfile.Vec3{-0.5 / math.Hypot(1, 0.5), 0, 1 / math.Hypot(1, 0.5)}, d: 10 / math.Hypot(1, 0.5)}, {n: mapfile.Vec3{0, 0, -1}, d: -200}}
+	if lo, hi, ok := column(over, 40, 0); !ok || math.Abs(lo-30) > 1e-6 || hi != 200 {
+		t.Errorf("under an overhang: %v to %v, %v", lo, hi, ok)
+	}
+	tri := [3]mapfile.Vec3{{0, 0, 0}, {100, 20, 20}, {30, 100, 40}}
+	n := cross(sub(tri[1], tri[0]), sub(tri[2], tri[0]))
+	on := func(x, y float64) float64 { return -(n[0]*x + n[1]*y) / n[2] } // the plane through tri, z at (x, y)
+	g := &ground{patches: [][3]mapfile.Vec3{tri}}
+	for _, p := range [][2]float64{{40, 40}, {50, 10}, {15, 50}, {65, 60}} { // inside, then the middles of its three edges
+		if z, ok := g.floor(p[0], p[1], -100, 100); !ok || math.Abs(z-on(p[0], p[1])) > 1e-6 {
+			t.Errorf("on the triangle at %v: %v %v, want %v", p, z, ok, on(p[0], p[1]))
+		}
+	}
+	floor := slab(mapfile.Vec3{0, 0, -16}, mapfile.Vec3{256, 256, 0}, "brick", plain)
+	roof := slab(mapfile.Vec3{0, 0, 72}, mapfile.Vec3{256, 256, 88}, "brick", plain)
+	bump := slab(mapfile.Vec3{110, 100, 0}, mapfile.Vec3{120, 140, 1}, "brick", plain)
+	g = groundOfText(t, floor, roof, bump)
+	for _, c := range [][2]float64{{0, 18}, {-18, 0}} {
+		if z, ok := g.floor(100, 120, c[0], c[1]); !ok || z != 0 {
+			t.Errorf("a floor at the search's bound, from %v to %v: %v %v", c[0], c[1], z, ok)
+		}
+	}
+	if _, ok := g.floor(100, 120, 1, 18); ok {
+		t.Error("a floor below the search")
+	}
+	g = &ground{patches: [][3]mapfile.Vec3{{{0, 0, 10}, {100, 0, 10}, {0, 100, 10}}}}
+	for _, c := range [][2]float64{{10, 20}, {-5, 10}} {
+		if z, ok := g.floor(20, 20, c[0], c[1]); !ok || z != 10 {
+			t.Errorf("terrain at the search's bound, from %v to %v: %v %v", c[0], c[1], z, ok)
+		}
+	}
+	if _, ok := g.floor(20, 20, 11, 30); ok {
+		t.Error("terrain below the search")
+	}
+}

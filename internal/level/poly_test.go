@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 	"testing"
 
@@ -145,5 +146,60 @@ func TestAShapeStandsOnItsOutline(t *testing.T) {
 		if _, err := Edit(context.Background(), c, snap, ops(t, "["+op+"]"), "", nil); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%q: %v", want, err)
 		}
+	}
+}
+
+// Where a shape's pieces meet, their faces are caulk, and only those: one on
+// each piece, a world shape's or an entity's.
+func TestAShapesPiecesCaulkWhereTheyMeet(t *testing.T) {
+	c, snap := zoning(t, 802)
+	for _, class := range []string{``, `, "class": "script_brushmodel"`} {
+		d, err := Edit(context.Background(), c, snap, ops(t, `[{"shape": {"outline": [[0, 0], [200, 0], [200, 100], [100, 100], [100, 200], [0, 200]], "z": [0, 112], "material": "brick"`+class+`}}]`), "", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var pieces []*mapfile.Brush
+		for _, e := range d.After.Map.Entities {
+			for _, br := range e.Brushes() {
+				for _, m := range d.Made {
+					if hexOf(br.Guid()) == hexOf(m.ID) || hexOf(e.Guid()) == hexOf(m.ID) {
+						pieces = append(pieces, br)
+					}
+				}
+			}
+		}
+		hidden := selfHiddenFaces(pieces)
+		caulk := 0
+		for k, br := range pieces {
+			faces, err := br.Faces()
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i, f := range faces {
+				if f.Material == "caulk" {
+					caulk++
+					if !slices.Contains(hidden[k], i) {
+						t.Errorf("%q: piece %d's face %d is caulk, and shows", class, k, i)
+					}
+				}
+			}
+		}
+		if len(pieces) != 2 || caulk != 2 {
+			t.Errorf("%q: %d pieces, %d faces caulk, want the 2 where the L's pieces meet", class, len(pieces), caulk)
+		}
+	}
+}
+
+// Outlines away from the origin: a corner given twice and the first given
+// again at the end are dropped, and a corner a little off the line between
+// its neighbours stays.
+func TestOutlinesAwayFromTheOrigin(t *testing.T) {
+	poly, err := outlineOf([][2]float64{{1000, 1000}, {1100, 1000}, {1100, 1100}, {1100, 1100}, {1000, 1100}, {1000, 1000}})
+	if err != nil || fmt.Sprint(poly) != "[{1000 1000} {1100 1000} {1100 1100} {1000 1100}]" {
+		t.Errorf("a corner twice, the first again: %v, %v", poly, err)
+	}
+	poly, err = outlineOf([][2]float64{{5000, 5000}, {5100, 5000.5}, {5200, 5000}, {5200, 5100}, {5000, 5100}})
+	if err != nil || len(poly) != 5 {
+		t.Errorf("half a unit off a line 200 long is a corner: %v, %v", poly, err)
 	}
 }

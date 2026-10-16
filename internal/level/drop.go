@@ -109,15 +109,13 @@ const clearance, halfWidth = 72, 16
 var bodyLines = [...]float64{-halfWidth, -halfWidth / 2, 0, halfWidth / 2, halfWidth}
 
 // floor is the top of the ground under (x, y) between lo and hi, the
-// highest, with a body's room clear above it; false when there is none, or
-// the line starts inside a solid at hi.
+// highest, with a body's room clear above it; false when there is none. A
+// line that starts inside a wall finds the wall in the body's room.
 func (g *ground) floor(x, y, lo, hi float64) (float64, bool) {
 	z, found := math.Inf(-1), false
 	for _, s := range g.solids {
-		if a, b, ok := column(s, x, y); ok && b <= hi+eps && b >= lo-eps && b > z {
+		if _, b, ok := column(s, x, y); ok && b <= hi+eps && b >= lo-eps && b > z {
 			z, found = b, true
-		} else if ok && a < hi-eps && b > hi+eps {
-			return 0, false // inside a wall or a pillar
 		}
 	}
 	for _, t := range g.patches {
@@ -134,7 +132,7 @@ func (g *ground) floor(x, y, lo, hi float64) (float64, bool) {
 func (g *ground) clear(x, y, z float64) bool {
 	body := Box{Min: mapfile.Vec3{x - halfWidth, y - halfWidth, z + 1}, Max: mapfile.Vec3{x + halfWidth, y + halfWidth, z + clearance}, Ok: true}
 	for i, s := range g.solids {
-		if !overlaps(g.boxes[i], body) {
+		if !g.boxes[i].overlaps(body) {
 			continue
 		}
 		for _, dx := range bodyLines {

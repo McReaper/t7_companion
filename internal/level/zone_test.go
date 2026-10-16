@@ -3,6 +3,7 @@ package level
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"sort"
 	"strings"
@@ -98,6 +99,9 @@ func TestAZoneCoversItsOutlineAndPutsItsSpawnersOnTheFloor(t *testing.T) {
 			t.Errorf("a spawner at %v: outside the L, or against the pillar", o)
 		}
 		at = append(at, fmt.Sprint(o))
+		if a, _ := e.Key("angles"); o[0] == 32 && o[1] == 32 && a != "0 45 0" {
+			t.Errorf("the corner spawner faces %q: the L's middle, on its diagonal, is at 45 degrees", a)
+		}
 	}
 	sort.Strings(at)
 	if strings.Join(at, " ") != "[224 256 0] [32 32 0] [32 480 0] [480 32 0]" { // three ends, then the elbow farthest from them
@@ -107,7 +111,7 @@ func TestAZoneCoversItsOutlineAndPutsItsSpawnersOnTheFloor(t *testing.T) {
 		t.Errorf("pathnode at %v: on the floor", o)
 	}
 	if fmt.Sprint(d.Links) != "[{yard_zone start_zone always_on false}]" || len(d.Notes) != 1 ||
-		d.Notes[0] != "zones yard_zone and start_zone are linked but 1000 units apart: a player crossing between them is in neither, and dies there; grow one to meet the other" {
+		d.Notes[0] != "zones yard_zone and start_zone are linked but 1414 units apart: a player crossing between them is in neither, and dies there; grow one to meet the other" { // corner to corner
 		t.Errorf("links %v, notes %v", d.Links, d.Notes)
 	}
 }
@@ -128,7 +132,7 @@ func TestAZoneAddsToTheMapsZoneAndNotesOverlaps(t *testing.T) {
 	if v, _ := parts["start_zone spawner"][0].Key("targetname"); v != "start_zone_spawners" || len(parts["hall_zone spawner"]) != 0 || len(parts["start_zone pathnode"]) != 0 {
 		t.Errorf("parts %v", parts)
 	}
-	if strings.Join(d.Notes, "\n") != "zone hall_zone overlaps zone start_zone (their bounds): a player inside both counts in both; shrink or delete one's volumes" {
+	if strings.Join(d.Notes, "\n") != "zone hall_zone overlaps zone start_zone: a player inside both counts in both; shrink or delete one's volumes" {
 		t.Errorf("notes %q", d.Notes)
 	}
 }
@@ -216,5 +220,162 @@ func TestALayoutsRoomsMakeTheirZones(t *testing.T) {
 	}
 	if fmt.Sprint(d.Links) != "[{house_zone yard_zone always_on false}]" || strings.Join(d.Notes, "|") != "rooms shed are in no zone: a player there is killed within 3 seconds" {
 		t.Errorf("links %v, notes %q", d.Links, d.Notes)
+	}
+}
+
+// Zones are compared by their pieces, not their bounds: two Ls that wind
+// round each other, their bounds overlapping, only touch, and linked they
+// meet; a zone over another, a storey up, touches it from above.
+func TestZonesThatOnlyTouchArentNotedAsOverlapping(t *testing.T) {
+	c, snap := zoning(t, 706)
+	d, err := Edit(context.Background(), c, snap, ops(t, `[
+		{"box": {"min": [0, 0, -16], "max": [512, 512, 0], "material": "brick"}},
+		{"zone": {"name": "a_zone", "areas": [{"outline": [[0, 0], [512, 0], [512, 128], [128, 128], [128, 512], [0, 512]]}], "spawners": 0, "pathnode": false,
+			"links": [{"zone": "b_zone"}, {"zone": "c_zone"}]}},
+		{"zone": {"name": "b_zone", "areas": [{"outline": [[128, 128], [512, 128], [512, 512], [128, 512]]}], "spawners": 0, "pathnode": false}},
+		{"zone": {"name": "c_zone", "areas": [{"min": [0, 0, 128], "max": [128, 128, 256]}], "spawners": 0, "pathnode": false}}
+	]`), "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Notes) != 0 {
+		t.Errorf("notes %q", d.Notes)
+	}
+	if bx := (zpart{rect(0, 0, 10, 10), 0, 10}); apart([]zpart{bx}, []zpart{{rect(13, 14, 20, 20), 0, 10}}) != 5 || apart([]zpart{bx}, []zpart{{rect(0, 0, 10, 10), 22, 30}}) != 12 {
+		t.Error("3 across and 4 up is 5 apart; 12 up is 12")
+	}
+}
+
+// zoningWith is zoning's map with more entities in it.
+func zoningWith(t *testing.T, pid int, extra string) (*radiant.Client, *Snapshot) {
+	t.Helper()
+	b, err := os.ReadFile("testdata/test_claude.map")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(b)[strings.Index(string(b), "// entity 0"):]
+	f := radianttest.New(pid, `C:\m\test_claude.map`)
+	f.Text = text + fmt.Sprintf("// entity %d\n", strings.Count(text, "// entity ")) + extra
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	t.Cleanup(cancel)
+	c, err := radiant.NewClient(ctx, f.Dial())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(c.Close)
+	snap, err := Read(ctx, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c, snap
+}
+
+// A zone the map has keeps the name its first volume gives its spawners,
+// whatever it is.
+func TestAZoneKeepsItsSpawnersOwnName(t *testing.T) {
+	yard := strings.Replace(EntityText("info_volume", map[string]string{"targetname": "yard_zone", "target": "yard_risers", "script_noteworthy": "player_volume"},
+		BoxBrush(Box{Min: mapfile.Vec3{-2000, -2000, 0}, Max: mapfile.Vec3{-1000, -1000, 256}, Ok: true}, "volume", "")),
+		"{\n", "{\nguid \"{0D00AA02-0000-0000-0000-000000000000}\"\n", 1)
+	c, snap := zoningWith(t, 707, yard)
+	d, err := Edit(context.Background(), c, snap, ops(t, `[
+		{"box": {"min": [0, 0, -16], "max": [256, 256, 0], "material": "brick"}},
+		{"zone": {"name": "yard_zone", "areas": [{"min": [0, 0, 0], "max": [256, 256, 128]}], "spawners": 1, "pathnode": false}}
+	]`), "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := partsOf(t, d)["yard_zone spawner"][0].Key("targetname"); v != "yard_risers" {
+		t.Errorf("the spawner is %q's", v)
+	}
+}
+
+// Spawners: the grid reaches an area's far side; a room gets its spawner
+// before a doorway; a room with no floor gets none and the others still
+// spread; three rooms, one far bigger, get one each.
+func TestSpawnersSpreadOverAZonesRooms(t *testing.T) {
+	c, snap := zoning(t, 708)
+	spawners := func(js string) []mapfile.Vec3 {
+		t.Helper()
+		d, err := Edit(context.Background(), c, snap, ops(t, js), "", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []mapfile.Vec3
+		for _, e := range partsOf(t, d)["z spawner"] {
+			o, _ := Origin(e)
+			out = append(out, o)
+		}
+		sort.Slice(out, func(i, j int) bool { return out[i][0] < out[j][0] })
+		return out
+	}
+	floor := `{"box": {"min": [0, 0, -16], "max": [2000, 2000, 0], "material": "brick"}},`
+	at := spawners(`[` + floor + `{"zone": {"name": "z", "areas": [{"min": [0, 0, 0], "max": [500, 64, 128]}], "spawners": 2, "pathnode": false}}]`)
+	if fmt.Sprint(at) != "[[32 32 0] [480 32 0]]" {
+		t.Errorf("a strip 500 long: %v, its ends", at)
+	}
+	at = spawners(`[` + floor + `{"zone": {"name": "z", "areas": [{"min": [0, 0, 0], "max": [96, 96, 128]}, {"min": [96, 0, 0], "max": [1000, 600, 128]}], "spawners": 1, "pathnode": false}}]`)
+	if len(at) != 1 || at[0][0] < 96 {
+		t.Errorf("a doorway and a room, one spawner: %v, in the room", at)
+	}
+	at = spawners(`[{"box": {"min": [0, 0, -16], "max": [256, 256, 0], "material": "brick"}},` +
+		`{"zone": {"name": "z", "areas": [{"min": [3000, 3000, 0], "max": [3256, 3256, 128]}, {"min": [0, 0, 0], "max": [256, 256, 128]}], "spawners": 2, "pathnode": false}}]`)
+	if len(at) != 2 || at[0][0] > 256 || at[1][0] > 256 || flat(at[0], at[1]) < 250 {
+		t.Errorf("a room with no floor beside one with: %v, both in the floored one, apart", at)
+	}
+	at = spawners(`[` + floor + `{"zone": {"name": "z", "areas": [{"min": [0, 0, 0], "max": [128, 128, 128]}, {"min": [128, 0, 0], "max": [256, 128, 128]}, ` +
+		`{"min": [0, 128, 0], "max": [1500, 1500, 128]}], "spawners": 3, "pathnode": false}}]`)
+	rooms := map[int]int{}
+	for _, p := range at {
+		switch {
+		case p[1] > 128:
+			rooms[2]++
+		case p[0] < 128:
+			rooms[0]++
+		default:
+			rooms[1]++
+		}
+	}
+	if fmt.Sprint(rooms) != "map[0:1 1:1 2:1]" {
+		t.Errorf("two small rooms and a big one: %v, one each", at)
+	}
+}
+
+// A layout whose rooms are all zoned says nothing of them; a floor brush on
+// a slope gives its zone the slope's height, from its lowest to its
+// highest.
+func TestZonesOfALayoutAndASlope(t *testing.T) {
+	c, snap := zoning(t, 709)
+	d, err := Edit(context.Background(), c, snap, ops(t, `[{"layout": {"material": "brick", "probes": false, "spawners": 1, "rooms": [
+		{"name": "a", "min": [0, 0], "max": [256, 256], "zone": "a_zone"}, {"name": "b", "min": [256, 0], "max": [512, 256], "zone": "a_zone"}]}}]`), "", nil)
+	if err != nil || len(d.Notes) != 0 {
+		t.Errorf("%v, notes %q", err, d.Notes)
+	}
+	a, ok := floorArea(mustBrush(t, wedge("brick", 0, 64, mapfile.Vec3{1000, 0, 0})), 100)
+	if !ok || math.Abs(a.z0-0.32) > 1e-6 || math.Abs(a.z1-163.68) > 1e-6 {
+		t.Errorf("over a ramp 64 high: %+v, %v", a, ok)
+	}
+}
+
+func mustBrush(t *testing.T, text string) *mapfile.Brush {
+	t.Helper()
+	m, err := mapfile.Parse([]byte(EntityText("worldspawn", nil, text)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m.Entities[0].Brushes()[0]
+}
+
+func TestInOutlineIsInsideNotOnTheEdge(t *testing.T) {
+	l := []pt2{{0, 0}, {200, 0}, {200, 100}, {100, 100}, {100, 200}, {0, 200}}
+	for p, want := range map[pt2]bool{
+		{50, 50}: true, {150, 50}: true, {50, 150}: true, // the L's three squares
+		{150, 150}: false, {250, 50}: false, {-1, 50}: false, // its notch, and outside
+		{0, 50}: false, {100, 150}: false, {150, 100}: false, {200, 50}: false, // on its edges
+		{100, 100}: false, {0, 0}: false, // on its corners
+		{50, 100}: true, {150, 99}: true, // level with a corner, inside
+	} {
+		if got := inOutline(l, p); got != want {
+			t.Errorf("%v: %v, want %v", p, got, want)
+		}
 	}
 }
