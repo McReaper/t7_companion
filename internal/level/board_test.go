@@ -183,4 +183,9 @@ func TestAModelBoardsModelsStandInRowsAboveTheMap(t *testing.T) {
 	if one := modelItems(snap, names[:1]); one[0].op.Entity.Origin != (mapfile.Vec3{c[0], c[1], z}) {
 		t.Errorf("one model stands over the map's centre: %v", one[0].op.Entity.Origin)
 	}
+	for _, it := range modelItems(snap, names[:modelRow]) { // a full row is one row, over the map's centre
+		if it.op.Entity.Origin[1] != c[1] {
+			t.Errorf("a row of %d: %v", modelRow, it.op.Entity.Origin)
+		}
+	}
 }

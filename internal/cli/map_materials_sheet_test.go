@@ -36,7 +36,7 @@ func TestMapMaterialsShowsASheetOfTheirColorImages(t *testing.T) {
 		}
 	}
 	var red, blue bytes.Buffer
-	if err := png.Encode(&red, solid(64, 64, color.RGBA{200, 10, 10, 255})); err != nil {
+	if err := png.Encode(&red, solid(400, 400, color.RGBA{200, 10, 10, 255})); err != nil { // larger than its square, as textures are
 		t.Fatal(err)
 	}
 	if err := tiff.Encode(&blue, solid(32, 64, color.RGBA{10, 10, 200, 255}), nil); err != nil {
@@ -89,7 +89,9 @@ func TestMapMaterialsShowsASheetOfTheirColorImages(t *testing.T) {
 		{3*192 + 96, 96, color.RGBA{200, 10, 10, 255}}, // 4, the PNG
 		{96, 192 + 96, color.RGBA{10, 10, 200, 255}},   // 5, the TIFF, half as wide, centred
 		{20, 192 + 96, color.RGBA{24, 24, 24, 255}},    // beside it, the sheet's ground
-		{2, 2, color.RGBA{0, 0, 0, 255}},               // the number's plate
+		{767, 96, color.RGBA{24, 24, 24, 255}},         // the PNG's square stops a pixel short of its cell's edge
+		{766, 96, color.RGBA{200, 10, 10, 255}},
+		{2, 2, color.RGBA{0, 0, 0, 255}}, // the number's plate
 	} {
 		if got := color.RGBAModel.Convert(sheet.At(c.x, c.y)).(color.RGBA); got != c.want {
 			t.Errorf("at %d,%d: %v, want %v", c.x, c.y, got, c.want)

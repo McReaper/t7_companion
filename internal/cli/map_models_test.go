@@ -65,6 +65,9 @@ func TestMapModelsListsTheModelsMostPlacedFirst(t *testing.T) {
 	if out, _, _ := mapModels(context.Background(), mapModelsArgs{ToolsPath: root, Limit: 2}); out.Found != 5 {
 		t.Errorf("found %d: the five props, before the limit", out.Found)
 	}
+	if _, _, err := mapModels(context.Background(), mapModelsArgs{ToolsPath: root, Limit: maxMaterialsLimit, Size: maxViewSize}); err != nil {
+		t.Errorf("the most a list and an image take: %v", err)
+	}
 	for _, a := range []mapModelsArgs{{ToolsPath: root, Limit: -1}, {ToolsPath: root, Limit: 201}, {ToolsPath: root, Size: 2000}, {ToolsPath: root, Size: -1}} {
 		if _, _, err := mapModels(context.Background(), a); err == nil {
 			t.Errorf("%+v: no error", a)
@@ -99,6 +102,9 @@ func TestMapModelsShowsThemInRadiant(t *testing.T) {
 	}
 	if f.Text != string(b)[strings.Index(string(b), "// entity 0"):] {
 		t.Error("the board was left on the map")
+	}
+	if many, _, err := mapModels(context.Background(), mapModelsArgs{Name: "p7", Show: true}); err != nil || len(many.Board) != 5 || len(many.Notes) != 0 {
+		t.Errorf("five shown, all on the board, nothing to say: %+v, %v", many, err)
 	}
 	// the CLI: the image written where --out says
 	cmd := newMapCmd()

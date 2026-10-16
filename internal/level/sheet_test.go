@@ -67,3 +67,25 @@ func TestSheetIsAsWideAsItsThumbnailsUpToFour(t *testing.T) {
 		t.Errorf("an empty square is grey, each numbered in its corner: %v %v %v %v", s.RGBAAt(20, 20), s.RGBAAt(60, 20), s.RGBAAt(2, 2), s.RGBAAt(42, 2))
 	}
 }
+
+// A square's inside is inset a pixel from its cell, a thumbnail sits in its
+// middle, and its number's plate starts 2 pixels in: the gap shows between.
+func TestSheetSquaresLeaveAPixelOfGapAndCentreTheirThumbnails(t *testing.T) {
+	tall := image.NewRGBA(image.Rect(0, 0, 10, 30))
+	blue := color.RGBA{0, 0, 255, 255}
+	fill(tall, tall.Rect, blue)
+	s := Sheet([]*image.RGBA{nil, tall}, 40)
+	for _, c := range []struct {
+		x, y int
+		want color.RGBA
+	}{
+		{0, 20, sheetGap}, {1, 20, sheetEmpty}, {38, 30, sheetEmpty}, {39, 30, sheetGap}, {20, 39, sheetGap}, {20, 38, sheetEmpty},
+		{54, 20, sheetGap}, {55, 20, blue}, {64, 20, blue}, {65, 20, sheetGap}, // the thumbnail: x 55 to 64
+		{60, 4, sheetGap}, {60, 5, blue}, {60, 34, blue}, {60, 35, sheetGap}, // and y 5 to 34
+		{2, 2, plate}, {11, 15, plate}, {12, 2, sheetEmpty}, {2, 16, sheetEmpty}, // "1": a plate from 2,2 to 11,15
+	} {
+		if got := s.RGBAAt(c.x, c.y); got != c.want {
+			t.Errorf("at %d,%d: %v, want %v", c.x, c.y, got, c.want)
+		}
+	}
+}
