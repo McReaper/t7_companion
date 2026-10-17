@@ -281,6 +281,9 @@ func wrap(x, size float64) float64 {
 // world brushes that other world brushes hide, as the batch leaves the map:
 // against an opaque face or inside an opaque brush, the checks' own test. A
 // face is named by its index, as faces at an angle can share a direction.
+// A face that draws nothing (a clip's, a trigger's) keeps its material: a
+// face's material is also what collides, and caulk is solid to all, so a
+// clip_player brush with a caulk face stops the AI and its navmesh too.
 func (b *batch) textureHidden(i int, o *TextureOp) error {
 	mat := o.Material
 	if mat == "" {
@@ -294,7 +297,7 @@ func (b *batch) textureHidden(i int, o *TextureOp) error {
 	}
 	info := b.info
 	if info == nil {
-		info = func(string) MaterialInfo { return MaterialInfo{Known: true, Opaque: true, Drawn: true} }
+		info = toolsByName
 	}
 	c := newChecker(func(g string) string { return g }, info)
 	index := map[*mapfile.Brush]int{}
@@ -306,7 +309,7 @@ func (b *batch) textureHidden(i int, o *TextureOp) error {
 	}
 	hidden := map[int][]int{}
 	for _, f := range c.faces {
-		if c.hidden(f) != "" {
+		if c.hidden(f) != "" && info(f.material).Drawn {
 			hidden[f.bi] = append(hidden[f.bi], f.fi)
 		}
 	}
@@ -324,4 +327,12 @@ func (b *batch) textureHidden(i int, o *TextureOp) error {
 	})
 	b.faces[i] = n
 	return err
+}
+
+// toolsByName is what a batch without the install's catalog knows of a
+// material: caulk, clips and triggers are tools and draw nothing; of them,
+// caulk alone hides what is behind it.
+func toolsByName(m string) MaterialInfo {
+	tool := m == "caulk" || strings.HasPrefix(m, "clip") || strings.HasPrefix(m, "trigger")
+	return MaterialInfo{Known: true, Opaque: m == "caulk" || !tool, Drawn: !tool}
 }
