@@ -1,11 +1,11 @@
 ---
 name: atmosphere
-description: How to make a Black Ops 3 map sound and feel right — sound aliases and snd_convert, ambient rooms and reverb (`ambient_package` triggers, the `.szc` MapFile), sun/sky/SSI and reflection probes, visionsets for runtime color grading, the four fog sections (world/lit/sun/atmospheric) and their two placeable volumes, weather (rain/snow/lightning), and exploders. Use when an alias plays silently or not at all, the link log says `wav is not 48k sample rate` / `wav is not 16 bit sample depth` / `'FileSpec' cannot contain a space` / `no files for filespec`, ambient-room reverb never switches between spaces or `ambientgeometry.json` is empty, fog or the sky/sun looks wrong or ignores an edit, a visionset asserts or won't apply, rain/snow leaks indoors or doesn't play, or the sound banks (`.sabs`/`.sabl`) weigh too much. Distinct from t7kb:fx-editing (building the `.efx` particle effect itself) — this is wiring and playing existing sound, light, fog and effects for mood.
+description: How to make a Black Ops 3 map sound and feel right — sound aliases and snd_convert, ambient rooms and reverb (`ambient_package` triggers, the `.szc` MapFile), visionsets for runtime color grading, the four fog sections (world/lit/sun/atmospheric) and their two placeable volumes, weather (rain/snow/lightning), and exploders. Use when an alias plays silently or not at all, the link log says `wav is not 48k sample rate` / `wav is not 16 bit sample depth` / `'FileSpec' cannot contain a space` / `no files for filespec`, ambient-room reverb never switches between spaces or `ambientgeometry.json` is empty, fog looks wrong or ignores an edit, a visionset asserts or won't apply, rain/snow leaks indoors or doesn't play, or the sound banks (`.sabs`/`.sabl`) weigh too much. Distinct from t7kb:fx-editing (building the `.efx` particle effect itself) and t7kb:lighting (sun, SSI, exposure, lights, reflection probes) — this is wiring and playing existing sound, fog and effects for mood.
 ---
 
-# Atmosphere: sound, lighting, fog & FX in Black Ops 3
+# Atmosphere: sound, fog & FX in Black Ops 3
 
-**Atmosphere fails quietly by design** — an alias that never plays, a reverb that never switches, a sun edit that never shows — because every piece is baked or converted at a build step you don't watch. The craft is knowing which build step owns each piece and where it reports. Look up exact CSV columns, KVPs, and error strings in **t7kb** (`t7kb:search` then `t7kb:get`). Ground on files dated with the install, not the community packs that commonly overwrite `share/raw/sound/` and the Radiant templates.
+**Atmosphere fails quietly by design** — an alias that never plays, a reverb that never switches, a fog edit that never shows — because every piece is baked or converted at a build step you don't watch. The craft is knowing which build step owns each piece and where it reports. Look up exact CSV columns, KVPs, and error strings in **t7kb** (`t7kb:search` then `t7kb:get`). Ground on files dated with the install, not the community packs that commonly overwrite `share/raw/sound/` and the Radiant templates.
 
 ## Sound: aliases are the unit, not WAV files
 
@@ -31,18 +31,9 @@ Per-space ambience and reverb is **baked**: snd_convert reads the `.map` named i
 
 `targetname ambient_room` + `CLIENTSIDE_TRIGGER` is a **different, community** mechanism: it only works with Ardivee's `_ambient_room.csc` (which finds the triggers client-side and calls `forceambientroom`), plus that script's zone lines. Pick one system; mixing the two recipes leaves rooms never switching. (Verified in the install: `snd_convert.exe` strings, the zm_giant prefab, the stock `.szc` templates.)
 
-## Sun, sky & SSI: the primary light source
+## Visionsets and exploders: runtime looks over the baked light
 
-A **`volume_sun`** holds up to four light states — its `ssi1`–`ssi4` KVPs (Radiant groups them "Light State 1–4") — plus `shadowSplitDistance` (default 2000) for the shadow cascade. Each **`ssi`** APE asset carries sun `pitch`/`yaw`/`colorSRGB` and `stops` (sun brightness). The skybox is a separate chain (image → material → model) assigned in the SSI; **`skyRotation` (alignment) and `skyStops` (brightness) are fields on the sky *material*, not the SSI** (`deffiles/material.awi`, `ssi.awi`).
-
-Two "I changed it and nothing happened" traps:
-
-- **`ssiN_runtime_override` wins in game, the baked `ssiN` wins in the probes.** With an override set, you see the override live, but reflection probes keep the baked SSI unless `override_reflections` is on (`t7.def.json`). Edit the one that's actually showing.
-- **`pitch`, `yaw`, `skyStops` and the bounce part of `stops` only change after a rebake** (Light stage, **t7kb:compiling**) — a relink alone shows the old sun (Treyarch's SunSky doc, per the corpus).
-
-## Lighting & reflections
-
-**Reflection probes** give bounce light and reflections: with a probe selected, **Alt+Left-click** snaps its box to geometry, **Alt+Right-click** snaps its 6 reflection planes to walls (**W** auto-picks all six). Probes blend via `blend_maxs`/`blend_mins`; a smaller, denser, or less-occluded probe wins over a larger overlapping one.
+The sun, the SSI, exposure, lights and reflection probes are **t7kb:lighting**.
 
 **Visionsets are a full runtime color-grading system.** `visionset_mgr::register_info` / `activate` / `deactivate` switch grading live — a GobbleGum wash, a black-and-white death, a zone's mood. Activation is driven from GSC, but the GSC `register_info` needs its matching CSC `register_visionset_info`, or `activate` does nothing visible. **Register during the first frame**: `visionset_mgr_shared.gsc:32` asserts *"All info registration in the visionset_mgr system must occur during the first frame while the system is initializing"* — so no `wait` before it — and it also asserts on a reused name or a priority already taken within that type. A `.vision` file (`vkTT` temperature, `vkTS` saturation, `vkTC` tint) lives under `share/raw/vision/` and zones via `rawfile,vision/<file>.vision`.
 

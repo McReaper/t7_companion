@@ -35,7 +35,8 @@ type mapViewOut struct {
 	Scale  float64           `json:"scale,omitempty"`  // a 2D view's image pixels per unit
 	Labels map[string][2]int `json:"labels,omitempty"` // id: where its label's point is in the image
 	Notes  []string          `json:"notes,omitempty"`
-	Baked  string            `json:"baked,omitempty"` // the bake's end, as Radiant's console said it
+	Baked  string            `json:"baked,omitempty"`  // the bake's end, as Radiant's console said it
+	Warned []string          `json:"warned,omitempty"` // what the bake's console warned of
 }
 
 // maxViewSize is the longest side an image may ask for: what an agent's
@@ -81,7 +82,7 @@ func mapView(ctx context.Context, a mapViewArgs) (*mapViewOut, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	out := &mapViewOut{Map: baseName(snap.State.Map), View: shot.View, W: shot.Image.Rect.Dx(), H: shot.Image.Rect.Dy(), Notes: shot.Notes, Baked: shot.Baked}
+	out := &mapViewOut{Map: baseName(snap.State.Map), View: shot.View, W: shot.Image.Rect.Dx(), H: shot.Image.Rect.Dy(), Notes: shot.Notes, Baked: shot.Baked, Warned: shot.Warned}
 	if shot.Pose != nil {
 		out.Camera = append(vec(shot.Pose.Origin), vec([3]float64{shot.Pose.Pitch, shot.Pose.Yaw, shot.Pose.Roll})...)
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"math"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -49,6 +50,7 @@ type Shot struct {
 	Labels []Label       // the ids in the image, where their points landed
 	Notes  []string      // what View could not put back as it was
 	Baked  string        // the bake's end, as Radiant's console said it: "All Probes Done (1.61 s)"
+	Warned []string      // what the bake's console warned of: a shadow dropped, a probe that failed
 }
 
 // views are the names View takes, by bridge name.
@@ -103,7 +105,7 @@ func View(ctx context.Context, c *radiant.Client, snap *Snapshot, o ViewOptions)
 	if err != nil {
 		return nil, err
 	}
-	shot.Notes, shot.Baked = s.notes, s.baked
+	shot.Notes, shot.Baked, shot.Warned = s.notes, s.baked, s.warned
 	return shot, nil
 }
 
@@ -265,7 +267,8 @@ type session struct {
 	pid      int
 	restores []restore
 	notes    []string
-	baked    string // the console line that ended the bake
+	baked    string   // the console line that ended the bake
+	warned   []string // the bake's console warnings, repeats counted
 }
 
 // blank tells a capture of one colour: no view Radiant draws is, as its
@@ -462,12 +465,51 @@ func (s *session) bake(ctx context.Context) error {
 				return fmt.Errorf("bake: the bridge closed before the bake ended")
 			case e.Name == "console" && strings.HasPrefix(e.Args, "All Probes Done"):
 				s.baked = e.Args
+				s.warned = bakeWarnings(s.warned)
 				return nil
+			case e.Name == "console" && bakeWarning.MatchString(e.Args):
+				s.warned = append(s.warned, strings.TrimSpace(e.Args))
 			}
 		case <-ctx.Done():
 			return fmt.Errorf("bake: Radiant said no \"All Probes Done\" in %s", bakeTimeout)
 		}
 	}
+}
+
+// bakeWarning is a console line of the bake worth an agent's eye: a light's
+// shadow dropped (more shadowing lights than the worldspawn's shadow slices),
+// a probe or light that failed. Progress lines ("Probe 3 of 53") are not.
+var bakeWarning = regexp.MustCompile(`(?i)too many|dropped|error|warning|fail|invalid|exceed|overflow|not support`)
+
+// maxBakeWarnings bounds the distinct warnings a shot reports.
+const maxBakeWarnings = 8
+
+// bakeWarnings folds lines that differ only by their numbers (a dropped
+// shadow names its light's position) into one, with how many there were.
+func bakeWarnings(lines []string) []string {
+	number := regexp.MustCompile(`-?\d+(\.\d+)?`)
+	var order []string
+	first, count := map[string]string{}, map[string]int{}
+	for _, l := range lines {
+		k := number.ReplaceAllString(l, "#")
+		if _, ok := first[k]; !ok {
+			first[k] = l
+			order = append(order, k)
+		}
+		count[k]++
+	}
+	var out []string
+	for _, k := range order {
+		l := first[k]
+		if n := count[k]; n > 1 {
+			l = fmt.Sprintf("%s (and %d more like it)", l, n-1)
+		}
+		out = append(out, l)
+	}
+	if len(out) > maxBakeWarnings {
+		out = append(out[:maxBakeWarnings], fmt.Sprintf("%d other kinds", len(out)-maxBakeWarnings))
+	}
+	return out
 }
 
 // setRender switches the 3D view's render method for the shot; the session

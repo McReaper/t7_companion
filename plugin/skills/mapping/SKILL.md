@@ -17,12 +17,12 @@ t7kb's map tools edit the map open in the user's Radiant, through the T7RadiantB
 
 1. `t7kb:radiant_open` the map: the Radiant that has it open, or a new one started on it.
 2. `t7kb:map_find` what is there: short ids, bounds, the naming keys; `class`, `key` and `near` narrow it.
-3. `t7kb:map_edit` a batch of ops (a storey's `layout` of rooms, boxes, entities, deletes, keys, moves, copies, materials and per-face textures, the materials found with `t7kb:map_materials`) for one step the user would undo as a whole.
+3. `t7kb:map_edit` a batch of ops (a plan's `walls` and doors, a storey's `layout` of rooms, boxes, entities, deletes, keys, moves, copies, materials and per-face textures, the materials found with `t7kb:map_materials`) for one step the user would undo as a whole.
 4. `t7kb:map_view` the result: `top` for the layout, `3d` with `render` `fake` for the shapes of an unbaked map.
 5. `t7kb:map_command` for Radiant's own tools (`Selection/CSG/CSG Hollow`, patch and texture tools) on the ids given.
 6. Before `t7kb:build`, `t7kb:map_command` `File/Save`: the build compiles the file on disk, not Radiant's memory.
 
-The sizes to build to (Treyarch's scale standards), what a new map already holds, the `layout` op, which edits change an id, and the traps — **CSG Subtract carves the zone and sun volumes too** — are in `references/map-tools.md`; picking materials and props, texturing face by face, the views and the light in `references/map-looks.md`.
+The sizes to build to (Treyarch's scale standards), what a new map already holds, which edits change an id, and the traps are in `references/map-tools.md`; a plan's walls and doors (the `walls` and `layout` ops, and why **CSG Subtract carves the zone and sun volumes too**) in `references/map-plans.md`; picking materials and props, texturing face by face, the views and the light in `references/map-looks.md`.
 
 ## Grid discipline and brush basics
 
@@ -49,6 +49,12 @@ Models have **no collision by default**, but they aren't limited to it — an xm
 **`dyn_model` entities are the exception — don't clip them at all.** A `dyn_model`'s collision and physics response come from the model + its `physpreset`, not from brushes placed around it; wrapping one in a clip brush is fighting the entity type, not supporting it.
 
 **Clip textures aren't one-size-fits-all** — `clip`/`clip_full` (everything), `clip_player`, `weaponClip`/`clip_weapon` (bullets only, no player), `clip_missile`, `clip_ai`, `clip_vehicle`, and `clip_nosight` (blocks movement, not AI sightlines) each gate a different actor/projectile class — pick the one that matches what you're actually trying to block, not just `clip` by habit. A common stair/ramp trick: `Make Weapon Clip` on the visible geometry (keeps bullet collision, drops player collision) paired with a smooth `clip_player` ramp underneath, so players glide up the stairs' silhouette instead of catching on each step. Don't confuse clip with **caulk**: caulk is a *non-drawing* face, not a non-colliding one — a caulked brush still blocks the player (community-confirmed: a caulk doorway with colliding patches blocked the player until the patches were weapon clip). Use caulk to cut rendering, clip to shape collision, and neither as a stand-in for the other.
+
+## Treyarch draws with detail and collides with clip
+
+In Treyarch's shipped sources (zm_giant, mp_combine, mp_sector and their prefabs) 60% of the brushes carry a `contents` flag: `nonColliding` (11,482: trims, beams and ironwork nobody bumps into), `weaponClip detail`, with `ai_nosight` or not (about 19,000: bullets hit them, nobody walks into them), `detail` (1,496). Movement collides with a few big hulls laid over that detail: zm_giant has 576 `clip` brushes (median 41 × 163 × 216), 93 `clip_player`, 36 `clip_ai` (verified in the install). The flags are Selection > Make Geo (Make Non-Colliding, Make Weapon Clip, Make Detail); through `t7kb:map_edit`, a `box`'s or `shape`'s `contents`.
+
+**A doorway is an opening with a lintel and a trim frame, not a gap to the ceiling.** zm_giant's `tp_east_door`: a 12-thick wall with an opening 128 between its faces and 104 high, wall continuing above it as a lintel; a 2-unit trim of `weaponClip detail` round the opening; `clip` hulls 27 thick on each side; the buyable door a `clip` `script_brushmodel` filling the opening, its look a `script_model` (verified in the install). The trim never narrows the way through: players and zombies stop on the same clip. A blockout's plain walls collide as they are; give a finished room's detail its flags and the movement its hulls.
 
 ## Zones: sealing the level isn't just BSP leaks
 

@@ -213,6 +213,9 @@ func bake(f *Fake, _ string, _ []byte) Reply {
 	if !f.BakeSilent {
 		time.AfterFunc(20*time.Millisecond, func() {
 			f.Event("console", "Sun bake Done")
+			for _, l := range f.BakeConsole {
+				f.Event("console", l)
+			}
 			f.Event("console", "Probe 1 of 1")
 			f.Event("console", "All Probes Done (0.02 s)")
 		})

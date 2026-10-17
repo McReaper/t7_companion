@@ -2,6 +2,7 @@ package level
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -9,6 +10,35 @@ import (
 
 	"github.com/McReaper/t7_companion/internal/radiant/radianttest"
 )
+
+// A bake's warnings come back, those that differ only by numbers folded
+// into one; its progress lines do not.
+func TestViewReportsWhatTheBakeWarnedOf(t *testing.T) {
+	f, c, snap := viewing(t, 401)
+	f.Update(func(f *radianttest.Fake) {
+		f.BakeConsole = []string{
+			"Too many shadowing spot lights. Shadow for light at 1.00 2.00 3.00 is being dropped",
+			"Probe 2 of 9",
+			"Too many shadowing spot lights. Shadow for light at -4.50 5.00 6.00 is being dropped",
+			"ERROR: probe 7 is buried",
+		}
+	})
+	shot, err := View(context.Background(), c, snap, ViewOptions{Bake: true, Size: 160})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"Too many shadowing spot lights. Shadow for light at 1.00 2.00 3.00 is being dropped (and 1 more like it)", "ERROR: probe 7 is buried"}
+	if !slices.Equal(shot.Warned, want) {
+		t.Errorf("warned %q, want %q", shot.Warned, want)
+	}
+	lines := make([]string, 12)
+	for i := range lines {
+		lines[i] = fmt.Sprintf("warning %c", 'a'+i)
+	}
+	if got := bakeWarnings(lines); len(got) != maxBakeWarnings+1 || got[maxBakeWarnings] != "4 other kinds" {
+		t.Errorf("12 kinds: %q", got)
+	}
+}
 
 // A bake switches the 3D view to real lighting, runs Radiant's bake, waits
 // for the console line that ends it (not the ones before), shoots, and puts

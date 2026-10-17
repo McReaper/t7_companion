@@ -96,10 +96,17 @@ func mapEditTool() server.ServerTool {
 	return server.ServerTool{Tool: mcp.NewTool("map_edit",
 		mcp.WithDescription("Edit the map open in Radiant: a batch of ops, applied in order, lands as ONE undo step "+
 			"(the answer's undo names it; one Ctrl+Z in Radiant takes it all back) or not at all. Ops, each an object with "+
-			"one key: {\"box\": {\"min\": [x,y,z], \"max\": [x,y,z], \"material\": m, \"contents\"?: \"detail\", "+
+			"one key: {\"box\": {\"min\": [x,y,z], \"max\": [x,y,z], \"material\": m, \"contents\"?: flags as Treyarch's brushes carry, \"weaponClip detail\" (only bullets hit it: trims, frames) or \"nonColliding\", "+
 			"\"class\"?: c, \"keys\"?: {…}}} a box brush, in worldspawn or as a new brush entity of class (volume_sun, "+
-			"trigger_multiple); {\"shape\": {\"outline\": [[x,y]…], \"z\": [z0,z1], \"material\": m, \"class\"?: c, \"keys\"?: {…}}} a solid on any "+
-			"outline, concave too (cut into convex brushes): an angled wall, a hexagonal floor; {\"entity\": {\"class\": c, \"origin\": [x,y,z], \"angles\"?: [p,y,r], \"keys\"?: {…}}} a "+
+			"trigger_multiple); {\"shape\": {\"outline\": [[x,y]…], \"z\": [z0,z1], \"material\": m, \"contents\"?: as box, \"class\"?: c, \"keys\"?: {…}}} a solid on any "+
+			"outline, concave too (cut into convex brushes): an angled wall, a hexagonal floor; "+
+			"{\"walls\": {\"lines\": [{\"points\": [[x,y]…], \"closed\"?: true}…], \"doors\"?: [{\"at\": [x,y], \"width\"?: 72, "+
+			"\"height\"?: 96, \"seen\"?: 56}…], \"material\": m, \"z\"?: [0,112], \"thickness\"?: 8, \"grid\"?: 8}} walls along "+
+			"a plan's lines, centrelines as drawn: corners snap to the grid, a line a few units off an axis runs on it, an end "+
+			"near another wall lands on it; corners are mitred, a wall ending on another's side stops on its face, walls "+
+			"crossing split, nothing overlaps; each door is cut in the wall nearest at: width clear for the AI, nonColliding "+
+			"jambs and clip_player narrowing it to seen for the eye and players only, a lintel, a weaponClip detail trim; "+
+			"{\"entity\": {\"class\": c, \"origin\": [x,y,z], \"angles\"?: [p,y,r], \"keys\"?: {…}}} a "+
 			"point entity; {\"delete\": [ids]}; {\"set\": {\"id\": id, \"keys\": {k: v, k2: null}}} (null removes); "+
 			"{\"move\": {\"ids\": [ids], \"by\": [dx,dy,dz]}}; {\"copy\": {\"ids\": [ids], \"by\": [dx,dy,dz], "+
 			"\"count\"?: n}} n copies, each by further than the last (a row of pillars or wall panels from one); "+
@@ -158,7 +165,7 @@ func mapViewTool() server.ServerTool {
 			"Top shows the layout best (outlines, entity names). Pick the render by the question: fullbright for "+
 			"textures, fake for shapes, bake for light (sun leaks, dark rooms): it bakes Radiant's lighting (its toolbar's "+
 			"bolt, its view only; the game's is build's light stage) and shoots under real lighting, black on an unbaked "+
-			"map. A 2D answer gives its centre and scale (image pixels per unit). "+
+			"map; warned lists what the bake's console warned of (a probe out of range, a shadow dropped). A 2D answer gives its centre and scale (image pixels per unit). "+
 			"The user's camera, render method, 2D axis, zoom and centre are put back (notes says what could not be); "+
 			"Radiant must not be minimised. size is the image's longer side (default 768: about 400 tokens)."),
 		mcp.WithString("view", mcp.Description("3d (default), top, front or side.")),

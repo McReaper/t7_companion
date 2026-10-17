@@ -1,10 +1,10 @@
-Detail for **t7kb:mapping** (`plugin/skills/mapping/SKILL.md`) — how the map looks, through t7kb's map tools: the materials and props to pick, texturing face by face, the views to check them and the light. Read the parent skill first, and `map-tools.md` for building.
+Detail for **t7kb:mapping** (`plugin/skills/mapping/SKILL.md`) — how the map looks, through t7kb's map tools: the materials and props to pick, texturing face by face, the views to check them, and keeping the sun out. Read the parent skill first, and `map-tools.md` for building.
 
 Contents:
 
 - [Texture faces, not brushes: caulk what nobody sees](#texture-faces-not-brushes-caulk-what-nobody-sees)
 - [Look from the top first](#look-from-the-top-first)
-- [Light every space and block the sun: probes, overlaps, sun-shadow caps](#light-every-space-and-block-the-sun-probes-overlaps-sun-shadow-caps)
+- [Block the sun with the geometry: overlaps, sun-shadow caps](#block-the-sun-with-the-geometry-overlaps-sun-shadow-caps)
 
 ## Texture faces, not brushes: caulk what nobody sees
 
@@ -21,6 +21,6 @@ Then `t7kb:map_check` the brushes: it lists faces left uncaulked where nothing c
 
 `t7kb:map_view` with `view` `top` is the layout: outlines, entity names, the ids written on it, and the `scale` (image pixels per unit) to measure with. In the 3D view pick the render by the question (Radiant's F5–F8): `fullbright` for textures, `fake` for shapes, `bake` for light: it runs Radiant's own bake (the lighting toolbar's bolt, at its L/M/H) and shoots under real lighting, where an unbaked map is black and a sun leak or a dark room shows. A volume's brush (the `volume_sun`, the start zone) draws its tool texture over everything behind it, from outside it or inside (verified: sun icons covering the shot), so pass `hide` `volumes`; `hide` `sky` takes the sky box's brushes away for a shot from outside the map. Every view puts the user's camera, render method, 2D axis, zoom and centre back, but they see them move: take the views the work needs.
 
-## Light every space and block the sun: probes, overlaps, sun-shadow caps
+## Block the sun with the geometry: overlaps, sun-shadow caps
 
-Sunlight showing through a wall is fixed in Radiant, not in GDTs: a `reflection_probe` in every space (the template has one, in its start room; a `layout` op puts one in each room, sized to it). A probe is a box, `size_min` and `size_max` its reach each way, 72 by default, with no `radius` (`bin/t7.def.json`; official, `Reflection_Probes.pdf`): left at its default, it covers a 144-unit cube and the rest of the room falls back to the global probe, so size it to its space. Then use walls that overlap where they meet rather than touch edge to edge, and brushes all of `caulk_sun_shadow` outside what must stay in shade — Treyarch's `zm_giant_light.map` holds 12 such brushes, 8-unit sheets over roofs among them (verified in the install; the leak fixes themselves community, t7kb modme 0.60). Then `bake` and look from inside each space.
+Sunlight showing through a wall is fixed in Radiant, not in GDTs. Walls overlap where they meet rather than touch edge to edge, and brushes all of `caulk_sun_shadow` cover what must stay in shade — Treyarch's `zm_giant_light.map` holds 12 such brushes, 8-unit sheets over roofs among them (verified in the install; the leak fixes themselves community, t7kb modme 0.60). A space no reflection probe covers takes the global probe's sky light too: probes, lights and exposure are **t7kb:lighting**. Then `bake` and look from inside each space.

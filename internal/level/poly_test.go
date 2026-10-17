@@ -190,6 +190,48 @@ func TestAShapesPiecesCaulkWhereTheyMeet(t *testing.T) {
 	}
 }
 
+// A shape's contents goes on each of its brushes, a world shape's or an
+// entity's, as Radiant's Make Non-Colliding writes it; a brush with none has
+// no contents line.
+func TestAShapesContentsGoesOnEachPiece(t *testing.T) {
+	c, snap := zoning(t, 803)
+	for _, class := range []string{``, `, "class": "script_brushmodel"`} {
+		d, err := Edit(context.Background(), c, snap, ops(t, `[
+			{"shape": {"outline": [[0, 0], [200, 0], [200, 100], [100, 100], [100, 200], [0, 200]], "z": [0, 96], "material": "brick", "contents": "nonColliding"`+class+`}},
+			{"shape": {"outline": [[300, 0], [400, 0], [350, 80]], "z": [0, 64], "material": "clip_player"}}
+		]`), "", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := map[int][]string{}
+		for _, e := range d.After.Map.Entities {
+			for _, br := range e.Brushes() {
+				for _, m := range d.Made {
+					if hexOf(br.Guid()) == hexOf(m.ID) || hexOf(e.Guid()) == hexOf(m.ID) {
+						got[m.Op] = append(got[m.Op], br.Contents())
+					}
+				}
+			}
+		}
+		if !slices.Equal(got[0], []string{"nonColliding", "nonColliding"}) || !slices.Equal(got[1], []string{""}) {
+			t.Errorf("%q: contents %v", class, got)
+		}
+	}
+	for _, bad := range []string{"non colliding", "noncolliding", "detail clip"} {
+		for _, op := range []string{
+			`{"shape": {"outline": [[0,0],[1,0],[0,1]], "z": [0, 10], "material": "brick", "contents": "` + bad + `"}}`,
+			`{"box": {"min": [0,0,0], "max": [8,8,8], "material": "brick", "contents": "` + bad + `"}}`,
+		} {
+			if _, err := Edit(context.Background(), c, snap, ops(t, "["+op+"]"), "", nil); err == nil || !strings.Contains(err.Error(), "is not one of nonColliding") {
+				t.Errorf("%s: %v", op, err)
+			}
+		}
+	}
+	if _, err := Edit(context.Background(), c, snap, ops(t, `[{"box": {"min": [0,0,0], "max": [8,8,8], "material": "brick", "contents": "weaponClip detail ai_nosight"}}]`), "", nil); err != nil {
+		t.Errorf("Treyarch's own three flags: %v", err)
+	}
+}
+
 // Outlines away from the origin: a corner given twice and the first given
 // again at the end are dropped, and a corner a little off the line between
 // its neighbours stays.
