@@ -1,12 +1,7 @@
 package level
 
 import (
-	"math"
 	"testing"
-
-	"github.com/McReaper/t7_companion/internal/format/mapfile"
-	"github.com/McReaper/t7_companion/internal/level/camera"
-	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // The checks' 2D geometry, case by case, away from the origin and both ways
@@ -43,32 +38,6 @@ func TestSameTilesWithinAThousandth(t *testing.T) {
 		}
 		if got := sameTiles(b, base); got != c.want {
 			t.Errorf("%s, the other way: %v", name, got)
-		}
-	}
-}
-
-func TestFramingFromAboveFramesABoardAwayFromTheOrigin(t *testing.T) {
-	l := camera.Lens{W: 1648, H: 869, F: 1212.4}
-	for _, b := range []geom.Box{
-		box(mapfile.Vec3{100, -40, 500}, mapfile.Vec3{1748, 60, 508}),     // as wide as the view's aspect
-		box(mapfile.Vec3{-40, 200, 500}, mapfile.Vec3{60, 1069, 508}),     // as deep
-		box(mapfile.Vec3{3000, 3000, 900}, mapfile.Vec3{3800, 3500, 908}), // far off
-	} {
-		p := camera.FrameBox(l, above, b)
-		x, y, ok := l.Project(p, b.Centre())
-		if !ok || math.Abs(x-824) > 1 || math.Abs(y-434.5) > 1 {
-			t.Errorf("%v: its middle at %v, %v", b, x, y)
-		}
-		var lo, hi [2]float64
-		for i, c := range b.Corners() {
-			cx, cy, _ := l.Project(p, c)
-			if i == 0 {
-				lo, hi = [2]float64{cx, cy}, [2]float64{cx, cy}
-			}
-			lo, hi = [2]float64{math.Min(lo[0], cx), math.Min(lo[1], cy)}, [2]float64{math.Max(hi[0], cx), math.Max(hi[1], cy)}
-		}
-		if fill := math.Max((hi[0]-lo[0])/1648, (hi[1]-lo[1])/869); fill < 0.85 || fill > 1 {
-			t.Errorf("%v fills %.2f of the view", b, fill)
 		}
 	}
 }

@@ -144,23 +144,6 @@ func mapSamples(t *testing.T, root string, add func(key, s string), addImage fun
 	v, err = mapCheck(ctx, nil, "seam,stretched,unknown", 0, 0)
 	run("map_check|seams, stretch and unknown materials only", v, err)
 
-	v, err = mapMaterials0(ctx, mapMaterialsArgs{ToolsPath: root, Usage: "wall", Surface: "brick"})
-	run("map_materials|brick walls (20 listed)", v, err)
-	for _, how := range []struct {
-		name string
-		a    mapMaterialsArgs
-	}{
-		{"on a sheet", mapMaterialsArgs{Usage: "floor", Name: "wood", Limit: 6, Show: true}},
-		{"on a board", mapMaterialsArgs{Usage: "floor", Name: "wood", Limit: 6, Board: true}},
-	} {
-		if out, png, err := mapMaterials(ctx, how.a); err == nil {
-			add("map_materials|6 wood floors "+how.name+": the JSON", mcpJSON(t, out))
-			addImage(fmt.Sprintf("map_materials|6 wood floors %s: the %d×%d image", how.name, out.W, out.H), out.W, out.H, len(png))
-		} else {
-			t.Logf("map_materials %s: %v", how.name, err)
-		}
-	}
-
 	v, err = mapCommand(ctx, "", nil, "Selection/CSG", 0)
 	run("map_command|list Selection/CSG", v, err)
 	box, _ := decodeOps([]byte(`[{"box": {"min": [900, 900, 0], "max": [1400, 1400, 128], "material": "script_wall"}}]`))
@@ -210,10 +193,4 @@ func hollow(f *radianttest.Fake, args string, _ []byte) radianttest.Reply {
 		return radianttest.OK("", nil)
 	}
 	return radianttest.Err("disabled", args+" is disabled")
-}
-
-// mapMaterials0 is mapMaterials' answer alone, for a list with no image.
-func mapMaterials0(ctx context.Context, a mapMaterialsArgs) (*mapMaterialsOut, error) {
-	out, _, err := mapMaterials(ctx, a)
-	return out, err
 }

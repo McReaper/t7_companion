@@ -26,10 +26,7 @@ Measured on the stock ZM Mod Level template's map (33 entities, 20 world brushes
 | `map_edit` | moving a point entity | 49 | 140 |
 | `map_command` | listing `Selection/CSG` | 32 | 111 |
 | `map_command` | `CSG Hollow` on a box | 206 | 579 |
-| `map_materials` | brick walls, 20 listed | 656 | 2122 |
-| `map_materials` | six wood floors on a sheet (`show`): JSON + 768×384 image | 272 + 393 | 813 + 320718 |
-| `map_materials` | the same on a board in Radiant (`board`): JSON + 768×405 image | 350 + 414 | 1050 + 3096 |
 | `map_check` | the template and the rooms above, 50 findings listed | 1664 | 5170 |
 | `map_check` | seams, stretch and unknown materials only | 210 | 608 |
 
-A room costs about a thousand tokens: its ops (254), the answer (269), a top view to check it (515); a `layout` of two rooms, door and window included, is 130, its answer 764; a `zone` over them is 76, its answer 327 with the script's missing call and the overlap with the template's start zone. The whole map's `map_find` is the dearest call, about 48 tokens an entity, so `class`, `near` or `ids` narrow it; the default image, 768 pixels on the long side, stays near 450 tokens, and `size 1568` quadruples it. A list of materials costs about 33 tokens a material, a finding of `map_check` about 32: `kinds` narrows a long one.
+A room costs about a thousand tokens: its ops (254), the answer (269), a top view to check it (515); a `layout` of two rooms, door and window included, is 130, its answer 764; a `zone` over them is 76, its answer 327 with the script's missing call and the overlap with the template's start zone. The whole map's `map_find` is the dearest call, about 48 tokens an entity, so `class`, `near` or `ids` narrow it; the default image, 768 pixels on the long side, stays near 450 tokens, and `size 1568` quadruples it. A finding of `map_check` costs about 32: `kinds` narrows a long one.
