@@ -97,6 +97,8 @@ type buildPlan struct {
 	quality             string
 	mapSrc, d3dbsp, led string
 	dvars               []dvar // the game's dvars, for the run stage
+	language            string // the link's, and why when it wasn't asked for
+	languageNote        string
 }
 
 func newBuildPlan(o *Options, name string, stdout io.Writer) (*buildPlan, error) {
@@ -122,6 +124,7 @@ func newBuildPlan(o *Options, name string, stdout io.Writer) (*buildPlan, error)
 	if p.dvars, err = gameDvars(o); err != nil {
 		return nil, err
 	}
+	p.language, p.languageNote = linkLanguage(o.Language, p.game)
 	pp := name[:2]
 	p.mapSrc = filepath.Join(p.game, "map_source", pp, name+".map")
 	p.d3dbsp = filepath.Join(p.game, "share", "raw", "maps", pp, name+".d3dbsp")
@@ -275,65 +278,6 @@ func runLight(bin, mapSrc, led, quality string) StageResult {
 	}
 	return StageResult{Name: "light", OK: false, Seconds: round1(time.Since(start).Seconds()),
 		Errors: []string{"no " + filepath.Base(led) + " after " + lightTimeout.String() + " — radiant may have failed silently or the map has no lighting"}}
-}
-
-// runGame launches the game and returns immediately (fire-and-forget).
-// bo3AppID is Black Ops III's Steam app id.
-const bo3AppID = "311210"
-
-// gameStartup is how long the game must stay up for run to count as launched:
-// without Steam attached it shows "you must launch Steam" and exits at once.
-var gameStartup = 8 * time.Second
-
-func runGame(game string, args []string) StageResult {
-	exe := filepath.Join(game, "BlackOps3.exe")
-	c := exec.Command(exe, args...)
-	c.Dir = game
-	c.Env = gameEnv(os.Environ())
-	if err := c.Start(); err != nil {
-		return StageResult{Name: "run", OK: false, Errors: []string{"could not launch game: " + err.Error()}}
-	}
-	exited := make(chan error, 1)
-	go func() { exited <- c.Wait() }()
-	select {
-	case err := <-exited:
-		msg := "the game exited right after starting"
-		if err != nil {
-			msg += " (" + err.Error() + ")"
-		}
-		return StageResult{Name: "run", OK: false, Errors: []string{msg + " — is Steam running and signed in? A game it shows \"you must launch Steam\" in closes at once"}}
-	case <-time.After(gameStartup):
-		return StageResult{Name: "run", OK: true, Note: "launched " + filepath.Base(exe)}
-	}
-}
-
-// gameArgs are the Launcher's own run arguments (captured from the stock
-// modlauncher.exe starting the game): fs_game is the map's name for a usermap
-// too — without it the game never mounts usermaps/<map>/ and +devmap leaves it
-// on the main menu. A mod is mounted with fs_game and loaded from the menu, so it
-// gets no +devmap.
-func gameArgs(name string, isMod bool) []string {
-	args := []string{"+set", "fs_game", name}
-	if !isMod {
-		args = append(args, "+devmap", name)
-	}
-	return args
-}
-
-// gameEnv is the environment the game starts with: Steam starts the mod tools
-// Launcher with SteamAppId/SteamGameId set and the game inherits them; started
-// from anywhere else, BlackOps3.exe can't attach to the running Steam client and
-// refuses with "you must launch Steam to play the game" (verified on a real
-// install: the same command runs once SteamAppId=311210 is set).
-func gameEnv(env []string) []string {
-	out := make([]string, 0, len(env)+2)
-	for _, kv := range env {
-		k, _, _ := strings.Cut(kv, "=")
-		if !strings.EqualFold(k, "SteamAppId") && !strings.EqualFold(k, "SteamGameId") {
-			out = append(out, kv)
-		}
-	}
-	return append(out, "SteamAppId="+bo3AppID, "SteamGameId="+bo3AppID)
 }
 
 func stageSkipped(name, why string) StageResult {

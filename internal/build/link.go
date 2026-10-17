@@ -11,16 +11,23 @@ func (p *buildPlan) linkStage() (StageResult, bool) {
 	if !p.stages["link"] {
 		return StageResult{}, false
 	}
+	sr := p.linkXpaks()
+	sr.Note = joinNotes(p.languageNote, sr.Note)
+	return sr, true
+}
+
+// linkXpaks links, the .xpak files set aside first for a fresh one.
+func (p *buildPlan) linkXpaks() StageResult {
 	if !p.o.FreshXpak {
-		return p.linkTarget(), true
+		return p.linkTarget()
 	}
 	aside, err := setXpaksAside(p.zoneDir())
 	if err != nil {
-		return StageResult{Name: "link", Errors: []string{err.Error()}}, true
+		return StageResult{Name: "link", Errors: []string{err.Error()}}
 	}
 	sr := p.linkTarget()
 	sr.Note = joinNotes(sr.Note, aside.settle(sr.OK))
-	return sr, true
+	return sr
 }
 
 func (p *buildPlan) linkTarget() StageResult {
@@ -38,7 +45,7 @@ func (p *buildPlan) linkTarget() StageResult {
 }
 
 func (p *buildPlan) link(args ...string) StageResult {
-	args = append([]string{"-language", p.o.Language}, args...)
+	args = append([]string{"-language", p.language}, args...)
 	// 60 min: a map's first link converts every image it packs (~23 min for the ZM Advanced template)
 	return stageRunner("link", p.bin, filepath.Join(p.bin, "linker_modtools.exe"), 60*time.Minute, p.o.Verbose, p.stdout, args...)
 }

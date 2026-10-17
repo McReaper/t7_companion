@@ -33,7 +33,11 @@
 // that order, as the Launcher does. With FreshXpak the link sets the target's
 // .xpak files aside so the linker writes them from scratch (it only ever
 // appends), then keeps the new ones, or puts the old ones back after a failed
-// link (xpak.go).
+// link (xpak.go). Its language, unless asked for, is the game's own, read from
+// its install (language.go: localization.txt's first line, which the game
+// reads at startup, else Steam's manifest), else english: the game loads a
+// map's <language>_<map>.ff in its own language and stops on a fatal error
+// without it.
 //
 // # The run stage
 //
@@ -42,5 +46,13 @@
 // game launched once it stays up 8 s: a game that can't attach to Steam exits
 // at once. Its dvars are Options.Dvars over, with LauncherDvars, the ones
 // saved in the Launcher's Dvars dialog (the Windows registry,
-// dvars_windows.go).
+// dvars_windows.go). It then watches the game's first 90 s (game.go): the game
+// shows its fatal errors, and asks its questions (safe mode after a crash), in
+// a message box, and waits on it, so a dialog of its process fails the stage
+// with what it says, and the last lines of the console the game opens beside a
+// fatal error; so does a crash (an exit code), not a clean quit. Until a dialog
+// exists only the windows' classes are read, so nothing is sent to the game
+// while it loads, and no dialog is ever answered. It is read with WM_GETTEXT
+// (window_windows.go), as GetWindowText reads no other process's controls. The
+// game keeps running whatever the stage says.
 package build
