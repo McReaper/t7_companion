@@ -9,12 +9,12 @@
 - **Reflection probes**: the floor players reach, walked from the spawn (stairs, storeys and prefabs included, kept to the zones), cut into boxes snapped to the walls, floor to ceiling, none overlapping; the global probe moved off the sky.
 - **Caulk and lint**: caulk on the faces nobody sees; `map_check` lists faces left drawn where nothing sees them, z-fighting, seams, stretched tiles and unknown materials, by brush and face.
 - **Radiant's own commands** (CSG and the like) on what it names, and the build and a launch of the game.
+- **No edit over yours**: a batch naming something you changed or deleted since the agent read it is refused whole, so it reads again before acting.
 
 ## Planned
 
 - `map_check` reporting floor no zone covers, and surfaces no probe covers.
 - Lights placed room by room from the fixture you choose: the spot under it and a probe-only fill.
-- The lighting set as one: the map's SSI and exposure, fog, probes and lights tuned together.
-- A refusal to edit what you changed since the agent read it, as you both work in the same Radiant.
+- The lighting set as one: the map's SSI and exposure, the sun's shadow resolution, fog, probes and lights tuned together.
 - Probes turned to fit walls off the axes, and over the vistas players see but don't walk.
-- Clip hulls over finished detail, and sun-shadow caps over closed rooms.
+- Clip hulls over finished detail.

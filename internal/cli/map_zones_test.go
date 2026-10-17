@@ -53,7 +53,7 @@ func TestMapEditListsTheZoneLinksTheScriptLacks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := mapEdit(context.Background(), ops, "", 0)
+	out, err := mapEdit(context.Background(), ops, nil, "", 0)
 	if err != nil {
 		t.Fatal(err)
 	}

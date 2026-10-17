@@ -53,13 +53,13 @@ func mapSamples(t *testing.T, root string, add func(key, s string), addImage fun
 	if err != nil {
 		return
 	}
-	zone, start := "", ""
+	zone, start, startRev := "", "", ""
 	for _, e := range all.Found {
 		switch e.Class {
 		case "info_volume":
 			zone = e.ID
 		case "info_player_start":
-			start = e.ID
+			start, startRev = e.ID, e.Rev
 		}
 	}
 	v, err = mapFind(ctx, mapFindArgs{Class: "script_struct"})
@@ -101,10 +101,10 @@ func mapSamples(t *testing.T, root string, add func(key, s string), addImage fun
 	if err != nil {
 		t.Fatal(err)
 	}
-	edit, err := mapEdit(ctx, ops, "a room", 0)
+	edit, err := mapEdit(ctx, ops, nil, "a room", 0)
 	run("map_edit|its answer", edit, err)
 	moved, _ := decodeOps([]byte(`[{"move": {"ids": ["` + start + `"], "by": [0, 64, 0]}}]`))
-	v, err = mapEdit(ctx, moved, "", 0)
+	v, err = mapEdit(ctx, moved, map[string]string{start: startRev}, "", 0)
 	run("map_edit|move the player start (a point entity, in place)", v, err)
 	textured := `[` +
 		`{"box": {"min": [900, -1400, -16], "max": [1400, -900, 0], "material": "t7_wood_plank_floor_02"}},` +
@@ -118,7 +118,7 @@ func mapSamples(t *testing.T, root string, add func(key, s string), addImage fun
 	if err != nil {
 		t.Fatal(err)
 	}
-	v, err = mapEdit(ctx, tops, "textures and copies", 0)
+	v, err = mapEdit(ctx, tops, nil, "textures and copies", 0)
 	run("map_edit|its answer (with each material's tile)", v, err)
 	layoutOp := `[{"layout": {"material": "t7_brick_worn_dirty_red_wet", "floor": "t7_wood_plank_floor_02", "rooms": [` +
 		`{"name": "hall", "min": [-1400, 900], "max": [-1144, 1284]}, {"name": "kitchen", "min": [-1144, 900], "max": [-888, 1284]}], ` +
@@ -128,7 +128,7 @@ func mapSamples(t *testing.T, root string, add func(key, s string), addImage fun
 	if err != nil {
 		t.Fatal(err)
 	}
-	v, err = mapEdit(ctx, rooms, "two rooms", 0)
+	v, err = mapEdit(ctx, rooms, nil, "two rooms", 0)
 	run("map_edit|its answer (17 pieces and 2 probes)", v, err)
 	zoneOp := `[{"zone": {"name": "house_zone", "areas": [{"outline": [[-1400, 900], [-888, 900], [-888, 1284], [-1144, 1284], ` +
 		`[-1144, 1092], [-1400, 1092]]}], "links": [{"zone": "start_zone"}]}}]`
@@ -137,7 +137,7 @@ func mapSamples(t *testing.T, root string, add func(key, s string), addImage fun
 	if err != nil {
 		t.Fatal(err)
 	}
-	v, err = mapEdit(ctx, zoned, "a zone", 0)
+	v, err = mapEdit(ctx, zoned, nil, "a zone", 0)
 	run("map_edit|its answer (a volume, 4 spawners, a pathnode, the script's call, a note)", v, err)
 	v, err = mapCheck(ctx, nil, "", 0, 0)
 	run("map_check|the template and the rooms above (50 listed)", v, err)
@@ -148,7 +148,7 @@ func mapSamples(t *testing.T, root string, add func(key, s string), addImage fun
 	run("map_command|list Selection/CSG", v, err)
 	box, _ := decodeOps([]byte(`[{"box": {"min": [900, 900, 0], "max": [1400, 1400, 128], "material": "script_wall"}}]`))
 	f.Handle("command", hollow) // the views above needed the fake's own commands
-	if made, err := mapEdit(ctx, box, "a box", 0); err == nil && len(made.Made) == 1 {
+	if made, err := mapEdit(ctx, box, nil, "a box", 0); err == nil && len(made.Made) == 1 {
 		v, err = mapCommand(ctx, "Selection/CSG/CSG Hollow", []string{made.Made[0].ID}, "", 0)
 		run("map_command|CSG Hollow on a box (six walls)", v, err)
 	}

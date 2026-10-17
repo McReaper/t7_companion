@@ -41,6 +41,7 @@ type mapFindOut struct {
 // foundEnt is one entity map_find matched.
 type foundEnt struct {
 	ID       string            `json:"id"`
+	Rev      string            `json:"rev"` // what map_edit's revs want back
 	Class    string            `json:"class"`
 	Origin   []float64         `json:"origin,omitempty"`
 	Bounds   []float64         `json:"bounds,omitempty"` // min x y z, then max x y z
@@ -54,6 +55,7 @@ type foundEnt struct {
 // foundBrush is one brush or patch of a matched entity.
 type foundBrush struct {
 	ID       string    `json:"id"`
+	Rev      string    `json:"rev"`
 	Kind     string    `json:"kind,omitempty"` // curve or mesh; a classic brush has none
 	Material string    `json:"material"`
 	Bounds   []float64 `json:"bounds,omitempty"`
@@ -121,7 +123,7 @@ func mapFind(ctx context.Context, a mapFindArgs) (*mapFindOut, error) {
 
 func foundOf(h level.Hit, snap *level.Snapshot, a mapFindArgs) foundEnt {
 	e := h.Entity
-	f := foundEnt{ID: snap.IDs.Short(e.Guid()), Class: e.Class(), Layer: e.Layer(), Selected: h.Selected, Keys: keysOf(e, a.Keys)}
+	f := foundEnt{ID: snap.IDs.Short(e.Guid()), Rev: level.Rev(e), Class: e.Class(), Layer: e.Layer(), Selected: h.Selected, Keys: keysOf(e, a.Keys)}
 	if o, ok := geom.Origin(e); ok {
 		f.Origin = vec(o)
 	}
@@ -141,7 +143,7 @@ func foundOf(h level.Hit, snap *level.Snapshot, a mapFindArgs) foundEnt {
 		if b.Kind() == mapfile.KindEmpty {
 			continue
 		}
-		fb := foundBrush{ID: snap.IDs.Short(b.Guid()), Material: level.Material(b), Contents: b.Contents(),
+		fb := foundBrush{ID: snap.IDs.Short(b.Guid()), Rev: level.BrushRev(b), Material: level.Material(b), Contents: b.Contents(),
 			Selected: snap.Sel.Brush(b.Guid())}
 		if k := b.Kind(); k != mapfile.KindFaces {
 			fb.Kind = level.KindName(k)

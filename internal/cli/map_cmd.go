@@ -90,7 +90,7 @@ func newMapCommandCmd() *cobra.Command {
 }
 
 func newMapEditCmd() *cobra.Command {
-	var file, label string
+	var file, label, revsJSON string
 	var pid int
 	edit := &cobra.Command{Use: "edit --ops <file|->",
 		Short: "Apply a batch of ops (a JSON array, as map_edit takes) as one undo step",
@@ -110,10 +110,17 @@ func newMapEditCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return printIndented(c.OutOrStdout())(mapEdit(c.Context(), ops, label, pid))
+			var revs map[string]string
+			if revsJSON != "" {
+				if err := decodeStrict([]byte(revsJSON), &revs); err != nil {
+					return fmt.Errorf("--revs: an object of id to rev: %w", err)
+				}
+			}
+			return printIndented(c.OutOrStdout())(mapEdit(c.Context(), ops, revs, label, pid))
 		}}
 	edit.Flags().StringVar(&file, "ops", "-", "the ops' JSON file, - for stdin")
 	edit.Flags().StringVar(&label, "label", "", "what the batch does, for Radiant's undo menu")
+	edit.Flags().StringVar(&revsJSON, "revs", "", `the rev map_find gave each entity and brush the ops name, as JSON {"id": "rev"}; required for each`)
 	edit.Flags().IntVar(&pid, "pid", 0, "the Radiant to edit when several run")
 	return edit
 }

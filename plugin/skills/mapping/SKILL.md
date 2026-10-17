@@ -16,8 +16,8 @@ A usermap is more than its `.map`: the build also needs the map's `.zone`, scrip
 t7kb's map tools edit the map open in the user's Radiant, through the T7RadiantBridge plugin: the user watches the work land and takes it back from Radiant's own undo menu. Don't write the `.map` file instead — Radiant keeps the map in memory, and its next save overwrites the file. The loop:
 
 1. `t7kb:radiant_open` the map: the Radiant that has it open, or a new one started on it.
-2. `t7kb:map_find` what is there: short ids, bounds, the naming keys; `class`, `key` and `near` narrow it.
-3. `t7kb:map_edit` a batch of ops (a plan's `walls` and doors, a storey's `layout` of rooms, boxes, entities, deletes, keys, moves, copies, materials and per-face textures) for one step the user would undo as a whole.
+2. `t7kb:map_find` what is there: short ids, their `rev`s, bounds, the naming keys; `class`, `key` and `near` narrow it.
+3. `t7kb:map_edit` a batch of ops (a plan's `walls` and doors, a storey's `layout` of rooms, boxes, entities, deletes, keys, moves, copies, materials and per-face textures) for one step the user would undo as a whole, with `revs`: the `rev` map_find gave each entity and brush the ops name. The user works in the same Radiant: a batch naming something they changed since it was read is refused whole, so `map_find` it again and check the plan still holds before resending.
 4. `t7kb:map_view` the result: `top` for the layout, `3d` with `render` `fake` for the shapes of an unbaked map.
 5. `t7kb:map_command` for Radiant's own tools (`Selection/CSG/CSG Hollow`, patch and texture tools) on the ids given.
 6. Before `t7kb:build`, `t7kb:map_command` `File/Save`: the build compiles the file on disk, not Radiant's memory.

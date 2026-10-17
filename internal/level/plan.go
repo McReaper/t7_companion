@@ -146,6 +146,9 @@ func EditWith(ctx context.Context, c *radiant.Client, snap *Snapshot, ops []Op, 
 	for _, o := range opts {
 		o(b)
 	}
+	if err := b.checkRevs(ops); err != nil {
+		return nil, err
+	}
 	if err := b.apply(ops); err != nil {
 		return nil, err
 	}

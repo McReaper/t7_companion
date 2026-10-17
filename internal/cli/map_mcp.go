@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -107,10 +108,15 @@ func mapEditTool() server.ServerTool {
 			"the global probe into the largest box (an info_null the volume_sun targets). Ids are map_find's, or @n: what op "+
 			"n of this batch made (every copy of a copy op), so a box built, textured and copied is one undo step. A point "+
 			"entity keeps its id; a world brush or an entity that owns brushes is rebuilt and gets a new one (was gives "+
-			"the old). The answer reads the map back: each op's id, class, origin or bounds, the tile each material got "+
+			"the old). Every entity or brush of the map an op names needs the rev map_find gave it, in revs: the user works in the "+
+			"same Radiant, and a batch naming something they changed or deleted since it was read is refused whole, nothing sent. "+
+			"The answer reads the map back: each op's id and rev, class, origin or bounds, the tile each material got "+
 			"and where it came from, the faces each texture op textured. Edits go through Radiant, never the .map file, "+
 			"and the user's selection is kept."),
 		mcp.WithArray("ops", mcp.Required(), mcp.Description("The ops, in order."), mcp.Items(map[string]any{"type": "object"})),
+		mcp.WithObject("revs", mcp.Description("The rev map_find (or a previous map_edit) gave each entity and brush of the map "+
+			"the ops name, by id: {id: rev}. Required for every such id (@n, what this batch makes, needs none): the user "+
+			"edits the same map, and a batch naming something they changed since it was read, or deleted, is refused whole.")),
 		mcp.WithString("label", mcp.Description("What the batch does, for Radiant's undo menu (default: the ops counted).")),
 		mcp.WithNumber("pid", mcp.Description("The Radiant to edit when several run."))),
 		Handler: jsonHandler(func(ctx context.Context, r mcp.CallToolRequest) (any, error) {
@@ -122,7 +128,13 @@ func mapEditTool() server.ServerTool {
 			if err != nil {
 				return nil, err
 			}
-			return mapEdit(ctx, ops, r.GetString("label", ""), r.GetInt("pid", 0))
+			var revs map[string]string
+			if v, ok := r.GetArguments()["revs"]; ok {
+				if err := decodeArg(v, &revs); err != nil {
+					return nil, fmt.Errorf("revs: an object of id to rev: %w", err)
+				}
+			}
+			return mapEdit(ctx, ops, revs, r.GetString("label", ""), r.GetInt("pid", 0))
 		})}
 }
 
@@ -166,10 +178,10 @@ func mapFindTool() server.ServerTool {
 	return server.ServerTool{Tool: mcp.NewTool("map_find",
 		mcp.WithDescription("Find entities in the map open in Radiant (the one running, or pid), as it is now, unsaved edits "+
 			"included. Every filter given must hold: ids, class, key, near, selected. Each entity comes with its short id "+
-			"(the map tools' name for it: a GUID's first 8 hex digits), class, origin, and for brush entities their bounds "+
+			"(the map tools' name for it: a GUID's first 8 hex digits) and its rev (what map_edit's revs want back), class, origin, and for brush entities their bounds "+
 			"(min x y z, max x y z) and brush count; keys are the naming ones (targetname, target, script_noteworthy, "+
 			"script_string, script_int, name, model) unless keys asks for others. brushes lists each one's brushes and "+
-			"patches (id, material, bounds, contents, curve/mesh); naming a brush's id lists just it. near sorts by distance. "+
+			"patches (id, rev, material, bounds, contents, curve/mesh); naming a brush's id lists just it. near sorts by distance. "+
 			"No face is shown: Radiant holds the geometry."),
 		mcp.WithString("ids", mcp.Description("Entity or brush ids (or GUIDs, or any start of one), comma- or space-separated.")),
 		mcp.WithString("class", mcp.Description("Classname; * matches any run of characters (light*, script_*).")),
