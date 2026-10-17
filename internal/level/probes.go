@@ -34,6 +34,10 @@ const (
 	sampleOff = 0.5  // a cell is sampled this far off its middle: a face on the 4s of the grid (an 8-thick wall centred on a grid line) or the 8s never lies on a sample
 )
 
+// maxWalk bounds the walk, in cells: the largest map's play space is far
+// smaller, so a walk this long is lost, and memory stays bounded.
+var maxWalk = 4_000_000
+
 // pspot is somewhere to stand in a cell: the floor's top and the ceiling over
 // it, or the open-sky cap.
 type pspot struct {
@@ -117,7 +121,10 @@ func (g *probeGrid) reach(at mapfile.Vec3) (map[pstate]bool, error) {
 	}
 	seen := map[pstate]bool{{i + j*g.n, start}: true}
 	queue := []pstate{{i + j*g.n, start}}
-	for len(queue) > 0 {
+	for steps := 0; len(queue) > 0; steps++ {
+		if steps > maxWalk {
+			return nil, fmt.Errorf("probes: the walk passed %d cells without ending: start at a point inside the play space", maxWalk)
+		}
 		st := queue[0]
 		queue = queue[1:]
 		next := g.neighbours(st, sides)

@@ -383,3 +383,12 @@ func TestProbesKeepThreeCellsPastAZone(t *testing.T) {
 		t.Errorf("notes %q: the 8 by 31 cells past the zone's 3", n)
 	}
 }
+
+// The walk gives up past maxWalk cells, saying why, rather than run on.
+func TestProbesWalkIsBounded(t *testing.T) {
+	defer func(n int) { maxWalk = n }(maxWalk)
+	maxWalk = 10
+	if _, _, err := probesRun(t, 983, `[`+room(6000, 0, 6256, 256, 0, "")+`, {"probes": {"at": [6128, 128, 8]}}]`); err == nil || !strings.Contains(err.Error(), "the walk passed 10 cells") {
+		t.Errorf("err = %v", err)
+	}
+}
