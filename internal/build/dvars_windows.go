@@ -30,15 +30,3 @@ func readLauncherDvars() ([]dvar, error) {
 	}
 	return out, nil
 }
-
-// readLauncherLanguage is the Build Language saved in the Launcher's options
-// (HKCU\Software\Treyarch\ModLauncher, BuildLanguage), "" when none is.
-func readLauncherLanguage() string {
-	k, err := registry.OpenKey(registry.CURRENT_USER, `Software\Treyarch\ModLauncher`, registry.QUERY_VALUE)
-	if err != nil {
-		return ""
-	}
-	defer func() { _ = k.Close() }() // a read-only key
-	s, _, _ := k.GetStringValue("BuildLanguage")
-	return s
-}

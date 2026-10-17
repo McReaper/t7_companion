@@ -2,6 +2,8 @@ package build
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -106,19 +108,35 @@ func TestGameExitSaysWhenItEnded(t *testing.T) {
 	}
 }
 
-func TestLinkLanguageIsTheAskedOneElseTheLaunchersElseEnglish(t *testing.T) {
-	old := launcherLanguage
-	t.Cleanup(func() { launcherLanguage = old })
-	for _, c := range []struct{ asked, launcher, lang, note string }{
-		{"german", "french", "german", ""},
-		{"", "french", "french", "language french: the Launcher's Build Language"},
-		{"", "  all \r\n", "all", "language all: the Launcher's Build Language"},
-		{"", "", "english", "language english: the Launcher saves no Build Language"},
-		{"", " \t", "english", "language english: the Launcher saves no Build Language"},
+func TestLinkLanguageIsTheAskedOneElseTheGamesElseEnglish(t *testing.T) {
+	for _, c := range []struct {
+		asked, localization, manifest, lang, note string
+	}{
+		{"german", "french" + "\r\n", "", "german", ""},
+		{"", "french\r\n\r\nWIN_COULDNT_START_PROCESS\r\n", "", "french", "language french: the game's, from its localization.txt"},
+		{"", "\ufeff\r\n French \r\n", "", "french", "language french: the game's, from its localization.txt"},
+		{"", "WIN_COULDNT_START_PROCESS\r\n", "\t\t\"language\"\t\t\"German\"\r\n", "german", "language german: the game's, from its Steam's appmanifest_311210.acf"},
+		{"", "", "\t\t\"language\"\t\t\"spanish\"\n", "spanish", "language spanish: the game's, from its Steam's appmanifest_311210.acf"},
+		{"", "", "\"name\" \"x\"\n", "english", "language english: the game's install names none (localization.txt, Steam's manifest)"},
+		{"", "", "", "english", "language english: the game's install names none (localization.txt, Steam's manifest)"},
 	} {
-		launcherLanguage = func() string { return c.launcher }
-		if lang, note := linkLanguage(c.asked); lang != c.lang || note != c.note {
-			t.Errorf("asked %q, launcher %q: %q %q", c.asked, c.launcher, lang, note)
+		steamapps := t.TempDir()
+		game := filepath.Join(steamapps, "common", "Call of Duty Black Ops III")
+		if err := os.MkdirAll(game, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if c.localization != "" {
+			if err := os.WriteFile(filepath.Join(game, "localization.txt"), []byte(c.localization), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if c.manifest != "" {
+			if err := os.WriteFile(filepath.Join(steamapps, "appmanifest_311210.acf"), []byte(c.manifest), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if lang, note := linkLanguage(c.asked, game); lang != c.lang || note != c.note {
+			t.Errorf("asked %q, localization %q, manifest %q: %q %q", c.asked, c.localization, c.manifest, lang, note)
 		}
 	}
 }

@@ -65,16 +65,16 @@ func TestRunBuildReportPipeline(t *testing.T) {
 	t.Setenv("TA_TOOLS_PATH", "")
 	t.Setenv("TA_GAME_PATH", "")
 	cases := []struct {
-		name     string
-		opts     Options
-		fail     string
-		noBSP    bool
-		calls    []string
-		ok       bool
-		failed   string
-		notes    map[string]string // stage -> note or first error it must contain
-		zones    []string          // a mod's zone files to lay out under mods/zm_test/zone_source
-		launcher string            // the Build Language the Launcher saved
+		name         string
+		opts         Options
+		fail         string
+		noBSP        bool
+		calls        []string
+		ok           bool
+		failed       string
+		notes        map[string]string // stage -> note or first error it must contain
+		zones        []string          // a mod's zone files to lay out under mods/zm_test/zone_source
+		localization string            // the game's localization.txt, none when ""
 	}{
 		{
 			name: "usermap, every stage",
@@ -106,19 +106,19 @@ func TestRunBuildReportPipeline(t *testing.T) {
 			notes: map[string]string{"compile": "not applicable to a mod", "light": "not applicable to a mod", "link": "linked core_mod, zm_mod"},
 		},
 		{
-			name:     "no language asked: the Launcher's Build Language",
-			opts:     Options{Stages: "link", Light: "medium", SkipGDT: true},
-			launcher: " french\r\n",
-			calls:    []string{"link bin linker_modtools.exe -language french -modsource zm_test"},
-			ok:       true,
-			notes:    map[string]string{"link": "language french: the Launcher's Build Language"},
+			name:         "no language asked: the game's",
+			opts:         Options{Stages: "link", Light: "medium", SkipGDT: true},
+			localization: "french\r\n",
+			calls:        []string{"link bin linker_modtools.exe -language french -modsource zm_test"},
+			ok:           true,
+			notes:        map[string]string{"link": "language french: the game's, from its localization.txt"},
 		},
 		{
 			name:  "no language asked or saved: english",
 			opts:  Options{Stages: "link", Light: "medium", SkipGDT: true},
 			calls: []string{"link bin linker_modtools.exe -language english -modsource zm_test"},
 			ok:    true,
-			notes: map[string]string{"link": "language english: the Launcher saves no Build Language"},
+			notes: map[string]string{"link": "language english: the game's install names none (localization.txt, Steam's manifest)"},
 		},
 		{
 			name:   "mod with no zone file: nothing to link",
@@ -169,9 +169,11 @@ func TestRunBuildReportPipeline(t *testing.T) {
 			}
 			f := &fakePipeline{root: root, fail: tc.fail, noBSP: tc.noBSP}
 			f.install(t)
-			old := launcherLanguage
-			t.Cleanup(func() { launcherLanguage = old })
-			launcherLanguage = func() string { return tc.launcher }
+			if tc.localization != "" {
+				if err := os.WriteFile(filepath.Join(root, "localization.txt"), []byte(tc.localization), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
 			opts := tc.opts
 			opts.ToolsPath = root
 			rep, err := Run(&opts, "zm_test", io.Discard)

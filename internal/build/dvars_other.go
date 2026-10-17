@@ -8,6 +8,3 @@ import "fmt"
 func readLauncherDvars() ([]dvar, error) {
 	return nil, fmt.Errorf("launcher dvars are read from the Windows registry; pass dvars explicitly")
 }
-
-// readLauncherLanguage: no Launcher, no saved Build Language.
-func readLauncherLanguage() string { return "" }
