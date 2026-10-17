@@ -14,9 +14,10 @@ import (
 // lighter snaps them by hand: from a point players stand (none, the map's
 // info_player_start), the floor a player walks to, stairs, ledges dropped
 // off and floors above included, and on a map with zones only what lies in
-// them (the play space: out of it a player dies), is cut into boxes, the largest first, each from its floor to its
-// ceiling, its sides on the walls' faces, no two overlapping (inner boxes
-// never overlap: their blends do the joining). A lintel's lower ceiling
+// them (the play space: out of it a player dies), is cut into boxes, the
+// largest first, each from its floor to its ceiling, its sides on the walls'
+// faces, turned along the walls off the axes about it, no two overlapping
+// (inner boxes never overlap: their blends do the joining). A lintel's lower ceiling
 // parts two rooms, a storey keeps to itself, a space nobody reaches gets no
 // probe. Blends are 3 (the entity's default, what zm_test's lighter kept),
 // longer over floor no box holds.
@@ -218,10 +219,11 @@ func (g *probeGrid) next(st pstate, d [2]int) (pstate, bool) {
 	return pstate{}, false
 }
 
-// probeBox is a probe to place: its cells' rectangle, floor to ceiling,
-// and its blends.
+// probeBox is a probe to place: its turn, its cells' rectangle in it, its
+// sides (in its turn, its floor and ceiling in the world's) and its blends.
 type probeBox struct {
-	i0, j0, i1, j1   int // cells, ends exclusive
+	f                turn
+	rlo, rhi         [2]float64 // the rectangle of its cells, before its sides move onto the walls
 	lo, hi           mapfile.Vec3
 	blendLo, blendHi mapfile.Vec3
 	cells            map[int]cellInfo // its group's cells
@@ -298,13 +300,13 @@ func (b *batch) probeStart(o *ProbesOp) (mapfile.Vec3, error) {
 }
 
 // probeEntity is a box's reflection_probe: its origin over its floor (out
-// of any solid), its reach each way, Treyarch's defaults (4x, AO range 8,
-// power and strength 1: Multiplayer_Lighting_Workflow.pdf).
+// of any solid), its reach each way in its turn, turned with it, Treyarch's
+// defaults (4x, AO range 8, power and strength 1:
+// Multiplayer_Lighting_Workflow.pdf).
 func probeEntity(s *solids, bx probeBox, extra map[string]string) *EntityOp {
-	c := geom.Box{Min: bx.lo, Max: bx.hi, Ok: true}.Centre()
-	c[2] = bx.lo[2] + math.Min(56, (bx.hi[2]-bx.lo[2])/2)
+	c := mapfile.Vec3{(bx.lo[0] + bx.hi[0]) / 2, (bx.lo[1] + bx.hi[1]) / 2, bx.lo[2] + math.Min(56, (bx.hi[2]-bx.lo[2])/2)}
 	for _, d := range []float64{0, 16, -16, 32, -32} { // out of a counter or a stair the middle falls in
-		if p := (mapfile.Vec3{c[0] + d, c[1], c[2]}); !s.inside(p) {
+		if p := (mapfile.Vec3{c[0] + d, c[1], c[2]}); !s.inside(bx.at(p)) {
 			c = p
 			break
 		}
@@ -316,7 +318,11 @@ func probeEntity(s *solids, bx probeBox, extra map[string]string) *EntityOp {
 	for k, v := range extra {
 		keys[k] = v
 	}
-	return &EntityOp{Class: "reflection_probe", Origin: c, Keys: keys}
+	op := &EntityOp{Class: "reflection_probe", Origin: bx.at(c), Keys: keys}
+	if bx.f.yaw != 0 {
+		op.Angles = &[3]float64{0, bx.f.yaw, 0}
+	}
+	return op
 }
 
 // replaceProbes deletes, with replace, the probes whose origin lies in a new
@@ -329,7 +335,7 @@ func (b *batch) replaceProbes(i int, replace bool, boxes []probeBox) {
 		}
 		p, _ := geom.Origin(u.ent)
 		for _, bx := range boxes {
-			if p[0] >= bx.lo[0] && p[0] <= bx.hi[0] && p[1] >= bx.lo[1] && p[1] <= bx.hi[1] && p[2] >= bx.lo[2] && p[2] <= bx.hi[2] {
+			if bx.contains(p) {
 				in = append(in, u)
 				break
 			}
@@ -354,8 +360,7 @@ func (b *batch) moveGlobalProbe(i int, boxes []probeBox) error {
 			big = bx
 		}
 	}
-	at := geom.Box{Min: big.lo, Max: big.hi, Ok: true}.Centre()
-	at[2] = big.lo[2] + 56
+	at := big.at(mapfile.Vec3{(big.lo[0] + big.hi[0]) / 2, (big.lo[1] + big.hi[1]) / 2, big.lo[2] + 56})
 	var sun *unit
 	for _, u := range b.units {
 		if u.state != deleted && u.ent != nil && u.ent.Class() == "volume_sun" {

@@ -39,7 +39,7 @@ func probesRun(t *testing.T, pid int, opsJSON string, opts ...EditOption) (*Done
 			a, _ := geom.ParseVec3(mn)
 			b, _ := geom.ParseVec3(mx)
 			p := madeProbe{origin: o, lo: mapfile.Vec3{o[0] - a[0], o[1] - a[1], o[2] - a[2]}, hi: mapfile.Vec3{o[0] + b[0], o[1] + b[1], o[2] + b[2]}, keys: map[string]string{}}
-			for _, k := range []string{"resolution", "ao_range", "blend_mins", "blend_maxs", "box", "lighting_state"} {
+			for _, k := range []string{"resolution", "ao_range", "blend_mins", "blend_maxs", "box", "lighting_state", "size_min", "size_max", "angles"} {
 				p.keys[k], _ = e.Key(k)
 			}
 			out = append(out, p)

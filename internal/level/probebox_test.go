@@ -82,11 +82,11 @@ func TestProbesBoxCorridorsFromFortyEightWide(t *testing.T) {
 	}
 }
 
-// holder finds the box holding a cell at a height: its rectangle's cells,
-// ends exclusive, from its floor to under its top.
+// holder finds the box holding a cell at a height: the cells whose middles
+// its rectangle holds, ends exclusive, from its floor to under its top.
 func TestProbeBoxHolder(t *testing.T) {
 	g := &probeGrid{n: 10, m: 10}
-	boxes := []probeBox{{i0: 8, j0: 8, i1: 9, j1: 9}, {i0: 2, j0: 3, i1: 5, j1: 6, lo: mapfile.Vec3{0, 0, 0}, hi: mapfile.Vec3{0, 0, 100}}}
+	boxes := []probeBox{{rlo: [2]float64{64, 64}, rhi: [2]float64{72, 72}}, {rlo: [2]float64{16, 24}, rhi: [2]float64{40, 48}, lo: mapfile.Vec3{0, 0, 0}, hi: mapfile.Vec3{0, 0, 100}}}
 	for _, c := range []struct {
 		i, j int
 		z    float64

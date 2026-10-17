@@ -101,7 +101,8 @@ func mapEditTool() server.ServerTool {
 			"zones and rooms in none. {\"probes\": {\"at\"?: [x,y,z], \"replace\"?: false, \"global\"?: false, \"height\"?: 384, "+
 			"\"keys\"?: {…}}} probes the space players reach, any map: from at (default the info_player_start) it walks the "+
 			"floors a player gets to (steps of 18 up, any drop off a ledge, a body's room; stairs, upper storeys and prefabs' "+
-			"brushes included, clips and nonColliding brushes passed through), on a map with zones only what lies in them, and boxes them, the largest first, floor to ceiling, sides on the walls' "+
+			"brushes included, clips and nonColliding brushes passed through), on a map with zones only what lies in them, and boxes them: a box turned along each wall off the axes (48 deep, "+
+			"across a corridor off the axes), then the largest first on the axes, floor to ceiling, sides on the walls' "+
 			"faces, none overlapping: a lintel or a storey parts boxes, a sealed space gets none (it would bake out of range), "+
 			"a box over open sky stops height up; each a reflection_probe at Treyarch's defaults (4x, AO 8, blends 3), blends "+
 			"longer over floor no box holds; replace deletes the probes standing in the boxes (kept by default, noted); global also moves "+
