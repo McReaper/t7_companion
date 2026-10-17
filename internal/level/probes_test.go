@@ -236,7 +236,10 @@ func TestProbesStandOnPrefabs(t *testing.T) {
 // Replace deletes the probes in the boxes; without it they stay, said.
 func TestProbesReplace(t *testing.T) {
 	base := room(6000, 0, 6256, 256, 0, "") + `, {"entity": {"class": "reflection_probe", "origin": [6128, 128, 56]}}`
-	before := countClass(&Done{After: fixture(t, 955)}, "reflection_probe")
+	for _, o := range []string{"5900 128 56", "6400 128 56", "6128 -100 56", "6128 400 56", "6128 128 -50", "6128 128 300"} { // just out of the box, one way each
+		base += `, {"entity": {"class": "reflection_probe", "origin": [` + strings.ReplaceAll(o, " ", ", ") + `]}}`
+	}
+	before := countClass(&Done{After: fixture(t, 955)}, "reflection_probe") + 6
 	d, ps, err := probesRun(t, 956, `[`+base+`, {"probes": {"at": [6128, 128, 8], "replace": true}}]`)
 	if err != nil {
 		t.Fatal(err)
@@ -248,7 +251,7 @@ func TestProbesReplace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := countClass(d, "reflection_probe"); n != before+2 || !strings.Contains(strings.Join(d.Notes, "\n"), "kept") {
+	if n := countClass(d, "reflection_probe"); n != before+2 || !strings.Contains(strings.Join(d.Notes, "\n"), "probes: 1 probes already stand in the boxes, kept") {
 		t.Errorf("kept: %d probes, %d made, notes %q", n, len(ps), d.Notes)
 	}
 }
@@ -315,15 +318,18 @@ func TestProbesMoveTheGlobalProbe(t *testing.T) {
 
 func TestProbesRefuse(t *testing.T) {
 	r := room(6000, 0, 6256, 256, 0, "")
-	for want, op := range map[string]string{
-		"no floor to stand on":       `[` + r + `, {"probes": {"at": [6128, 128, -100]}}]`,
-		"off the map":                `[` + r + `, {"probes": {"at": [90000, 0, 0]}}]`,
-		"a player's 72":              `[` + r + `, {"probes": {"at": [6128, 128, 8], "height": 40}}]`,
-		"no info_player_start":       `[` + r + `, {"probes": {}}]`,
-		"not one map_edit can write": `[` + r + `, {"probes": {"at": [6128, 128, 8], "keys": {"a\"b": "1"}}}]`,
+	for _, c := range [][2]string{
+		{"no floor to stand on", `{"at": [6128, 128, -100]}`},
+		{"off the map", `{"at": [90000, 128, 0]}`},
+		{"off the map", `{"at": [-90000, 128, 0]}`},
+		{"off the map", `{"at": [6128, 90000, 0]}`},
+		{"off the map", `{"at": [6128, -90000, 0]}`},
+		{"a player's 72", `{"at": [6128, 128, 8], "height": 40}`},
+		{"no info_player_start", `{}`},
+		{"not one map_edit can write", `{"at": [6128, 128, 8], "keys": {"a\"b": "1"}}`},
 	} {
-		if _, _, err := probesRun(t, 960, op); err == nil || !strings.Contains(err.Error(), want) {
-			t.Errorf("%q: %v", want, err)
+		if _, _, err := probesRun(t, 960, `[`+r+`, {"probes": `+c[1]+`}]`); err == nil || !strings.Contains(err.Error(), c[0]) {
+			t.Errorf("%s: %v, want %q", c[1], err, c[0])
 		}
 	}
 }
@@ -445,4 +451,87 @@ func TestProbesBoxCorridorsFromFortyEightWide(t *testing.T) {
 			t.Errorf("corridor from %g, %g wide: %d probes, want %d: %+v", c.lo, c.width, len(ps), c.boxes, ps)
 		}
 	}
+}
+
+// A gap narrower than a body stops the walk; one a body passes doesn't.
+func TestProbesPassOnlyWhereABodyFits(t *testing.T) {
+	for gap, boxes := range map[float64]int{16: 1, 40: 2} {
+		_, ps, err := probesRun(t, 970+int(gap), `[`+room(6000, 0, 6512, 256, 0, "")+fmt.Sprintf(`,
+			{"box": {"min": [6252, 4, 0], "max": [6260, %g, 112], "material": "brick"}},
+			{"box": {"min": [6252, %g, 0], "max": [6260, 252, 112], "material": "brick"}},
+			{"probes": {"at": [6128, 128, 8]}}]`, 128-gap/2, 128+gap/2))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(ps) != boxes {
+			t.Errorf("a gap %g wide: %d probes, want %d: %+v", gap, len(ps), boxes, ps)
+		}
+	}
+}
+
+// The capture point stands 56 over the box's floor, half a low space's
+// height under 112, and steps out of a solid the middle falls in: 16 one
+// way, then the other, then 32.
+func TestProbesPlaceTheCapturePoint(t *testing.T) {
+	_, ps, err := probesRun(t, 975, `[{"walls": {"material": "brick", "z": [0, 80], "lines": [{"points": [[6000, 0], [6256, 0], [6256, 256], [6000, 256]], "closed": true}]}},
+		{"box": {"min": [5996, -4, -16], "max": [6260, 260, 0], "material": "concrete"}},
+		{"box": {"min": [5996, -4, 80], "max": [6260, 260, 96], "material": "concrete"}},
+		{"probes": {"at": [6128, 128, 8]}}]`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ps) != 1 || !vecNear(ps[0].origin, mapfile.Vec3{6128, 128, 40}) {
+		t.Errorf("a room 80 high: %+v, want the point at 40", ps)
+	}
+	var steps []string
+	for k := range 16 { // 8 up every 16 along x from 6012, a strip of floor before them
+		steps = append(steps, fmt.Sprintf(`{"box": {"min": [%d, 4, 0], "max": [%d, 252, %d], "material": "concrete"}}`, 6012+16*k, 6028+16*k, 8*(k+1)))
+	}
+	_, ps, err = probesRun(t, 976, `[{"walls": {"material": "brick", "z": [0, 384], "lines": [{"points": [[6000, 0], [6256, 0], [6256, 256], [6000, 256]], "closed": true}]}},
+		{"box": {"min": [5996, -4, -16], "max": [6260, 260, 0], "material": "concrete"}},
+		{"box": {"min": [5996, -4, 384], "max": [6260, 260, 400], "material": "concrete"}},
+		`+strings.Join(steps, ",")+`,
+		{"probes": {"at": [6008, 128, 8]}}]`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// the middle, 6128, is in the step 64 high, 6144 in the next, 6112 on top of the one under
+	if len(ps) != 1 || !vecNear(ps[0].origin, mapfile.Vec3{6112, 128, 56}) {
+		t.Errorf("over a stair: %+v, want the point at 6112 128 56", ps)
+	}
+}
+
+// holder finds the box holding a cell at a height: its rectangle's cells,
+// ends exclusive, from its floor to under its top.
+func TestProbeBoxHolder(t *testing.T) {
+	g := &probeGrid{n: 10, m: 10}
+	boxes := []probeBox{{i0: 8, j0: 8, i1: 9, j1: 9}, {i0: 2, j0: 3, i1: 5, j1: 6, lo: mapfile.Vec3{0, 0, 0}, hi: mapfile.Vec3{0, 0, 100}}}
+	for _, c := range []struct {
+		i, j int
+		z    float64
+		want int
+	}{
+		{2, 3, 0, 1}, {4, 5, 99.9, 1}, {2, 3, -0.005, 1},
+		{1, 3, 50, -1}, {5, 3, 50, -1}, {2, 2, 50, -1}, {2, 6, 50, -1}, {2, 3, 100, -1}, {2, 3, -0.02, -1},
+	} {
+		if got := g.holder(c.i+c.j*g.n, c.z, boxes); got != c.want {
+			t.Errorf("cell %d,%d at %g: box %d, want %d", c.i, c.j, c.z, got, c.want)
+		}
+	}
+	if a := (probeBox{lo: mapfile.Vec3{1, 2, 0}, hi: mapfile.Vec3{4, 7, 9}}).area(); a != 15 {
+		t.Errorf("area %g, want 3 by 5", a)
+	}
+}
+
+// A room at the low corner of everything solid still has its ring of empty
+// cells around it.
+func TestProbesBoxARoomAtTheMapsEdge(t *testing.T) {
+	_, ps, err := probesRun(t, 977, `[`+room(-9000, -9000, -8744, -8744, 0, "")+`, {"probes": {"at": [-8872, -8872, 8]}}]`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ps) != 1 {
+		t.Fatalf("%d probes: %+v", len(ps), ps)
+	}
+	wantBox(t, ps, mapfile.Vec3{-8996, -8996, 0}, mapfile.Vec3{-8748, -8748, 112})
 }

@@ -77,7 +77,7 @@ func (g *probeGrid) standing(x, y float64) []pspot {
 	var out []pspot
 	for k, s := range sp {
 		p := pspot{s.hi, s.hi + g.height, true}
-		if k+1 < len(sp) && sp[k+1].lo < p.ceil {
+		if k+1 < len(sp) && sp[k+1].lo <= p.ceil { // a roof right at the cap is a roof
 			p.ceil, p.sky = sp[k+1].lo, false
 		}
 		if p.ceil-p.floor >= clearance {
@@ -213,6 +213,9 @@ type probeBox struct {
 	cells            map[int]cellInfo // its group's cells
 }
 
+// area is a box's floor area.
+func (bx probeBox) area() float64 { return (bx.hi[0] - bx.lo[0]) * (bx.hi[1] - bx.lo[1]) }
+
 // probes runs a probes op: the boxes, then a reflection_probe each.
 func (b *batch) probes(i int, o *ProbesOp) error {
 	height := o.Height
@@ -333,7 +336,7 @@ func (b *batch) replaceProbes(i int, replace bool, boxes []probeBox) {
 func (b *batch) moveGlobalProbe(i int, boxes []probeBox) error {
 	big := boxes[0]
 	for _, bx := range boxes[1:] {
-		if (bx.hi[0]-bx.lo[0])*(bx.hi[1]-bx.lo[1]) > (big.hi[0]-big.lo[0])*(big.hi[1]-big.lo[1]) {
+		if bx.area() > big.area() {
 			big = bx
 		}
 	}
