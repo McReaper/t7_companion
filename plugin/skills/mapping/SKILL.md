@@ -17,12 +17,12 @@ t7kb's map tools edit the map open in the user's Radiant, through the T7RadiantB
 
 1. `t7kb:radiant_open` the map: the Radiant that has it open, or a new one started on it.
 2. `t7kb:map_find` what is there: short ids, bounds, the naming keys; `class`, `key` and `near` narrow it.
-3. `t7kb:map_edit` a batch of ops (boxes, entities, deletes, keys, moves, copies, materials and per-face textures, the materials found with `t7kb:map_materials`) for one step the user would undo as a whole.
+3. `t7kb:map_edit` a batch of ops (a storey's `layout` of rooms, boxes, entities, deletes, keys, moves, copies, materials and per-face textures, the materials found with `t7kb:map_materials`) for one step the user would undo as a whole.
 4. `t7kb:map_view` the result: `top` for the layout, `3d` with `render` `fake` for the shapes of an unbaked map.
 5. `t7kb:map_command` for Radiant's own tools (`Selection/CSG/CSG Hollow`, patch and texture tools) on the ids given.
 6. Before `t7kb:build`, `t7kb:map_command` `File/Save`: the build compiles the file on disk, not Radiant's memory.
 
-The sizes to build to (Treyarch's scale standards), what a new map already holds, which edits change an id, and the traps — **CSG Subtract carves the zone and sun volumes too** — are in `references/map-tools.md`.
+The sizes to build to (Treyarch's scale standards), what a new map already holds, the `layout` op, which edits change an id, and the traps — **CSG Subtract carves the zone and sun volumes too** — are in `references/map-tools.md`; picking materials and props, texturing face by face, the views and the light in `references/map-looks.md`.
 
 ## Grid discipline and brush basics
 
@@ -52,7 +52,7 @@ Models have **no collision by default**, but they aren't limited to it — an xm
 
 ## Zones: sealing the level isn't just BSP leaks
 
-Beyond geometric leaks, a **zone** is the unit of playable space in a custom zombies map — an `info_volume` brush with `script_noteworthy = player_volume`, `target`ing that zone's spawners, wired into GSC via `add_adjacent_zone`. The zone volumes are read by more than the spawner logic, and each reader fails silently:
+Beyond geometric leaks, a **zone** is the unit of playable space in a custom zombies map — an `info_volume` brush with `script_noteworthy = player_volume`, `target`ing that zone's spawners, wired into GSC via `add_adjacent_zone`; `t7kb:map_edit`'s `zone` op builds one (`references/map-tools.md`). The zone volumes are read by more than the spawner logic, and each reader fails silently:
 
 - **Un-zoned ground kills.** A player not inside an *enabled* zone is killed by `_zm.gsc`'s out-of-playable-area monitor, which re-checks every `3` seconds (`get_player_out_of_playable_area_monitor_wait_time`) — so a hole in coverage reads as a mystery instant-death, not a leak or a collision bug. Check zone coverage first when a player dies just standing somewhere. A spot that must be safe without being a zone (a teleporter's holding room, a cutscene position) takes a `script_noteworthy "life_brush"` volume, which the monitor honours.
 - **Power-ups only drop where a zone covers the kill.** `_zm_powerups.gsc` keeps a drop only if it `istouching` a `player_volume` — so zombies killed in an un-zoned area never drop anything, and a volume that spills past a window barrier drops power-ups where nobody can reach them. Zone exactly the reachable space.

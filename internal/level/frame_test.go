@@ -44,6 +44,7 @@ func TestFrameBoxFitsTheBoxInTheView(t *testing.T) {
 		box(mapfile.Vec3{-216, -232, -64}, mapfile.Vec3{248, 256, -16}),
 		box(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{2048, 64, 512}),
 		box(mapfile.Vec3{10, 10, 10}, mapfile.Vec3{10, 10, 10}).Grown(256), // a point, as View grows it
+		box(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{2048, 2048, 64}),           // deep along the line of sight: its near corner far nearer than its centre
 	} {
 		p := FrameBox(l, Looking, b)
 		if p.Pitch != Looking.Pitch || p.Yaw != Looking.Yaw {
@@ -56,6 +57,14 @@ func TestFrameBoxFitsTheBoxInTheView(t *testing.T) {
 		}
 		if !fits(at, l.W, l.H) {
 			t.Errorf("%v framed from %+v lands at %v", b, p, at)
+		}
+		// the corners fill it, margin aside: one of them lands within a margin of an edge
+		edge := 1.0
+		for _, a := range at {
+			edge = math.Min(edge, math.Min(math.Min(a[0], float64(l.W)-a[0])/float64(l.W), math.Min(a[1], float64(l.H)-a[1])/float64(l.H)))
+		}
+		if edge > 0.1 { // a sphere framed it 0.2 to 0.3 in
+			t.Errorf("%v framed from %+v: the nearest corner is %.3f of the view from its edge", b, p, edge)
 		}
 		if fwd, _, _ := p.basis(); dot(sub(b.Centre(), p.Origin), fwd) <= 0 {
 			t.Errorf("the camera looks away from %v", b)

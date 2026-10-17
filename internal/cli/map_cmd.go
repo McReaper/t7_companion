@@ -51,7 +51,7 @@ func newMapCmd() *cobra.Command {
 	fl.StringVar(&a.Keys, "keys", "", "which keys to show: all, or a comma list (default the naming keys)")
 	fl.IntVar(&a.Limit, "limit", 0, "how many entities at most (default 50)")
 	fl.IntVar(&a.PID, "pid", 0, "the Radiant to read when several run")
-	root.AddCommand(find, newMapViewCmd(), newMapEditCmd(), newMapCommandCmd(), newMapMaterialsCmd(), newMapCheckCmd())
+	root.AddCommand(find, newMapViewCmd(), newMapEditCmd(), newMapCommandCmd(), newMapMaterialsCmd(), newMapModelsCmd(), newMapCheckCmd())
 	return root
 }
 
@@ -63,7 +63,7 @@ func newMapCheckCmd() *cobra.Command {
 		RunE: func(c *cobra.Command, ids []string) error {
 			return printIndented(c.OutOrStdout())(mapCheck(c.Context(), ids, kinds, limit, pid))
 		}}
-	check.Flags().StringVar(&kinds, "kinds", "", "only these kinds, comma-separated: unknown, seam, stretched, hidden")
+	check.Flags().StringVar(&kinds, "kinds", "", "only these kinds, comma-separated: unknown, zfight, seam, stretched, hidden")
 	check.Flags().IntVar(&limit, "limit", 0, "how many findings to list (default 50, at most 200)")
 	check.Flags().IntVar(&pid, "pid", 0, "the Radiant to use when several run")
 	return check
@@ -73,7 +73,7 @@ func newMapMaterialsCmd() *cobra.Command {
 	var a mapMaterialsArgs
 	var out string
 	materials := &cobra.Command{Use: "materials",
-		Short: "Find materials to texture with, most used by the install's maps first; --show lays them out in Radiant",
+		Short: "Find materials to texture with, most used by the install's maps first; --show writes a sheet of their images",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			res, png, err := mapMaterials(c.Context(), a)
@@ -94,10 +94,12 @@ func newMapMaterialsCmd() *cobra.Command {
 	fl.StringVar(&a.Name, "name", "", "words the name holds, all of them; comma-separated alternatives")
 	fl.IntVar(&a.Limit, "limit", 0, "how many to list (default 20, at most 200)")
 	fl.BoolVar(&a.All, "all", false, "include materials marked DO NOT USE")
-	fl.BoolVar(&a.Show, "show", false, "lay the first 16 out in Radiant and write their image")
+	fl.BoolVar(&a.Show, "show", false, "write a sheet of the first 16's color images, read from the install")
+	fl.BoolVar(&a.Board, "board", false, "lay the first 16 out in Radiant instead and write that shot")
+	fl.IntVar(&a.Size, "size", 0, "the image's longer side in pixels (default 768)")
 	fl.StringVar(&a.ToolsPath, "tools-path", "", "BO3 mod-tools root (default: $TA_TOOLS_PATH, else the running Radiant's)")
-	fl.IntVar(&a.PID, "pid", 0, "with --show: the Radiant to use when several run")
-	fl.StringVar(&out, "out", "map_materials.png", "with --show: where to write the image")
+	fl.IntVar(&a.PID, "pid", 0, "with --board: the Radiant to use when several run")
+	fl.StringVar(&out, "out", "map_materials.png", "with --show or --board: where to write the image")
 	return materials
 }
 
@@ -173,7 +175,8 @@ func newMapViewCmd() *cobra.Command {
 	fl.Float64Var(&a.Radius, "radius", 0, "with --at: how far around it to show (default 256)")
 	fl.StringVar(&a.Camera, "camera", "", "3d: shoot from x,y,z,pitch,yaw,roll")
 	fl.StringVar(&a.Render, "render", "", "3d: fake, fullbright, wireframe, real, view or density for this shot")
-	fl.StringVar(&a.Hide, "hide", "", "volumes: hide the map's volumes and triggers for this shot")
+	fl.StringVar(&a.Hide, "hide", "", "volumes, sky or both comma-separated: hide them for this shot")
+	fl.BoolVar(&a.Bake, "bake", false, "3d: bake Radiant's lighting first (its toolbar's bolt, at its L/M/H) and shoot under real lighting")
 	fl.IntVar(&a.Size, "size", 0, "the image's longer side in pixels (default 768)")
 	fl.BoolVar(&a.NoLabels, "no-labels", false, "leave the ids off the image")
 	fl.IntVar(&a.PID, "pid", 0, "the Radiant to see when several run")

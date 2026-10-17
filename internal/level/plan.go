@@ -104,6 +104,7 @@ type Made struct {
 	Was   string // its GUID before, when it was rebuilt under a new one
 	Class string // "" for a world brush
 	Box   Box
+	Part  string // what of a layout it is: "hall floor", "hall|kitchen wall"
 }
 
 // Done is a batch's outcome.
@@ -113,6 +114,8 @@ type Done struct {
 	Made    []Made
 	Tiles   map[string]Tile // the tile each material sized by the batch was given
 	Faces   map[int]int     // texture op -> how many faces it textured
+	Links   []Link          // the add_adjacent_zone calls the zones made need
+	Notes   []string        // what the batch's zones leave to see to
 	After   *Snapshot       // the map as Radiant has it afterwards
 }
 
@@ -121,7 +124,15 @@ type Done struct {
 // tiles sizes the materials of new boxes and texture ops (nil assumes 64
 // units).
 func Edit(ctx context.Context, c *radiant.Client, snap *Snapshot, ops []Op, label string, tiles Tiles) (*Done, error) {
+	return EditWith(ctx, c, snap, ops, label, tiles, nil)
+}
+
+// EditWith is Edit knowing the materials: which hide what is behind them,
+// for a texture op on the faces other brushes hide (nil takes every material
+// as opaque).
+func EditWith(ctx context.Context, c *radiant.Client, snap *Snapshot, ops []Op, label string, tiles Tiles, info func(string) MaterialInfo) (*Done, error) {
 	b := newBatch(snap, tiles)
+	b.info = info
 	if err := b.apply(ops); err != nil {
 		return nil, err
 	}
@@ -140,7 +151,7 @@ func Edit(ctx context.Context, c *radiant.Client, snap *Snapshot, ops []Op, labe
 	if err != nil {
 		return nil, fmt.Errorf("the edit is done (one Ctrl+Z undoes it), but the map could not be read back: %w", err)
 	}
-	d := &Done{Label: "t7kb: " + label, After: after, Tiles: b.used, Faces: b.faces}
+	d := &Done{Label: "t7kb: " + strings.TrimPrefix(label, "t7kb: "), After: after, Tiles: b.used, Faces: b.faces, Links: b.links, Notes: b.notes} // a label already marked once
 	d.Deleted, _ = strconv.Atoi(strings.TrimPrefix(r.Summary, "deleted="))
 	d.Made = p.match(fresh(string(r.Body)), after)
 	sort.SliceStable(d.Made, func(i, j int) bool { return d.Made[i].Op < d.Made[j].Op })
@@ -181,7 +192,7 @@ func (p *plan) match(got map[string]bool, after *Snapshot) []Made {
 	taken := map[string]bool{}
 	for _, u := range append(append(append([]*unit{}, p.world...), p.ents...), p.replace...) {
 		class, box := u.shape()
-		m := Made{Op: u.op, Class: class, Box: box}
+		m := Made{Op: u.op, Class: class, Box: box, Part: u.part}
 		if u.state == changed && u.point {
 			m.ID = u.guid
 		} else {

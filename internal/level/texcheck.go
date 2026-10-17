@@ -1,6 +1,8 @@
 package level
 
 import (
+	"cmp"
+	"fmt"
 	"math"
 	"slices"
 	"sort"
@@ -28,6 +30,7 @@ type Finding struct {
 // cface is a brush face as the checks see it.
 type cface struct {
 	bi       int    // its brush's index among the map's world brushes
+	fi       int    // its index among its brush's faces
 	brush    string // GUID
 	dir      string
 	material string
@@ -94,14 +97,33 @@ func newChecker(short func(string) string, info func(string) MaterialInfo) *chec
 // selfHidden is, by brush index, the directions of the faces of each brush
 // the others hide, every brush taken as opaque.
 func selfHidden(brushes []*mapfile.Brush) map[int][]string {
+	out := map[int][]string{}
+	for _, f := range hiddenAmong(brushes) {
+		out[f.bi] = append(out[f.bi], f.dir)
+	}
+	return out
+}
+
+// selfHiddenFaces is the same by face index: faces at an angle can share a
+// direction.
+func selfHiddenFaces(brushes []*mapfile.Brush) map[int][]int {
+	out := map[int][]int{}
+	for _, f := range hiddenAmong(brushes) {
+		out[f.bi] = append(out[f.bi], f.fi)
+	}
+	return out
+}
+
+// hiddenAmong are the faces of brushes the others hide.
+func hiddenAmong(brushes []*mapfile.Brush) []*cface {
 	c := newChecker(func(g string) string { return g }, func(string) MaterialInfo { return MaterialInfo{Known: true, Opaque: true, Drawn: true} })
 	for _, b := range brushes {
 		c.add(b)
 	}
-	out := map[int][]string{}
+	var out []*cface
 	for _, f := range c.faces {
 		if c.hidden(f) != "" {
-			out[f.bi] = append(out[f.bi], f.dir)
+			out = append(out, f)
 		}
 	}
 	return out
@@ -126,6 +148,11 @@ func (c *checker) check(f *cface, checked func(string) bool) []Finding {
 	}
 	if g := c.seamWith(f); g != nil && (!checked(g.brush) || f.bi < g.bi) { // a pair once
 		out = append(out, c.finding(f, "seam", c.short(g.brush)+" "+g.dir))
+	}
+	for _, g := range c.zfightsWith(f) {
+		if fi.Drawn && fi.Opaque && (!checked(g.brush) || f.bi < g.bi) { // a pair once
+			out = append(out, c.finding(f, "zfight", c.short(g.brush)+" "+g.dir))
+		}
 	}
 	return out
 }
@@ -152,7 +179,7 @@ func (c *checker) add(b *mapfile.Brush) {
 	}
 	for i, f := range fs {
 		n := planes[i].n
-		fc := &cface{bi: len(c.solids) - 1, brush: b.Guid(), material: f.Material, tex: f.Tex, pl: plane{mapfile.Vec3{-n[0], -n[1], -n[2]}, -planes[i].d}}
+		fc := &cface{bi: len(c.solids) - 1, fi: i, brush: b.Guid(), material: f.Material, tex: f.Tex, pl: plane{mapfile.Vec3{-n[0], -n[1], -n[2]}, -planes[i].d}}
 		fc.dir, _, _ = texAxes(fc.pl.n)
 		fc.pts = faceVertices(planes, i)
 		if fc.poly = convexHull(project(fc.pts, dominant(fc.pl.n))); len(fc.poly) < 3 {
@@ -182,14 +209,24 @@ func (c *checker) hidden(f *cface) string {
 }
 
 // hiddenBy names what hides a face: an opaque brush's face against it, on
-// its plane, facing it, that covers it whole; or an opaque brush it lies
-// buried in. "" when it can be seen.
+// its plane, facing it, that covers it whole, or several that do together;
+// or an opaque brush it lies buried in. "" when it can be seen.
 func (c *checker) hiddenBy(f *cface) string {
 	back := plane{mapfile.Vec3{-f.pl.n[0], -f.pl.n[1], -f.pl.n[2]}, -f.pl.d}
+	var against [][]pt2
+	var first *cface
 	for _, g := range c.byPlane[keyOf(back)] {
-		if g.bi != f.bi && c.info(g.material).Opaque && covers(g.poly, f.poly) {
+		switch {
+		case g.bi == f.bi || !c.info(g.material).Opaque:
+		case covers(g.poly, f.poly):
 			return "against " + c.short(g.brush) + " " + g.dir
+		case touch(g.poly, f.poly):
+			against = append(against, g.poly)
+			first = cmp.Or(first, g)
 		}
+	}
+	if len(against) > 1 && coveredBy(against, f.poly) {
+		return fmt.Sprintf("against %s %s and %d more", c.short(first.brush), first.dir, len(against)-1)
 	}
 	for i, s := range c.solids {
 		if i != f.bi && s.box.overlaps(f.box) && c.buriedIn(f, s) {
@@ -213,6 +250,24 @@ func (c *checker) buriedIn(f *cface, s *solid) bool {
 		}
 	}
 	return len(s.faces) >= 4
+}
+
+// zfightsWith are the faces of other brushes on this one's plane, facing
+// its way, opaque, drawn and seen, that overlap it and draw otherwise (another
+// material, or tiles that don't meet): the two draw over each other and
+// flicker in game (z-fighting), as a floor laid inside another floor does.
+// Two faces drawing the same texels show nothing; a decal or a window is
+// meant to lie on a wall: not opaque, it is left out.
+func (c *checker) zfightsWith(f *cface) []*cface {
+	var out []*cface
+	for _, g := range c.byPlane[keyOf(f.pl)] {
+		gi := c.info(g.material)
+		differ := g.material != f.material || !sameTiles(f.tex, g.tex)
+		if g.bi != f.bi && differ && gi.Opaque && gi.Drawn && overlapping(f.poly, g.poly) && c.hidden(g) == "" {
+			out = append(out, g)
+		}
+	}
+	return out
 }
 
 // seamWith is a face of another brush touching this one on its plane, of the

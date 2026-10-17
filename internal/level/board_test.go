@@ -26,7 +26,7 @@ func TestABoardShowsMaterialsAndLeavesTheMapAsItWas(t *testing.T) {
 		t.Fatalf("board %+v", b)
 	}
 	for i, s := range b.Swatches {
-		if s.Material != []string{"brick", "wood", "caulk"}[i] || s.Tile.W != 128 || s.Label != fmt.Sprint(i+1) {
+		if s.Name != []string{"brick", "wood", "caulk"}[i] || s.Tile.W != 128 || s.Label != fmt.Sprint(i+1) {
 			t.Errorf("swatch %d: %+v", i, s)
 		}
 	}
@@ -55,9 +55,16 @@ func TestABoardsSlabsSitAboveTheMapInRows(t *testing.T) {
 	for _, e := range snap.Map.Entities {
 		world.Union(EntityBox(e))
 	}
-	ops := boardOps(snap, []string{"a", "b", "c", "d", "e"})
-	if len(ops) != 5 {
-		t.Fatalf("%d ops", len(ops))
+	items := materialItems(snap, []string{"a", "b", "c", "d", "e"})
+	if len(items) != 5 {
+		t.Fatalf("%d items", len(items))
+	}
+	ops := make([]Op, len(items))
+	for i, it := range items {
+		ops[i] = it.op
+		if it.name != "abcde"[i:i+1] || it.box != box(it.op.Box.Min, it.op.Box.Max) || it.mark != cornerOf(it.box) {
+			t.Errorf("item %d: %+v", i, it)
+		}
 	}
 	// three columns, two rows; the first row at the top of the image (+y)
 	first, second, fourth := ops[0].Box, ops[1].Box, ops[3].Box
@@ -101,11 +108,12 @@ func TestABoardIsDeletedWhenItCannotBeUndone(t *testing.T) {
 	}
 }
 
-// The board fills the view and sits in its middle, the tilt aside.
-func TestOverheadCentresAFlatBoxInTheView(t *testing.T) {
+// Framed from above, a board fills the view and sits in its middle, the
+// tilt aside.
+func TestFramingFromAboveCentresAFlatBoxInTheView(t *testing.T) {
 	l := Lens{W: 1648, H: 869, F: 1212.4}
 	b := box(mapfile.Vec3{-400, 100, 500}, mapfile.Vec3{400, 600, 508})
-	p := overhead(l, b)
+	p := FrameBox(l, above, b)
 	x, y, ok := l.Project(p, b.Centre())
 	if !ok || math.Abs(x-824) > 1 || math.Abs(y-434.5) > 1 {
 		t.Errorf("the board's middle at %v, %v", x, y)
@@ -131,8 +139,8 @@ func TestOverheadCentresAFlatBoxInTheView(t *testing.T) {
 		t.Errorf("the board fills %.0f%% of the view", fill*100)
 	}
 	// A wide board fits its width, a deep one its depth.
-	wide, deep := overhead(l, box(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{1648, 100, 8})), overhead(l, box(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{100, 869, 8}))
-	if math.Abs(wide.Origin[2]-(8+1212.4*boardMargin)) > 0.01 || math.Abs(deep.Origin[2]-wide.Origin[2]) > 0.01 {
+	wide, deep := FrameBox(l, above, box(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{1648, 100, 8})), FrameBox(l, above, box(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{100, 869, 8}))
+	if math.Abs(wide.Origin[2]-(4+1216.4*margin)) > 1 || math.Abs(deep.Origin[2]-wide.Origin[2]) > wide.Origin[2]/100 { // the 1° tilt aside
 		t.Errorf("a board as wide as the view and one as deep are shot from %v and %v", wide.Origin[2], deep.Origin[2])
 	}
 	if c := cornerOf(box(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{256, 256, 8})); c != (mapfile.Vec3{20, 236, 8}) {
@@ -146,4 +154,38 @@ func make16() []string {
 		out[i] = fmt.Sprintf("m%d", i)
 	}
 	return out
+}
+
+// A model board places a misc_model in the middle of each place, modelRow
+// to a row running +x, the next row behind (+y), centred over the map; each
+// number in its place's front-left corner.
+func TestAModelBoardsModelsStandInRowsAboveTheMap(t *testing.T) {
+	_, _, snap := viewing(t, 503)
+	var world Box
+	for _, e := range snap.Map.Entities {
+		world.Union(EntityBox(e))
+	}
+	names := []string{"p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9"}
+	items := modelItems(snap, names)
+	c, z := world.Centre(), world.Max[2]+512
+	for i, it := range items {
+		col, row, rows := float64(i%modelRow), float64(i/modelRow), float64((len(names)+modelRow-1)/modelRow)
+		x, y := c[0]-float64(modelRow)*modelStep/2+col*modelStep, c[1]-rows*modelStep/2+row*modelStep
+		want := mapfile.Vec3{x + modelStep/2, y + modelStep/2, z}
+		e := it.op.Entity
+		if e == nil || e.Class != "misc_model" || e.Keys["model"] != names[i] || it.name != names[i] || e.Origin != want {
+			t.Errorf("model %d: %+v at %v, want at %v", i, e, e.Origin, want)
+		}
+		if it.mark != (mapfile.Vec3{x + 8, y + 8, z}) || it.box != box(mapfile.Vec3{x, y, z}, mapfile.Vec3{x + modelStep, y + modelStep, z + modelHeight}) {
+			t.Errorf("model %d: mark %v, framed in %+v", i, it.mark, it.box)
+		}
+	}
+	if one := modelItems(snap, names[:1]); one[0].op.Entity.Origin != (mapfile.Vec3{c[0], c[1], z}) {
+		t.Errorf("one model stands over the map's centre: %v", one[0].op.Entity.Origin)
+	}
+	for _, it := range modelItems(snap, names[:modelRow]) { // a full row is one row, over the map's centre
+		if it.op.Entity.Origin[1] != c[1] {
+			t.Errorf("a row of %d: %v", modelRow, it.op.Entity.Origin)
+		}
+	}
 }

@@ -36,11 +36,13 @@
 // entity shows with the room around it.
 //
 //   - 3D: a framed target is shot from the south-west, above (Looking), from
-//     where its bounding sphere fills the view. Radiant's lens is a pinhole,
-//     px = w/2 + f·x/z, and its focal length isn't given: View guesses it, checks
-//     that the target's corners landed in the frame and fill it, and if not
-//     recovers f from where they landed (FocalFrom) and shoots again; the lens is
-//     kept per Radiant, so the next view takes one shot.
+//     where its corners just fill the view (FrameBox). Radiant's lens is a
+//     pinhole, px = w/2 + f·x/z, and its focal length isn't given: View guesses
+//     it, recovers f from where the target's corners landed (FocalFrom), and
+//     shoots again when it is off by more than lensSlack or the corners overflow
+//     the frame: a frame from a lens 5% off fills the view 5% off, which the
+//     corners filling more than half of it doesn't catch. The lens is kept per
+//     Radiant, so the next view takes one shot.
 //   - 2D: the view shows one axis; a capture of another fails naming the axis
 //     shown, and View/Layout/Next turns it XY, XZ, YZ. Zooming moves the
 //     view's centre (towards the mouse), so a frame sets the zoom first, from
@@ -50,7 +52,11 @@
 // Everything View changes of the user's views (render method, 2D axis, zoom
 // and centre, camera) is put back, last change first, even when the shot
 // failed; the zoom comes back to the nearest step of 1.25, and what could not
-// be put back is noted in the answer.
+// be put back is noted in the answer. A bake (ViewOptions.Bake) runs
+// Radiant's own, the lighting toolbar's bolt, under real lighting, and waits
+// for the console's "All Probes Done": the console is subscribed to before
+// the bake starts, as the client drops the events it can't hold. It lights
+// Radiant's view only; the game's .led is the build's light stage.
 //
 // # Editing
 //
@@ -86,30 +92,84 @@
 // # Checks
 //
 // CheckTextures reads the world brushes' faces for what draws badly. A drawn
-// face is hidden when an opaque brush's face on its plane, facing it, covers
-// it whole, or when it lies inside an opaque brush; on the stock prefabs'
-// geometry 85% of the faces it calls hidden are caulk or another tool
-// material, against 56% of all faces (TestHiddenFacesAreTheOnesTreyarchCaulked).
-// A seam is two faces of one material on one plane, both seen, sharing an
+// face is hidden when the opaque brushes' faces on its plane, facing it,
+// cover it whole, one alone or several together (what is left of it once
+// each is clipped away is nothing, slivers under eps aside), or when it lies
+// inside an opaque brush; on the stock prefabs' geometry 86% of the faces it
+// calls hidden are caulk or another tool material, against 56% of all faces
+// (TestHiddenFacesAreTheOnesTreyarchCaulked).
+// Two opaque drawn faces on one plane, facing the same way, overlapping by
+// an area and drawing otherwise (another material, or tiles that don't
+// meet) fight: the engine flickers between them (community, t7kb video
+// 0.30), as a floor laid inside the template's ground does; the stock
+// prefabs hold 570 such pairs among 117,778 faces, left in by hand. A seam
+// is two faces of one material on one plane, both seen, sharing an
 // edge or overlapping, whose tiles differ (size, rotation, mirror, or offset
 // modulo a tile): faces meeting at a corner alone show none. Coplanar faces
 // are found by their rounded plane, so the checks scale with a map.
 //
-// # Rooms
+// # Layouts
 //
-// A room op builds around its inside box: a floor and a ceiling slab over the
-// walls' whole footprint, the x walls the room's whole length (its corners),
-// the y walls between them, a wall with holes in strips around them, a sill
-// under a hole and a lintel over it. Its pieces' faces that the others hide
-// (selfHidden, the checks' own test) are caulk; the faces at a hole show.
+// A layout op builds a storey from a plan of rooms, rectangles meeting along
+// their edges. Every line a room's edge lies on is cut where an edge on it
+// starts or ends, so each stretch of wall has one room, or the outside, on
+// either side, and a wall across it meets it at each end (a room's corner is
+// on both its edges). A stretch is a box centred on its line, through the
+// floor and ceiling slabs; the walls along x run on half a wall past the end
+// of their line's run and take the corners, the walls along y stop half a
+// wall short of every end, against them: no two pieces overlap, no corner is
+// left open. Slabs fill each room between its walls. An opening sits in the
+// stretch that holds it between those end walls, the stretch cut in strips
+// around it, a sill under it (a door's threshold, of its room's floor) and a
+// lintel over it. A stretch's sides take the material of the room each looks
+// into; the faces the pieces hide of each other (selfHidden, the checks' own
+// test) are caulk.
+//
+// # Shapes
+//
+// A shape op stands a solid on an outline, cut into convex pieces as a zone's
+// is (below), a prism brush each: faces wound as a box's, its sides left of
+// each edge of the counter-clockwise outline.
+//
+// # Zones
+//
+// A zone op builds what the stock zone manager (_zm_zonemgr.gsc, in the
+// install) reads: every info_volume whose targetname is the zone's name, the
+// spawner structs the first of them targets (riser_location and
+// spawn_location are zombies' spots; a zone the map has keeps its first
+// volume's target), and add_adjacent_zone links in the map's script under a
+// flag (always_on, which the template sets, for an open passage). An area is
+// a box, an outline (cleaned, wound counter-clockwise, cut by ear clipping
+// and merged back into convex pieces, one brush each: a brush is convex), or
+// floor brushes, each one's outline from above from the lowest point of its
+// top. Spawners stand on a 32-unit grid over each area's outline where the
+// ground (world and func_group brushes, exact along a vertical line; mesh
+// and curve patches as their control grids' triangles; never sky or brush
+// entities) has a floor within a step (18) of the area's bottom and a body's
+// room (72 high, 32 wide, tried every 8 units across) above it. A
+// node_pathnode stands 2 above the spot nearest the middle, for
+// the compiler to grow the navmesh from where the floor isn't joined to the
+// player's (community: a pathnode seeds it; cod2map prunes regions far from
+// its seed points); the spawners take the other spots, one in each area of
+// a room's size (128 × 128 or more, not a doorway's) first while there are
+// enough, each the farthest from those picked. A
+// nav_volume is for flying AI (cod2map's warning names
+// it), not the zombies' navmesh, so zones make none. Links are checked
+// against the zones of the map and the batch; zones are compared by their
+// convex pieces (their bounds would have two zones winding round each other
+// overlap), and those that overlap, or are linked and don't meet, are noted.
 //
 // # Boards
 //
 // ShowMaterials shows materials as Radiant draws them: a 256-unit slab of
 // each, at its tile, in rows 512 units above the map, framed from straight
-// above, fullbright, volumes hidden; then the edit that built them is undone
+// above, fullbright. ShowModels places a misc_model of each, four to a row
+// 128 units apart, framed from the front under fake lighting. Both hide the
+// volumes and the sky's brushes for the shot; then the edit that built them is undone
 // when the undo menu's last entry is still it, else the slabs are deleted
-// (one more undo entry). Radiant's redo holds the board.
+// (one more undo entry). Radiant's redo holds the board. Sheet shows them
+// as Radiant's Textures pane does instead, without Radiant: their color
+// images, read from the install's files (Thumb), four across, numbered.
 //
 // # Commands
 //

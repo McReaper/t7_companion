@@ -73,15 +73,11 @@ func (w *Workspace) largestImage(fields []Field) (int, int) {
 // imageTexels is an image asset's size as the game loads it: its texture's
 // pixels divided by its mipBase.
 func (w *Workspace) imageTexels(name string) (int, int, error) {
-	fields, err := w.resolvedTyped(name, "image")
+	path, fields, err := w.imageFile(name)
 	if err != nil {
 		return 0, 0, err
 	}
-	base := field(fields, "baseImage")
-	if base == "" {
-		return 0, 0, fmt.Errorf("image %q has no baseImage", name)
-	}
-	iw, ih, err := imageSize(w.Abs(strings.ReplaceAll(base, `\`, "/")))
+	iw, ih, err := imageSize(path)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -92,6 +88,25 @@ func (w *Workspace) imageTexels(name string) (int, int, error) {
 		}
 	}
 	return max(iw/d, 1), max(ih/d, 1), nil
+}
+
+// ImageFile is an image asset's texture on disk, its baseImage: what Radiant's
+// Textures pane shows a material by, through its colorMap.
+func (w *Workspace) ImageFile(name string) (string, error) {
+	path, _, err := w.imageFile(name)
+	return path, err
+}
+
+func (w *Workspace) imageFile(name string) (string, []Field, error) {
+	fields, err := w.resolvedTyped(name, "image")
+	if err != nil {
+		return "", nil, err
+	}
+	base := field(fields, "baseImage")
+	if base == "" {
+		return "", nil, fmt.Errorf("image %q has no baseImage", name)
+	}
+	return w.Abs(strings.ReplaceAll(base, `\`, "/")), fields, nil
 }
 
 // resolvedTyped is the effective fields of the first definition of an asset

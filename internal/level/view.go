@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -18,13 +19,15 @@ import (
 type ViewOptions struct {
 	View   string        // 3d (default), top, front or side; xy, xz and yz too
 	IDs    []string      // frame these entities or brushes
+	Frame  *Box          // or frame this box
 	At     *mapfile.Vec3 // or frame the box of Radius around this point
 	Radius float64
 	Camera *Pose  // or shoot the 3D view from here
 	Size   int    // the image's longer side, at most
 	Render string // the 3D view's render method for the shot, put back after
 	Labels bool   // write ids on the image
-	Hide   string // "volumes": hide the map's volumes and triggers for the shot
+	Hide   string // "volumes", "sky" or both, comma-separated: hidden for the shot
+	Bake   bool   // bake Radiant's lighting first and shoot under real lighting
 	Look   *Pose  // the way a framed 3D target is looked at (default Looking)
 	Marks  []Mark // with Labels, these labels instead of ids
 }
@@ -45,6 +48,7 @@ type Shot struct {
 	Scale  float64       // a 2D shot's image pixels per unit
 	Labels []Label       // the ids in the image, where their points landed
 	Notes  []string      // what View could not put back as it was
+	Baked  string        // the bake's end, as Radiant's console said it: "All Probes Done (1.61 s)"
 }
 
 // views are the names View takes, by bridge name.
@@ -75,7 +79,7 @@ func View(ctx context.Context, c *radiant.Client, snap *Snapshot, o ViewOptions)
 	s := &session{c: c, pid: c.Hello.PID}
 	var f *frame
 	if o.Hide != "" {
-		err = s.hideVolumes(ctx, snap)
+		err = s.hide(ctx, snap, o.Hide)
 	}
 	switch {
 	case err != nil:
@@ -99,7 +103,7 @@ func View(ctx context.Context, c *radiant.Client, snap *Snapshot, o ViewOptions)
 	if err != nil {
 		return nil, err
 	}
-	shot.Notes = s.notes
+	shot.Notes, shot.Baked = s.notes, s.baked
 	return shot, nil
 }
 
@@ -114,9 +118,15 @@ func (o ViewOptions) check() (string, error) {
 		return "", fmt.Errorf("a camera pose is for the 3d view")
 	case o.Render != "" && view != "3d":
 		return "", fmt.Errorf("render is the 3d view's: a 2D view draws outlines")
+	case o.Bake && view != "3d":
+		return "", fmt.Errorf("a bake shows in the 3d view: a 2D view draws outlines")
+	case o.Bake && o.Render != "" && renders[strings.ToLower(o.Render)] != "Real Lighting" && !strings.EqualFold(o.Render, "Real Lighting"):
+		return "", fmt.Errorf("render %q: a bake shows under real lighting, the render a bake shoots with", o.Render)
 	}
-	if h := strings.ToLower(o.Hide); h != "" && h != "volumes" {
-		return "", fmt.Errorf("hide %q: volumes, or nothing", o.Hide)
+	for _, h := range strings.Split(o.Hide, ",") {
+		if h = strings.ToLower(strings.TrimSpace(h)); h != "" && h != "volumes" && h != "sky" {
+			return "", fmt.Errorf("hide %q: volumes, sky, or both comma-separated", o.Hide)
+		}
 	}
 	return view, nil
 }
@@ -140,6 +150,8 @@ func (o ViewOptions) marks(snap *Snapshot, target *Box) []labelPoint {
 func targetBox(snap *Snapshot, o ViewOptions) (*Box, error) {
 	var b Box
 	switch {
+	case o.Frame != nil:
+		return o.Frame, nil
 	case len(o.IDs) > 0:
 		boxes, err := boxesOf(snap, o.IDs)
 		if err != nil {
@@ -253,6 +265,7 @@ type session struct {
 	pid      int
 	restores []restore
 	notes    []string
+	baked    string // the console line that ended the bake
 }
 
 // blank tells a capture of one colour: no view Radiant draws is, as its
@@ -267,17 +280,14 @@ func blank(f *frame) bool {
 	return true
 }
 
-// hideVolumes hides, for the shot, the entities whose tool textures draw
-// over a view from inside them as well as from outside: volumes and triggers
-// (a volume_decal stays, as it draws its decal). View/Show Last Hidden shows
-// them again, and only them: what the user had hidden stays hidden.
-func (s *session) hideVolumes(ctx context.Context, snap *Snapshot) error {
-	var guids []string
-	for _, e := range snap.Map.Entities {
-		if c := e.Class(); c != "volume_decal" && (strings.Contains(c, "volume") || strings.HasPrefix(c, "trigger_")) {
-			guids = append(guids, e.Guid())
-		}
-	}
+// hide hides, for the shot, what the hide option names: volumes and triggers,
+// whose tool textures draw over a view from inside them as well as from
+// outside (a volume_decal stays, as it draws its decal); the sky's brushes,
+// whose faces draw over a view from outside the skybox. View/Show Last
+// Hidden shows them again, and only them: what the user had hidden stays
+// hidden.
+func (s *session) hide(ctx context.Context, snap *Snapshot, what string) error {
+	guids := hiddenBy(snap, strings.ToLower(what))
 	if len(guids) == 0 {
 		return nil
 	}
@@ -290,10 +300,35 @@ func (s *session) hideVolumes(ctx context.Context, snap *Snapshot) error {
 	}
 	restoreSelection(ctx, s.c, snap.Sel.GUIDs)
 	if err != nil {
-		return fmt.Errorf("hiding the volumes: %w", err)
+		return fmt.Errorf("hiding the %s: %w", what, err)
 	}
-	s.restores = append(s.restores, restore{what: "hidden volumes", lines: []string{"command View/Show Last Hidden"}})
+	s.restores = append(s.restores, restore{what: "hidden " + what, lines: []string{"command View/Show Last Hidden"}})
 	return nil
+}
+
+// hiddenBy is the GUIDs a hide option names: entities for volumes, brushes
+// with a sky face for sky.
+func hiddenBy(snap *Snapshot, what string) []string {
+	volumes, sky := strings.Contains(what, "volumes"), strings.Contains(what, "sky")
+	var guids []string
+	for _, e := range snap.Map.Entities {
+		if c := e.Class(); volumes && c != "volume_decal" && (strings.Contains(c, "volume") || strings.HasPrefix(c, "trigger_")) {
+			guids = append(guids, e.Guid())
+			continue
+		}
+		for _, it := range e.Items {
+			if sky && it.Brush != nil && skyBrush(it.Brush) {
+				guids = append(guids, it.Brush.Guid())
+			}
+		}
+	}
+	return guids
+}
+
+// skyBrush tells a brush with a face of the sky's material, as a skybox is.
+func skyBrush(b *mapfile.Brush) bool {
+	faces, _ := b.Faces()
+	return slices.ContainsFunc(faces, func(f mapfile.Face) bool { return strings.EqualFold(f.Material, "sky") })
 }
 
 // restore is the calls that put one thing back as the user had it.
@@ -321,6 +356,10 @@ func (s *session) undo(ctx context.Context) {
 		}
 	}
 }
+
+// lensSlack is how far a measured focal length may be off the assumed one
+// before a framed shot is taken again: a view's fill shifts as much.
+const lensSlack = 0.05
 
 // restoreTimeout bounds putting the user's views back.
 const restoreTimeout = 10 * time.Second
@@ -354,8 +393,17 @@ func (s *session) remember(l Lens) {
 // view3D shoots the 3D view: from the pose given, framed on the target (a
 // second shot when the lens it assumed was off), or as it is.
 func (s *session) view3D(ctx context.Context, target *Box, o ViewOptions, pts []mapfile.Vec3) (*frame, error) {
-	if err := s.setRender(ctx, o.Render); err != nil {
+	render := o.Render
+	if o.Bake {
+		render = "real"
+	}
+	if err := s.setRender(ctx, render); err != nil {
 		return nil, err
+	}
+	if o.Bake {
+		if err := s.bake(ctx); err != nil {
+			return nil, err
+		}
 	}
 	pose := o.Camera
 	var corners []mapfile.Vec3
@@ -369,11 +417,16 @@ func (s *session) view3D(ctx context.Context, target *Box, o ViewOptions, pts []
 		pose = &p
 	}
 	f, err := shoot(ctx, s.c, "3d", pose, append(corners, pts...))
-	if err == nil && corners != nil && !fits(f.At[:len(corners)], f.W, f.H) {
+	if err == nil && corners != nil {
+		// The lens the frame assumed is checked against where Radiant drew the
+		// corners: a frame from another lens is shot again with the one measured.
 		if l := (Lens{f.W, f.H, FocalFrom(f.W, f.H, f.Pose, corners, f.At[:len(corners)])}); l.F > 0 {
+			assumed := s.lens()
 			s.remember(l)
-			p := FrameBox(l, look, *target)
-			f, err = shoot(ctx, s.c, "3d", &p, append(corners, pts...))
+			if !fits(f.At[:len(corners)], f.W, f.H) || l.W != assumed.W || l.H != assumed.H || math.Abs(l.F/assumed.F-1) > lensSlack {
+				p := FrameBox(l, look, *target)
+				f, err = shoot(ctx, s.c, "3d", &p, append(corners, pts...))
+			}
 		}
 	}
 	if err != nil {
@@ -381,6 +434,40 @@ func (s *session) view3D(ctx context.Context, target *Box, o ViewOptions, pts []
 	}
 	f.At = f.At[len(corners):]
 	return f, nil
+}
+
+// bakeTimeout bounds the wait on Radiant's bake; a variable so tests wait
+// less.
+var bakeTimeout = 10 * time.Minute
+
+// bake runs Radiant's own lighting bake, the lighting toolbar's bolt at its
+// L/M/H setting, and waits for the console's "All Probes Done" that ends it.
+// It lights Radiant's view only: the game's .led is the build's light stage.
+// The console is read from before the bake starts, as the client drops what
+// it can't hold.
+func (s *session) bake(ctx context.Context) error {
+	if err := s.call(ctx, "subscribe console"); err != nil {
+		return err
+	}
+	if err := s.call(ctx, "bake"); err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(ctx, bakeTimeout)
+	defer cancel()
+	for {
+		select {
+		case e, ok := <-s.c.Events():
+			switch {
+			case !ok:
+				return fmt.Errorf("bake: the bridge closed before the bake ended")
+			case e.Name == "console" && strings.HasPrefix(e.Args, "All Probes Done"):
+				s.baked = e.Args
+				return nil
+			}
+		case <-ctx.Done():
+			return fmt.Errorf("bake: Radiant said no \"All Probes Done\" in %s", bakeTimeout)
+		}
+	}
 }
 
 // setRender switches the 3D view's render method for the shot; the session

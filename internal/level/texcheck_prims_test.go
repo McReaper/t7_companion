@@ -155,14 +155,14 @@ func TestSameTilesWithinAThousandth(t *testing.T) {
 	}
 }
 
-func TestOverheadFramesABoardAwayFromTheOrigin(t *testing.T) {
+func TestFramingFromAboveFramesABoardAwayFromTheOrigin(t *testing.T) {
 	l := Lens{W: 1648, H: 869, F: 1212.4}
 	for _, b := range []Box{
 		box(mapfile.Vec3{100, -40, 500}, mapfile.Vec3{1748, 60, 508}),     // as wide as the view's aspect
 		box(mapfile.Vec3{-40, 200, 500}, mapfile.Vec3{60, 1069, 508}),     // as deep
 		box(mapfile.Vec3{3000, 3000, 900}, mapfile.Vec3{3800, 3500, 908}), // far off
 	} {
-		p := overhead(l, b)
+		p := FrameBox(l, above, b)
 		x, y, ok := l.Project(p, b.Centre())
 		if !ok || math.Abs(x-824) > 1 || math.Abs(y-434.5) > 1 {
 			t.Errorf("%v: its middle at %v, %v", b, x, y)
