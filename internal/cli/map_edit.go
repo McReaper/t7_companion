@@ -44,6 +44,7 @@ type texturedOut struct {
 type madeOut struct {
 	Op     int       `json:"op"`
 	ID     string    `json:"id"`
+	Rev    string    `json:"rev,omitempty"`   // what a next batch's revs want back
 	Was    string    `json:"was,omitempty"`   // its id before, when it was rebuilt under a new one
 	Class  string    `json:"class,omitempty"` // none for a world brush
 	Origin []float64 `json:"origin,omitempty"`
@@ -68,7 +69,7 @@ func decodeOps(raw []byte) ([]level.Op, error) {
 }
 
 // mapEdit applies ops to the map open in Radiant as one undo step.
-func mapEdit(ctx context.Context, ops []level.Op, label string, pid int) (*mapEditOut, error) {
+func mapEdit(ctx context.Context, ops []level.Op, revs map[string]string, label string, pid int) (*mapEditOut, error) {
 	c, err := radiant.Connect(ctx, radiantMachine, pid)
 	if err != nil {
 		return nil, err
@@ -84,7 +85,7 @@ func mapEdit(ctx context.Context, ops []level.Op, label string, pid int) (*mapEd
 			info = materialInfo(w, tilesIn(root))
 		}
 	}
-	d, err := level.EditWith(ctx, c, snap, ops, label, mapTiles(snap.State.Map), info, level.WithPrefabs(prefabReader(installOf(snap.State.Map))))
+	d, err := level.EditWith(ctx, c, snap, ops, label, mapTiles(snap.State.Map), info, level.WithPrefabs(prefabReader(installOf(snap.State.Map))), level.WithRevs(revs, true))
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +109,7 @@ func mapEdit(ctx context.Context, ops []level.Op, label string, pid int) (*mapEd
 		if m.ID == "" {
 			mo.Note = "not found in the map read back: map_find to see what Radiant made"
 		} else {
-			mo.ID = d.After.IDs.Short(m.ID)
+			mo.ID, mo.Rev = d.After.IDs.Short(m.ID), d.After.RevOf(m.ID)
 		}
 		if m.Was != "" {
 			mo.Was = snap.IDs.Short(m.Was)

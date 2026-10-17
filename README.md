@@ -31,6 +31,7 @@ T7 Companion gives your AI agent everything ten years of the BO3 modding communi
 - **GDT tools** — find, read, check and edit APE's GDTs against the install's own schema, as a dry run unless told to write. `gdt_check` catches broken references, missing files and duplicates before the linker does.
 - **What the build packed** — why an asset is in your fastfile, what each zone line weighs, and which of your stock overrides won't ship.
 - **A headless build** — create, compile, light, link and launch your map, with a short report of every linker error and warning instead of hundreds of lines: *"Relink zm_mymap"*. Windows only.
+- **An assistant in your Radiant** — the map's look stays yours; the agent lays out a plan's walls and doors, zones and probes the floor players reach, and lints your brushes, each batch one undo step: [what it takes on](docs/radiant-assistant.md).
 - **Shader decompilation** — the game's compiled shaders back to HLSL, to start a custom shader from a stock one.
 
 > [!NOTE]
@@ -75,7 +76,7 @@ T7 Companion gives your AI agent everything ten years of the BO3 modding communi
 >             t4["build"]
 >             t5["zone_explain<br/>zone_contents<br/>zone_check"]
 >             t6["shader_decompile"]
->             t7["radiant_open<br/>map_find<br/>map_view<br/>map_edit<br/>map_command<br/>map_materials<br/>map_models<br/>map_check"]
+>             t7["radiant_open<br/>map_find<br/>map_view<br/>map_edit<br/>map_command<br/>map_check"]
 >         end
 >         K[("10 years of BO3<br/>modding knowledge")]
 >     end

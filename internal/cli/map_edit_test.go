@@ -38,7 +38,7 @@ func TestMapEditAnswersEachOpsID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := mapEdit(context.Background(), ops, "light and floor", 0)
+	out, err := mapEdit(context.Background(), ops, revsOf(t, "5ec8de49", "76780cea"), "light and floor", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,12 +58,12 @@ func TestMapEditSaysWhatItCouldNotFindBack(t *testing.T) {
 	f := testRadiant(t)
 	f.Handle("edit", func(*radianttest.Fake, string, []byte) radianttest.Reply { return radianttest.OK("deleted=0", nil) })
 	ops, _ := decodeOps([]byte(`[{"box": {"min": [0,0,0], "max": [8,8,8], "material": "caulk"}}]`))
-	out, err := mapEdit(context.Background(), ops, "", 0)
+	out, err := mapEdit(context.Background(), ops, nil, "", 0)
 	if err != nil || len(out.Made) != 1 || out.Made[0].ID != "" || !strings.Contains(out.Made[0].Note, "not found in the map read back") {
 		t.Errorf("answer %+v, %v", out, err)
 	}
 	onMachine(t)
-	if _, err := mapEdit(context.Background(), ops, "", 0); err == nil {
+	if _, err := mapEdit(context.Background(), ops, nil, "", 0); err == nil {
 		t.Error("an edit with no Radiant")
 	}
 }
@@ -90,7 +90,15 @@ func TestMapEditToolAndCommand(t *testing.T) {
 		err := cmd.Execute()
 		return out.String(), err
 	}
-	out, err := run(`[{"delete": ["f2d51a52"]}]`)
+	if _, err := run(`[{"delete": ["f2d51a52"]}]`); err == nil || !strings.Contains(err.Error(), "f2d51a52: named without the rev") {
+		t.Errorf("no revs: %v", err)
+	}
+	if _, err := run(`[{"delete": ["f2d51a52"]}]`, "--revs", `["f2d51a52"]`); err == nil || !strings.Contains(err.Error(), "--revs: an object") {
+		t.Errorf("revs no object: %v", err)
+	}
+	revs, _ := json.Marshal(revsOf(t, "f2d51a52"))
+	sunRevs, _ := json.Marshal(revsOf(t, "6e73936d"))
+	out, err := run(`[{"delete": ["f2d51a52"]}]`, "--revs", string(revs))
 	var answer mapEditOut
 	if err != nil || json.Unmarshal([]byte(out), &answer) != nil || answer.Deleted != 1 {
 		t.Errorf("stdin: %v\n%s", err, out)
@@ -99,7 +107,7 @@ func TestMapEditToolAndCommand(t *testing.T) {
 	if err := os.WriteFile(file, []byte(`[{"delete": ["6e73936d"]}]`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := run("", "--ops", file, "--label", "no sun"); err != nil || !strings.Contains(out, `"undo": "t7kb: no sun"`) {
+	if out, err := run("", "--ops", file, "--label", "no sun", "--revs", string(sunRevs)); err != nil || !strings.Contains(out, `"undo": "t7kb: no sun"`) {
 		t.Errorf("file: %v\n%s", err, out)
 	}
 	if _, err := run("", "--ops", filepath.Join(t.TempDir(), "missing.json")); err == nil {
@@ -108,6 +116,28 @@ func TestMapEditToolAndCommand(t *testing.T) {
 	if _, err := run(`not json`); err == nil {
 		t.Error("ops that are no JSON")
 	}
+}
+
+// revsOf reads, through map_find, the revs map_edit wants for these ids.
+func revsOf(t *testing.T, ids ...string) map[string]string {
+	t.Helper()
+	out, err := mapFind(context.Background(), mapFindArgs{IDs: ids, Brushes: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	revs := map[string]string{}
+	for _, e := range out.Found {
+		revs[e.ID] = e.Rev
+		for _, b := range e.List {
+			revs[b.ID] = b.Rev
+		}
+	}
+	for _, id := range ids {
+		if revs[id] == "" {
+			t.Fatalf("no rev for %s in %+v", id, out.Found)
+		}
+	}
+	return revs
 }
 
 // prefabReader reads a prefab from the install's map_source once, and says

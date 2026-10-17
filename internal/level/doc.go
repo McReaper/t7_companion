@@ -182,18 +182,6 @@
 // ceiling. Sides then move onto the face of the wall beyond, found along five
 // lines at a body's height over the floor inside, never into another box.
 //
-// # Boards
-//
-// ShowMaterials shows materials as Radiant draws them: a 256-unit slab of
-// each, at its tile, in rows 512 units above the map, framed from straight
-// above, fullbright. ShowModels places a misc_model of each, four to a row
-// 128 units apart, framed from the front under fake lighting. Both hide the
-// volumes and the sky's brushes for the shot; then the edit that built them is undone
-// when the undo menu's last entry is still it, else the slabs are deleted
-// (one more undo entry). Radiant's redo holds the board. Sheet shows them
-// as Radiant's Textures pane does instead, without Radiant: their color
-// images, read from the install's files (Thumb), four across, numbered.
-//
 // # Commands
 //
 // Command runs a Radiant menu entry (a CSG, a patch tool) on what the ids

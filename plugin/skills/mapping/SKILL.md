@@ -16,13 +16,23 @@ A usermap is more than its `.map`: the build also needs the map's `.zone`, scrip
 t7kb's map tools edit the map open in the user's Radiant, through the T7RadiantBridge plugin: the user watches the work land and takes it back from Radiant's own undo menu. Don't write the `.map` file instead — Radiant keeps the map in memory, and its next save overwrites the file. The loop:
 
 1. `t7kb:radiant_open` the map: the Radiant that has it open, or a new one started on it.
-2. `t7kb:map_find` what is there: short ids, bounds, the naming keys; `class`, `key` and `near` narrow it.
-3. `t7kb:map_edit` a batch of ops (a plan's `walls` and doors, a storey's `layout` of rooms, boxes, entities, deletes, keys, moves, copies, materials and per-face textures, the materials found with `t7kb:map_materials`) for one step the user would undo as a whole.
+2. `t7kb:map_find` what is there: short ids, their `rev`s, bounds, the naming keys; `class`, `key` and `near` narrow it.
+3. `t7kb:map_edit` a batch of ops (a plan's `walls` and doors, a storey's `layout` of rooms, boxes, entities, deletes, keys, moves, copies, materials and per-face textures) for one step the user would undo as a whole, with `revs`: the `rev` map_find gave each entity and brush the ops name. The user works in the same Radiant: a batch naming something they changed since it was read is refused whole, so `map_find` it again and check the plan still holds before resending.
 4. `t7kb:map_view` the result: `top` for the layout, `3d` with `render` `fake` for the shapes of an unbaked map.
 5. `t7kb:map_command` for Radiant's own tools (`Selection/CSG/CSG Hollow`, patch and texture tools) on the ids given.
 6. Before `t7kb:build`, `t7kb:map_command` `File/Save`: the build compiles the file on disk, not Radiant's memory.
 
-The sizes to build to (Treyarch's scale standards), what a new map already holds, which edits change an id, and the traps are in `references/map-tools.md`; a plan's walls and doors (the `walls` and `layout` ops, and why **CSG Subtract carves the zone and sun volumes too**) in `references/map-plans.md`; picking materials and props, texturing face by face, the views and the light in `references/map-looks.md`.
+The sizes to build to (Treyarch's scale standards), what a new map already holds, which edits change an id, and the traps are in `references/map-tools.md`; a plan's walls and doors (the `walls` and `layout` ops, and why **CSG Subtract carves the zone and sun volumes too**) in `references/map-plans.md`; texturing face by face, the views and the light in `references/map-looks.md`.
+
+## The mapper owns the map; the agent takes the layout and the chores
+
+The map's details are the mapper's: its geometry, materials, props, light fixtures and mood. Don't texture, prop, restyle or reshape what the mapper built unless they ask for that piece of work; when a task needs a look decided, ask. What the agent is handed:
+
+- **A layout from a plan**: walls and doors from a plan's lines (`walls`), a storey of rectangle rooms (`layout`), to Treyarch's scale standards (`references/map-plans.md`).
+- **Zones**: volumes over the reachable floor, spawners on it, a pathnode, and the `add_adjacent_zone` calls the script lacks (`zone`).
+- **Reflection probes** over the floor players reach (`probes`, **t7kb:lighting**).
+- **Caulk** on the faces nobody sees (a `texture` op with `faces` `hidden`), and `t7kb:map_check`'s lint: faces left drawn where nothing sees them, z-fighting, seams, stretched tiles, unknown materials.
+- Radiant's own tools on the ids given (`t7kb:map_command`), the build and a run (**t7kb:compiling**).
 
 ## Grid discipline and brush basics
 

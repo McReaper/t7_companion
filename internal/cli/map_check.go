@@ -37,13 +37,16 @@ var findingOrder = map[string]int{"unknown": 0, "zfight": 1, "seam": 2, "stretch
 // behind one shows.
 var seeThrough = map[string]bool{"window": true, "decal": true, "water": true, "foliage": true, "clip": true}
 
-const findingsLimit = 50
+const (
+	findingsLimit    = 50
+	maxFindingsLimit = 200
+)
 
 // mapCheck checks the textures of the map open in Radiant: all its world
 // brushes, or those ids names.
 func mapCheck(ctx context.Context, ids []string, kinds string, limit, pid int) (*mapCheckOut, error) {
-	if limit < 0 || limit > maxMaterialsLimit {
-		return nil, fmt.Errorf("limit %d: at most %d", limit, maxMaterialsLimit)
+	if limit < 0 || limit > maxFindingsLimit {
+		return nil, fmt.Errorf("limit %d: at most %d", limit, maxFindingsLimit)
 	}
 	want := map[string]bool{}
 	for _, k := range strings.Split(kinds, ",") {

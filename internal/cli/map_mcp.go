@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -15,7 +16,7 @@ import (
 // tools refuse an argument they don't take: their options share names
 // (board, show) that mean different things from tool to tool.
 func mapToolset() toolset {
-	return toolset{name: "map", tools: strictArgs([]server.ServerTool{radiantOpenTool(), mapFindTool(), mapViewTool(), mapEditTool(), mapCommandTool(), mapMaterialsTool(), mapModelsTool(), mapCheckTool()})}
+	return toolset{name: "map", tools: strictArgs([]server.ServerTool{radiantOpenTool(), mapFindTool(), mapViewTool(), mapEditTool(), mapCommandTool(), mapCheckTool()})}
 }
 
 func mapCheckTool() server.ServerTool {
@@ -36,43 +37,6 @@ func mapCheckTool() server.ServerTool {
 		Handler: jsonHandler(func(ctx context.Context, r mcp.CallToolRequest) (any, error) {
 			return mapCheck(ctx, splitIDs(r.GetString("ids", "")), r.GetString("kinds", ""), r.GetInt("limit", 0), r.GetInt("pid", 0))
 		})}
-}
-
-func mapMaterialsTool() server.ServerTool {
-	return server.ServerTool{Tool: mcp.NewTool("map_materials",
-		mcp.WithDescription("Find materials to texture with: the ones Radiant's Textures pane shows (a usage other than "+
-			"<not in editor>), filtered by usage (floor, ceiling, roof, door, window, decal, interior wall, interior trim, "+
-			"exterior wall, exterior trim, terrain, foliage, water, sky, background, tools, clip; \"wall\" takes both walls), "+
-			"surface (brick, wood, concrete, metal, plaster, glass…: the surfaceType footsteps and impacts use) and name "+
-			"words; comma-separated alternatives. Most used by the install's maps first: faces is how many of their faces "+
-			"have it, and tile the world units one repeat spans as map_edit lays it. Materials marked DO NOT USE "+
-			"(Radiant crosses them out; script_wall and script_floor_ceiling among them) only with all. show answers "+
-			"a sheet of the first 16's color images as Radiant's Textures pane shows them, read from the install "+
-			"(no Radiant needed, nothing added to the map): sheet names the material numbered 1, 2… board instead lays "+
-			"them out in Radiant, a slab each above the map, shoots them from above fullbright and takes them off the map "+
-			"again (Radiant's redo holds them): their look in the engine at map_edit's tile; board says which label is which."),
-		mcp.WithString("usage", mcp.Description("Radiant's filter: floor, interior wall, exterior trim…, comma-separated alternatives.")),
-		mcp.WithString("surface", mcp.Description("The surfaceType: brick, wood, concrete…, comma-separated alternatives.")),
-		mcp.WithString("name", mcp.Description("Words the name holds, all of them; comma-separated alternatives (\"brick red, plaster\").")),
-		mcp.WithNumber("limit", mcp.Description("How many to list (default 20, at most 200).")),
-		mcp.WithBoolean("all", mcp.Description("Include materials marked DO NOT USE (default false).")),
-		mcp.WithBoolean("show", mcp.Description("Answer a sheet of the first 16's color images too (default false).")),
-		mcp.WithBoolean("board", mcp.Description("Lay the first 16 out in Radiant instead and answer that shot (default false).")),
-		mcp.WithString("tools_path", mcp.Description("BO3 mod-tools root (default $TA_TOOLS_PATH, else the running Radiant's).")),
-		mcp.WithNumber("pid", mcp.Description("With board: the Radiant to use when several run."))),
-		Handler: func(ctx context.Context, r mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			out, png, err := mapMaterials(ctx, mapMaterialsArgs{Usage: r.GetString("usage", ""), Surface: r.GetString("surface", ""),
-				Name: r.GetString("name", ""), Limit: r.GetInt("limit", 0), All: r.GetBool("all", false), Show: r.GetBool("show", false),
-				Board: r.GetBool("board", false), ToolsPath: r.GetString("tools_path", ""), PID: r.GetInt("pid", 0)})
-			if err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
-			}
-			res := jsonResult(out)
-			if png != nil {
-				res.Content = append(res.Content, mcp.NewImageContent(base64.StdEncoding.EncodeToString(png), "image/png"))
-			}
-			return res, nil
-		}}
 }
 
 func mapCommandTool() server.ServerTool {
@@ -144,10 +108,15 @@ func mapEditTool() server.ServerTool {
 			"the global probe into the largest box (an info_null the volume_sun targets). Ids are map_find's, or @n: what op "+
 			"n of this batch made (every copy of a copy op), so a box built, textured and copied is one undo step. A point "+
 			"entity keeps its id; a world brush or an entity that owns brushes is rebuilt and gets a new one (was gives "+
-			"the old). The answer reads the map back: each op's id, class, origin or bounds, the tile each material got "+
+			"the old). Every entity or brush of the map an op names needs the rev map_find gave it, in revs: the user works in the "+
+			"same Radiant, and a batch naming something they changed or deleted since it was read is refused whole, nothing sent. "+
+			"The answer reads the map back: each op's id and rev, class, origin or bounds, the tile each material got "+
 			"and where it came from, the faces each texture op textured. Edits go through Radiant, never the .map file, "+
 			"and the user's selection is kept."),
 		mcp.WithArray("ops", mcp.Required(), mcp.Description("The ops, in order."), mcp.Items(map[string]any{"type": "object"})),
+		mcp.WithObject("revs", mcp.Description("The rev map_find (or a previous map_edit) gave each entity and brush of the map "+
+			"the ops name, by id: {id: rev}. Required for every such id (@n, what this batch makes, needs none): the user "+
+			"edits the same map, and a batch naming something they changed since it was read, or deleted, is refused whole.")),
 		mcp.WithString("label", mcp.Description("What the batch does, for Radiant's undo menu (default: the ops counted).")),
 		mcp.WithNumber("pid", mcp.Description("The Radiant to edit when several run."))),
 		Handler: jsonHandler(func(ctx context.Context, r mcp.CallToolRequest) (any, error) {
@@ -159,7 +128,13 @@ func mapEditTool() server.ServerTool {
 			if err != nil {
 				return nil, err
 			}
-			return mapEdit(ctx, ops, r.GetString("label", ""), r.GetInt("pid", 0))
+			var revs map[string]string
+			if v, ok := r.GetArguments()["revs"]; ok {
+				if err := decodeArg(v, &revs); err != nil {
+					return nil, fmt.Errorf("revs: an object of id to rev: %w", err)
+				}
+			}
+			return mapEdit(ctx, ops, revs, r.GetString("label", ""), r.GetInt("pid", 0))
 		})}
 }
 
@@ -203,10 +178,10 @@ func mapFindTool() server.ServerTool {
 	return server.ServerTool{Tool: mcp.NewTool("map_find",
 		mcp.WithDescription("Find entities in the map open in Radiant (the one running, or pid), as it is now, unsaved edits "+
 			"included. Every filter given must hold: ids, class, key, near, selected. Each entity comes with its short id "+
-			"(the map tools' name for it: a GUID's first 8 hex digits), class, origin, and for brush entities their bounds "+
+			"(the map tools' name for it: a GUID's first 8 hex digits) and its rev (what map_edit's revs want back), class, origin, and for brush entities their bounds "+
 			"(min x y z, max x y z) and brush count; keys are the naming ones (targetname, target, script_noteworthy, "+
 			"script_string, script_int, name, model) unless keys asks for others. brushes lists each one's brushes and "+
-			"patches (id, material, bounds, contents, curve/mesh); naming a brush's id lists just it. near sorts by distance. "+
+			"patches (id, rev, material, bounds, contents, curve/mesh); naming a brush's id lists just it. near sorts by distance. "+
 			"No face is shown: Radiant holds the geometry."),
 		mcp.WithString("ids", mcp.Description("Entity or brush ids (or GUIDs, or any start of one), comma- or space-separated.")),
 		mcp.WithString("class", mcp.Description("Classname; * matches any run of characters (light*, script_*).")),

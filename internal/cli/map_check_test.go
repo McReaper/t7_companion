@@ -144,3 +144,44 @@ func TestMaterialInfoJudgesByMaterialType(t *testing.T) {
 		t.Errorf("the brick's tile: %+v", info("t7_brick_worn_red"))
 	}
 }
+
+// materialsInstall is an install with six editor materials, one of them DO
+// NOT USE, and a map that uses two of them.
+func materialsInstall(t *testing.T) string {
+	t.Helper()
+	t.Setenv("LOCALAPPDATA", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	root := t.TempDir()
+	write := func(rel, body string) {
+		p := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("deffiles/material.awi", "")
+	write("share/raw/techsetdefs_stable/geometry/lit.techsetdef", "")
+	mat := func(name, usage, surface string, more ...string) string {
+		s := "\t\"" + name + "\" ( \"material.gdf\" )\r\n\t{\r\n\t\t\"usage\" \"" + usage + "\"\r\n\t\t\"surfaceType\" \"" + surface + "\"\r\n" +
+			"\t\t\"tilingWidth\" \"1024\"\r\n\t\t\"tilingHeight\" \"512\"\r\n"
+		for i := 0; i < len(more); i += 2 {
+			s += "\t\t\"" + more[i] + "\" \"" + more[i+1] + "\"\r\n"
+		}
+		return s + "\t}\r\n"
+	}
+	write("source_data/mats.gdt", "{\r\n"+
+		mat("t7_brick_worn_red", "exterior wall", "brick")+
+		mat("t7_brick_clean_red", "interior wall", "brick")+
+		mat("t7_plaster_white", "interior wall", "plaster")+
+		mat("t7_wood_planks", "floor", "wood")+
+		mat("t7_metal_grate", "floor", "metal")+
+		mat("old_script_wall", "tools", "concrete", "doNotUse", "1")+
+		"\t\"t7_model_only\" ( \"material.gdf\" )\r\n\t{\r\n\t\t\"usage\" \"<not in editor>\"\r\n\t}\r\n}\r\n")
+	face := func(mat string) string {
+		return " ( 0 0 0 ) ( 1 0 0 ) ( 0 1 0 ) " + mat + " 128 128 0 0 0 0 lightmap_gray 16384 16384 0 0 0 0\n"
+	}
+	write("map_source/zm/a.map", "{\n{\n"+strings.Repeat(face("t7_plaster_white"), 12)+strings.Repeat(face("t7_brick_clean_red"), 3)+"}\n}\n")
+	return root
+}

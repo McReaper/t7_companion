@@ -101,19 +101,21 @@ const (
 
 // batch is the map as a batch of ops leaves it, unit by unit.
 type batch struct {
-	snap   *Snapshot
-	units  []*unit
-	by     map[string]*unit                   // GUID hex (entity, world brush, entity brush) -> its unit
-	brush  map[string]*mapfile.Brush          // GUID hex -> the brush, for an entity's brush named alone
-	world  string                             // worldspawn's GUID hex
-	tiles  Tiles                              // sizes a material's tile; nil assumes one
-	info   func(string) MaterialInfo          // which materials hide what is behind them; nil, all
-	used   map[string]Tile                    // the tile each material was given
-	faces  map[int]int                        // texture op -> faces it textured
-	zones  []madeZone                         // the zones it made
-	links  []Link                             // the add_adjacent_zone calls they need
-	notes  []string                           // what the answer should say of them
-	prefab func(string) (*mapfile.Map, error) // reads a misc_prefab's map by its model path; nil, prefabs unread
+	snap        *Snapshot
+	units       []*unit
+	by          map[string]*unit                   // GUID hex (entity, world brush, entity brush) -> its unit
+	brush       map[string]*mapfile.Brush          // GUID hex -> the brush, for an entity's brush named alone
+	world       string                             // worldspawn's GUID hex
+	tiles       Tiles                              // sizes a material's tile; nil assumes one
+	info        func(string) MaterialInfo          // which materials hide what is behind them; nil, all
+	used        map[string]Tile                    // the tile each material was given
+	faces       map[int]int                        // texture op -> faces it textured
+	zones       []madeZone                         // the zones it made
+	links       []Link                             // the add_adjacent_zone calls they need
+	notes       []string                           // what the answer should say of them
+	prefab      func(string) (*mapfile.Map, error) // reads a misc_prefab's map by its model path; nil, prefabs unread
+	revs        map[string]string                  // what was read, by id (WithRevs)
+	requireRevs bool
 }
 
 func newBatch(snap *Snapshot, tiles Tiles) *batch {

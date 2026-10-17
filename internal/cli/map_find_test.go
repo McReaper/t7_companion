@@ -177,7 +177,7 @@ func TestMapFindCommandAndTool(t *testing.T) {
 	}
 	req := mcpRequest("map_find", map[string]any{"class": "volume_sun", "brushes": true})
 	res, err := mapFindTool().Handler(context.Background(), req)
-	if err != nil || res.IsError || !strings.Contains(resultText(res), `"brush_list":[{"id":"6e73936c","material":"sun_volume"`) {
+	if err != nil || res.IsError || !strings.Contains(resultText(res), `"brush_list":[{"id":"6e73936c","rev":"65e5c5a7","material":"sun_volume"`) {
 		t.Errorf("tool: %v %s", err, resultText(res))
 	}
 }
