@@ -10,52 +10,13 @@ import (
 	"time"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/camera"
 	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant"
 	"github.com/McReaper/t7_companion/internal/radiant/radianttest"
 )
 
 // The cases below pin what the CI's mutation run found unchecked.
-
-func TestTheFocalComesFromThePointFarthestOffCentre(t *testing.T) {
-	l := Lens{W: 200, H: 100, F: 150}
-	pose := Pose{Origin: mapfile.Vec3{0, 0, 0}, Yaw: 90} // looking +y
-	up := mapfile.Vec3{0, 100, 30}                       // straight above the centre: only y tells f
-	_, py, _ := l.Project(pose, up)
-	if f := FocalFrom(200, 100, pose, []mapfile.Vec3{up}, [][2]float64{{100, py}}); math.Abs(f-150) > 1e-6 {
-		t.Errorf("focal from a point above = %v", f)
-	}
-	// a point a little off centre, projected wrongly, must not be the one used
-	near, far := mapfile.Vec3{1, 100, 0}, mapfile.Vec3{40, 100, 0}
-	fx, _, _ := l.Project(pose, far)
-	if f := FocalFrom(200, 100, pose, []mapfile.Vec3{near, far}, [][2]float64{{150, 50}, {fx, 50}}); math.Abs(f-150) > 1e-6 {
-		t.Errorf("focal = %v: taken from the near point", f)
-	}
-	// a point far off but little off centre, projected wrongly, is not the one used: it is the
-	// least off centre (x/z), though the farthest (x·z)
-	deep, wide := mapfile.Vec3{10, 1000, 0}, mapfile.Vec3{40, 100, 0}
-	wx, _, _ := l.Project(pose, wide)
-	if f := FocalFrom(200, 100, pose, []mapfile.Vec3{deep, wide}, [][2]float64{{190, 50}, {wx, 50}}); math.Abs(f-150) > 1e-6 {
-		t.Errorf("focal = %v: taken from the deep point", f)
-	}
-	deepUp, high := mapfile.Vec3{0, 1000, 10}, mapfile.Vec3{0, 100, 40}
-	_, hy, _ := l.Project(pose, high)
-	if f := FocalFrom(200, 100, pose, []mapfile.Vec3{deepUp, high}, [][2]float64{{100, 5}, {100, hy}}); math.Abs(f-150) > 1e-6 {
-		t.Errorf("focal = %v: taken from the deep point above", f)
-	}
-	// fewer projections than points
-	if f := FocalFrom(200, 100, pose, []mapfile.Vec3{far, near}, [][2]float64{{fx, 50}}); math.Abs(f-150) > 1e-6 {
-		t.Errorf("focal with a projection missing = %v", f)
-	}
-}
-
-func TestZoomFitsATallBox(t *testing.T) {
-	tall := box(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{100, 0, 1000}) // front view: 100 across, 1000 up
-	// a 400×400 view: 400/1150 = 0.348 px/unit, 5 steps out from 100% (0.328)
-	if n := ZoomSteps(Axes[1], 400, 400, tall); n != -5 {
-		t.Errorf("ZoomSteps(front, tall) = %d, want -5", n)
-	}
-}
 
 func TestShortIDsOfTheFirstGUIDsAndOfShortOnes(t *testing.T) {
 	ids := NewIDs([]string{"{00000000-1111-0000-0000-000000000000}", "{00000000-2222-0000-0000-000000000000}", "{A}", "{AB}"})
@@ -134,7 +95,7 @@ func TestOnlyTheThousandPointsNearestTheTargetGetLabels(t *testing.T) {
 		fmt.Fprintf(&text, "{\nguid \"{%08X-0000-0000-0000-000000000000}\"\n\"classname\" \"info_null\"\n\"origin\" \"%d %d 0\"\n}\n", 0x10000000+i, 3000+i%40, 3000+i/40)
 	}
 	// far past the target along the framing camera's view: it lands in the middle of the shot
-	fwd, _, _ := Looking.basis()
+	fwd, _, _ := camera.Looking.Basis()
 	fmt.Fprintf(&text, "{\nguid \"{0FFFFFFF-0000-0000-0000-000000000000}\"\n\"classname\" \"info_null\"\n\"origin\" \"%s\"\n}\n",
 		vecText(mapfile.Vec3{fwd[0] * 20000, fwd[1] * 20000, fwd[2] * 20000}))
 	text.WriteString("{\nguid \"{0EEEEEEE-0000-0000-0000-000000000000}\"\n\"classname\" \"info_null\"\n\"origin\" \"0 0 0\"\n}\n")
@@ -189,7 +150,7 @@ func TestFitsAtItsEdges(t *testing.T) {
 		"half the width only":  {[][2]float64{{25, 25}, {75, 25}}, false},
 		"half the height only": {[][2]float64{{50, 0}, {50, 25}}, false},
 	} {
-		if fits(tc.at, 100, 50) != tc.want {
+		if camera.Fits(tc.at, 100, 50) != tc.want {
 			t.Errorf("%s: fits != %v", name, tc.want)
 		}
 	}

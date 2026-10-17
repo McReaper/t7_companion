@@ -1,4 +1,4 @@
-package level
+package picture
 
 import (
 	"flag"
@@ -31,8 +31,6 @@ func art(img *image.RGBA) string {
 	return s.String()
 }
 
-var update = flag.Bool("update", false, "rewrite testdata/labels.golden from the drawing")
-
 // Five labels on one point take its four places, above right, below right,
 // above left, below left, and the fifth its marker only; a sixth at the
 // corner is pushed inside the image. testdata/labels.golden was read glyph
@@ -60,23 +58,6 @@ func TestLabelsMakeRoomAtTheirThreshold(t *testing.T) {
 		{"d", 80, 100}, {"e", 80, 86}, // 14 above: both above right
 	})
 	golden(t, "testdata/labels_room.golden", art(img))
-}
-
-// golden compares a drawing with its golden file, rewritten under -update.
-func golden(t *testing.T, path, got string) {
-	t.Helper()
-	if *update {
-		if err := os.WriteFile(path, []byte(got), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	want, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != string(want) {
-		t.Errorf("drawn:\n%s\nwant:\n%s", got, want)
-	}
 }
 
 func TestFromBGRAReadsEveryPixel(t *testing.T) {
@@ -117,5 +98,24 @@ func TestShrinkTakesTheMeanUnderEachPixel(t *testing.T) {
 		if c := dst.RGBAAt(i%2, i/2); c != w {
 			t.Errorf("pixel %d = %v, want %v", i, c, w)
 		}
+	}
+}
+
+var update = flag.Bool("update", false, "rewrite testdata/labels.golden from the drawing")
+
+// golden compares a drawing with its golden file, rewritten under -update.
+func golden(t *testing.T, path, got string) {
+	t.Helper()
+	if *update {
+		if err := os.WriteFile(path, []byte(got), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != string(want) {
+		t.Errorf("drawn:\n%s\nwant:\n%s", got, want)
 	}
 }

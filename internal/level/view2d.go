@@ -9,7 +9,9 @@ import (
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/camera"
 	"github.com/McReaper/t7_companion/internal/level/geom"
+	"github.com/McReaper/t7_companion/internal/level/picture"
 	"github.com/McReaper/t7_companion/internal/radiant"
 )
 
@@ -22,7 +24,7 @@ const nextAxis = "command View/Layout/Next (XY, YZ, XY)"
 // moves the centre) or as it is. The user's view is read first, on the axis
 // it shows, and put back in that order: axis, zoom, centre.
 func (s *session) view2D(ctx context.Context, axis int, target *geom.Box, pts []mapfile.Vec3) (*frame, error) {
-	a := Axes[axis]
+	a := camera.Axes[axis]
 	first := pts
 	if target != nil {
 		first = nil // this shot only reads the view
@@ -31,7 +33,7 @@ func (s *session) view2D(ctx context.Context, axis int, target *geom.Box, pts []
 	shown, turned := shownAxis(err)
 	switch {
 	case turned:
-		user, err = shoot(ctx, s.c, Axes[shown].Name, nil, nil)
+		user, err = shoot(ctx, s.c, camera.Axes[shown].Name, nil, nil)
 	case err == nil && target == nil:
 		return user, nil
 	default:
@@ -44,11 +46,11 @@ func (s *session) view2D(ctx context.Context, axis int, target *geom.Box, pts []
 	if err != nil {
 		return nil, err
 	}
-	back := append(append(turns(axis, shown), zoomLines(StepsTo(user.Scale))...), centreLines(user.Centre, cam)...)
+	back := append(append(turns(axis, shown), zoomLines(camera.StepsTo(user.Scale))...), centreLines(user.Centre, cam)...)
 	s.restores = append(s.restores, restore{"2D view's axis, zoom and centre", back})
 	lines := turns(shown, axis)
 	if target != nil {
-		lines = append(append(lines, zoomLines(ZoomSteps(a, user.W, user.H, *target))...), centreLines(target.Centre(), cam)...)
+		lines = append(append(lines, zoomLines(camera.ZoomSteps(a, user.W, user.H, *target))...), centreLines(target.Centre(), cam)...)
 	}
 	for _, line := range lines {
 		if err := s.call(ctx, line); err != nil {
@@ -61,7 +63,7 @@ func (s *session) view2D(ctx context.Context, axis int, target *geom.Box, pts []
 // turns are the View/Layout/Next that turn the 2D view from one axis to another.
 func turns(from, to int) []string {
 	var out []string
-	for range NextPresses(from, to) {
+	for range camera.NextPresses(from, to) {
 		out = append(out, nextAxis)
 	}
 	return out
@@ -79,25 +81,25 @@ func shownAxis(err error) (int, bool) {
 		return 0, false
 	}
 	name, _, _ := strings.Cut(rest, ":")
-	return AxisNamed(strings.TrimSpace(name))
+	return camera.AxisNamed(strings.TrimSpace(name))
 }
 
 // camera reads the 3D camera.
-func (s *session) camera(ctx context.Context) (Pose, error) {
+func (s *session) camera(ctx context.Context) (camera.Pose, error) {
 	r, err := s.c.Call(ctx, "camera", nil)
 	if err != nil {
-		return Pose{}, err
+		return camera.Pose{}, err
 	}
 	f := strings.Fields(r.Summary)
 	if len(f) != 6 {
-		return Pose{}, fmt.Errorf("the camera is %q, not x y z pitch yaw roll", r.Summary)
+		return camera.Pose{}, fmt.Errorf("the camera is %q, not x y z pitch yaw roll", r.Summary)
 	}
 	o, ok1 := geom.ParseVec3(strings.Join(f[:3], " "))
 	a, ok2 := geom.ParseVec3(strings.Join(f[3:], " "))
 	if !ok1 || !ok2 {
-		return Pose{}, fmt.Errorf("the camera is %q, not x y z pitch yaw roll", r.Summary)
+		return camera.Pose{}, fmt.Errorf("the camera is %q, not x y z pitch yaw roll", r.Summary)
 	}
-	return Pose{Origin: o, Pitch: a[0], Yaw: a[1], Roll: a[2]}, nil
+	return camera.Pose{Origin: o, Pitch: a[0], Yaw: a[1], Roll: a[2]}, nil
 }
 
 // zoomLines set the 2D view's zoom to 100% then n steps in (out when n < 0).
@@ -115,13 +117,13 @@ func zoomLines(n int) []string {
 
 // centreLines centre the 2D view on a point: the camera goes there, the view
 // centres on it, the camera comes back.
-func centreLines(c mapfile.Vec3, cam Pose) []string {
+func centreLines(c mapfile.Vec3, cam camera.Pose) []string {
 	at := cam
 	at.Origin = c
 	return []string{"camera " + poseArgs(at), "action actionCenter_2D_On_Camera trigger", "camera " + poseArgs(cam)}
 }
 
-func poseArgs(p Pose) string {
+func poseArgs(p camera.Pose) string {
 	return strings.Join([]string{num(p.Origin[0]), num(p.Origin[1]), num(p.Origin[2]), num(p.Pitch), num(p.Yaw), num(p.Roll)}, " ")
 }
 
@@ -131,15 +133,15 @@ const DefaultSize = 768
 // compose scales the frame to the size asked and writes the ids whose points
 // landed in it, nearest the centre first.
 func compose(f *frame, view string, pts []labelPoint, size int) (*Shot, error) {
-	img, err := FromBGRA(f.Pixels, f.W, f.H)
+	img, err := picture.FromBGRA(f.Pixels, f.W, f.H)
 	if err != nil {
 		return nil, err
 	}
 	if size <= 0 {
 		size = DefaultSize
 	}
-	w, h := Fit(f.W, f.H, size)
-	img = Shrink(img, w, h)
+	w, h := picture.Fit(f.W, f.H, size)
+	img = picture.Shrink(img, w, h)
 	k := float64(w) / float64(f.W)
 	shot := &Shot{View: view, Image: img}
 	if view == "3d" {
@@ -155,7 +157,7 @@ func compose(f *frame, view string, pts []labelPoint, size int) (*Shot, error) {
 		if math.IsNaN(x) || x < 0 || y < 0 || x >= float64(w) || y >= float64(h) {
 			continue
 		}
-		shot.Labels = append(shot.Labels, Label{ID: p.id, X: int(x), Y: int(y)})
+		shot.Labels = append(shot.Labels, picture.Label{ID: p.id, X: int(x), Y: int(y)})
 	}
 	cx, cy := w/2, h/2
 	sort.SliceStable(shot.Labels, func(i, j int) bool {
@@ -165,6 +167,6 @@ func compose(f *frame, view string, pts []labelPoint, size int) (*Shot, error) {
 	if len(shot.Labels) > maxLabels {
 		shot.Labels = shot.Labels[:maxLabels]
 	}
-	DrawLabels(img, shot.Labels)
+	picture.DrawLabels(img, shot.Labels)
 	return shot, nil
 }

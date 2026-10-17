@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/camera"
 	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant"
 )
@@ -45,7 +46,7 @@ const (
 )
 
 // above is the direction a board is shot from: straight down, +y up the image.
-var above = Pose{Pitch: -89, Yaw: 90} // at -90 Radiant drops the yaw: the board comes out turned
+var above = camera.Pose{Pitch: -89, Yaw: 90} // at -90 Radiant drops the yaw: the board comes out turned
 
 // boardItem is one thing on a board: the op that puts it there, the box the
 // shot frames, and where its number goes.
@@ -61,7 +62,7 @@ type boardItem struct {
 type boardShot struct {
 	label  string
 	render string
-	look   Pose
+	look   camera.Pose
 }
 
 // ShowMaterials lays the materials out on a board above the map, shoots it
@@ -85,7 +86,7 @@ func ShowModels(ctx context.Context, c *radiant.Client, snap *Snapshot, models [
 
 // modelLook is the way a model board is looked at: from the front (-y),
 // a little above, so a second row shows behind the first.
-var modelLook = Pose{Pitch: -35, Yaw: 90}
+var modelLook = camera.Pose{Pitch: -35, Yaw: 90}
 
 // showBoard puts the items on the map, shoots them numbered, and takes them
 // back.

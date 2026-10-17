@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/camera"
 	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant"
 )
@@ -16,7 +17,7 @@ import (
 // and where each point asked for landed (NaN behind the camera).
 type frame struct {
 	W, H   int
-	Pose   Pose         // a 3D view's camera
+	Pose   camera.Pose  // a 3D view's camera
 	Centre mapfile.Vec3 // a 2D view's centre
 	Scale  float64      // a 2D view's pixels per unit
 	Pixels []byte
@@ -25,7 +26,7 @@ type frame struct {
 
 // shoot captures a view ("3d", "xy", "xz" or "yz"), from pose when given
 // (3D), projecting the points.
-func shoot(ctx context.Context, c *radiant.Client, view string, pose *Pose, pts []mapfile.Vec3) (*frame, error) {
+func shoot(ctx context.Context, c *radiant.Client, view string, pose *camera.Pose, pts []mapfile.Vec3) (*frame, error) {
 	line := "capture " + view
 	if pose != nil {
 		line += fmt.Sprintf(" %s %s %s %s %s %s", num(pose.Origin[0]), num(pose.Origin[1]), num(pose.Origin[2]), num(pose.Pitch), num(pose.Yaw), num(pose.Roll))
