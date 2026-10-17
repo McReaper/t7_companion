@@ -11,6 +11,7 @@ import (
 
 	"github.com/McReaper/t7_companion/internal/gdt"
 	"github.com/McReaper/t7_companion/internal/level"
+	"github.com/McReaper/t7_companion/internal/level/picture"
 	"github.com/McReaper/t7_companion/internal/radiant"
 )
 
@@ -141,7 +142,7 @@ func showMaterials(ctx context.Context, c *radiant.Client, snap *level.Snapshot,
 	if err != nil {
 		return nil, nil, err
 	}
-	png, err := level.PNG(b.Shot.Image)
+	png, err := picture.PNG(b.Shot.Image)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -188,7 +189,7 @@ func sheetMaterials(w *gdt.Workspace, out *mapMaterialsOut, size int) (*mapMater
 		wg.Go(func() {
 			slots <- struct{}{}
 			defer func() { <-slots }()
-			thumbs[i], errs[i] = level.Thumb(paths[i], cell-2)
+			thumbs[i], errs[i] = picture.Thumb(paths[i], cell-2)
 		})
 	}
 	wg.Wait()
@@ -198,8 +199,8 @@ func sheetMaterials(w *gdt.Workspace, out *mapMaterialsOut, size int) (*mapMater
 			out.Notes = append(out.Notes, fmt.Sprintf("%d, %s: %v", i+1, m.Name, errs[i]))
 		}
 	}
-	img := level.Sheet(thumbs, cell)
-	png, err := level.PNG(img)
+	img := picture.Sheet(thumbs, cell)
+	png, err := picture.PNG(img)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/camera"
 	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant/radianttest"
 )
@@ -112,9 +113,9 @@ func TestABoardIsDeletedWhenItCannotBeUndone(t *testing.T) {
 // Framed from above, a board fills the view and sits in its middle, the
 // tilt aside.
 func TestFramingFromAboveCentresAFlatBoxInTheView(t *testing.T) {
-	l := Lens{W: 1648, H: 869, F: 1212.4}
+	l := camera.Lens{W: 1648, H: 869, F: 1212.4}
 	b := box(mapfile.Vec3{-400, 100, 500}, mapfile.Vec3{400, 600, 508})
-	p := FrameBox(l, above, b)
+	p := camera.FrameBox(l, above, b)
 	x, y, ok := l.Project(p, b.Centre())
 	if !ok || math.Abs(x-824) > 1 || math.Abs(y-434.5) > 1 {
 		t.Errorf("the board's middle at %v, %v", x, y)
@@ -140,8 +141,8 @@ func TestFramingFromAboveCentresAFlatBoxInTheView(t *testing.T) {
 		t.Errorf("the board fills %.0f%% of the view", fill*100)
 	}
 	// A wide board fits its width, a deep one its depth.
-	wide, deep := FrameBox(l, above, box(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{1648, 100, 8})), FrameBox(l, above, box(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{100, 869, 8}))
-	if math.Abs(wide.Origin[2]-(4+1216.4*margin)) > 1 || math.Abs(deep.Origin[2]-wide.Origin[2]) > wide.Origin[2]/100 { // the 1° tilt aside
+	wide, deep := camera.FrameBox(l, above, box(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{1648, 100, 8})), camera.FrameBox(l, above, box(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{100, 869, 8}))
+	if math.Abs(wide.Origin[2]-(4+1216.4*camera.Margin)) > 1 || math.Abs(deep.Origin[2]-wide.Origin[2]) > wide.Origin[2]/100 { // the 1° tilt aside
 		t.Errorf("a board as wide as the view and one as deep are shot from %v and %v", wide.Origin[2], deep.Origin[2])
 	}
 	if c := cornerOf(box(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{256, 256, 8})); c != (mapfile.Vec3{20, 236, 8}) {

@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/camera"
+	"github.com/McReaper/t7_companion/internal/level/picture"
 	"github.com/McReaper/t7_companion/internal/radiant"
 	"github.com/McReaper/t7_companion/internal/radiant/radianttest"
 )
@@ -75,7 +77,7 @@ func TestA3DViewFramesItsTargetMeasuringTheLensOnce(t *testing.T) {
 
 func TestA3DViewFromAPoseOrAsItIs(t *testing.T) {
 	f, c, snap := viewing(t, 102)
-	pose := Pose{Origin: mapfile.Vec3{0, -600, 200}, Pitch: -15, Yaw: 90}
+	pose := camera.Pose{Origin: mapfile.Vec3{0, -600, 200}, Pitch: -15, Yaw: 90}
 	shot, err := View(context.Background(), c, snap, ViewOptions{Camera: &pose, Labels: true, Size: 80})
 	if err != nil {
 		t.Fatal(err)
@@ -131,7 +133,7 @@ func TestATopViewTurnsZoomsAndCentresThenPutsItAllBack(t *testing.T) {
 	if shot.View != "xy" || *shot.Centre != (mapfile.Vec3{12, 28, 16}) || fmt.Sprintf("%.4f", shot.Scale) != "0.1342" {
 		t.Errorf("shot centre %v scale %v", shot.Centre, shot.Scale)
 	}
-	if len(shot.Labels) != 1 || shot.Labels[0] != (Label{"6e73936d", 45, 80}) {
+	if len(shot.Labels) != 1 || shot.Labels[0] != (picture.Label{ID: "6e73936d", X: 45, Y: 80}) {
 		t.Errorf("labels = %+v", shot.Labels)
 	}
 	var st radianttest.Fake
@@ -172,7 +174,7 @@ func TestA2DViewAsItIs(t *testing.T) {
 
 func TestViewRefusals(t *testing.T) {
 	_, c, snap := viewing(t, 106)
-	pose := Pose{}
+	pose := camera.Pose{}
 	for o, want := range map[*ViewOptions]string{
 		{View: "diagonal"}:                 `view "diagonal": 3d, top, front or side`,
 		{View: "top", Camera: &pose}:       "a camera pose is for the 3d view",
@@ -251,7 +253,7 @@ func TestTheIDsOnAnImageStopAtForty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pose := Pose{Origin: mapfile.Vec3{30, -200, 0}, Yaw: 90}
+	pose := camera.Pose{Origin: mapfile.Vec3{30, -200, 0}, Yaw: 90}
 	shot, err := View(context.Background(), c, snap, ViewOptions{Camera: &pose, Labels: true})
 	if err != nil || len(shot.Labels) != maxLabels {
 		t.Errorf("%d labels, %v", len(shot.Labels), err)

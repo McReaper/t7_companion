@@ -13,6 +13,7 @@ import (
 
 	"github.com/McReaper/t7_companion/internal/gdt"
 	"github.com/McReaper/t7_companion/internal/level"
+	"github.com/McReaper/t7_companion/internal/level/picture"
 	"github.com/McReaper/t7_companion/internal/radiant"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -128,7 +129,7 @@ func showModels(ctx context.Context, c *radiant.Client, snap *level.Snapshot, ou
 	if err != nil {
 		return nil, nil, err
 	}
-	png, err := level.PNG(b.Shot.Image)
+	png, err := picture.PNG(b.Shot.Image)
 	if err != nil {
 		return nil, nil, err
 	}

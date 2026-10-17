@@ -6,7 +6,9 @@ import (
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/level"
+	"github.com/McReaper/t7_companion/internal/level/camera"
 	"github.com/McReaper/t7_companion/internal/level/geom"
+	"github.com/McReaper/t7_companion/internal/level/picture"
 	"github.com/McReaper/t7_companion/internal/radiant"
 )
 
@@ -64,7 +66,7 @@ func mapView(ctx context.Context, a mapViewArgs) (*mapViewOut, []byte, error) {
 		if !ok1 || !ok2 {
 			return nil, nil, fmt.Errorf("camera %q: give x y z pitch yaw roll", a.Camera)
 		}
-		o.Camera = &level.Pose{Origin: pos, Pitch: ang[0], Yaw: ang[1], Roll: ang[2]}
+		o.Camera = &camera.Pose{Origin: pos, Pitch: ang[0], Yaw: ang[1], Roll: ang[2]}
 	}
 	c, err := radiant.Connect(ctx, radiantMachine, a.PID)
 	if err != nil {
@@ -79,7 +81,7 @@ func mapView(ctx context.Context, a mapViewArgs) (*mapViewOut, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	png, err := level.PNG(shot.Image)
+	png, err := picture.PNG(shot.Image)
 	if err != nil {
 		return nil, nil, err
 	}

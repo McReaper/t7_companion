@@ -13,7 +13,9 @@ import (
 	"time"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/camera"
 	"github.com/McReaper/t7_companion/internal/level/geom"
+	"github.com/McReaper/t7_companion/internal/level/picture"
 	"github.com/McReaper/t7_companion/internal/radiant"
 )
 
@@ -24,14 +26,14 @@ type ViewOptions struct {
 	Frame  *geom.Box     // or frame this box
 	At     *mapfile.Vec3 // or frame the box of Radius around this point
 	Radius float64
-	Camera *Pose  // or shoot the 3D view from here
-	Size   int    // the image's longer side, at most
-	Render string // the 3D view's render method for the shot, put back after
-	Labels bool   // write ids on the image
-	Hide   string // "volumes", "sky" or both, comma-separated: hidden for the shot
-	Bake   bool   // bake Radiant's lighting first and shoot under real lighting
-	Look   *Pose  // the way a framed 3D target is looked at (default Looking)
-	Marks  []Mark // with Labels, these labels instead of ids
+	Camera *camera.Pose // or shoot the 3D view from here
+	Size   int          // the image's longer side, at most
+	Render string       // the 3D view's render method for the shot, put back after
+	Labels bool         // write ids on the image
+	Hide   string       // "volumes", "sky" or both, comma-separated: hidden for the shot
+	Bake   bool         // bake Radiant's lighting first and shoot under real lighting
+	Look   *camera.Pose // the way a framed 3D target is looked at (default Looking)
+	Marks  []Mark       // with Labels, these labels instead of ids
 }
 
 // Mark is a label of the caller's: its text (hex digits, as ids are) and the
@@ -45,13 +47,13 @@ type Mark struct {
 type Shot struct {
 	View   string // 3d, xy, xz or yz
 	Image  *image.RGBA
-	Pose   *Pose         // a 3D shot's camera
-	Centre *mapfile.Vec3 // a 2D shot's centre
-	Scale  float64       // a 2D shot's image pixels per unit
-	Labels []Label       // the ids in the image, where their points landed
-	Notes  []string      // what View could not put back as it was
-	Baked  string        // the bake's end, as Radiant's console said it: "All Probes Done (1.61 s)"
-	Warned []string      // what the bake's console warned of: a shadow dropped, a probe that failed
+	Pose   *camera.Pose    // a 3D shot's camera
+	Centre *mapfile.Vec3   // a 2D shot's centre
+	Scale  float64         // a 2D shot's image pixels per unit
+	Labels []picture.Label // the ids in the image, where their points landed
+	Notes  []string        // what View could not put back as it was
+	Baked  string          // the bake's end, as Radiant's console said it: "All Probes Done (1.61 s)"
+	Warned []string        // what the bake's console warned of: a shadow dropped, a probe that failed
 }
 
 // views are the names View takes, by bridge name.
@@ -89,7 +91,7 @@ func View(ctx context.Context, c *radiant.Client, snap *Snapshot, o ViewOptions)
 	case view == "3d":
 		f, err = s.view3D(ctx, target, o, points(pts))
 	default:
-		axis, _ := AxisNamed(view)
+		axis, _ := camera.AxisNamed(view)
 		f, err = s.view2D(ctx, axis, target, points(pts))
 	}
 	s.undo(ctx)
@@ -372,14 +374,14 @@ const restoreTimeout = 10 * time.Second
 // one is, the lens of a 1648×869 view Radiant drew.
 var (
 	lensMu sync.Mutex
-	lenses = map[int]Lens{}
-	guess  = Lens{W: 1648, H: 869, F: 1212.4}
+	lenses = map[int]camera.Lens{}
+	guess  = camera.Lens{W: 1648, H: 869, F: 1212.4}
 )
 
-func (s *session) lens() Lens { return lensOf(s.pid) }
+func (s *session) lens() camera.Lens { return lensOf(s.pid) }
 
 // lensOf is a Radiant's 3D lens as last measured, else the guess.
-func lensOf(pid int) Lens {
+func lensOf(pid int) camera.Lens {
 	lensMu.Lock()
 	defer lensMu.Unlock()
 	if l, ok := lenses[pid]; ok {
@@ -388,7 +390,7 @@ func lensOf(pid int) Lens {
 	return guess
 }
 
-func (s *session) remember(l Lens) {
+func (s *session) remember(l camera.Lens) {
 	lensMu.Lock()
 	defer lensMu.Unlock()
 	lenses[s.pid] = l
@@ -411,24 +413,24 @@ func (s *session) view3D(ctx context.Context, target *geom.Box, o ViewOptions, p
 	}
 	pose := o.Camera
 	var corners []mapfile.Vec3
-	look := Looking
+	look := camera.Looking
 	if o.Look != nil {
 		look = *o.Look
 	}
 	if pose == nil && target != nil {
 		corners = target.Corners()
-		p := FrameBox(s.lens(), look, *target)
+		p := camera.FrameBox(s.lens(), look, *target)
 		pose = &p
 	}
 	f, err := shoot(ctx, s.c, "3d", pose, append(corners, pts...))
 	if err == nil && corners != nil {
 		// The lens the frame assumed is checked against where Radiant drew the
 		// corners: a frame from another lens is shot again with the one measured.
-		if l := (Lens{f.W, f.H, FocalFrom(f.W, f.H, f.Pose, corners, f.At[:len(corners)])}); l.F > 0 {
+		if l := (camera.Lens{W: f.W, H: f.H, F: camera.FocalFrom(f.W, f.H, f.Pose, corners, f.At[:len(corners)])}); l.F > 0 {
 			assumed := s.lens()
 			s.remember(l)
-			if !fits(f.At[:len(corners)], f.W, f.H) || l.W != assumed.W || l.H != assumed.H || math.Abs(l.F/assumed.F-1) > lensSlack {
-				p := FrameBox(l, look, *target)
+			if !camera.Fits(f.At[:len(corners)], f.W, f.H) || l.W != assumed.W || l.H != assumed.H || math.Abs(l.F/assumed.F-1) > lensSlack {
+				p := camera.FrameBox(l, look, *target)
 				f, err = shoot(ctx, s.c, "3d", &p, append(corners, pts...))
 			}
 		}
@@ -544,18 +546,4 @@ func (s *session) setRender(ctx context.Context, render string) error {
 		s.restores = append(s.restores, restore{"render method", []string{"command View/Render Method/" + st.Render}})
 	}
 	return nil
-}
-
-// fits reports whether the points all landed in the view and span more than
-// half of it one way.
-func fits(at [][2]float64, w, h int) bool {
-	minX, minY, maxX, maxY := math.Inf(1), math.Inf(1), math.Inf(-1), math.Inf(-1)
-	for _, p := range at {
-		if math.IsNaN(p[0]) {
-			return false
-		}
-		minX, minY, maxX, maxY = math.Min(minX, p[0]), math.Min(minY, p[1]), math.Max(maxX, p[0]), math.Max(maxY, p[1])
-	}
-	fw, fh := float64(w), float64(h)
-	return minX >= 0 && minY >= 0 && maxX <= fw && maxY <= fh && (maxX-minX > fw/2 || maxY-minY > fh/2)
 }
