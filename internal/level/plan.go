@@ -127,12 +127,24 @@ func Edit(ctx context.Context, c *radiant.Client, snap *Snapshot, ops []Op, labe
 	return EditWith(ctx, c, snap, ops, label, tiles, nil)
 }
 
+// EditOption sets something an edit may read beyond the map.
+type EditOption func(*batch)
+
+// WithPrefabs lets the edit read a misc_prefab's map by its model path
+// ("_prefabs/zm/…map"): the probes op stands on what prefabs hold.
+func WithPrefabs(read func(model string) (*mapfile.Map, error)) EditOption {
+	return func(b *batch) { b.prefab = read }
+}
+
 // EditWith is Edit knowing the materials: which hide what is behind them,
 // for a texture op on the faces other brushes hide (nil takes every material
 // as opaque).
-func EditWith(ctx context.Context, c *radiant.Client, snap *Snapshot, ops []Op, label string, tiles Tiles, info func(string) MaterialInfo) (*Done, error) {
+func EditWith(ctx context.Context, c *radiant.Client, snap *Snapshot, ops []Op, label string, tiles Tiles, info func(string) MaterialInfo, opts ...EditOption) (*Done, error) {
 	b := newBatch(snap, tiles)
 	b.info = info
+	for _, o := range opts {
+		o(b)
+	}
 	if err := b.apply(ops); err != nil {
 		return nil, err
 	}

@@ -134,7 +134,14 @@ func mapEditTool() server.ServerTool {
 			"any outline (cut into convex brushes) or the floor brushes' own; riser spawners spread on the floor found under it, clear "+
 			"of walls; a node_pathnode for the navmesh to grow from; a zone the map has keeps its spawners' name. The answer's "+
 			"script lists the add_adjacent_zone calls the map's script lacks (map_edit writes no script), its notes overlapping "+
-			"zones and rooms in none. Ids are map_find's, or @n: what op "+
+			"zones and rooms in none. {\"probes\": {\"at\"?: [x,y,z], \"replace\"?: false, \"global\"?: false, \"height\"?: 384, "+
+			"\"keys\"?: {…}}} probes the space players reach, any map: from at (default the info_player_start) it walks the "+
+			"floors a player gets to (steps of 18 up, any drop off a ledge, a body's room; stairs, upper storeys and prefabs' "+
+			"brushes included, clips and nonColliding brushes passed through), on a map with zones only what lies in them, and boxes them, the largest first, floor to ceiling, sides on the walls' "+
+			"faces, none overlapping: a lintel or a storey parts boxes, a sealed space gets none (it would bake out of range), "+
+			"a box over open sky stops height up; each a reflection_probe at Treyarch's defaults (4x, AO 8, blends 3), blends "+
+			"longer over floor no box holds; replace deletes the probes standing in the boxes (kept by default, noted); global also moves "+
+			"the global probe into the largest box (an info_null the volume_sun targets). Ids are map_find's, or @n: what op "+
 			"n of this batch made (every copy of a copy op), so a box built, textured and copied is one undo step. A point "+
 			"entity keeps its id; a world brush or an entity that owns brushes is rebuilt and gets a new one (was gives "+
 			"the old). The answer reads the map back: each op's id, class, origin or bounds, the tile each material got "+

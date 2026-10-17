@@ -159,6 +159,29 @@
 // convex pieces (their bounds would have two zones winding round each other
 // overlap), and those that overlap, or are linked and don't meet, are noted.
 //
+// # Probes
+//
+// A probes op samples the ground every 8 units as its walk reaches it, half
+// a unit off each cell's middle (no face on the grid's 4s or 8s lies on a
+// sample), over what a player collides with (solids.go: world, func_group and prefab brushes, prefabs read from
+// map_source and placed by origin, angles and modelscale; patches as
+// floors; tool-only, nonColliding and weaponClip brushes left out): each
+// cell's spots are the solids' tops with 72 of room above, a spot's ceiling
+// the next solid up or, past height, open sky. A walk from the start reaches
+// a neighbour a step (18) up or any drop down; a cell spreads it only when
+// its four sides stand (a body's width), to its diagonals too (a room's
+// corners), and a drop carries it one cell past the ledge (a body lands
+// clear of it). On a map with player_volumes, the spots in none are dropped
+// but for 3 cells around those kept (doorways, strips along walls); if none
+// is in a zone, all are kept. Spots are grouped by storey (reached spots
+// under theirs) and ceiling (16-unit steps, open sky one): a lintel, a storey,
+// a stair climbing through an opening part groups, and a cell has one spot a
+// storey. Each group is cut into its largest rectangles of 6 cells or more
+// each way (a maximal rectangle can't grow, so narrower leftovers stay out),
+// each from its lowest floor, never below a storey under it, to its highest
+// ceiling. Sides then move onto the face of the wall beyond, found along five
+// lines at a body's height over the floor inside, never into another box.
+//
 // # Boards
 //
 // ShowMaterials shows materials as Radiant draws them: a 256-unit slab of
