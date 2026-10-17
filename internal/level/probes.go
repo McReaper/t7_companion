@@ -31,6 +31,7 @@ const (
 	probeCell = 8.0
 	stepUp    = 18.0 // the highest step a player climbs
 	minSide   = 6    // cells: a box narrower than 48 is a doorway or a gap, left to the blends
+	sampleOff = 0.5  // a cell is sampled this far off its middle: a face on the 4s of the grid (an 8-thick wall centred on a grid line) or the 8s never lies on a sample
 )
 
 // pspot is somewhere to stand in a cell: the floor's top and the ceiling over
@@ -59,7 +60,7 @@ func newProbeGrid(s *solids, height float64) *probeGrid {
 	g.spots = make([][]pspot, g.n*g.m)
 	for j := range g.m {
 		for i := range g.n {
-			g.spots[i+j*g.n] = g.standing(g.cx(i), g.cy(j))
+			g.spots[i+j*g.n] = g.standing(g.cx(i)+sampleOff, g.cy(j)+sampleOff)
 		}
 	}
 	return g

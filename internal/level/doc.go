@@ -161,8 +161,9 @@
 //
 // # Probes
 //
-// A probes op samples the ground every 8 units over what a player collides
-// with (solids.go: world, func_group and prefab brushes, prefabs read from
+// A probes op samples the ground every 8 units, half a unit off each cell's
+// middle (no face on the grid's 4s or 8s lies on a sample), over what a
+// player collides with (solids.go: world, func_group and prefab brushes, prefabs read from
 // map_source and placed by origin, angles and modelscale; patches as
 // floors; tool-only, nonColliding and weaponClip brushes left out): each
 // cell's spots are the solids' tops with 72 of room above, a spot's ceiling

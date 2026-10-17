@@ -372,3 +372,77 @@ func TestProbesDropOffLedges(t *testing.T) {
 	}
 	wantBox(t, ps, mapfile.Vec3{6004, 4, 0}, mapfile.Vec3{6508, 252, 240})
 }
+
+// An L-shaped room is two boxes meeting edge to edge: the leg and corner
+// first (the larger), then the rest, neither snapping into the other.
+func TestProbesCutAnLShapedRoom(t *testing.T) {
+	d, ps, err := probesRun(t, 964, `[
+		{"walls": {"material": "brick", "z": [0, 112], "lines": [{"points": [[6000, 0], [6512, 0], [6512, 128], [6256, 128], [6256, 384], [6000, 384]], "closed": true}]}},
+		{"box": {"min": [5996, -4, -16], "max": [6516, 388, 0], "material": "concrete"}},
+		{"box": {"min": [5996, -4, 112], "max": [6516, 388, 128], "material": "concrete"}},
+		{"probes": {"at": [6128, 200, 8]}}]`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ps) != 2 {
+		t.Fatalf("%d probes: %+v", len(ps), ps)
+	}
+	wantBox(t, ps, mapfile.Vec3{6004, 4, 0}, mapfile.Vec3{6248, 380, 112})
+	wantBox(t, ps, mapfile.Vec3{6248, 4, 0}, mapfile.Vec3{6508, 124, 112})
+	noProbeOverlap(t, ps)
+	if n := strings.Join(d.Notes, "\n"); strings.Contains(n, "in no box") {
+		t.Errorf("notes %q: every cell reached is in a box", n)
+	}
+}
+
+// A strip under a soffit, too narrow for a box of its own, is in none: the
+// room's blend reaches over it, 3 cells and 4, and the note counts it.
+func TestProbesBlendOverAStripNoBoxHolds(t *testing.T) {
+	d, ps, err := probesRun(t, 965, `[`+room(6000, 0, 6256, 256, 0, "")+`,
+		{"box": {"min": [6004, 4, 88], "max": [6252, 28, 112], "material": "concrete"}},
+		{"probes": {"at": [6128, 128, 8]}}]`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ps) != 1 {
+		t.Fatalf("%d probes: %+v", len(ps), ps)
+	}
+	wantBox(t, ps, mapfile.Vec3{6004, 24, 0}, mapfile.Vec3{6252, 252, 112}) // the soffit ends at 28: the row from 24 is mostly the room
+	if p := ps[0]; p.keys["blend_mins"] != "3 28 3" || p.keys["blend_maxs"] != "3 3 3" {
+		t.Errorf("blends %s / %s, want 28 over the strip, 3 on the walls", p.keys["blend_mins"], p.keys["blend_maxs"])
+	}
+	if n := strings.Join(d.Notes, "\n"); !strings.Contains(n, "probes: 93 of the 8-unit cells reached are in no box") {
+		t.Errorf("notes %q: the strip's 31 by 3 cells", n)
+	}
+}
+
+// A corridor 48 wide is a box's narrowest, its faces on the 4s of the grid
+// or on the 8s; one 40 wide is left to the blends.
+func TestProbesBoxCorridorsFromFortyEightWide(t *testing.T) {
+	pid := 966
+	for _, c := range []struct {
+		lo, width float64 // the corridor's inside, from its south face
+		boxes     int
+	}{{4, 48, 2}, {4, 40, 1}, {0, 48, 2}, {0, 40, 1}} {
+		hi := c.lo + c.width
+		hall := fmt.Sprintf(`[{"box": {"min": [6000, -16, 0], "max": [6256, 0, 112], "material": "brick"}},
+			{"box": {"min": [6000, 256, 0], "max": [6256, 272, 112], "material": "brick"}},
+			{"box": {"min": [5984, -16, 0], "max": [6000, 272, 112], "material": "brick"}},
+			{"box": {"min": [6256, -16, 0], "max": [6272, %[1]g, 112], "material": "brick"}},
+			{"box": {"min": [6256, %[2]g, 0], "max": [6272, 272, 112], "material": "brick"}},
+			{"box": {"min": [6272, -16, 0], "max": [6528, %[1]g, 112], "material": "brick"}},
+			{"box": {"min": [6272, %[2]g, 0], "max": [6528, %[3]g, 112], "material": "brick"}},
+			{"box": {"min": [6512, %[1]g, 0], "max": [6528, %[2]g, 112], "material": "brick"}},
+			{"box": {"min": [5984, -16, -16], "max": [6528, 272, 0], "material": "concrete"}},
+			{"box": {"min": [5984, -16, 112], "max": [6528, 272, 128], "material": "concrete"}},
+			{"probes": {"at": [6128, 128, 8]}}]`, c.lo, hi, hi+16)
+		_, ps, err := probesRun(t, pid, hall)
+		pid++
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(ps) != c.boxes {
+			t.Errorf("corridor from %g, %g wide: %d probes, want %d: %+v", c.lo, c.width, len(ps), c.boxes, ps)
+		}
+	}
+}
