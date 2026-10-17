@@ -124,7 +124,7 @@ func newBuildPlan(o *Options, name string, stdout io.Writer) (*buildPlan, error)
 	if p.dvars, err = gameDvars(o); err != nil {
 		return nil, err
 	}
-	p.language, p.languageNote = linkLanguage(o.Language)
+	p.language, p.languageNote = linkLanguage(o.Language, p.game)
 	pp := name[:2]
 	p.mapSrc = filepath.Join(p.game, "map_source", pp, name+".map")
 	p.d3dbsp = filepath.Join(p.game, "share", "raw", "maps", pp, name+".d3dbsp")
@@ -191,24 +191,6 @@ func (p *buildPlan) gameStage() (StageResult, bool) {
 		return StageResult{}, false
 	}
 	return gameRunner(p.game, append(dvarArgs(p.dvars), gameArgs(p.name, p.o.Mod)...)), true
-}
-
-// launcherLanguage reads the Launcher's Build Language; a variable so tests
-// don't read the machine's.
-var launcherLanguage = readLauncherLanguage
-
-// linkLanguage is the language the link passes and, when it wasn't asked for,
-// why: the Launcher's Build Language as a Launcher build would, else english.
-// The game loads a map's <language>_<map>.ff in its own language and stops on
-// "Could not find zone" without it.
-func linkLanguage(asked string) (lang, note string) {
-	if asked != "" {
-		return asked, ""
-	}
-	if l := strings.TrimSpace(launcherLanguage()); l != "" {
-		return l, "language " + l + ": the Launcher's Build Language"
-	}
-	return "english", "language english: the Launcher saves no Build Language"
 }
 
 // gameDvars are the dvars the run stage starts the game with: the Launcher's

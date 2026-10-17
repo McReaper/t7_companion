@@ -33,11 +33,11 @@
 // that order, as the Launcher does. With FreshXpak the link sets the target's
 // .xpak files aside so the linker writes them from scratch (it only ever
 // appends), then keeps the new ones, or puts the old ones back after a failed
-// link (xpak.go). Its language, unless asked for, is the Launcher's Build
-// Language (the registry, dvars_windows.go), else english: the game loads a
+// link (xpak.go). Its language, unless asked for, is the game's own, read from
+// its install (language.go: localization.txt's first line, which the game
+// reads at startup, else Steam's manifest), else english: the game loads a
 // map's <language>_<map>.ff in its own language and stops on a fatal error
-// without it, so a link in another language than the Launcher's builds a map
-// the user's game can't open.
+// without it.
 //
 // # The run stage
 //

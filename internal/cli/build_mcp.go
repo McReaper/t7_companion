@@ -41,7 +41,7 @@ func buildToolDef() mcp.Tool {
 		mcp.WithBoolean("onlyents",
 			mcp.Description("Fast entity-only compile (-onlyents); invalid after brush edits (default false).")),
 		mcp.WithString("language",
-			mcp.Description("Linker language (default: the Build Language saved in the mod tools Launcher's options, else \"english\"). The game loads a map's <language>_<map>.ff in its own language and stops on \"Could not find zone\" without it.")),
+			mcp.Description("Linker language (default: the game's own, read from its install: localization.txt's first line, else Steam's manifest, else \"english\"). The game loads a map's <language>_<map>.ff in its own language and stops on \"Could not find zone\" without it.")),
 		mcp.WithBoolean("skip_gdt",
 			mcp.Description("Skip the gdtdb /update pass before building (default false).")),
 		mcp.WithBoolean("gdt_rebuild",
