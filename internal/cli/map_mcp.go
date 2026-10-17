@@ -85,10 +85,10 @@ func mapEditTool() server.ServerTool {
 			"\"min\": [x,y], \"max\": [x,y], \"material\"?: m, \"floor\"?: m, \"ceiling\"?: m, \"outdoor\"?: true, \"zone\"?: z}], "+
 			"\"openings\"?: [{\"room\": n, \"to\": n2 | \"side\": \"-y\", \"at\"?: u, \"width\"?: 72, \"height\"?: 96, "+
 			"\"sill\"?: 0}], \"material\": m, \"floor\"?: m, \"ceiling\"?: m, \"exterior\"?: m, \"z\"?: 0, \"height\"?: 112, "+
-			"\"wall\"?: 8, \"slab\"?: 16, \"probes\"?: true, \"spawners\"?: 4}} builds a storey from its plan: rooms are rectangles meeting along "+
+			"\"wall\"?: 8, \"slab\"?: 16, \"spawners\"?: 4}} builds a storey from its plan: rooms are rectangles meeting along "+
 			"their edges, from wall centre to wall centre (a room 256 wide is 248 inside); a wall stands on every edge, one where two "+
 			"rooms meet, each side of it in the material of the room it looks into (exterior outside, and in an outdoor room); each room gets a floor slab "+
-			"under z and a ceiling height above (outdoor: none) and a reflection_probe (probes false: none); an opening is a door to "+
+			"under z and a ceiling height above (outdoor: none); an opening is a door to "+
 			"the room it opens on, or on a side of its room, 72 wide (two abreast), a window with a sill (56 by 64 then), at the world x or y u of its middle "+
 			"(default the middle of the shared wall or side), the walls built around it; the faces the pieces hide of each other are "+
 			"caulk, and the answer's part names each piece (\"hall floor\", \"hall|kitchen wall\"); rooms naming a zone get it, its "+
@@ -98,15 +98,8 @@ func mapEditTool() server.ServerTool {
 			"any outline (cut into convex brushes) or the floor brushes' own; riser spawners spread on the floor found under it, clear "+
 			"of walls; a node_pathnode for the navmesh to grow from; a zone the map has keeps its spawners' name. The answer's "+
 			"script lists the add_adjacent_zone calls the map's script lacks (map_edit writes no script), its notes overlapping "+
-			"zones and rooms in none. {\"probes\": {\"at\"?: [x,y,z], \"replace\"?: false, \"global\"?: false, \"height\"?: 384, "+
-			"\"keys\"?: {…}}} probes the space players reach, any map: from at (default the info_player_start) it walks the "+
-			"floors a player gets to (steps of 18 up, any drop off a ledge, a body's room; stairs, upper storeys and prefabs' "+
-			"brushes included, clips and nonColliding brushes passed through), on a map with zones only what lies in them, and boxes them: a box turned along each wall off the axes (48 deep, "+
-			"across a corridor off the axes), then the largest first on the axes, floor to ceiling, sides on the walls' "+
-			"faces, none overlapping: a lintel or a storey parts boxes, a sealed space gets none (it would bake out of range), "+
-			"a box over open sky stops height up; each a reflection_probe at Treyarch's defaults (4x, AO 8, blends 3), blends "+
-			"longer over floor no box holds; replace deletes the probes standing in the space it probes (kept by default, noted); global also moves "+
-			"the global probe into the largest box (an info_null the volume_sun targets). Ids are map_find's, or @n: what op "+
+			"zones and rooms in none. "+
+			"Ids are map_find's, or @n: what op "+
 			"n of this batch made (every copy of a copy op), so a box built, textured and copied is one undo step. A point "+
 			"entity keeps its id; a world brush or an entity that owns brushes is rebuilt and gets a new one (was gives "+
 			"the old). Every entity or brush of the map an op names needs the rev map_find gave it, in revs: the user works in the "+

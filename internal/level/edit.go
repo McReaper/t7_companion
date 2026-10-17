@@ -22,16 +22,15 @@ type Op struct {
 	Zone     *ZoneOp     `json:"zone,omitempty"`
 	Shape    *ShapeOp    `json:"shape,omitempty"`
 	Walls    *WallsOp    `json:"walls,omitempty"`
-	Probes   *ProbesOp   `json:"probes,omitempty"`
 }
 
 // opKinds are the names of an op's fields, in Op's order.
-var opKinds = []string{"box", "entity", "delete", "set", "move", "material", "texture", "copy", "layout", "zone", "shape", "walls", "probes"}
+var opKinds = []string{"box", "entity", "delete", "set", "move", "material", "texture", "copy", "layout", "zone", "shape", "walls"}
 
 // kinds are which of its fields an op sets, by their index in opKinds.
 func (op Op) kinds() []int {
 	var out []int
-	for i, set := range []bool{op.Box != nil, op.Entity != nil, op.Delete != nil, op.Set != nil, op.Move != nil, op.Material != nil, op.Texture != nil, op.Copy != nil, op.Layout != nil, op.Zone != nil, op.Shape != nil, op.Walls != nil, op.Probes != nil} {
+	for i, set := range []bool{op.Box != nil, op.Entity != nil, op.Delete != nil, op.Set != nil, op.Move != nil, op.Material != nil, op.Texture != nil, op.Copy != nil, op.Layout != nil, op.Zone != nil, op.Shape != nil, op.Walls != nil} {
 		if set {
 			out = append(out, i)
 		}
@@ -103,18 +102,17 @@ const (
 type batch struct {
 	snap        *Snapshot
 	units       []*unit
-	by          map[string]*unit                   // GUID hex (entity, world brush, entity brush) -> its unit
-	brush       map[string]*mapfile.Brush          // GUID hex -> the brush, for an entity's brush named alone
-	world       string                             // worldspawn's GUID hex
-	tiles       Tiles                              // sizes a material's tile; nil assumes one
-	info        func(string) MaterialInfo          // which materials hide what is behind them; nil, all
-	used        map[string]Tile                    // the tile each material was given
-	faces       map[int]int                        // texture op -> faces it textured
-	zones       []madeZone                         // the zones it made
-	links       []Link                             // the add_adjacent_zone calls they need
-	notes       []string                           // what the answer should say of them
-	prefab      func(string) (*mapfile.Map, error) // reads a misc_prefab's map by its model path; nil, prefabs unread
-	revs        map[string]string                  // what was read, by id (WithRevs)
+	by          map[string]*unit          // GUID hex (entity, world brush, entity brush) -> its unit
+	brush       map[string]*mapfile.Brush // GUID hex -> the brush, for an entity's brush named alone
+	world       string                    // worldspawn's GUID hex
+	tiles       Tiles                     // sizes a material's tile; nil assumes one
+	info        func(string) MaterialInfo // which materials hide what is behind them; nil, all
+	used        map[string]Tile           // the tile each material was given
+	faces       map[int]int               // texture op -> faces it textured
+	zones       []madeZone                // the zones it made
+	links       []Link                    // the add_adjacent_zone calls they need
+	notes       []string                  // what the answer should say of them
+	revs        map[string]string         // what was read, by id (WithRevs)
 	requireRevs bool
 }
 
@@ -145,7 +143,7 @@ func newBatch(snap *Snapshot, tiles Tiles) *batch {
 // apply runs the ops in order over the batch.
 func (b *batch) apply(ops []Op) error {
 	if len(ops) == 0 {
-		return fmt.Errorf("no ops: give box, entity, delete, set, move, material, texture, copy, layout, zone, shape, walls or probes ops")
+		return fmt.Errorf("no ops: give box, entity, delete, set, move, material, texture, copy, layout, zone, shape or walls ops")
 	}
 	for i, op := range ops {
 		if err := b.applyOne(i, op); err != nil {
@@ -182,8 +180,6 @@ func (b *batch) applyOne(i int, op Op) error {
 		return b.shape(i, op.Shape)
 	case op.Walls != nil:
 		return b.walls(i, op.Walls)
-	case op.Probes != nil:
-		return b.probes(i, op.Probes)
 	default:
 		if !word(op.Material.Material) {
 			return fmt.Errorf("material %q: one word, a material's name", op.Material.Material)

@@ -139,39 +139,3 @@ func revsOf(t *testing.T, ids ...string) map[string]string {
 	}
 	return revs
 }
-
-// prefabReader reads a prefab from the install's map_source once, and says
-// why it can't.
-func TestPrefabReader(t *testing.T) {
-	root := t.TempDir()
-	dir := filepath.Join(root, "map_source", "_prefabs", "test")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	room := filepath.Join(dir, "room.map")
-	if err := os.WriteFile(room, []byte("iwmap 4\n// entity 0\n{\n\"classname\" \"worldspawn\"\n}\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "open.map"), []byte("{\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	read := prefabReader(root)
-	m, err := read("_prefabs/test/room.map")
-	if err != nil || len(m.Entities) != 1 {
-		t.Fatalf("room.map: %v, %v", m, err)
-	}
-	if err := os.Remove(room); err != nil {
-		t.Fatal(err)
-	}
-	if again, err := read("_prefabs/test/room.map"); err != nil || again != m {
-		t.Errorf("read again: %v, %v: the first read, kept", again, err)
-	}
-	for model, want := range map[string]string{"_prefabs/test/none.map": "none.map", "_prefabs/test/open.map": "still open"} {
-		if _, err := read(model); err == nil || !strings.Contains(err.Error(), want) {
-			t.Errorf("%s: %v, want %q", model, err, want)
-		}
-	}
-	if _, err := prefabReader("")("_prefabs/test/room.map"); err == nil || !strings.Contains(err.Error(), "install isn't known") {
-		t.Errorf("no install: %v", err)
-	}
-}

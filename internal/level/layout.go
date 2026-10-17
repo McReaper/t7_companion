@@ -15,8 +15,7 @@ import (
 // LayoutOp builds a storey from its plan: named rooms, rectangles on the
 // ground that meet along their edges. A wall stands centred on every edge,
 // one where two rooms meet; each room gets a floor and a ceiling slab between
-// its walls (an outdoor one no ceiling) and a reflection probe; openings are
-// holes the walls are built around (CSG Subtract would carve the map's
+// its walls (an outdoor one no ceiling); openings are holes the walls are built around (CSG Subtract would carve the map's
 // volumes too). A wall's sides take the material of the room each looks
 // into, or the exterior's; the faces its pieces hide of each other are caulk.
 type LayoutOp struct {
@@ -30,7 +29,6 @@ type LayoutOp struct {
 	Height   float64    `json:"height,omitempty"`   // floor to ceiling; none, Treyarch's 112
 	Wall     float64    `json:"wall,omitempty"`     // wall thickness; none, Treyarch's 8
 	Slab     float64    `json:"slab,omitempty"`     // floor and ceiling thickness; none, Treyarch's 16
-	Probes   *bool      `json:"probes,omitempty"`   // a reflection_probe in each room; none, true
 	Spawners *int       `json:"spawners,omitempty"` // each zone's riser spawners; none, the zone op's
 }
 
@@ -87,8 +85,7 @@ type hole struct {
 	floor          string // a door's threshold takes its room's floor material
 }
 
-// layout runs a layout op: its pieces, each a world brush of op i, then a
-// probe in each room.
+// layout runs a layout op: its pieces, each a world brush of op i.
 func (b *batch) layout(i int, o *LayoutOp) error {
 	l := *o // its defaults filled, the op left as sent
 	l.Rooms, l.Openings = slices.Clone(o.Rooms), slices.Clone(o.Openings)
@@ -109,15 +106,6 @@ func (b *batch) layout(i int, o *LayoutOp) error {
 	}
 	for k, br := range brushes {
 		b.units = append(b.units, &unit{brush: br, world: true, state: created, op: i, part: pieces[k].part})
-	}
-	for _, r := range l.Rooms {
-		if l.Probes != nil && !*l.Probes {
-			break
-		}
-		if err := b.entity(i, l.probe(r)); err != nil {
-			return err
-		}
-		b.units[len(b.units)-1].part = r.Name + " probe"
 	}
 	return b.layoutZones(i, &l)
 }
@@ -553,20 +541,4 @@ func (l *LayoutOp) part(s *seg) string {
 		}
 	}
 	return strings.Join(names, "|") + " wall"
-}
-
-// probe is a room's reflection probe: in the middle of its inside, its box
-// its inside, so the room's surfaces take their reflections and bounce
-// light from inside it, not from the sky beyond its walls (a space with no
-// probe of its own shows the sun through them: community, t7kb modme 0.60).
-// A probe is a box, size_min and size_max its reach each way from its
-// origin, 72 by default (bin/t7.def.json): it has no radius.
-func (l *LayoutOp) probe(r PlanRoom) *EntityOp {
-	in := l.Wall / 2
-	lo, hi := mapfile.Vec3{r.Min[0] + in, r.Min[1] + in, l.Z}, mapfile.Vec3{r.Max[0] - in, r.Max[1] - in, l.Z + l.Height}
-	var c, half mapfile.Vec3
-	for k := range 3 {
-		c[k], half[k] = (lo[k]+hi[k])/2, (hi[k]-lo[k])/2
-	}
-	return &EntityOp{Class: "reflection_probe", Origin: c, Keys: map[string]string{"size_min": vecText(half), "size_max": vecText(half)}}
 }

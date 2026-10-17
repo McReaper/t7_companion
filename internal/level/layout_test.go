@@ -328,8 +328,7 @@ func TestALayoutRefusesWhatItCantBuild(t *testing.T) {
 }
 
 // One undo step: a layout's pieces, its hidden faces caulk, each found back
-// under its op and named by its part, a probe in each room, @0 naming them
-// all.
+// under its op and named by its part, @0 naming them all.
 func TestALayoutLandsAsOneStepWithItsHiddenFacesCaulked(t *testing.T) {
 	_, c, snap := viewing(t, 601)
 	tiles := func(m string) (Tile, error) { return Tile{W: 64, H: 64, From: "test"}, nil }
@@ -350,20 +349,11 @@ func TestALayoutLandsAsOneStepWithItsHiddenFacesCaulked(t *testing.T) {
 			t.Errorf("made %+v: the layout's, moved up 8", m)
 		}
 	}
-	if d.Label != "t7kb: 1 move, 1 layout" || fmt.Sprint(parts) != "map[hall ceiling:1 hall floor:1 hall probe:1 hall wall:3 hall|yard wall:4 yard floor:1 yard probe:1 yard wall:3]" {
+	if d.Label != "t7kb: 1 move, 1 layout" || fmt.Sprint(parts) != "map[hall ceiling:1 hall floor:1 hall wall:3 hall|yard wall:4 yard floor:1 yard wall:3]" {
 		t.Fatalf("done %q, parts %v", d.Label, parts)
 	}
-	var probes []string
 	materials := map[string]int{}
 	for _, e := range d.After.Map.Entities {
-		for _, m := range d.Made {
-			if m.Class == "reflection_probe" && hexOf(e.Guid()) == hexOf(m.ID) {
-				origin, _ := e.Key("origin")
-				lo, _ := e.Key("size_min")
-				hi, _ := e.Key("size_max")
-				probes = append(probes, m.Part+" "+origin+" "+lo+" "+hi)
-			}
-		}
 		for _, br := range e.Brushes() {
 			for _, m := range d.Made {
 				if hexOf(br.Guid()) == hexOf(m.ID) {
@@ -374,31 +364,11 @@ func TestALayoutLandsAsOneStepWithItsHiddenFacesCaulked(t *testing.T) {
 			}
 		}
 	}
-	sort.Strings(probes)
-	if fmt.Sprint(probes) != "[hall probe 1128 128 64 124 124 56 124 124 56 yard probe 1384 128 64 124 124 56 124 124 56]" {
-		t.Errorf("probes %v: each room's middle, moved up 8; its box the room's inside", probes)
-	}
 	if fmt.Sprint(materials) != "map[brick:38 caulk:28 plaster:6 wood:6]" {
 		t.Errorf("faces %v", materials)
 	}
 	if d.Tiles["caulk"].W != 64 || d.Tiles["wood"].From != "test" {
 		t.Errorf("tiles %+v", d.Tiles)
-	}
-}
-
-// "probes": false leaves the rooms without one, for spaces probes already
-// cover.
-func TestALayoutWithoutItsProbes(t *testing.T) {
-	_, c, snap := viewing(t, 602)
-	d, err := Edit(context.Background(), c, snap, ops(t, `[{"layout": {"material": "brick", "probes": false,
-		"rooms": [{"name": "hall", "min": [1000, 0], "max": [1256, 256]}]}}]`), "", nil)
-	if err != nil || len(d.Made) != 6 {
-		t.Fatalf("%v, %d made: floor, ceiling, four walls", err, len(d.Made))
-	}
-	for _, m := range d.Made {
-		if m.Class != "" {
-			t.Errorf("made %+v", m)
-		}
 	}
 }
 

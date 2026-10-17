@@ -189,7 +189,7 @@ func TestAZoneRefusesWhatItCantBuild(t *testing.T) {
 // where a door joins two; a room in none is noted.
 func TestALayoutsRoomsMakeTheirZones(t *testing.T) {
 	c, snap := zoning(t, 705)
-	d, err := Edit(context.Background(), c, snap, ops(t, `[{"layout": {"material": "brick", "probes": false, "spawners": 2, "rooms": [
+	d, err := Edit(context.Background(), c, snap, ops(t, `[{"layout": {"material": "brick", "spawners": 2, "rooms": [
 		{"name": "hall", "min": [0, 0], "max": [256, 256], "zone": "house_zone"},
 		{"name": "kitchen", "min": [256, 0], "max": [512, 256], "zone": "house_zone"},
 		{"name": "yard", "min": [0, -256], "max": [512, 0], "outdoor": true, "zone": "yard_zone"},
@@ -346,7 +346,7 @@ func TestSpawnersSpreadOverAZonesRooms(t *testing.T) {
 // highest.
 func TestZonesOfALayoutAndASlope(t *testing.T) {
 	c, snap := zoning(t, 709)
-	d, err := Edit(context.Background(), c, snap, ops(t, `[{"layout": {"material": "brick", "probes": false, "spawners": 1, "rooms": [
+	d, err := Edit(context.Background(), c, snap, ops(t, `[{"layout": {"material": "brick", "spawners": 1, "rooms": [
 		{"name": "a", "min": [0, 0], "max": [256, 256], "zone": "a_zone"}, {"name": "b", "min": [256, 0], "max": [512, 256], "zone": "a_zone"}]}}]`), "", nil)
 	if err != nil || len(d.Notes) != 0 {
 		t.Errorf("%v, notes %q", err, d.Notes)

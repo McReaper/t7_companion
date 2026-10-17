@@ -44,7 +44,7 @@ func TestMapEditListsTheZoneLinksTheScriptLacks(t *testing.T) {
 	f := radianttest.New(44, mapPath)
 	f.Text = string(b)[strings.Index(string(b), "// entity 0"):]
 	onMachine(t, f)
-	ops, err := decodeOps([]byte(`[{"layout": {"material": "brick", "probes": false, "rooms": [
+	ops, err := decodeOps([]byte(`[{"layout": {"material": "brick", "rooms": [
 		{"name": "house", "min": [0, 0], "max": [256, 256], "zone": "house_zone"},
 		{"name": "yard", "min": [0, -256], "max": [256, 0], "outdoor": true, "zone": "yard_zone"},
 		{"name": "garden", "min": [256, -256], "max": [512, 0], "outdoor": true, "zone": "garden_zone"},

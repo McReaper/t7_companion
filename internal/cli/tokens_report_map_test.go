@@ -129,7 +129,7 @@ func mapSamples(t *testing.T, root string, add func(key, s string), addImage fun
 		t.Fatal(err)
 	}
 	v, err = mapEdit(ctx, rooms, nil, "two rooms", 0)
-	run("map_edit|its answer (17 pieces and 2 probes)", v, err)
+	run("map_edit|its answer (17 pieces)", v, err)
 	zoneOp := `[{"zone": {"name": "house_zone", "areas": [{"outline": [[-1400, 900], [-888, 900], [-888, 1284], [-1144, 1284], ` +
 		`[-1144, 1092], [-1400, 1092]]}], "links": [{"zone": "start_zone"}]}}]`
 	add("map_edit|the op sent: a zone over an L outline, linked to the start zone", zoneOp)

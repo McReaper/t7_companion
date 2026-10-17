@@ -26,11 +26,10 @@ The sizes to build to (Treyarch's scale standards), what a new map already holds
 
 ## The mapper owns the map; the agent takes the layout and the chores
 
-The map's details are the mapper's: its geometry, materials, props, light fixtures and mood. Don't texture, prop, restyle or reshape what the mapper built unless they ask for that piece of work; when a task needs a look decided, ask. What the agent is handed:
+The map's details are the mapper's: its geometry, materials, props, light fixtures, reflection probes and mood. Don't texture, prop, restyle or reshape what the mapper built unless they ask for that piece of work; when a task needs a look decided, ask. What the agent is handed:
 
 - **A layout from a plan**: walls and doors from a plan's lines (`walls`), a storey of rectangle rooms (`layout`), to Treyarch's scale standards (`references/map-plans.md`).
 - **Zones**: volumes over the reachable floor, spawners on it, a pathnode, and the `add_adjacent_zone` calls the script lacks (`zone`).
-- **Reflection probes** over the floor players reach (`probes`, **t7kb:lighting**).
 - **Caulk** on the faces nobody sees (a `texture` op with `faces` `hidden`), and `t7kb:map_check`'s lint: faces left drawn where nothing sees them, z-fighting, seams, stretched tiles, unknown materials.
 - Radiant's own tools on the ids given (`t7kb:map_command`), the build and a run (**t7kb:compiling**).
 

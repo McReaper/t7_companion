@@ -4,10 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 
-	"github.com/McReaper/t7_companion/internal/format/mapfile"
 	"github.com/McReaper/t7_companion/internal/level"
 	"github.com/McReaper/t7_companion/internal/radiant"
 )
@@ -85,7 +82,7 @@ func mapEdit(ctx context.Context, ops []level.Op, revs map[string]string, label 
 			info = materialInfo(w, tilesIn(root))
 		}
 	}
-	d, err := level.EditWith(ctx, c, snap, ops, label, mapTiles(snap.State.Map), info, level.WithPrefabs(prefabReader(installOf(snap.State.Map))), level.WithRevs(revs, true))
+	d, err := level.EditWith(ctx, c, snap, ops, label, mapTiles(snap.State.Map), info, level.WithRevs(revs, true))
 	if err != nil {
 		return nil, err
 	}
@@ -124,28 +121,4 @@ func mapEdit(ctx context.Context, ops []level.Op, revs map[string]string, label 
 		out.Made = append(out.Made, mo)
 	}
 	return out, nil
-}
-
-// prefabReader reads a misc_prefab's map from the install's map_source by
-// its model path, each file once.
-func prefabReader(root string) func(string) (*mapfile.Map, error) {
-	cache := map[string]*mapfile.Map{}
-	return func(model string) (*mapfile.Map, error) {
-		if root == "" {
-			return nil, fmt.Errorf("the map's install isn't known")
-		}
-		if m, ok := cache[model]; ok {
-			return m, nil
-		}
-		b, err := os.ReadFile(filepath.Join(root, "map_source", filepath.FromSlash(model)))
-		if err != nil {
-			return nil, err
-		}
-		m, err := mapfile.Parse(b)
-		if err != nil {
-			return nil, err
-		}
-		cache[model] = m
-		return m, nil
-	}
 }
