@@ -190,8 +190,24 @@ func TestProbesReplace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := countClass(d, "reflection_probe"); n != before+2 || !strings.Contains(strings.Join(d.Notes, "\n"), "probes: 1 probes already stand in the boxes, kept") {
+	if n := countClass(d, "reflection_probe"); n != before+2 || !strings.Contains(strings.Join(d.Notes, "\n"), "probes: 1 probes already stand in the space probed, kept") {
 		t.Errorf("kept: %d probes, %d made, notes %q", n, len(ps), d.Notes)
+	}
+}
+
+// replace also deletes a probe standing in a doorway, over floor reached that
+// no box holds.
+func TestProbesReplaceOneInADoorway(t *testing.T) {
+	d, ps, err := probesRun(t, 958, `[`+
+		room(6000, 0, 6512, 256, 0, "")+`,
+		{"walls": {"material": "brick", "lines": [{"points": [[6256, 0], [6256, 256]]}], "doors": [{"at": [6256, 128]}]}},
+		{"entity": {"class": "reflection_probe", "origin": [6256, 128, 48]}},
+		{"probes": {"at": [6128, 128, 8], "replace": true}}]`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := countClass(d, "reflection_probe"); len(ps) != 2 || n != countClass(&Done{After: fixture(t, 959)}, "reflection_probe")+2 {
+		t.Errorf("%d probes in the map, %d made: the doorway's deleted", n, len(ps))
 	}
 }
 

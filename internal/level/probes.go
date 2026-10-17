@@ -3,6 +3,7 @@ package level
 import (
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -271,7 +272,7 @@ func (b *batch) probes(i int, o *ProbesOp) error {
 	if left > 0 {
 		b.notes = append(b.notes, fmt.Sprintf("probes: %d of the 8-unit cells reached are in no box: doorways, strips under 48 wide, the edges of walls off the axes (the blends and the global probe light them)", left))
 	}
-	b.replaceProbes(i, o.Replace, boxes)
+	b.replaceProbes(i, o.Replace, boxes, func(p mapfile.Vec3) bool { return g.over(p, reached) })
 	for k, bx := range boxes {
 		if err := b.entity(i, probeEntity(s, bx, o.Keys)); err != nil {
 			return err
@@ -282,6 +283,20 @@ func (b *batch) probes(i int, o *ProbesOp) error {
 		return b.moveGlobalProbe(i, boxes)
 	}
 	return nil
+}
+
+// over tells whether a point lies over a spot reached, under its ceiling.
+func (g *probeGrid) over(p mapfile.Vec3, reached map[pstate]bool) bool {
+	c, ok := g.cellAt(p[0], p[1])
+	if !ok {
+		return false
+	}
+	for k, sp := range g.spots(c) {
+		if reached[pstate{c, k}] && p[2] >= sp.floor && p[2] < sp.ceil {
+			return true
+		}
+	}
+	return false
 }
 
 // probeStart is where the walk starts: at, or the info_player_start.
@@ -326,23 +341,21 @@ func probeEntity(s *solids, bx probeBox, extra map[string]string) *EntityOp {
 }
 
 // replaceProbes deletes, with replace, the probes whose origin lies in a new
-// box; without, it says how many it left there.
-func (b *batch) replaceProbes(i int, replace bool, boxes []probeBox) {
+// box or over the floor reached (a doorway's, a strip no box holds); without,
+// it says how many it left there.
+func (b *batch) replaceProbes(i int, replace bool, boxes []probeBox, reached func(mapfile.Vec3) bool) {
 	var in []*unit
 	for _, u := range b.units {
 		if u.state == deleted || u.ent == nil || u.ent.Class() != "reflection_probe" {
 			continue
 		}
 		p, _ := geom.Origin(u.ent)
-		for _, bx := range boxes {
-			if bx.contains(p) {
-				in = append(in, u)
-				break
-			}
+		if reached(p) || slices.ContainsFunc(boxes, func(bx probeBox) bool { return bx.contains(p) }) {
+			in = append(in, u)
 		}
 	}
 	if len(in) > 0 && !replace {
-		b.notes = append(b.notes, fmt.Sprintf("probes: %d probes already stand in the boxes, kept (replace deletes them)", len(in)))
+		b.notes = append(b.notes, fmt.Sprintf("probes: %d probes already stand in the space probed, kept (replace deletes them)", len(in)))
 		return
 	}
 	for _, u := range in { // one an earlier op of the batch made has no GUID yet: it is marked, not named

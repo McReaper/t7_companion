@@ -105,7 +105,7 @@ func mapEditTool() server.ServerTool {
 			"across a corridor off the axes), then the largest first on the axes, floor to ceiling, sides on the walls' "+
 			"faces, none overlapping: a lintel or a storey parts boxes, a sealed space gets none (it would bake out of range), "+
 			"a box over open sky stops height up; each a reflection_probe at Treyarch's defaults (4x, AO 8, blends 3), blends "+
-			"longer over floor no box holds; replace deletes the probes standing in the boxes (kept by default, noted); global also moves "+
+			"longer over floor no box holds; replace deletes the probes standing in the space it probes (kept by default, noted); global also moves "+
 			"the global probe into the largest box (an info_null the volume_sun targets). Ids are map_find's, or @n: what op "+
 			"n of this batch made (every copy of a copy op), so a box built, textured and copied is one undo step. A point "+
 			"entity keeps its id; a world brush or an entity that owns brushes is rebuilt and gets a new one (was gives "+
