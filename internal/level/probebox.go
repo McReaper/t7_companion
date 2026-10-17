@@ -56,7 +56,7 @@ func (g *probeGrid) boxes(reached map[pstate]bool) ([]probeBox, int) {
 	}
 	left := 0
 	for st := range reached {
-		if g.holder(st.cell, g.spots[st.cell][st.k].floor, out) < 0 {
+		if g.holder(st.cell, g.spots(st.cell)[st.k].floor, out) < 0 {
 			left++
 		}
 	}
@@ -68,12 +68,12 @@ func (g *probeGrid) boxes(reached map[pstate]bool) ([]probeBox, int) {
 func (g *probeGrid) groups(reached map[pstate]bool) (map[group]map[int]cellInfo, []group) {
 	groups := map[group]map[int]cellInfo{}
 	for st := range reached {
-		sp := g.spots[st.cell][st.k]
+		sp := g.spots(st.cell)[st.k]
 		info, storey := cellInfo{sp.floor, sp.ceil, math.Inf(-1)}, 0
 		for k := range st.k {
 			if reached[pstate{st.cell, k}] {
 				storey++
-				info.below = g.spots[st.cell][k].ceil
+				info.below = g.spots(st.cell)[k].ceil
 			}
 		}
 		key := group{storey, int(math.Round(sp.ceil / 16))}
@@ -233,7 +233,7 @@ func (g *probeGrid) snapSide(n int, boxes []probeBox, axis int, dir float64) {
 func (g *probeGrid) blends(n int, boxes []probeBox, reached map[pstate]bool) {
 	bx := &boxes[n]
 	open := func(i, j int) bool { // someone stands there at the box's height
-		for k, sp := range g.spots[i+j*g.n] {
+		for k, sp := range g.spots(i + j*g.n) {
 			if reached[pstate{i + j*g.n, k}] && sp.floor >= bx.lo[2]-stepUp && sp.floor < bx.hi[2] {
 				return true
 			}

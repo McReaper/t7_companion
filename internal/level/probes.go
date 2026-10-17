@@ -43,11 +43,12 @@ type pspot struct {
 
 // probeGrid is the ground sampled every 8 units over the solids' bounds, and
 // a ring of empty cells around them: a cell where one stands has its eight
-// neighbours on the grid.
+// neighbours on the grid. A cell is sampled when the walk first looks at it,
+// so the work follows the floor reached, not the map's bounds (a skybox).
 type probeGrid struct {
 	x0, y0 float64
 	n, m   int
-	spots  [][]pspot // cell (i + j*n) -> where one stands in it
+	cells  map[int][]pspot // cell (i + j*n) -> where one stands in it, once sampled
 	s      *solids
 	height float64
 }
@@ -57,13 +58,18 @@ func newProbeGrid(s *solids, height float64) *probeGrid {
 	g := &probeGrid{x0: math.Floor(b.Min[0]/probeCell)*probeCell - probeCell, y0: math.Floor(b.Min[1]/probeCell)*probeCell - probeCell, s: s, height: height}
 	g.n = int((b.Max[0]-g.x0)/probeCell) + 2
 	g.m = int((b.Max[1]-g.y0)/probeCell) + 2
-	g.spots = make([][]pspot, g.n*g.m)
-	for j := range g.m {
-		for i := range g.n {
-			g.spots[i+j*g.n] = g.standing(g.cx(i)+sampleOff, g.cy(j)+sampleOff)
-		}
-	}
+	g.cells = map[int][]pspot{}
 	return g
+}
+
+// spots are where one stands in a cell.
+func (g *probeGrid) spots(c int) []pspot {
+	sp, ok := g.cells[c]
+	if !ok {
+		sp = g.standing(g.cx(c%g.n)+sampleOff, g.cy(c/g.n)+sampleOff)
+		g.cells[c] = sp
+	}
+	return sp
 }
 
 func (g *probeGrid) cx(i int) float64 { return g.x0 + (float64(i)+0.5)*probeCell }
@@ -101,7 +107,7 @@ func (g *probeGrid) reach(at mapfile.Vec3) (map[pstate]bool, error) {
 		return nil, fmt.Errorf("probes: at %v is off the map", at)
 	}
 	start, best := -1, math.Inf(-1)
-	for k, sp := range g.spots[i+j*g.n] {
+	for k, sp := range g.spots(i + j*g.n) {
 		if sp.floor <= at[2]+stepUp && sp.floor > best {
 			start, best = k, sp.floor
 		}
@@ -138,7 +144,7 @@ func (g *probeGrid) inPlay(reached map[pstate]bool) (map[pstate]bool, int) {
 	kept := map[pstate]bool{}
 	var queue []pstate
 	for st := range reached {
-		sp := g.spots[st.cell][st.k]
+		sp := g.spots(st.cell)[st.k]
 		if g.s.inZone(mapfile.Vec3{g.cx(st.cell % g.n), g.cy(st.cell / g.n), sp.floor + 16}) {
 			kept[st] = true
 			queue = append(queue, st)
@@ -181,7 +187,7 @@ func (g *probeGrid) neighbours(st pstate, ways [4][2]int) []pstate {
 func (g *probeGrid) drops(st pstate) []pstate {
 	var out []pstate
 	for _, d := range sides {
-		if nb, ok := g.next(st, d); ok && g.spots[nb.cell][nb.k].floor < g.spots[st.cell][st.k].floor-stepUp {
+		if nb, ok := g.next(st, d); ok && g.spots(nb.cell)[nb.k].floor < g.spots(st.cell)[st.k].floor-stepUp {
 			out = append(out, nb)
 			if past, ok := g.next(nb, d); ok {
 				out = append(out, past)
@@ -194,9 +200,9 @@ func (g *probeGrid) drops(st pstate) []pstate {
 // next is the spot one cell off a pstate's, d away, a player can step up to
 // or drop to, a body's height of room on the way.
 func (g *probeGrid) next(st pstate, d [2]int) (pstate, bool) {
-	here := g.spots[st.cell][st.k]
+	here := g.spots(st.cell)[st.k]
 	c := st.cell + d[0] + d[1]*g.n
-	for k, sp := range g.spots[c] {
+	for k, sp := range g.spots(c) {
 		if sp.floor-here.floor <= stepUp && math.Min(sp.ceil, here.ceil)-math.Max(sp.floor, here.floor) >= clearance {
 			return pstate{c, k}, true
 		}
