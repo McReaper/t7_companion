@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant"
 )
 
@@ -20,7 +21,7 @@ import (
 type ViewOptions struct {
 	View   string        // 3d (default), top, front or side; xy, xz and yz too
 	IDs    []string      // frame these entities or brushes
-	Frame  *Box          // or frame this box
+	Frame  *geom.Box     // or frame this box
 	At     *mapfile.Vec3 // or frame the box of Radius around this point
 	Radius float64
 	Camera *Pose  // or shoot the 3D view from here
@@ -134,7 +135,7 @@ func (o ViewOptions) check() (string, error) {
 }
 
 // marks are the points the shot labels: the caller's, else the ids'.
-func (o ViewOptions) marks(snap *Snapshot, target *Box) []labelPoint {
+func (o ViewOptions) marks(snap *Snapshot, target *geom.Box) []labelPoint {
 	if !o.Labels {
 		return nil
 	}
@@ -149,8 +150,8 @@ func (o ViewOptions) marks(snap *Snapshot, target *Box) []labelPoint {
 }
 
 // targetBox is what the shot frames, nil for the view as it is.
-func targetBox(snap *Snapshot, o ViewOptions) (*Box, error) {
-	var b Box
+func targetBox(snap *Snapshot, o ViewOptions) (*geom.Box, error) {
+	var b geom.Box
 	switch {
 	case o.Frame != nil:
 		return o.Frame, nil
@@ -185,7 +186,7 @@ func targetBox(snap *Snapshot, o ViewOptions) (*Box, error) {
 const minFrame = 256
 
 // boxesOf are the boxes of the entities and brushes the ids name, by GUID.
-func boxesOf(snap *Snapshot, ids []string) (map[string]Box, error) {
+func boxesOf(snap *Snapshot, ids []string) (map[string]geom.Box, error) {
 	want := map[string]bool{}
 	for _, id := range ids {
 		g, err := snap.IDs.Resolve(id)
@@ -194,14 +195,14 @@ func boxesOf(snap *Snapshot, ids []string) (map[string]Box, error) {
 		}
 		want[hexOf(g)] = true
 	}
-	out := map[string]Box{}
+	out := map[string]geom.Box{}
 	for _, e := range snap.Map.Entities {
 		if want[hexOf(e.Guid())] {
-			out[e.Guid()] = EntityBox(e)
+			out[e.Guid()] = geom.EntityBox(e)
 		}
 		for _, b := range e.Brushes() {
 			if want[hexOf(b.Guid())] {
-				out[b.Guid()] = BrushBox(b)
+				out[b.Guid()] = geom.BrushBox(b)
 			}
 		}
 	}
@@ -226,7 +227,7 @@ func points(pts []labelPoint) []mapfile.Vec3 {
 // brushes, else every entity but worldspawn, at its origin or its box's
 // centre; the nearest the target's centre first, when there are too many to
 // project.
-func labelPoints(snap *Snapshot, o ViewOptions, target *Box) []labelPoint {
+func labelPoints(snap *Snapshot, o ViewOptions, target *geom.Box) []labelPoint {
 	var out []labelPoint
 	if len(o.IDs) > 0 {
 		boxes, _ := boxesOf(snap, o.IDs)
@@ -240,8 +241,8 @@ func labelPoints(snap *Snapshot, o ViewOptions, target *Box) []labelPoint {
 			if e.Class() == "worldspawn" {
 				continue
 			}
-			p, ok := Origin(e)
-			if b := EntityBox(e); !ok && b.Ok {
+			p, ok := geom.Origin(e)
+			if b := geom.EntityBox(e); !ok && b.Ok {
 				p, ok = b.Centre(), true
 			}
 			if ok {
@@ -258,7 +259,7 @@ func labelPoints(snap *Snapshot, o ViewOptions, target *Box) []labelPoint {
 	return out
 }
 
-func dist(a, b mapfile.Vec3) float64 { d := sub(a, b); return math.Sqrt(dot(d, d)) }
+func dist(a, b mapfile.Vec3) float64 { d := geom.Sub(a, b); return math.Sqrt(geom.Dot(d, d)) }
 
 // session is one View's calls to Radiant: what it changed of the user's
 // views, to undo, and what it could not put back.
@@ -395,7 +396,7 @@ func (s *session) remember(l Lens) {
 
 // view3D shoots the 3D view: from the pose given, framed on the target (a
 // second shot when the lens it assumed was off), or as it is.
-func (s *session) view3D(ctx context.Context, target *Box, o ViewOptions, pts []mapfile.Vec3) (*frame, error) {
+func (s *session) view3D(ctx context.Context, target *geom.Box, o ViewOptions, pts []mapfile.Vec3) (*frame, error) {
 	render := o.Render
 	if o.Bake {
 		render = "real"

@@ -9,6 +9,7 @@ import (
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
 	"github.com/McReaper/t7_companion/internal/level"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant"
 )
 
@@ -74,7 +75,7 @@ const (
 func mapFind(ctx context.Context, a mapFindArgs) (*mapFindOut, error) {
 	q := level.Query{IDs: a.IDs, Class: a.Class, Key: a.Key, Selected: a.Selected, Radius: a.Radius}
 	if a.Near != "" {
-		v, ok := level.ParseVec3(strings.ReplaceAll(a.Near, ",", " "))
+		v, ok := geom.ParseVec3(strings.ReplaceAll(a.Near, ",", " "))
 		if !ok {
 			return nil, fmt.Errorf("near %q: give a point as x y z", a.Near)
 		}
@@ -121,7 +122,7 @@ func mapFind(ctx context.Context, a mapFindArgs) (*mapFindOut, error) {
 func foundOf(h level.Hit, snap *level.Snapshot, a mapFindArgs) foundEnt {
 	e := h.Entity
 	f := foundEnt{ID: snap.IDs.Short(e.Guid()), Class: e.Class(), Layer: e.Layer(), Selected: h.Selected, Keys: keysOf(e, a.Keys)}
-	if o, ok := level.Origin(e); ok {
+	if o, ok := geom.Origin(e); ok {
 		f.Origin = vec(o)
 	}
 	for _, b := range e.Brushes() {
@@ -145,7 +146,7 @@ func foundOf(h level.Hit, snap *level.Snapshot, a mapFindArgs) foundEnt {
 		if k := b.Kind(); k != mapfile.KindFaces {
 			fb.Kind = level.KindName(k)
 		}
-		if box := level.BrushBox(b); box.Ok {
+		if box := geom.BrushBox(b); box.Ok {
 			fb.Bounds = append(vec(box.Min), vec(box.Max)...)
 		}
 		f.List = append(f.List, fb)

@@ -1,7 +1,6 @@
 package level
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -124,18 +123,5 @@ func TestSeamsAndStretchAtTheirEdges(t *testing.T) {
 	defer delete(checkInfo, "untiled")
 	if got := check(t, world(t, []string{slab(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{64, 64, 64}, "untiled", "64 4 0 0 0 0")})); len(got) != 0 {
 		t.Errorf("an untiled material: %q", got)
-	}
-}
-
-func TestHullsOfRepeatedAndInLinePoints(t *testing.T) {
-	want := "[{0 0} {4 0} {4 2} {0 2}]"
-	for _, pts := range [][]pt2{
-		{{0, 0}, {2, 0}, {4, 0}, {4, 1}, {4, 2}, {2, 2}, {0, 2}, {0, 1}, {2, 1}},
-		{{4, 2}, {0, 0}, {0, 2}, {4, 0}, {0, 0}, {4, 2}, {2, 0}, {0, 1}},
-		{{0, 2}, {0, 1}, {0, 0}, {4, 2}, {4, 1}, {4, 0}},
-	} {
-		if got := fmt.Sprint(convexHull(pts)); got != want {
-			t.Errorf("hull of %v = %s, want %s", pts, got, want)
-		}
 	}
 }

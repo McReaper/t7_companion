@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant/radianttest"
 )
 
@@ -31,7 +32,7 @@ func faceTex(t *testing.T, b *mapfile.Brush) map[string]mapfile.Face {
 	}
 	out := map[string]mapfile.Face{}
 	for _, f := range faces {
-		n := planeOf(f.Points).n
+		n := geom.PlaneOf(f.Points).N
 		dir, _, _ := texAxes(mapfile.Vec3{-n[0], -n[1], -n[2]})
 		out[dir] = f
 	}
@@ -405,7 +406,7 @@ func TestAt30DegreesRadiantsFitAgreesWithTheTurnedAxes(t *testing.T) {
 	}
 	faces, _ := b.Faces()
 	for _, f := range faces {
-		n := planeOf(f.Points).n
+		n := geom.PlaneOf(f.Points).N
 		dir, u, v := texAxes(mapfile.Vec3{-n[0], -n[1], -n[2]})
 		r, ok := radiant[dir]
 		if !ok {
@@ -425,14 +426,14 @@ func TestAt30DegreesRadiantsFitAgreesWithTheTurnedAxes(t *testing.T) {
 		default:
 			lo[1] = 628
 		}
-		diag := sub(hi, lo)
+		diag := geom.Sub(hi, lo)
 		if math.Abs(f.Tex[0]-math.Abs(r[0])) > 1e-3 || math.Abs(f.Tex[2]-wrap(r[2], math.Abs(r[0]))) > 1e-3 {
 			t.Errorf("%s: width %v, u offset %v; Radiant's tiles are %v from %v", dir, f.Tex[0], f.Tex[2], math.Abs(r[0]), wrap(r[2], math.Abs(r[0])))
 		}
-		if h := math.Abs(dot(v, diag)); math.Abs(h-math.Abs(r[1])) > 1e-3 {
+		if h := math.Abs(geom.Dot(v, diag)); math.Abs(h-math.Abs(r[1])) > 1e-3 {
 			t.Errorf("%s: v along the diagonal %v, Radiant's height %v", dir, h, r[1])
 		}
-		if k := (dot(v, lo) + r[3]) / r[1]; math.Abs(k-math.Round(k)) > 1e-3 {
+		if k := (geom.Dot(v, lo) + r[3]) / r[1]; math.Abs(k-math.Round(k)) > 1e-3 {
 			t.Errorf("%s: Radiant's v tiles start at the box's corner: %v tiles there", dir, k)
 		}
 	}

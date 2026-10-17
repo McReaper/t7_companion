@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant"
 )
 
@@ -72,12 +73,12 @@ func parseSummary(s string) (*frame, error) {
 		case "h":
 			f.H, _ = strconv.Atoi(v)
 		case "origin":
-			f.Pose.Origin, _ = ParseVec3(strings.ReplaceAll(v, ",", " "))
+			f.Pose.Origin, _ = geom.ParseVec3(strings.ReplaceAll(v, ",", " "))
 		case "angles":
-			a, _ := ParseVec3(strings.ReplaceAll(v, ",", " "))
+			a, _ := geom.ParseVec3(strings.ReplaceAll(v, ",", " "))
 			f.Pose.Pitch, f.Pose.Yaw, f.Pose.Roll = a[0], a[1], a[2]
 		case "centre":
-			f.Centre, _ = ParseVec3(strings.ReplaceAll(v, ",", " "))
+			f.Centre, _ = geom.ParseVec3(strings.ReplaceAll(v, ",", " "))
 		case "scale":
 			f.Scale, _ = strconv.ParseFloat(v, 64)
 		}

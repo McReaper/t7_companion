@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // The text map_edit writes for Radiant's import: what Radiant itself writes,
@@ -22,11 +23,11 @@ func texNumbers(w, h float64) string {
 // BoxBrush is the text of an axis-aligned box brush, its faces wound as
 // Radiant winds them ((p1-p0)×(p2-p0) into the brush), at Radiant's default
 // tile of 64 units.
-func BoxBrush(b Box, material, contents string) string {
+func BoxBrush(b geom.Box, material, contents string) string {
 	return boxBrush(b, material, contents, texNumbers(64, 64))
 }
 
-func boxBrush(b Box, material, contents, tex string) string {
+func boxBrush(b geom.Box, material, contents, tex string) string {
 	lo, hi := b.Min, b.Max
 	v := func(x, y, z float64) string { return "( " + num(x) + " " + num(y) + " " + num(z) + " )" }
 	faces := [6][3]string{

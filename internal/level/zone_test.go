@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant"
 	"github.com/McReaper/t7_companion/internal/radiant/radianttest"
 )
@@ -26,7 +27,7 @@ func zoning(t *testing.T, pid int) (*radiant.Client, *Snapshot) {
 	text := string(b)[strings.Index(string(b), "// entity 0"):]
 	n := strings.Count(text, "// entity ")
 	start := strings.Replace(EntityText("info_volume", map[string]string{"targetname": "start_zone", "target": "start_zone_spawners", "script_noteworthy": "player_volume"},
-		BoxBrush(Box{Min: mapfile.Vec3{-2000, -2000, 0}, Max: mapfile.Vec3{-1000, -1000, 256}, Ok: true}, "volume", "")),
+		BoxBrush(geom.Box{Min: mapfile.Vec3{-2000, -2000, 0}, Max: mapfile.Vec3{-1000, -1000, 256}, Ok: true}, "volume", "")),
 		"{\n", "{\nguid \"{0D00AA01-0000-0000-0000-000000000000}\"\n", 1)
 	f := radianttest.New(pid, `C:\m\test_claude.map`)
 	f.Text = text + fmt.Sprintf("// entity %d\n", n) + strings.Replace(start, "BoxBrush", "", 1)
@@ -82,12 +83,12 @@ func TestAZoneCoversItsOutlineAndPutsItsSpawnersOnTheFloor(t *testing.T) {
 			t.Errorf("the volume's %s: %q", k, v)
 		}
 	}
-	if bx := EntityBox(vol[0]); bx.Min != (mapfile.Vec3{0, 0, 0}) || bx.Max != (mapfile.Vec3{512, 512, 160}) {
+	if bx := geom.EntityBox(vol[0]); bx.Min != (mapfile.Vec3{0, 0, 0}) || bx.Max != (mapfile.Vec3{512, 512, 160}) {
 		t.Errorf("volume bounds %+v", bx)
 	}
 	var at []string
 	for _, e := range parts["yard_zone spawner"] {
-		o, _ := Origin(e)
+		o, _ := geom.Origin(e)
 		k := map[string]string{}
 		for _, n := range []string{"targetname", "script_noteworthy", "script_string"} {
 			k[n], _ = e.Key(n)
@@ -107,7 +108,7 @@ func TestAZoneCoversItsOutlineAndPutsItsSpawnersOnTheFloor(t *testing.T) {
 	if strings.Join(at, " ") != "[224 256 0] [32 32 0] [32 480 0] [480 32 0]" { // three ends, then the elbow farthest from them
 		t.Errorf("spawners at %s: spread to the L's ends", strings.Join(at, " "))
 	}
-	if o, _ := Origin(parts["yard_zone pathnode"][0]); o[2] != 2 {
+	if o, _ := geom.Origin(parts["yard_zone pathnode"][0]); o[2] != 2 {
 		t.Errorf("pathnode at %v: on the floor", o)
 	}
 	if fmt.Sprint(d.Links) != "[{yard_zone start_zone always_on false}]" || len(d.Notes) != 1 ||
@@ -142,7 +143,7 @@ func TestAZoneAddsToTheMapsZoneAndNotesOverlaps(t *testing.T) {
 func TestAZoneFollowsItsFloors(t *testing.T) {
 	c, snap := zoning(t, 703)
 	b := newBatch(snap, nil)
-	wedge := prismBrush([]pt2{{0, 0}, {300, 0}, {0, 300}}, -16, 0, "brick", texNumbers(64, 64))
+	wedge := prismBrush([]geom.P2{{X: 0, Y: 0}, {X: 300, Y: 0}, {X: 0, Y: 300}}, -16, 0, "brick", texNumbers(64, 64))
 	if err := b.made(0, EntityText("worldspawn", nil, wedge), true); err != nil {
 		t.Fatal(err)
 	}
@@ -201,13 +202,13 @@ func TestALayoutsRoomsMakeTheirZones(t *testing.T) {
 	if len(parts["house_zone volume"]) != 2 || len(parts["yard_zone volume"]) != 1 || len(parts["house_zone spawner"]) != 2 || len(parts["yard_zone pathnode"]) != 1 {
 		t.Fatalf("parts %v", parts)
 	}
-	if bx := EntityBox(parts["yard_zone volume"][0]); bx.Min != (mapfile.Vec3{0, -256, 0}) || bx.Max != (mapfile.Vec3{512, 0, 128}) {
+	if bx := geom.EntityBox(parts["yard_zone volume"][0]); bx.Min != (mapfile.Vec3{0, -256, 0}) || bx.Max != (mapfile.Vec3{512, 0, 128}) {
 		t.Errorf("the yard's zone, to its walls' top: %+v", bx)
 	}
 	rooms := map[bool]int{}
-	node, _ := Origin(parts["house_zone pathnode"][0])
+	node, _ := geom.Origin(parts["house_zone pathnode"][0])
 	for _, e := range append(parts["house_zone spawner"], parts["yard_zone spawner"]...) {
-		o, _ := Origin(e)
+		o, _ := geom.Origin(e)
 		if o[2] != 0 || o[0] == node[0] && o[1] == node[1] {
 			t.Errorf("a spawner off the floor, or on the pathnode %v: %v", node, o)
 		}
@@ -274,7 +275,7 @@ func zoningWith(t *testing.T, pid int, extra string) (*radiant.Client, *Snapshot
 // whatever it is.
 func TestAZoneKeepsItsSpawnersOwnName(t *testing.T) {
 	yard := strings.Replace(EntityText("info_volume", map[string]string{"targetname": "yard_zone", "target": "yard_risers", "script_noteworthy": "player_volume"},
-		BoxBrush(Box{Min: mapfile.Vec3{-2000, -2000, 0}, Max: mapfile.Vec3{-1000, -1000, 256}, Ok: true}, "volume", "")),
+		BoxBrush(geom.Box{Min: mapfile.Vec3{-2000, -2000, 0}, Max: mapfile.Vec3{-1000, -1000, 256}, Ok: true}, "volume", "")),
 		"{\n", "{\nguid \"{0D00AA02-0000-0000-0000-000000000000}\"\n", 1)
 	c, snap := zoningWith(t, 707, yard)
 	d, err := Edit(context.Background(), c, snap, ops(t, `[
@@ -302,7 +303,7 @@ func TestSpawnersSpreadOverAZonesRooms(t *testing.T) {
 		}
 		var out []mapfile.Vec3
 		for _, e := range partsOf(t, d)["z spawner"] {
-			o, _ := Origin(e)
+			o, _ := geom.Origin(e)
 			out = append(out, o)
 		}
 		sort.Slice(out, func(i, j int) bool { return out[i][0] < out[j][0] })
@@ -366,13 +367,13 @@ func mustBrush(t *testing.T, text string) *mapfile.Brush {
 }
 
 func TestInOutlineIsInsideNotOnTheEdge(t *testing.T) {
-	l := []pt2{{0, 0}, {200, 0}, {200, 100}, {100, 100}, {100, 200}, {0, 200}}
-	for p, want := range map[pt2]bool{
-		{50, 50}: true, {150, 50}: true, {50, 150}: true, // the L's three squares
-		{150, 150}: false, {250, 50}: false, {-1, 50}: false, // its notch, and outside
-		{0, 50}: false, {100, 150}: false, {150, 100}: false, {200, 50}: false, // on its edges
-		{100, 100}: false, {0, 0}: false, // on its corners
-		{50, 100}: true, {150, 99}: true, // level with a corner, inside
+	l := []geom.P2{{X: 0, Y: 0}, {X: 200, Y: 0}, {X: 200, Y: 100}, {X: 100, Y: 100}, {X: 100, Y: 200}, {X: 0, Y: 200}}
+	for p, want := range map[geom.P2]bool{
+		{X: 50, Y: 50}: true, {X: 150, Y: 50}: true, {X: 50, Y: 150}: true, // the L's three squares
+		{X: 150, Y: 150}: false, {X: 250, Y: 50}: false, {X: -1, Y: 50}: false, // its notch, and outside
+		{X: 0, Y: 50}: false, {X: 100, Y: 150}: false, {X: 150, Y: 100}: false, {X: 200, Y: 50}: false, // on its edges
+		{X: 100, Y: 100}: false, {X: 0, Y: 0}: false, // on its corners
+		{X: 50, Y: 100}: true, {X: 150, Y: 99}: true, // level with a corner, inside
 	} {
 		if got := inOutline(l, p); got != want {
 			t.Errorf("%v: %v, want %v", p, got, want)
@@ -385,20 +386,20 @@ func TestInOutlineIsInsideNotOnTheEdge(t *testing.T) {
 // its zone, from its bottom to its top.
 func TestSegmentDistanceAndBrushParts(t *testing.T) {
 	for _, c := range []struct {
-		p, a, b pt2
+		p, a, b geom.P2
 		want    float64
 	}{
-		{pt2{5, 3}, pt2{1, 1}, pt2{9, 1}, 2},  // over its middle
-		{pt2{3, 9}, pt2{3, 1}, pt2{3, 5}, 4},  // past its end
-		{pt2{-3, 1}, pt2{1, 1}, pt2{9, 1}, 4}, // before its start
-		{pt2{4, 5}, pt2{1, 1}, pt2{1, 1}, 5},  // no length
-		{pt2{7, 7}, pt2{2, 2}, pt2{12, 2}, 5}, // over it, off the origin
+		{geom.P2{X: 5, Y: 3}, geom.P2{X: 1, Y: 1}, geom.P2{X: 9, Y: 1}, 2},  // over its middle
+		{geom.P2{X: 3, Y: 9}, geom.P2{X: 3, Y: 1}, geom.P2{X: 3, Y: 5}, 4},  // past its end
+		{geom.P2{X: -3, Y: 1}, geom.P2{X: 1, Y: 1}, geom.P2{X: 9, Y: 1}, 4}, // before its start
+		{geom.P2{X: 4, Y: 5}, geom.P2{X: 1, Y: 1}, geom.P2{X: 1, Y: 1}, 5},  // no length
+		{geom.P2{X: 7, Y: 7}, geom.P2{X: 2, Y: 2}, geom.P2{X: 12, Y: 2}, 5}, // over it, off the origin
 	} {
 		if got := segmentDistance(c.p, c.a, c.b); math.Abs(got-c.want) > 1e-9 {
 			t.Errorf("%v to %v-%v: %v, want %v", c.p, c.a, c.b, got, c.want)
 		}
 	}
-	p, ok := brushPart(mustBrush(t, BoxBrush(Box{Min: mapfile.Vec3{10, 20, -30}, Max: mapfile.Vec3{40, 60, 50}, Ok: true}, "volume", "")))
+	p, ok := brushPart(mustBrush(t, BoxBrush(geom.Box{Min: mapfile.Vec3{10, 20, -30}, Max: mapfile.Vec3{40, 60, 50}, Ok: true}, "volume", "")))
 	if !ok || p.z0 != -30 || p.z1 != 50 || len(p.hull) != 4 {
 		t.Errorf("a box's piece: %+v, %v", p, ok)
 	}

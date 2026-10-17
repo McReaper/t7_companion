@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // ProbesOp fills the space players reach with reflection probes, as a
@@ -288,7 +289,7 @@ func (b *batch) probeStart(o *ProbesOp) (mapfile.Vec3, error) {
 	}
 	for _, u := range b.units {
 		if u.state != deleted && u.ent != nil && u.ent.Class() == "info_player_start" {
-			if p, ok := Origin(u.ent); ok {
+			if p, ok := geom.Origin(u.ent); ok {
 				return mapfile.Vec3{p[0], p[1], p[2] + stepUp}, nil
 			}
 		}
@@ -300,7 +301,7 @@ func (b *batch) probeStart(o *ProbesOp) (mapfile.Vec3, error) {
 // of any solid), its reach each way, Treyarch's defaults (4x, AO range 8,
 // power and strength 1: Multiplayer_Lighting_Workflow.pdf).
 func probeEntity(s *solids, bx probeBox, extra map[string]string) *EntityOp {
-	c := Box{Min: bx.lo, Max: bx.hi, Ok: true}.Centre()
+	c := geom.Box{Min: bx.lo, Max: bx.hi, Ok: true}.Centre()
 	c[2] = bx.lo[2] + math.Min(56, (bx.hi[2]-bx.lo[2])/2)
 	for _, d := range []float64{0, 16, -16, 32, -32} { // out of a counter or a stair the middle falls in
 		if p := (mapfile.Vec3{c[0] + d, c[1], c[2]}); !s.inside(p) {
@@ -326,7 +327,7 @@ func (b *batch) replaceProbes(i int, replace bool, boxes []probeBox) {
 		if u.state == deleted || u.ent == nil || u.ent.Class() != "reflection_probe" {
 			continue
 		}
-		p, _ := Origin(u.ent)
+		p, _ := geom.Origin(u.ent)
 		for _, bx := range boxes {
 			if p[0] >= bx.lo[0] && p[0] <= bx.hi[0] && p[1] >= bx.lo[1] && p[1] <= bx.hi[1] && p[2] >= bx.lo[2] && p[2] <= bx.hi[2] {
 				in = append(in, u)
@@ -353,7 +354,7 @@ func (b *batch) moveGlobalProbe(i int, boxes []probeBox) error {
 			big = bx
 		}
 	}
-	at := Box{Min: big.lo, Max: big.hi, Ok: true}.Centre()
+	at := geom.Box{Min: big.lo, Max: big.hi, Ok: true}.Centre()
 	at[2] = big.lo[2] + 56
 	var sun *unit
 	for _, u := range b.units {

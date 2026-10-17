@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant/radianttest"
 )
 
@@ -51,9 +52,9 @@ func TestABoardShowsMaterialsAndLeavesTheMapAsItWas(t *testing.T) {
 
 func TestABoardsSlabsSitAboveTheMapInRows(t *testing.T) {
 	_, _, snap := viewing(t, 502)
-	var world Box
+	var world geom.Box
 	for _, e := range snap.Map.Entities {
-		world.Union(EntityBox(e))
+		world.Union(geom.EntityBox(e))
 	}
 	items := materialItems(snap, []string{"a", "b", "c", "d", "e"})
 	if len(items) != 5 {
@@ -161,9 +162,9 @@ func make16() []string {
 // number in its place's front-left corner.
 func TestAModelBoardsModelsStandInRowsAboveTheMap(t *testing.T) {
 	_, _, snap := viewing(t, 503)
-	var world Box
+	var world geom.Box
 	for _, e := range snap.Map.Entities {
-		world.Union(EntityBox(e))
+		world.Union(geom.EntityBox(e))
 	}
 	names := []string{"p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9"}
 	items := modelItems(snap, names)

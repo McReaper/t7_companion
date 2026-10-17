@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // prefabMap is a prefab's map: world brushes, then entities.
@@ -27,8 +28,8 @@ func prefabMap(t *testing.T, world []string, ents ...string) *mapfile.Map {
 	return m
 }
 
-func box6(b [6]float64) Box {
-	return Box{Min: mapfile.Vec3{b[0], b[1], b[2]}, Max: mapfile.Vec3{b[3], b[4], b[5]}, Ok: true}
+func box6(b [6]float64) geom.Box {
+	return geom.Box{Min: mapfile.Vec3{b[0], b[1], b[2]}, Max: mapfile.Vec3{b[3], b[4], b[5]}, Ok: true}
 }
 
 // A room inside a prefab inside a prefab, the inner one at a quarter size

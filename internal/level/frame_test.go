@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // What Radiant's 3D view (1648×869) projected for points around
@@ -40,7 +41,7 @@ func TestTheLensProjectsAsRadiantDid(t *testing.T) {
 
 func TestFrameBoxFitsTheBoxInTheView(t *testing.T) {
 	l := Lens{W: 1648, H: 869, F: 1212.4}
-	for _, b := range []Box{
+	for _, b := range []geom.Box{
 		box(mapfile.Vec3{-216, -232, -64}, mapfile.Vec3{248, 256, -16}),
 		box(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{2048, 64, 512}),
 		box(mapfile.Vec3{10, 10, 10}, mapfile.Vec3{10, 10, 10}).Grown(256), // a point, as View grows it
@@ -66,7 +67,7 @@ func TestFrameBoxFitsTheBoxInTheView(t *testing.T) {
 		if edge > 0.1 { // a sphere framed it 0.2 to 0.3 in
 			t.Errorf("%v framed from %+v: the nearest corner is %.3f of the view from its edge", b, p, edge)
 		}
-		if fwd, _, _ := p.basis(); dot(sub(b.Centre(), p.Origin), fwd) <= 0 {
+		if fwd, _, _ := p.basis(); geom.Dot(geom.Sub(b.Centre(), p.Origin), fwd) <= 0 {
 			t.Errorf("the camera looks away from %v", b)
 		}
 	}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant"
 	"github.com/McReaper/t7_companion/internal/radiant/radianttest"
 )
@@ -53,47 +54,6 @@ func TestZoomFitsATallBox(t *testing.T) {
 	// a 400×400 view: 400/1150 = 0.348 px/unit, 5 steps out from 100% (0.328)
 	if n := ZoomSteps(Axes[1], 400, 400, tall); n != -5 {
 		t.Errorf("ZoomSteps(front, tall) = %d, want -5", n)
-	}
-}
-
-func TestABrushWithADegenerateFaceStillHasItsBox(t *testing.T) {
-	b := brushOf(t,
-		face(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{1, 0, 0}, mapfile.Vec3{0, 1, 0}),
-		face(mapfile.Vec3{0, 0, 64}, mapfile.Vec3{0, 1, 64}, mapfile.Vec3{1, 0, 64}),
-		face(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{0, 1, 0}, mapfile.Vec3{0, 0, 1}),
-		face(mapfile.Vec3{64, 0, 0}, mapfile.Vec3{64, 0, 1}, mapfile.Vec3{64, 1, 0}),
-		face(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{0, 0, 1}, mapfile.Vec3{1, 0, 0}),
-		face(mapfile.Vec3{0, 64, 0}, mapfile.Vec3{1, 64, 0}, mapfile.Vec3{0, 64, 1}),
-		face(mapfile.Vec3{1, 1, 1}, mapfile.Vec3{2, 2, 2}, mapfile.Vec3{3, 3, 3})) // three points on a line: no plane
-	if bb := BrushBox(b); bb != box(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{64, 64, 64}) {
-		t.Errorf("box = %+v", bb)
-	}
-}
-
-// A box [0,64]³ cut by x + z ≤ 96: a plane leaning in z.
-func TestACutThatLeansInZ(t *testing.T) {
-	b := brushOf(t,
-		face(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{1, 0, 0}, mapfile.Vec3{0, 1, 0}),
-		face(mapfile.Vec3{0, 0, 64}, mapfile.Vec3{0, 1, 64}, mapfile.Vec3{1, 0, 64}),
-		face(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{0, 1, 0}, mapfile.Vec3{0, 0, 1}),
-		face(mapfile.Vec3{64, 0, 0}, mapfile.Vec3{64, 0, 1}, mapfile.Vec3{64, 1, 0}),
-		face(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{0, 0, 1}, mapfile.Vec3{1, 0, 0}),
-		face(mapfile.Vec3{0, 64, 0}, mapfile.Vec3{1, 64, 0}, mapfile.Vec3{0, 64, 1}),
-		face(mapfile.Vec3{96, 0, 0}, mapfile.Vec3{32, 0, 64}, mapfile.Vec3{96, 1, 0})) // x + z ≤ 96
-	faces, _ := b.Faces()
-	var planes []plane
-	for _, f := range faces {
-		planes = append(planes, planeOf(f.Points))
-	}
-	var got []string
-	for _, v := range vertices(planes) {
-		got = append(got, fmtVec(mapfile.Vec3{math.Round(v[0]) + 0, math.Round(v[1]) + 0, math.Round(v[2]) + 0}))
-	}
-	slices.Sort(got)
-	got = slices.Compact(got)
-	want := []string{"0 0 0", "0 0 64", "0 64 0", "0 64 64", "32 0 64", "32 64 64", "64 0 0", "64 0 32", "64 64 0", "64 64 32"}
-	if !slices.Equal(got, want) {
-		t.Errorf("vertices %q\nwant %q", got, want)
 	}
 }
 
@@ -329,7 +289,7 @@ func TestMovingAnEntityMovesAllItsBrushes(t *testing.T) {
 		t.Errorf("moved %+v", m)
 	}
 	hits, _ := Find(d.After.Map, d.After.IDs, Query{Class: "script_brushmodel"}, Selection{})
-	if o, _ := Origin(hits[0].Entity); o != (mapfile.Vec3{100, 0, 0}) {
+	if o, _ := geom.Origin(hits[0].Entity); o != (mapfile.Vec3{100, 0, 0}) {
 		t.Errorf("origin %v", o)
 	}
 }

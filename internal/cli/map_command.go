@@ -6,6 +6,7 @@ import (
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
 	"github.com/McReaper/t7_companion/internal/level"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant"
 )
 
@@ -103,7 +104,7 @@ func describeMade(after *level.Snapshot, guid string) madeThing {
 	for _, e := range after.Map.Entities {
 		if strings.EqualFold(e.Guid(), guid) {
 			m.Class = e.Class()
-			if b := level.EntityBox(e); b.Ok {
+			if b := geom.EntityBox(e); b.Ok {
 				m.Bounds = append(vec(b.Min), vec(b.Max)...)
 			}
 			return m
@@ -111,7 +112,7 @@ func describeMade(after *level.Snapshot, guid string) madeThing {
 		for _, b := range e.Brushes() {
 			if strings.EqualFold(b.Guid(), guid) && b.Kind() != mapfile.KindEmpty {
 				m.Material = level.Material(b)
-				if box := level.BrushBox(b); box.Ok {
+				if box := geom.BrushBox(b); box.Ok {
 					m.Bounds = append(vec(box.Min), vec(box.Max)...)
 				}
 				return m

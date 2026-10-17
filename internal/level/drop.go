@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // ground is what a point can stand on, as the batch leaves the map: its
@@ -12,8 +13,8 @@ import (
 // its mesh and curve patches (their control grids, in triangles: terrain).
 // Sky brushes and brush entities (volumes, triggers, doors) are not ground.
 type ground struct {
-	solids  [][]plane
-	boxes   []Box // each solid's bounds
+	solids  [][]geom.Plane
+	boxes   []geom.Box // each solid's bounds
 	patches [][3]mapfile.Vec3
 }
 
@@ -41,15 +42,15 @@ func (g *ground) add(br *mapfile.Brush) {
 		if err != nil || len(faces) < 4 {
 			return
 		}
-		planes := make([]plane, len(faces))
+		planes := make([]geom.Plane, len(faces))
 		for i, f := range faces {
 			if strings.EqualFold(f.Material, "sky") {
 				return
 			}
-			planes[i] = planeOf(f.Points)
+			planes[i] = geom.PlaneOf(f.Points)
 		}
-		var bx Box
-		for _, v := range vertices(planes) {
+		var bx geom.Box
+		for _, v := range geom.Vertices(planes) {
 			bx.Add(v)
 		}
 		g.solids, g.boxes = append(g.solids, planes), append(g.boxes, bx)
@@ -67,41 +68,6 @@ func (g *ground) add(br *mapfile.Brush) {
 	}
 }
 
-// column is the stretch of a vertical line through (x, y) inside a convex
-// brush, false when the line misses it: each plane bounds z from below or
-// above, or leaves the line out.
-func column(planes []plane, x, y float64) (lo, hi float64, ok bool) {
-	lo, hi = math.Inf(-1), math.Inf(1)
-	for _, p := range planes {
-		r := p.d - p.n[0]*x - p.n[1]*y // inside: n·v ≥ d, so n_z·z ≥ r
-		switch {
-		case p.n[2] > 1e-9:
-			lo = math.Max(lo, r/p.n[2])
-		case p.n[2] < -1e-9:
-			hi = math.Min(hi, r/p.n[2])
-		case r > eps:
-			return 0, 0, false
-		}
-	}
-	return lo, hi, hi-lo > eps
-}
-
-// onTriangle is where a vertical line through (x, y) meets a triangle,
-// false when it passes beside it.
-func onTriangle(t [3]mapfile.Vec3, x, y float64) (float64, bool) {
-	d := (t[1][1]-t[2][1])*(t[0][0]-t[2][0]) + (t[2][0]-t[1][0])*(t[0][1]-t[2][1])
-	if math.Abs(d) < 1e-9 {
-		return 0, false
-	}
-	l0 := ((t[1][1]-t[2][1])*(x-t[2][0]) + (t[2][0]-t[1][0])*(y-t[2][1])) / d
-	l1 := ((t[2][1]-t[0][1])*(x-t[2][0]) + (t[0][0]-t[2][0])*(y-t[2][1])) / d
-	l2 := 1 - l0 - l1
-	if l0 < -1e-6 || l1 < -1e-6 || l2 < -1e-6 {
-		return 0, false
-	}
-	return l0*t[0][2] + l1*t[1][2] + l2*t[2][2], true
-}
-
 // clearance is the room a body stands in: 72 high (the player's), 32 wide.
 const clearance, halfWidth = 72, 16
 
@@ -114,12 +80,12 @@ var bodyLines = [...]float64{-halfWidth, -halfWidth / 2, 0, halfWidth / 2, halfW
 func (g *ground) floor(x, y, lo, hi float64) (float64, bool) {
 	z, found := math.Inf(-1), false
 	for _, s := range g.solids {
-		if _, b, ok := column(s, x, y); ok && b <= hi+eps && b >= lo-eps && b > z {
+		if _, b, ok := geom.Column(s, x, y); ok && b <= hi+geom.Eps && b >= lo-geom.Eps && b > z {
 			z, found = b, true
 		}
 	}
 	for _, t := range g.patches {
-		if h, ok := onTriangle(t, x, y); ok && h <= hi+eps && h >= lo-eps && h > z {
+		if h, ok := geom.OnTriangle(t, x, y); ok && h <= hi+geom.Eps && h >= lo-geom.Eps && h > z {
 			z, found = h, true
 		}
 	}
@@ -130,14 +96,14 @@ func (g *ground) floor(x, y, lo, hi float64) (float64, bool) {
 // reaching into its box, tried along vertical lines every 8 units across it,
 // so a wall 8 thick can't slip between them.
 func (g *ground) clear(x, y, z float64) bool {
-	body := Box{Min: mapfile.Vec3{x - halfWidth, y - halfWidth, z + 1}, Max: mapfile.Vec3{x + halfWidth, y + halfWidth, z + clearance}, Ok: true}
+	body := geom.Box{Min: mapfile.Vec3{x - halfWidth, y - halfWidth, z + 1}, Max: mapfile.Vec3{x + halfWidth, y + halfWidth, z + clearance}, Ok: true}
 	for i, s := range g.solids {
-		if !g.boxes[i].overlaps(body) {
+		if !g.boxes[i].Overlaps(body) {
 			continue
 		}
 		for _, dx := range bodyLines {
 			for _, dy := range bodyLines {
-				if a, b, ok := column(s, x+dx, y+dy); ok && a < body.Max[2]-eps && b > body.Min[2] {
+				if a, b, ok := geom.Column(s, x+dx, y+dy); ok && a < body.Max[2]-geom.Eps && b > body.Min[2] {
 					return false
 				}
 			}

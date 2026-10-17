@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // The probes op's boxes. The cells reached are grouped by their storey (how
@@ -102,7 +103,7 @@ func (g *probeGrid) groups(reached map[pstate]bool) (map[group]map[int]cellInfo,
 func (g *probeGrid) holder(cell int, z float64, boxes []probeBox) int {
 	i, j := cell%g.n, cell/g.n
 	for n, bx := range boxes {
-		if i >= bx.i0 && i < bx.i1 && j >= bx.j0 && j < bx.j1 && z >= bx.lo[2]-eps && z < bx.hi[2] {
+		if i >= bx.i0 && i < bx.i1 && j >= bx.j0 && j < bx.j1 && z >= bx.lo[2]-geom.Eps && z < bx.hi[2] {
 			return n
 		}
 	}
@@ -214,9 +215,9 @@ func (g *probeGrid) snapSide(n int, boxes []probeBox, axis int, dir float64) {
 		if m == n || o.lo[2] >= bx.hi[2] || o.hi[2] <= bx.lo[2] || o.lo[other] >= bx.hi[other] || o.hi[other] <= bx.lo[other] {
 			continue
 		}
-		if dir > 0 && o.lo[axis] >= side-eps {
+		if dir > 0 && o.lo[axis] >= side-geom.Eps {
 			far = math.Min(far, o.lo[axis]-side)
-		} else if dir < 0 && o.hi[axis] <= side+eps {
+		} else if dir < 0 && o.hi[axis] <= side+geom.Eps {
 			far = math.Min(far, side-o.hi[axis])
 		}
 	}

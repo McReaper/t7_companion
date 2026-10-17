@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // TextureOp lays a material on faces of brushes (every brush of an entity the
@@ -104,9 +105,9 @@ func (t *texturing) brush(b *mapfile.Brush) error {
 	if err != nil {
 		return err
 	}
-	planes := make([]plane, len(faces))
+	planes := make([]geom.Plane, len(faces))
 	for i, f := range faces {
-		planes[i] = planeOf(f.Points)
+		planes[i] = geom.PlaneOf(f.Points)
 	}
 	k := 0
 	return rewrite(b, func(w []string) error {
@@ -121,8 +122,8 @@ func (t *texturing) brush(b *mapfile.Brush) error {
 
 // face writes face i's texture into its words, when its direction is one of
 // the op's.
-func (t *texturing) face(w []string, planes []plane, i int) error {
-	n := planes[i].n // into the brush
+func (t *texturing) face(w []string, planes []geom.Plane, i int) error {
+	n := planes[i].N // into the brush
 	dir, u, v := texAxes(mapfile.Vec3{-n[0], -n[1], -n[2]})
 	if !t.faces[dir] {
 		return nil
@@ -137,7 +138,7 @@ func (t *texturing) face(w []string, planes []plane, i int) error {
 	if t.op.Origin != nil {
 		o = *t.op.Origin
 	}
-	ou, ov := -dot(o, u), -dot(o, v)
+	ou, ov := -geom.Dot(o, u), -geom.Dot(o, v)
 	if t.op.Fit != nil {
 		var err error
 		if tw, th, ou, ov, err = t.fitted(faceVertices(planes, i), u, v, tw, th, ou, ov); err != nil {
@@ -239,14 +240,14 @@ func turned(u, v mapfile.Vec3, deg float64) (mapfile.Vec3, mapfile.Vec3) {
 
 // faceVertices are face i's corners: where it meets two other planes inside
 // every plane.
-func faceVertices(planes []plane, i int) []mapfile.Vec3 {
+func faceVertices(planes []geom.Plane, i int) []mapfile.Vec3 {
 	var out []mapfile.Vec3
 	for j := range planes {
 		for k := j + 1; k < len(planes); k++ {
 			if j == i || k == i {
 				continue
 			}
-			if v, ok := meet(planes[i], planes[j], planes[k]); ok && inside(v, planes) {
+			if v, ok := geom.Meet(planes[i], planes[j], planes[k]); ok && geom.Inside(v, planes) {
 				out = append(out, v)
 			}
 		}
@@ -258,7 +259,7 @@ func faceVertices(planes []plane, i int) []mapfile.Vec3 {
 func extent(pts []mapfile.Vec3, d mapfile.Vec3) (float64, float64) {
 	lo, hi := math.Inf(1), math.Inf(-1)
 	for _, p := range pts {
-		x := dot(p, d)
+		x := geom.Dot(p, d)
 		lo, hi = math.Min(lo, x), math.Max(hi, x)
 	}
 	return lo, hi

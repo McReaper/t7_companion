@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // Pose is a 3D camera: where it stands and its angles in degrees, Radiant's
@@ -19,14 +20,14 @@ func (p Pose) basis() (fwd, right, up mapfile.Vec3) {
 	pr, yr := p.Pitch*math.Pi/180, p.Yaw*math.Pi/180
 	fwd = mapfile.Vec3{math.Cos(pr) * math.Cos(yr), math.Cos(pr) * math.Sin(yr), math.Sin(pr)}
 	right = mapfile.Vec3{math.Sin(yr), -math.Cos(yr), 0}
-	return fwd, right, cross(right, fwd)
+	return fwd, right, geom.Cross(right, fwd)
 }
 
 // camSpace is a point in the camera's frame: across, up, and ahead.
 func (p Pose) camSpace(v mapfile.Vec3) (x, y, z float64) {
 	fwd, right, up := p.basis()
-	d := sub(v, p.Origin)
-	return dot(d, right), dot(d, up), dot(d, fwd)
+	d := geom.Sub(v, p.Origin)
+	return geom.Dot(d, right), geom.Dot(d, up), geom.Dot(d, fwd)
 }
 
 // Lens is a 3D view's pinhole projection: its size and its focal length in
@@ -79,13 +80,13 @@ const margin = 1.15
 // which its corners just fill the view, margin around: a corner x across, y
 // up and z ahead of the centre fits at a distance d once |x|·f/(w/2) ≤ d+z,
 // and so for y; and it stays ahead of the camera.
-func FrameBox(l Lens, look Pose, b Box) Pose {
+func FrameBox(l Lens, look Pose, b geom.Box) Pose {
 	fwd, right, up := look.basis()
 	c := b.Centre()
 	d := 1.0
 	for _, k := range b.Corners() {
-		p := sub(k, c)
-		x, y, z := dot(p, right), dot(p, up), dot(p, fwd)
+		p := geom.Sub(k, c)
+		x, y, z := geom.Dot(p, right), geom.Dot(p, up), geom.Dot(p, fwd)
 		d = math.Max(d, math.Max(math.Max(math.Abs(x)*l.F/(float64(l.W)/2), math.Abs(y)*l.F/(float64(l.H)/2)), 1)-z)
 	}
 	d *= margin
@@ -123,7 +124,7 @@ const ZoomStep = 1.25
 
 // ZoomSteps is how many XY Zoom In (negative: Zoom Out) from 100% make the
 // box fit a w×h view along the axis.
-func ZoomSteps(a Axis, w, h int, b Box) int {
+func ZoomSteps(a Axis, w, h int, b geom.Box) int {
 	bw := math.Max(b.Max[a.U]-b.Min[a.U], 1) * margin
 	bh := math.Max(b.Max[a.V]-b.Min[a.V], 1) * margin
 	s := math.Min(float64(w)/bw, float64(h)/bh)

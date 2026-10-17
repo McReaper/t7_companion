@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant/radianttest"
 )
 
@@ -201,7 +202,7 @@ func TestWhatMapEditWrites(t *testing.T) {
 		t.Fatal(err)
 	}
 	br := m.Entities[0].Brushes()[0]
-	if BrushBox(br) != box(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{64, 32, 16}) || br.Contents() != "detail" || Material(br) != "caulk" {
+	if geom.BrushBox(br) != box(mapfile.Vec3{0, 0, 0}, mapfile.Vec3{64, 32, 16}) || br.Contents() != "detail" || Material(br) != "caulk" {
 		t.Errorf("box brush:\n%s", b)
 	}
 	if got := EntityText("light", map[string]string{"z": "1", "a": "2"}); got != "{\n\"classname\" \"light\"\n\"a\" \"2\"\n\"z\" \"1\"\n}\n" {
@@ -229,13 +230,13 @@ func TestTranslateAndRetextureKeepEachLinesShape(t *testing.T) {
 	if err := translate(floor, mapfile.Vec3{1, 2, 3}); err != nil {
 		t.Fatal(err)
 	}
-	if BrushBox(floor) != box(mapfile.Vec3{-215, -230, -61}, mapfile.Vec3{249, 258, -13}) || !strings.HasPrefix(floor.Body[1], " ( 249 258 -61 )") {
-		t.Errorf("floor %+v\n%q", BrushBox(floor), floor.Body[1])
+	if geom.BrushBox(floor) != box(mapfile.Vec3{-215, -230, -61}, mapfile.Vec3{249, 258, -13}) || !strings.HasPrefix(floor.Body[1], " ( 249 258 -61 )") {
+		t.Errorf("floor %+v\n%q", geom.BrushBox(floor), floor.Body[1])
 	}
 	if err := translate(curve, mapfile.Vec3{0, 0, 100}); err != nil {
 		t.Fatal(err)
 	}
-	if BrushBox(curve).Max[2] != 300 || !strings.Contains(strings.Join(curve.Body, ""), "\tv -96 -64 84 t 0 0 0 0\n") {
+	if geom.BrushBox(curve).Max[2] != 300 || !strings.Contains(strings.Join(curve.Body, ""), "\tv -96 -64 84 t 0 0 0 0\n") {
 		t.Errorf("curve:\n%s", strings.Join(curve.Body, ""))
 	}
 	if err := retexture(curve, "caulk"); err != nil {

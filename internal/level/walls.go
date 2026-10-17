@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // WallsOp draws walls along lines on the ground, as a plan draws them, and
@@ -55,7 +56,7 @@ const (
 // wline is a wall's centreline as the op works it: its corners, closed or
 // not, and each segment's kind: on an axis ('h', 'v') or not ('d').
 type wline struct {
-	pts    []pt2
+	pts    []geom.P2
 	closed bool
 	kinds  []byte
 }
@@ -125,36 +126,34 @@ func (b *batch) walls(i int, o *WallsOp) error {
 func wallLines(in []WallLine) ([]*wline, error) {
 	var out []*wline
 	for k, l := range in {
-		var pts []pt2
+		var pts []geom.P2
 		for _, p := range l.Points {
-			q := pt2{p[0], p[1]}
-			if len(pts) == 0 || math.Hypot(q.x-pts[len(pts)-1].x, q.y-pts[len(pts)-1].y) > eps {
+			q := geom.P2{X: p[0], Y: p[1]}
+			if len(pts) == 0 || math.Hypot(q.X-pts[len(pts)-1].X, q.Y-pts[len(pts)-1].Y) > geom.Eps {
 				pts = append(pts, q)
 			}
 		}
-		if l.Closed && len(pts) > 2 && dist2(pts[0], pts[len(pts)-1]) > eps {
+		if l.Closed && len(pts) > 2 && geom.Dist2(pts[0], pts[len(pts)-1]) > geom.Eps {
 			pts = append(pts, pts[0])
 		}
 		if len(pts) < 2 || (l.Closed && len(pts) < 4) {
 			return nil, fmt.Errorf("walls: line %d: two points or more (three, closed)", k)
 		}
-		out = append(out, &wline{pts: pts, closed: l.Closed && dist2(pts[0], pts[len(pts)-1]) <= eps})
+		out = append(out, &wline{pts: pts, closed: l.Closed && geom.Dist2(pts[0], pts[len(pts)-1]) <= geom.Eps})
 	}
 	return out, nil
 }
 
-func dist2(a, b pt2) float64 { return math.Hypot(a.x-b.x, a.y-b.y) }
-
 // nearSeg is how far p is from segment ab, the nearest point and its share of ab.
-func nearSeg(p, a, b pt2) (float64, pt2, float64) {
-	dx, dy := b.x-a.x, b.y-a.y
+func nearSeg(p, a, b geom.P2) (float64, geom.P2, float64) {
+	dx, dy := b.X-a.X, b.Y-a.Y
 	l := dx*dx + dy*dy
 	t := 0.0
 	if l > 0 {
-		t = math.Max(0, math.Min(1, ((p.x-a.x)*dx+(p.y-a.y)*dy)/l))
+		t = math.Max(0, math.Min(1, ((p.X-a.X)*dx+(p.Y-a.Y)*dy)/l))
 	}
-	q := pt2{a.x + t*dx, a.y + t*dy}
-	return dist2(p, q), q, t
+	q := geom.P2{X: a.X + t*dx, Y: a.Y + t*dy}
+	return geom.Dist2(p, q), q, t
 }
 
 // findJoints are the ends lying on another wall, read before anything moves.
@@ -164,7 +163,7 @@ func findJoints(lines []*wline) map[wend]int {
 		if l.closed {
 			continue
 		}
-		for e, p := range []pt2{l.pts[0], l.pts[len(l.pts)-1]} {
+		for e, p := range []geom.P2{l.pts[0], l.pts[len(l.pts)-1]} {
 			best, at := float64(wallReach), -1
 			for m, o := range lines {
 				if m == n {
@@ -184,8 +183,8 @@ func findJoints(lines []*wline) map[wend]int {
 	return out
 }
 
-func segKind(a, b pt2) byte {
-	dx, dy := math.Abs(b.x-a.x), math.Abs(b.y-a.y)
+func segKind(a, b geom.P2) byte {
+	dx, dy := math.Abs(b.X-a.X), math.Abs(b.Y-a.Y)
 	switch {
 	case dy <= wallOff && dx > dy:
 		return 'h'
@@ -229,18 +228,18 @@ func runsOf(n int, l *wline) []wrun {
 	return out
 }
 
-func coord(p pt2, c int) float64 {
+func coord(p geom.P2, c int) float64 {
 	if c == 0 {
-		return p.x
+		return p.X
 	}
-	return p.y
+	return p.Y
 }
 
-func setCoord(p *pt2, c int, v float64) {
+func setCoord(p *geom.P2, c int, v float64) {
 	if c == 0 {
-		p.x = v
+		p.X = v
 	} else {
-		p.y = v
+		p.Y = v
 	}
 }
 
@@ -353,7 +352,7 @@ func landJoint(lines []*wline, k wend, host *wline) {
 		j, own = len(l.pts)-1, len(l.kinds)-1
 	}
 	p := l.pts[j]
-	q, ok := pt2{}, false
+	q, ok := geom.P2{}, false
 	if kind := l.kinds[own]; kind != 'd' {
 		keep := 0
 		if kind == 'h' {
@@ -380,8 +379,8 @@ func landJoint(lines []*wline, k wend, host *wline) {
 
 // alongAxis is where the line through p keeping coordinate c meets the
 // host, nearest p and within reach.
-func alongAxis(p pt2, c int, host *wline) (pt2, bool) {
-	best, out := 3.0*wallReach, pt2{}
+func alongAxis(p geom.P2, c int, host *wline) (geom.P2, bool) {
+	best, out := 3.0*wallReach, geom.P2{}
 	for s := range len(host.pts) - 1 {
 		a, b := host.pts[s], host.pts[s+1]
 		den := coord(b, c) - coord(a, c)
@@ -392,9 +391,9 @@ func alongAxis(p pt2, c int, host *wline) (pt2, bool) {
 		if t < -1e-9 || t > 1+1e-9 {
 			continue
 		}
-		q := pt2{a.x + t*(b.x-a.x), a.y + t*(b.y-a.y)}
+		q := geom.P2{X: a.X + t*(b.X-a.X), Y: a.Y + t*(b.Y-a.Y)}
 		setCoord(&q, c, coord(p, c))
-		if d := dist2(p, q); d < best {
+		if d := geom.Dist2(p, q); d < best {
 			best, out = d, q
 		}
 	}
@@ -415,7 +414,7 @@ func runIndices(lines []*wline, n, j, c int) []int {
 // wpiece is a stretch of wall between cuts: its points, the line it is of,
 // and whether it is a whole closed line (no free ends).
 type wpiece struct {
-	pts  []pt2
+	pts  []geom.P2
 	line int
 	ring bool
 }
@@ -423,7 +422,7 @@ type wpiece struct {
 // doorCut is a door cut out of a wall: its first jamb's point, the wall's
 // direction there, its width and height, and how wide players see it.
 type doorCut struct {
-	at, dir             pt2
+	at, dir             geom.P2
 	width, height, seen float64
 }
 
@@ -452,7 +451,7 @@ func cutDoors(lines []*wline, doors []WallDoor, grid, height float64) ([]wpiece,
 		case h <= 0 || h >= height:
 			return nil, nil, fmt.Errorf("walls: door %d: height %g: under the walls' %g", k, h, height)
 		}
-		c, rest, err := cutOne(pieces, pt2{d.At[0], d.At[1]}, w, grid)
+		c, rest, err := cutOne(pieces, geom.P2{X: d.At[0], Y: d.At[1]}, w, grid)
 		if err != nil {
 			return nil, nil, fmt.Errorf("walls: door %d at %v: %w", k, d.At, err)
 		}
@@ -463,7 +462,7 @@ func cutDoors(lines []*wline, doors []WallDoor, grid, height float64) ([]wpiece,
 	return pieces, cuts, nil
 }
 
-func cutOne(pieces []wpiece, at pt2, w, grid float64) (doorCut, []wpiece, error) {
+func cutOne(pieces []wpiece, at geom.P2, w, grid float64) (doorCut, []wpiece, error) {
 	best, bk, bs := math.Inf(1), -1, -1
 	for k, p := range pieces {
 		for s := range len(p.pts) - 1 {
@@ -477,14 +476,14 @@ func cutOne(pieces []wpiece, at pt2, w, grid float64) (doorCut, []wpiece, error)
 	}
 	p := pieces[bk]
 	a, b := p.pts[bs], p.pts[bs+1]
-	L := dist2(a, b)
-	u := pt2{(b.x - a.x) / L, (b.y - a.y) / L}
+	L := geom.Dist2(a, b)
+	u := geom.P2{X: (b.X - a.X) / L, Y: (b.Y - a.Y) / L}
 	_, q, _ := nearSeg(at, a, b)
-	t := (q.x-a.x)*u.x + (q.y-a.y)*u.y
-	if grid > 0 && (math.Abs(u.x) > 0.999 || math.Abs(u.y) > 0.999) { // an axis wall: the door's edges on the grid
-		c, sign := 0, u.x
-		if math.Abs(u.y) > 0.999 {
-			c, sign = 1, u.y
+	t := (q.X-a.X)*u.X + (q.Y-a.Y)*u.Y
+	if grid > 0 && (math.Abs(u.X) > 0.999 || math.Abs(u.Y) > 0.999) { // an axis wall: the door's edges on the grid
+		c, sign := 0, u.X
+		if math.Abs(u.Y) > 0.999 {
+			c, sign = 1, u.Y
 		}
 		mid := grid*math.Round((coord(a, c)+sign*t-w/2)/grid) + w/2
 		t = (mid - coord(a, c)) * sign
@@ -494,17 +493,17 @@ func cutOne(pieces []wpiece, at pt2, w, grid float64) (doorCut, []wpiece, error)
 		return doorCut{}, nil, fmt.Errorf("its wall is %.0f long: a %g door needs %g", L, w, w+2*margin)
 	}
 	t = math.Max(w/2+margin, math.Min(L-w/2-margin, t))
-	j1 := pt2{a.x + u.x*(t-w/2), a.y + u.y*(t-w/2)}
-	j2 := pt2{a.x + u.x*(t+w/2), a.y + u.y*(t+w/2)}
+	j1 := geom.P2{X: a.X + u.X*(t-w/2), Y: a.Y + u.Y*(t-w/2)}
+	j2 := geom.P2{X: a.X + u.X*(t+w/2), Y: a.Y + u.Y*(t+w/2)}
 	var cut []wpiece
 	if p.ring { // a ring cut once opens at the door: from the second jamb round to the first
-		pts := append([]pt2{j2}, p.pts[bs+1:len(p.pts)-1]...)
+		pts := append([]geom.P2{j2}, p.pts[bs+1:len(p.pts)-1]...)
 		pts = append(pts, p.pts[:bs+1]...)
 		cut = []wpiece{{pts: append(pts, j1), line: p.line}}
 	} else {
 		cut = []wpiece{
 			{pts: append(slices.Clone(p.pts[:bs+1]), j1), line: p.line},
-			{pts: append([]pt2{j2}, p.pts[bs+1:]...), line: p.line},
+			{pts: append([]geom.P2{j2}, p.pts[bs+1:]...), line: p.line},
 		}
 	}
 	rest := slices.Concat(pieces[:bk], cut, pieces[bk+1:])
@@ -514,7 +513,7 @@ func cutOne(pieces []wpiece, at pt2, w, grid float64) (doorCut, []wpiece, error)
 // wpart is one brush the op makes: its outline on the ground, from z0 to
 // z1, its material and contents, and what it is.
 type wpart struct {
-	poly               []pt2
+	poly               []geom.P2
 	z0, z1             float64
 	material, contents string
 	part               string
@@ -527,7 +526,7 @@ func (b *batch) wallBrushes(i int, parts []wpart) error {
 	var drawn []*mapfile.Brush
 	for _, p := range parts {
 		poly := slices.Clone(p.poly)
-		if signedArea(poly) < 0 {
+		if geom.SignedArea(poly) < 0 {
 			slices.Reverse(poly)
 		}
 		t := b.tile(p.material)

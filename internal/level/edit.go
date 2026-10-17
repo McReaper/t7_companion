@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // Op is one edit of a batch: exactly one of its fields is set.
@@ -202,7 +203,7 @@ func (b *batch) box(i int, o *BoxOp) error {
 		return fmt.Errorf("box: %w", err)
 	}
 	t := b.tile(o.Material)
-	brush := boxBrush(Box{Min: o.Min, Max: o.Max, Ok: true}, o.Material, o.Contents, texNumbers(t.W, t.H))
+	brush := boxBrush(geom.Box{Min: o.Min, Max: o.Max, Ok: true}, o.Material, o.Contents, texNumbers(t.W, t.H))
 	if o.Class == "" {
 		if len(o.Keys) > 0 {
 			return fmt.Errorf("box: keys belong to a brush entity: give its class")
@@ -413,7 +414,7 @@ func move(u *unit, br *mapfile.Brush, by mapfile.Vec3) error {
 			return err
 		}
 	}
-	if o, ok := Origin(u.ent); ok {
+	if o, ok := geom.Origin(u.ent); ok {
 		v := vecText(mapfile.Vec3{o[0] + by[0], o[1] + by[1], o[2] + by[2]})
 		setKeys(u.ent, map[string]*string{"origin": &v})
 	}

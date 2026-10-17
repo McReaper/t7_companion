@@ -4,10 +4,9 @@ import (
 	"cmp"
 	"fmt"
 	"math"
-	"slices"
-	"sort"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // MaterialInfo is what CheckTextures needs to know of a material.
@@ -35,28 +34,25 @@ type cface struct {
 	dir      string
 	material string
 	tex      [6]float64
-	pl       plane          // its normal out of the brush
+	pl       geom.Plane     // its normal out of the brush
 	pts      []mapfile.Vec3 // its corners
-	poly     []pt2          // the same in the plane's 2D coordinates, a convex hull
+	poly     []geom.P2      // the same in the plane's 2D coordinates, a convex hull
 	centre   mapfile.Vec3   // its corners' mean: on it, inside it
-	box      Box
+	box      geom.Box
 }
 
 // solid is a brush as the checks see it: its box and faces.
 type solid struct {
-	box   Box
+	box   geom.Box
 	faces []*cface
 }
-
-// pt2 is a point in a plane's 2D coordinates.
-type pt2 struct{ x, y float64 }
 
 // checker holds a map's world brushes for CheckTextures.
 type checker struct {
 	short   func(guid string) string // a brush's id in a finding
 	info    func(string) MaterialInfo
 	faces   []*cface
-	byPlane map[planeKey][]*cface
+	byPlane map[geom.PlaneKey][]*cface
 	solids  []*solid          // by brush index
 	hid     map[*cface]string // what hides a face, once found
 }
@@ -91,7 +87,7 @@ func CheckTextures(snap *Snapshot, ids []string, info func(material string) Mate
 }
 
 func newChecker(short func(string) string, info func(string) MaterialInfo) *checker {
-	return &checker{short: short, info: info, byPlane: map[planeKey][]*cface{}, hid: map[*cface]string{}}
+	return &checker{short: short, info: info, byPlane: map[geom.PlaneKey][]*cface{}, hid: map[*cface]string{}}
 }
 
 // selfHidden is, by brush index, the directions of the faces of each brush
@@ -173,16 +169,16 @@ func (c *checker) add(b *mapfile.Brush) {
 	if err != nil {
 		return
 	}
-	planes := make([]plane, len(fs))
+	planes := make([]geom.Plane, len(fs))
 	for i, f := range fs {
-		planes[i] = planeOf(f.Points)
+		planes[i] = geom.PlaneOf(f.Points)
 	}
 	for i, f := range fs {
-		n := planes[i].n
-		fc := &cface{bi: len(c.solids) - 1, fi: i, brush: b.Guid(), material: f.Material, tex: f.Tex, pl: plane{mapfile.Vec3{-n[0], -n[1], -n[2]}, -planes[i].d}}
-		fc.dir, _, _ = texAxes(fc.pl.n)
+		n := planes[i].N
+		fc := &cface{bi: len(c.solids) - 1, fi: i, brush: b.Guid(), material: f.Material, tex: f.Tex, pl: geom.Plane{N: mapfile.Vec3{-n[0], -n[1], -n[2]}, D: -planes[i].D}}
+		fc.dir, _, _ = texAxes(fc.pl.N)
 		fc.pts = faceVertices(planes, i)
-		if fc.poly = convexHull(project(fc.pts, dominant(fc.pl.n))); len(fc.poly) < 3 {
+		if fc.poly = geom.ConvexHull(geom.Flatten(fc.pts, geom.Dominant(fc.pl.N))); len(fc.poly) < 3 {
 			continue
 		}
 		for _, p := range fc.pts {
@@ -194,7 +190,7 @@ func (c *checker) add(b *mapfile.Brush) {
 		s.box.Union(fc.box)
 		s.faces = append(s.faces, fc)
 		c.faces = append(c.faces, fc)
-		c.byPlane[keyOf(fc.pl)] = append(c.byPlane[keyOf(fc.pl)], fc)
+		c.byPlane[geom.KeyOf(fc.pl)] = append(c.byPlane[geom.KeyOf(fc.pl)], fc)
 	}
 }
 
@@ -212,24 +208,24 @@ func (c *checker) hidden(f *cface) string {
 // its plane, facing it, that covers it whole, or several that do together;
 // or an opaque brush it lies buried in. "" when it can be seen.
 func (c *checker) hiddenBy(f *cface) string {
-	back := plane{mapfile.Vec3{-f.pl.n[0], -f.pl.n[1], -f.pl.n[2]}, -f.pl.d}
-	var against [][]pt2
+	back := geom.Plane{N: mapfile.Vec3{-f.pl.N[0], -f.pl.N[1], -f.pl.N[2]}, D: -f.pl.D}
+	var against [][]geom.P2
 	var first *cface
-	for _, g := range c.byPlane[keyOf(back)] {
+	for _, g := range c.byPlane[geom.KeyOf(back)] {
 		switch {
 		case g.bi == f.bi || !c.info(g.material).Opaque:
-		case covers(g.poly, f.poly):
+		case geom.Covers(g.poly, f.poly):
 			return "against " + c.short(g.brush) + " " + g.dir
-		case touch(g.poly, f.poly):
+		case geom.Touch(g.poly, f.poly):
 			against = append(against, g.poly)
 			first = cmp.Or(first, g)
 		}
 	}
-	if len(against) > 1 && coveredBy(against, f.poly) {
+	if len(against) > 1 && geom.CoveredBy(against, f.poly) {
 		return fmt.Sprintf("against %s %s and %d more", c.short(first.brush), first.dir, len(against)-1)
 	}
 	for i, s := range c.solids {
-		if i != f.bi && s.box.overlaps(f.box) && c.buriedIn(f, s) {
+		if i != f.bi && s.box.Overlaps(f.box) && c.buriedIn(f, s) {
 			return "inside " + c.short(s.faces[0].brush)
 		}
 	}
@@ -240,11 +236,11 @@ func (c *checker) hiddenBy(f *cface) string {
 // corners in or on the brush, its centre off every one of the brush's planes.
 func (c *checker) buriedIn(f *cface, s *solid) bool {
 	for _, g := range s.faces {
-		if !c.info(g.material).Opaque || dot(g.pl.n, f.centre)-g.pl.d > -eps {
+		if !c.info(g.material).Opaque || geom.Dot(g.pl.N, f.centre)-g.pl.D > -geom.Eps {
 			return false
 		}
 		for _, p := range f.pts {
-			if dot(g.pl.n, p)-g.pl.d > eps {
+			if geom.Dot(g.pl.N, p)-g.pl.D > geom.Eps {
 				return false
 			}
 		}
@@ -260,10 +256,10 @@ func (c *checker) buriedIn(f *cface, s *solid) bool {
 // meant to lie on a wall: not opaque, it is left out.
 func (c *checker) zfightsWith(f *cface) []*cface {
 	var out []*cface
-	for _, g := range c.byPlane[keyOf(f.pl)] {
+	for _, g := range c.byPlane[geom.KeyOf(f.pl)] {
 		gi := c.info(g.material)
 		differ := g.material != f.material || !sameTiles(f.tex, g.tex)
-		if g.bi != f.bi && differ && gi.Opaque && gi.Drawn && overlapping(f.poly, g.poly) && c.hidden(g) == "" {
+		if g.bi != f.bi && differ && gi.Opaque && gi.Drawn && geom.Overlapping(f.poly, g.poly) && c.hidden(g) == "" {
 			out = append(out, g)
 		}
 	}
@@ -273,8 +269,8 @@ func (c *checker) zfightsWith(f *cface) []*cface {
 // seamWith is a face of another brush touching this one on its plane, of the
 // same material, whose tiles don't continue this one's, and which shows.
 func (c *checker) seamWith(f *cface) *cface {
-	for _, g := range c.byPlane[keyOf(f.pl)] {
-		if g.bi != f.bi && g.material == f.material && !sameTiles(f.tex, g.tex) && touch(f.poly, g.poly) && c.hidden(g) == "" {
+	for _, g := range c.byPlane[geom.KeyOf(f.pl)] {
+		if g.bi != f.bi && g.material == f.material && !sameTiles(f.tex, g.tex) && geom.Touch(f.poly, g.poly) && c.hidden(g) == "" {
 			return g
 		}
 	}
@@ -324,154 +320,4 @@ func guidSet(snap *Snapshot, ids []string) (map[string]bool, error) {
 		out[hexOf(g)] = true
 	}
 	return out, nil
-}
-
-// planeKey is a plane rounded, so faces on one plane share it.
-type planeKey [4]int64
-
-func keyOf(p plane) planeKey {
-	q := func(x float64) int64 { return int64(math.Round(x * 1000)) }
-	return planeKey{q(p.n[0]), q(p.n[1]), q(p.n[2]), int64(math.Round(p.d * 10))}
-}
-
-// dominant is the axis a normal is closest to, as texAxes picks it.
-func dominant(n mapfile.Vec3) int {
-	ax, ay, az := math.Abs(n[0]), math.Abs(n[1]), math.Abs(n[2])
-	switch {
-	case az >= ax && az >= ay:
-		return 2
-	case ax >= ay:
-		return 0
-	}
-	return 1
-}
-
-// project drops an axis of the points.
-func project(pts []mapfile.Vec3, axis int) []pt2 {
-	out := make([]pt2, len(pts))
-	u, v := (axis+1)%3, (axis+2)%3
-	for i, p := range pts {
-		out[i] = pt2{p[u], p[v]}
-	}
-	return out
-}
-
-// convexHull is the points' hull, counter-clockwise (Andrew's monotone chain).
-func convexHull(pts []pt2) []pt2 {
-	if len(pts) < 3 {
-		return nil
-	}
-	pts = append([]pt2(nil), pts...)
-	sort.Slice(pts, func(i, j int) bool { return pts[i].x < pts[j].x || pts[i].x == pts[j].x && pts[i].y < pts[j].y })
-	lower := chain(pts)
-	slices.Reverse(pts)
-	return append(lower, chain(pts)...)
-}
-
-// chain is one half of a hull, the points taken in order, its last point
-// left for the other half to start from. Its loops run over the points, so
-// no counter can run away (a mutant that did ran CI's runner out of memory).
-func chain(pts []pt2) []pt2 {
-	var h []pt2
-	for _, p := range pts {
-		for len(h) >= 2 && cross2(h[len(h)-2], h[len(h)-1], p) <= 1e-9 {
-			h = h[:len(h)-1]
-		}
-		h = append(h, p)
-	}
-	return h[:len(h)-1]
-}
-
-func cross2(o, a, b pt2) float64 { return (a.x-o.x)*(b.y-o.y) - (a.y-o.y)*(b.x-o.x) }
-
-// inHull tells whether a point is inside or on a counter-clockwise hull.
-func inHull(h []pt2, p pt2) bool {
-	for i := range h {
-		a, b := h[i], h[(i+1)%len(h)]
-		if cross2(a, b, p) < -eps*math.Hypot(b.x-a.x, b.y-a.y) {
-			return false
-		}
-	}
-	return true
-}
-
-// covers tells whether hull a holds every corner of hull b.
-func covers(a, b []pt2) bool {
-	for _, p := range b {
-		if !inHull(a, p) {
-			return false
-		}
-	}
-	return true
-}
-
-// touch tells whether two hulls overlap or share a stretch of edge, where a
-// seam would show: a corner of one strictly inside the other, edges that
-// cross, or edges along one line that overlap. Hulls that meet at a corner
-// alone don't.
-func touch(a, b []pt2) bool {
-	for _, p := range a {
-		if strictlyIn(b, p) {
-			return true
-		}
-	}
-	for _, p := range b {
-		if strictlyIn(a, p) {
-			return true
-		}
-	}
-	for i := range a {
-		p, q := a[i], a[(i+1)%len(a)]
-		for j := range b {
-			if r, s := b[j], b[(j+1)%len(b)]; properlyCross(p, q, r, s) || alongside(p, q, r, s) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// side is where a point lies off a segment's line, in units: positive on its
-// left, within eps of 0 on it.
-func side(p, q, r pt2) float64 {
-	return cross2(p, q, r) / math.Max(math.Hypot(q.x-p.x, q.y-p.y), 1e-12)
-}
-
-// strictlyIn tells whether a point is inside a counter-clockwise hull, off
-// its edges.
-func strictlyIn(h []pt2, p pt2) bool {
-	for i := range h {
-		if side(h[i], h[(i+1)%len(h)], p) <= eps {
-			return false
-		}
-	}
-	return true
-}
-
-// properlyCross tells whether two segments cross each other inside both.
-func properlyCross(p, q, r, s pt2) bool {
-	d1, d2, d3, d4 := side(r, s, p), side(r, s, q), side(p, q, r), side(p, q, s)
-	return (d1 > eps && d2 < -eps || d1 < -eps && d2 > eps) && (d3 > eps && d4 < -eps || d3 < -eps && d4 > eps)
-}
-
-// alongside tells whether two segments lie on one line and overlap by more
-// than a point.
-func alongside(p, q, r, s pt2) bool {
-	if math.Abs(side(p, q, r)) > eps || math.Abs(side(p, q, s)) > eps {
-		return false
-	}
-	l := math.Hypot(q.x-p.x, q.y-p.y)
-	at := func(x pt2) float64 { return ((x.x-p.x)*(q.x-p.x) + (x.y-p.y)*(q.y-p.y)) / math.Max(l, 1e-12) }
-	lo, hi := math.Max(0, math.Min(at(r), at(s))), math.Min(l, math.Max(at(r), at(s)))
-	return hi-lo > eps
-}
-
-// overlaps tells whether two boxes share a point, within eps.
-func (b Box) overlaps(o Box) bool {
-	for i := range 3 {
-		if b.Max[i] < o.Min[i]-eps || o.Max[i] < b.Min[i]-eps {
-			return false
-		}
-	}
-	return b.Ok && o.Ok
 }
