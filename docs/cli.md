@@ -11,6 +11,7 @@ t7kb build <name>            compile/light/link/run  (--stages · --mod · --jso
 t7kb gdt <command>           find | get | schema | edit | check | refs
 t7kb zone <command>          explain | contents | check
 t7kb shader decompile <name> a stock shader's HLSL  (--stage · --json)
+t7kb radiant open <map>      open a map in Radiant, or start it  (--pid · --discard)
 t7kb mcp                     run the MCP server
 t7kb update-check            is a newer release out? is the plugin behind?
 ```
