@@ -51,8 +51,11 @@ type Fake struct {
 	LoadAfter   time.Duration     // how long reload takes to show the new map in state
 	Text        string            // the map's entities, as entities gives them
 	Selection   []string          // the selected brushes' GUIDs
+	Hidden      []string          // what View/Hide Entities/Hide Selected hid, until View/Show Last Hidden
+	Blank       bool              // the views draw nothing: a capture is white, as when Windows stops composing them
 	Menus       map[string]string // menus' entries by path, as menus gives them: "label	enabled	submenu" lines
 	UndoLabel   string            // the undo menu's entry: what the last edit was labelled
+	history     []undoStep        // the map before each edit, for Edit/Undo
 	views
 
 	mu       sync.Mutex

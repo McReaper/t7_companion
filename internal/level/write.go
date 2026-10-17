@@ -12,13 +12,21 @@ import (
 // The text map_edit writes for Radiant's import: what Radiant itself writes,
 // without the GUIDs, which the import gives.
 
-// texDefaults are a new face's texture numbers: Radiant's defaults, the
-// material's scale, no shift or rotation, and the lightmap's.
-const texDefaults = "64 64 0 0 0 0 lightmap_gray 16384 16384 0 0 0 0"
+// texNumbers are a new face's texture numbers: its tile, no offset (tiles
+// start on the world's origin, so new faces line up) or rotation, and the
+// lightmap's, as Radiant writes them.
+func texNumbers(w, h float64) string {
+	return num(w) + " " + num(h) + " 0 0 0 0 lightmap_gray 16384 16384 0 0 0 0"
+}
 
 // BoxBrush is the text of an axis-aligned box brush, its faces wound as
-// Radiant winds them ((p1-p0)×(p2-p0) into the brush).
+// Radiant winds them ((p1-p0)×(p2-p0) into the brush), at Radiant's default
+// tile of 64 units.
 func BoxBrush(b Box, material, contents string) string {
+	return boxBrush(b, material, contents, texNumbers(64, 64))
+}
+
+func boxBrush(b Box, material, contents, tex string) string {
 	lo, hi := b.Min, b.Max
 	v := func(x, y, z float64) string { return "( " + num(x) + " " + num(y) + " " + num(z) + " )" }
 	faces := [6][3]string{
@@ -35,7 +43,7 @@ func BoxBrush(b Box, material, contents string) string {
 		s.WriteString(" contents " + strings.TrimSuffix(contents, ";") + ";\n")
 	}
 	for _, f := range faces {
-		s.WriteString(" " + f[0] + " " + f[1] + " " + f[2] + " " + material + " " + texDefaults + "\n")
+		s.WriteString(" " + f[0] + " " + f[1] + " " + f[2] + " " + material + " " + tex + "\n")
 	}
 	s.WriteString("}\n")
 	return s.String()

@@ -24,6 +24,16 @@ type ViewOptions struct {
 	Size   int    // the image's longer side, at most
 	Render string // the 3D view's render method for the shot, put back after
 	Labels bool   // write ids on the image
+	Hide   string // "volumes": hide the map's volumes and triggers for the shot
+	Look   *Pose  // the way a framed 3D target is looked at (default Looking)
+	Marks  []Mark // with Labels, these labels instead of ids
+}
+
+// Mark is a label of the caller's: its text (hex digits, as ids are) and the
+// point it marks.
+type Mark struct {
+	Text string
+	At   mapfile.Vec3
 }
 
 // Shot is what View saw.
@@ -53,33 +63,32 @@ const maxLabels = 40
 // back what it changed of the user's views (render method, 2D axis, zoom and
 // centre, camera) and notes what it could not.
 func View(ctx context.Context, c *radiant.Client, snap *Snapshot, o ViewOptions) (*Shot, error) {
-	view, ok := views[strings.ToLower(strings.TrimSpace(o.View))]
-	if !ok {
-		return nil, fmt.Errorf("view %q: 3d, top, front or side", o.View)
-	}
-	if o.Camera != nil && view != "3d" {
-		return nil, fmt.Errorf("a camera pose is for the 3d view")
+	view, err := o.check()
+	if err != nil {
+		return nil, err
 	}
 	target, err := targetBox(snap, o)
 	if err != nil {
 		return nil, err
 	}
-	var pts []labelPoint
-	if o.Labels {
-		pts = labelPoints(snap, o, target)
-	}
-	if o.Render != "" && view != "3d" {
-		return nil, fmt.Errorf("render is the 3d view's: a 2D view draws outlines")
-	}
+	pts := o.marks(snap, target)
 	s := &session{c: c, pid: c.Hello.PID}
 	var f *frame
-	if view == "3d" {
+	if o.Hide != "" {
+		err = s.hideVolumes(ctx, snap)
+	}
+	switch {
+	case err != nil:
+	case view == "3d":
 		f, err = s.view3D(ctx, target, o, points(pts))
-	} else {
+	default:
 		axis, _ := AxisNamed(view)
 		f, err = s.view2D(ctx, axis, target, points(pts))
 	}
 	s.undo(ctx)
+	if err == nil && blank(f) {
+		err = fmt.Errorf("the capture is all one colour: Radiant drew nothing in the view (asleep screen, or a window Windows no longer draws); try again once Radiant is on screen")
+	}
 	if err != nil {
 		if len(s.notes) > 0 {
 			return nil, fmt.Errorf("%w; and %s", err, strings.Join(s.notes, "; "))
@@ -92,6 +101,39 @@ func View(ctx context.Context, c *radiant.Client, snap *Snapshot, o ViewOptions)
 	}
 	shot.Notes = s.notes
 	return shot, nil
+}
+
+// check is the view the options name, its bridge name, or why they can't
+// be shot.
+func (o ViewOptions) check() (string, error) {
+	view, ok := views[strings.ToLower(strings.TrimSpace(o.View))]
+	switch {
+	case !ok:
+		return "", fmt.Errorf("view %q: 3d, top, front or side", o.View)
+	case o.Camera != nil && view != "3d":
+		return "", fmt.Errorf("a camera pose is for the 3d view")
+	case o.Render != "" && view != "3d":
+		return "", fmt.Errorf("render is the 3d view's: a 2D view draws outlines")
+	}
+	if h := strings.ToLower(o.Hide); h != "" && h != "volumes" {
+		return "", fmt.Errorf("hide %q: volumes, or nothing", o.Hide)
+	}
+	return view, nil
+}
+
+// marks are the points the shot labels: the caller's, else the ids'.
+func (o ViewOptions) marks(snap *Snapshot, target *Box) []labelPoint {
+	if !o.Labels {
+		return nil
+	}
+	if len(o.Marks) == 0 {
+		return labelPoints(snap, o, target)
+	}
+	pts := make([]labelPoint, len(o.Marks))
+	for i, m := range o.Marks {
+		pts[i] = labelPoint{m.Text, m.At}
+	}
+	return pts
 }
 
 // targetBox is what the shot frames, nil for the view as it is.
@@ -213,6 +255,47 @@ type session struct {
 	notes    []string
 }
 
+// blank tells a capture of one colour: no view Radiant draws is, as its
+// statistics line alone has text in it.
+func blank(f *frame) bool {
+	p := f.Pixels
+	for i := 4; i+3 < len(p); i += 4 {
+		if p[i] != p[0] || p[i+1] != p[1] || p[i+2] != p[2] {
+			return false
+		}
+	}
+	return true
+}
+
+// hideVolumes hides, for the shot, the entities whose tool textures draw
+// over a view from inside them as well as from outside: volumes and triggers
+// (a volume_decal stays, as it draws its decal). View/Show Last Hidden shows
+// them again, and only them: what the user had hidden stays hidden.
+func (s *session) hideVolumes(ctx context.Context, snap *Snapshot) error {
+	var guids []string
+	for _, e := range snap.Map.Entities {
+		if c := e.Class(); c != "volume_decal" && (strings.Contains(c, "volume") || strings.HasPrefix(c, "trigger_")) {
+			guids = append(guids, e.Guid())
+		}
+	}
+	if len(guids) == 0 {
+		return nil
+	}
+	err := s.call(ctx, "deselect")
+	if err == nil {
+		err = s.call(ctx, "select "+strings.Join(guids, " "))
+	}
+	if err == nil {
+		err = s.call(ctx, "command View/Hide Entities/Hide Selected")
+	}
+	restoreSelection(ctx, s.c, snap.Sel.GUIDs)
+	if err != nil {
+		return fmt.Errorf("hiding the volumes: %w", err)
+	}
+	s.restores = append(s.restores, restore{what: "hidden volumes", lines: []string{"command View/Show Last Hidden"}})
+	return nil
+}
+
 // restore is the calls that put one thing back as the user had it.
 type restore struct {
 	what  string
@@ -250,10 +333,13 @@ var (
 	guess  = Lens{W: 1648, H: 869, F: 1212.4}
 )
 
-func (s *session) lens() Lens {
+func (s *session) lens() Lens { return lensOf(s.pid) }
+
+// lensOf is a Radiant's 3D lens as last measured, else the guess.
+func lensOf(pid int) Lens {
 	lensMu.Lock()
 	defer lensMu.Unlock()
-	if l, ok := lenses[s.pid]; ok {
+	if l, ok := lenses[pid]; ok {
 		return l
 	}
 	return guess
@@ -273,16 +359,20 @@ func (s *session) view3D(ctx context.Context, target *Box, o ViewOptions, pts []
 	}
 	pose := o.Camera
 	var corners []mapfile.Vec3
+	look := Looking
+	if o.Look != nil {
+		look = *o.Look
+	}
 	if pose == nil && target != nil {
 		corners = target.Corners()
-		p := FrameBox(s.lens(), Looking, *target)
+		p := FrameBox(s.lens(), look, *target)
 		pose = &p
 	}
 	f, err := shoot(ctx, s.c, "3d", pose, append(corners, pts...))
 	if err == nil && corners != nil && !fits(f.At[:len(corners)], f.W, f.H) {
 		if l := (Lens{f.W, f.H, FocalFrom(f.W, f.H, f.Pose, corners, f.At[:len(corners)])}); l.F > 0 {
 			s.remember(l)
-			p := FrameBox(l, Looking, *target)
+			p := FrameBox(l, look, *target)
 			f, err = shoot(ctx, s.c, "3d", &p, append(corners, pts...))
 		}
 	}

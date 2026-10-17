@@ -13,7 +13,60 @@ import (
 // mapToolset edits the map open in the user's Radiant, through the
 // T7RadiantBridge plugin: internal/radiant has the connection's rules.
 func mapToolset() toolset {
-	return toolset{name: "map", tools: []server.ServerTool{radiantOpenTool(), mapFindTool(), mapViewTool(), mapEditTool(), mapCommandTool()}}
+	return toolset{name: "map", tools: []server.ServerTool{radiantOpenTool(), mapFindTool(), mapViewTool(), mapEditTool(), mapCommandTool(), mapMaterialsTool(), mapCheckTool()}}
+}
+
+func mapCheckTool() server.ServerTool {
+	return server.ServerTool{Tool: mcp.NewTool("map_check",
+		mcp.WithDescription("Check the textures of the map open in Radiant, its world brushes (all, or those ids names), "+
+			"for what draws badly, the worst kinds first: unknown (a material no GDT defines: the missing-texture pattern); "+
+			"seam (faces of one material on one plane, both seen, sharing an edge, whose tiles don't meet; detail is the "+
+			"other face: give both the same tile, rotation and origin); stretched (a tile more than half again longer one way "+
+			"than the material's; detail is both tiles); hidden (a drawn face against an opaque brush's face, or inside an "+
+			"opaque brush; detail says which: texture it caulk, as it can't be seen and still draws). Each finding names the "+
+			"brush's id, the face (+x … -z, as map_edit's texture op takes faces) and the material; counts has every kind's "+
+			"total. Run it after texturing, and fix with map_edit."),
+		mcp.WithString("ids", mcp.Description("The brushes or entities to check, comma- or space-separated (default every world brush).")),
+		mcp.WithString("kinds", mcp.Description("Only these kinds, comma-separated: unknown, seam, stretched, hidden.")),
+		mcp.WithNumber("limit", mcp.Description("How many findings to list (default 50, at most 200); counts has them all.")),
+		mcp.WithNumber("pid", mcp.Description("The Radiant to use when several run."))),
+		Handler: jsonHandler(func(ctx context.Context, r mcp.CallToolRequest) (any, error) {
+			return mapCheck(ctx, splitIDs(r.GetString("ids", "")), r.GetString("kinds", ""), r.GetInt("limit", 0), r.GetInt("pid", 0))
+		})}
+}
+
+func mapMaterialsTool() server.ServerTool {
+	return server.ServerTool{Tool: mcp.NewTool("map_materials",
+		mcp.WithDescription("Find materials to texture with: the ones Radiant's texture browser shows (a usage other than "+
+			"<not in editor>), filtered by usage (floor, ceiling, roof, door, window, decal, interior wall, interior trim, "+
+			"exterior wall, exterior trim, terrain, foliage, water, sky, background, tools, clip; \"wall\" takes both walls), "+
+			"surface (brick, wood, concrete, metal, plaster, glass…: the surfaceType footsteps and impacts use) and name "+
+			"words; comma-separated alternatives. Most used by the install's maps first: faces is how many of their faces "+
+			"have it, and tile the world units one repeat spans as map_edit lays it. Materials marked DO NOT USE "+
+			"(Radiant crosses them out; script_wall and script_floor_ceiling among them) only with all. show lays the "+
+			"first 16 out in Radiant, a slab each above the map, shoots them from above fullbright and takes them off "+
+			"the map again (Radiant's redo holds them): the image, then board says which label is which material."),
+		mcp.WithString("usage", mcp.Description("Radiant's filter: floor, interior wall, exterior trim…, comma-separated alternatives.")),
+		mcp.WithString("surface", mcp.Description("The surfaceType: brick, wood, concrete…, comma-separated alternatives.")),
+		mcp.WithString("name", mcp.Description("Words the name holds, all of them; comma-separated alternatives (\"brick red, plaster\").")),
+		mcp.WithNumber("limit", mcp.Description("How many to list (default 20, at most 200).")),
+		mcp.WithBoolean("all", mcp.Description("Include materials marked DO NOT USE (default false).")),
+		mcp.WithBoolean("show", mcp.Description("Lay the first 16 out in Radiant and answer their image too (default false).")),
+		mcp.WithString("tools_path", mcp.Description("BO3 mod-tools root (default $TA_TOOLS_PATH, else the running Radiant's).")),
+		mcp.WithNumber("pid", mcp.Description("With show: the Radiant to use when several run."))),
+		Handler: func(ctx context.Context, r mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			out, png, err := mapMaterials(ctx, mapMaterialsArgs{Usage: r.GetString("usage", ""), Surface: r.GetString("surface", ""),
+				Name: r.GetString("name", ""), Limit: r.GetInt("limit", 0), All: r.GetBool("all", false), Show: r.GetBool("show", false),
+				ToolsPath: r.GetString("tools_path", ""), PID: r.GetInt("pid", 0)})
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			res := jsonResult(out)
+			if png != nil {
+				res.Content = append(res.Content, mcp.NewImageContent(base64.StdEncoding.EncodeToString(png), "image/png"))
+			}
+			return res, nil
+		}}
 }
 
 func mapCommandTool() server.ServerTool {
@@ -41,10 +94,26 @@ func mapEditTool() server.ServerTool {
 			"\"class\"?: c, \"keys\"?: {…}}} a box brush, in worldspawn or as a new brush entity of class (volume_sun, "+
 			"trigger_multiple); {\"entity\": {\"class\": c, \"origin\": [x,y,z], \"angles\"?: [p,y,r], \"keys\"?: {…}}} a "+
 			"point entity; {\"delete\": [ids]}; {\"set\": {\"id\": id, \"keys\": {k: v, k2: null}}} (null removes); "+
-			"{\"move\": {\"ids\": [ids], \"by\": [dx,dy,dz]}}; {\"material\": {\"ids\": [ids], \"material\": m}}. "+
-			"Ids are map_find's. A point entity keeps its id; a world brush or an entity that owns brushes is rebuilt and "+
-			"gets a new one (was gives the old). The answer reads the map back: each op's id, class, origin or bounds. "+
-			"Edits go through Radiant, never the .map file, and the user's selection is kept."),
+			"{\"move\": {\"ids\": [ids], \"by\": [dx,dy,dz]}}; {\"copy\": {\"ids\": [ids], \"by\": [dx,dy,dz], "+
+			"\"count\"?: n}} n copies, each by further than the last (a row of pillars or wall panels from one); "+
+			"{\"material\": {\"ids\": [ids], \"material\": m}} swaps the material, each face keeping its tile; "+
+			"{\"texture\": {\"ids\": [ids], \"faces\"?: \"top\"|\"bottom\"|\"sides\"|\"+x,-y\"…, \"material\"?: m, "+
+			"\"tile\"?: [u,v], \"scale\"?: s, \"origin\"?: [x,y,z], \"fit\"?: [nu,nv], \"rotate\"?: deg, \"flip\"?: "+
+			"\"u\"|\"v\"|\"uv\"}} lays a material on faces (all by default): tile is the world units one repeat spans "+
+			"(default the material's own, as the install's maps use it), tiles start on origin (default 0 0 0, so faces "+
+			"given the same tile line up across brushes), fit makes nu repeats span each face (0 sizes that axis as the "+
+			"other) starting at its edge. New boxes get their material's own tile too. {\"room\": {\"min\": [x,y,z], "+
+			"\"max\": [x,y,z], \"material\": m, \"floor\"?: m, \"ceiling\"?: m, \"wall\"?: 8, \"slab\"?: 16, \"open\"?: "+
+			"[\"+x\"…, \"top\", \"bottom\"], \"holes\"?: [{\"side\": \"-y\", \"at\": u, \"width\"?: 56, \"height\"?: 96, "+
+			"\"sill\"?: 0}]}} builds a room around the inside box min..max (where a player walks): a floor slab under it, "+
+			"a ceiling over it, a wall on each side not open (a corridor is open at its ends), doors and windows (sill 32) "+
+			"left as holes the walls are built around, at u units along the wall from the inside's lower corner; the "+
+			"faces its pieces hide of each other are caulk. Ids are map_find's, or @n: what op "+
+			"n of this batch made (every copy of a copy op), so a box built, textured and copied is one undo step. A point "+
+			"entity keeps its id; a world brush or an entity that owns brushes is rebuilt and gets a new one (was gives "+
+			"the old). The answer reads the map back: each op's id, class, origin or bounds, the tile each material got "+
+			"and where it came from, the faces each texture op textured. Edits go through Radiant, never the .map file, "+
+			"and the user's selection is kept."),
 		mcp.WithArray("ops", mcp.Required(), mcp.Description("The ops, in order."), mcp.Items(map[string]any{"type": "object"})),
 		mcp.WithString("label", mcp.Description("What the batch does, for Radiant's undo menu (default: the ops counted).")),
 		mcp.WithNumber("pid", mcp.Description("The Radiant to edit when several run."))),
@@ -77,13 +146,14 @@ func mapViewTool() server.ServerTool {
 		mcp.WithNumber("radius", mcp.Description("With at: how far around the point to show (default 256).")),
 		mcp.WithString("camera", mcp.Description("3d: shoot from x y z pitch yaw roll (degrees; positive pitch looks up, yaw 90 faces +y).")),
 		mcp.WithString("render", mcp.Description("3d: the render method for this shot: fake, fullbright, wireframe, real, view or density.")),
+		mcp.WithString("hide", mcp.Description("volumes: hide the map's volumes and triggers for this shot (their tool textures cover a view from inside them too); shown again after.")),
 		mcp.WithNumber("size", mcp.Description("The image's longer side in pixels (default 768, at most 1568).")),
 		mcp.WithBoolean("no_labels", mcp.Description("Leave the ids off the image (default false).")),
 		mcp.WithNumber("pid", mcp.Description("The Radiant to see when several run."))),
 		Handler: func(ctx context.Context, r mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			out, png, err := mapView(ctx, mapViewArgs{View: r.GetString("view", ""), IDs: splitIDs(r.GetString("ids", "")),
 				At: r.GetString("at", ""), Radius: r.GetFloat("radius", 0), Camera: r.GetString("camera", ""),
-				Render: r.GetString("render", ""), Size: r.GetInt("size", 0), NoLabels: r.GetBool("no_labels", false), PID: r.GetInt("pid", 0)})
+				Render: r.GetString("render", ""), Hide: r.GetString("hide", ""), Size: r.GetInt("size", 0), NoLabels: r.GetBool("no_labels", false), PID: r.GetInt("pid", 0)})
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}

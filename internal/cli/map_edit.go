@@ -16,6 +16,21 @@ type mapEditOut struct {
 	Undo    string    `json:"undo"` // the entry in Radiant's undo menu: one Ctrl+Z undoes the whole batch
 	Deleted int       `json:"deleted,omitempty"`
 	Made    []madeOut `json:"made,omitempty"`
+	// Tiles is the tile each material new boxes and texture ops sized was
+	// given, and Textured how many faces each texture op textured.
+	Tiles    map[string]tileOut `json:"tiles,omitempty"`
+	Textured []texturedOut      `json:"textured,omitempty"`
+}
+
+// tileOut is a material's tile: world units across and down, and its source.
+type tileOut struct {
+	Size [2]float64 `json:"size"`
+	From string     `json:"from"`
+}
+
+type texturedOut struct {
+	Op    int `json:"op"`
+	Faces int `json:"faces"`
 }
 
 // madeOut is what one op made or changed.
@@ -55,11 +70,22 @@ func mapEdit(ctx context.Context, ops []level.Op, label string, pid int) (*mapEd
 	if err != nil {
 		return nil, err
 	}
-	d, err := level.Edit(ctx, c, snap, ops, label)
+	d, err := level.Edit(ctx, c, snap, ops, label, mapTiles(snap.State.Map))
 	if err != nil {
 		return nil, err
 	}
 	out := &mapEditOut{Map: baseName(d.After.State.Map), Undo: d.Label, Deleted: d.Deleted}
+	for m, t := range d.Tiles {
+		if out.Tiles == nil {
+			out.Tiles = map[string]tileOut{}
+		}
+		out.Tiles[m] = tileOut{Size: [2]float64{t.W, t.H}, From: t.From}
+	}
+	for i := range ops {
+		if n, ok := d.Faces[i]; ok {
+			out.Textured = append(out.Textured, texturedOut{Op: i, Faces: n})
+		}
+	}
 	for _, m := range d.Made {
 		mo := madeOut{Op: m.Op, Class: m.Class}
 		if m.ID == "" {

@@ -15,6 +15,23 @@ type Op struct {
 	Set      *SetOp      `json:"set,omitempty"`
 	Move     *MoveOp     `json:"move,omitempty"`
 	Material *MaterialOp `json:"material,omitempty"`
+	Texture  *TextureOp  `json:"texture,omitempty"`
+	Copy     *CopyOp     `json:"copy,omitempty"`
+	Room     *RoomOp     `json:"room,omitempty"`
+}
+
+// opKinds are the names of an op's fields, in Op's order.
+var opKinds = []string{"box", "entity", "delete", "set", "move", "material", "texture", "copy", "room"}
+
+// kinds are which of its fields an op sets, by their index in opKinds.
+func (op Op) kinds() []int {
+	var out []int
+	for i, set := range []bool{op.Box != nil, op.Entity != nil, op.Delete != nil, op.Set != nil, op.Move != nil, op.Material != nil, op.Texture != nil, op.Copy != nil, op.Room != nil} {
+		if set {
+			out = append(out, i)
+		}
+	}
+	return out
 }
 
 // BoxOp adds an axis-aligned box: a world brush, or the brush of a new brush
@@ -48,7 +65,8 @@ type MoveOp struct {
 	By  [3]float64 `json:"by"`
 }
 
-// MaterialOp gives brushes, or all of an entity's, a material.
+// MaterialOp gives brushes, or all of an entity's, a material, each face
+// keeping its tile and alignment, as Radiant's Find/Replace does.
 type MaterialOp struct {
 	IDs      []string `json:"ids"`
 	Material string   `json:"material"`
@@ -60,7 +78,6 @@ type unit struct {
 	guid  string          // the map's GUID, "" for a new unit
 	ent   *mapfile.Entity // an entity's text
 	brush *mapfile.Brush  // or a world brush's
-	text  string          // a new unit's text: an entity block, or a world brush block
 	world bool            // a world brush
 	point bool            // a point entity of the map, which Radiant replaces in place
 	state state
@@ -83,10 +100,13 @@ type batch struct {
 	by    map[string]*unit          // GUID hex (entity, world brush, entity brush) -> its unit
 	brush map[string]*mapfile.Brush // GUID hex -> the brush, for an entity's brush named alone
 	world string                    // worldspawn's GUID hex
+	tiles Tiles                     // sizes a material's tile; nil assumes one
+	used  map[string]Tile           // the tile each material was given
+	faces map[int]int               // texture op -> faces it textured
 }
 
-func newBatch(snap *Snapshot) *batch {
-	b := &batch{snap: snap, by: map[string]*unit{}, brush: map[string]*mapfile.Brush{}}
+func newBatch(snap *Snapshot, tiles Tiles) *batch {
+	b := &batch{snap: snap, by: map[string]*unit{}, brush: map[string]*mapfile.Brush{}, tiles: tiles, used: map[string]Tile{}, faces: map[int]int{}}
 	for _, e := range snap.Map.Entities {
 		if e.Class() == "worldspawn" {
 			b.world = hexOf(e.Guid())
@@ -112,7 +132,7 @@ func newBatch(snap *Snapshot) *batch {
 // apply runs the ops in order over the batch.
 func (b *batch) apply(ops []Op) error {
 	if len(ops) == 0 {
-		return fmt.Errorf("no ops: give box, entity, delete, set, move or material ops")
+		return fmt.Errorf("no ops: give box, entity, delete, set, move, material, texture, copy or room ops")
 	}
 	for i, op := range ops {
 		if err := b.applyOne(i, op); err != nil {
@@ -123,14 +143,8 @@ func (b *batch) apply(ops []Op) error {
 }
 
 func (b *batch) applyOne(i int, op Op) error {
-	n := 0
-	for _, set := range []bool{op.Box != nil, op.Entity != nil, op.Delete != nil, op.Set != nil, op.Move != nil, op.Material != nil} {
-		if set {
-			n++
-		}
-	}
-	if n != 1 {
-		return fmt.Errorf("an op is exactly one of box, entity, delete, set, move, material (this one has %d)", n)
+	if n := len(op.kinds()); n != 1 {
+		return fmt.Errorf("an op is exactly one of %s (this one has %d)", strings.Join(opKinds, ", "), n)
 	}
 	switch {
 	case op.Box != nil:
@@ -143,6 +157,12 @@ func (b *batch) applyOne(i int, op Op) error {
 		return b.set(i, op.Set)
 	case op.Move != nil:
 		return b.each(i, op.Move.IDs, func(u *unit, br *mapfile.Brush) error { return move(u, br, op.Move.By) })
+	case op.Texture != nil:
+		return b.texture(i, op.Texture)
+	case op.Copy != nil:
+		return b.copies(i, op.Copy)
+	case op.Room != nil:
+		return b.room(i, op.Room)
 	default:
 		if !word(op.Material.Material) {
 			return fmt.Errorf("material %q: one word, a material's name", op.Material.Material)
@@ -163,19 +183,86 @@ func (b *batch) box(i int, o *BoxOp) error {
 	if o.Contents != "" && !cleanText(o.Contents) {
 		return fmt.Errorf("box: contents %q", o.Contents)
 	}
-	brush := BoxBrush(Box{Min: o.Min, Max: o.Max, Ok: true}, o.Material, o.Contents)
+	t := b.tile(o.Material)
+	brush := boxBrush(Box{Min: o.Min, Max: o.Max, Ok: true}, o.Material, o.Contents, texNumbers(t.W, t.H))
 	if o.Class == "" {
 		if len(o.Keys) > 0 {
 			return fmt.Errorf("box: keys belong to a brush entity: give its class")
 		}
-		b.units = append(b.units, &unit{text: brush, world: true, state: created, op: i})
-		return nil
+		return b.made(i, EntityText("worldspawn", nil, brush), true)
 	}
 	if err := checkKeys(o.Class, o.Keys); err != nil {
 		return fmt.Errorf("box: %w", err)
 	}
-	b.units = append(b.units, &unit{text: EntityText(o.Class, o.Keys, brush), state: created, op: i})
+	return b.made(i, EntityText(o.Class, o.Keys, brush), false)
+}
+
+// made adds the unit op i creates, from its text: an entity, or worldspawn
+// holding the world brush.
+func (b *batch) made(i int, text string, world bool) error {
+	m, err := mapfile.Parse([]byte(text))
+	if err != nil {
+		return fmt.Errorf("the text it makes doesn't read back: %w", err)
+	}
+	u := &unit{ent: m.Entities[0], world: world, state: created, op: i}
+	if world {
+		u.ent, u.brush = nil, m.Entities[0].Brushes()[0]
+	}
+	b.units = append(b.units, u)
 	return nil
+}
+
+// tile is a material's tile, sized once per batch.
+func (b *batch) tile(material string) Tile {
+	if t, ok := b.used[material]; ok {
+		return t
+	}
+	t := assumed
+	if b.tiles != nil {
+		got, err := b.tiles(material)
+		switch {
+		case err != nil:
+			t.From = "assumed, " + err.Error()
+		case got.W > 0 && got.H > 0:
+			t = got
+		}
+	}
+	b.used[material] = t
+	return t
+}
+
+// texture runs a texture op over what its ids name.
+func (b *batch) texture(i int, o *TextureOp) error {
+	t, err := newTexturing(o, b.tile)
+	if err != nil {
+		return fmt.Errorf("texture: %w", err)
+	}
+	err = b.each(i, o.IDs, func(u *unit, br *mapfile.Brush) error {
+		before := t.n
+		for _, x := range u.brushes(br) {
+			if err := t.brush(x); err != nil {
+				return err
+			}
+		}
+		if t.n == before {
+			return fmt.Errorf("texture: none of its faces is among faces %q (a patch has none: its texture lies in its vertices)", o.Faces)
+		}
+		return nil
+	})
+	b.faces[i] = t.n
+	return err
+}
+
+// brushes are the brushes an id names in a unit: a world brush, one brush of
+// an entity, or all of an entity's.
+func (u *unit) brushes(br *mapfile.Brush) []*mapfile.Brush {
+	switch {
+	case u.world:
+		return []*mapfile.Brush{u.brush}
+	case br != nil:
+		return []*mapfile.Brush{br}
+	}
+	return u.ent.Brushes()
 }
 
 func (b *batch) entity(i int, o *EntityOp) error {
@@ -189,8 +276,7 @@ func (b *batch) entity(i int, o *EntityOp) error {
 	if o.Angles != nil {
 		keys["angles"] = vecText(*o.Angles)
 	}
-	b.units = append(b.units, &unit{text: EntityText(o.Class, keys), state: created, op: i})
-	return nil
+	return b.made(i, EntityText(o.Class, keys), false)
 }
 
 func (b *batch) delete(i int, ids []string) error {
@@ -216,10 +302,14 @@ func (b *batch) set(i int, o *SetOp) error {
 	if len(o.Keys) == 0 {
 		return fmt.Errorf("set: no keys")
 	}
-	u, _, err := b.resolve(o.ID)
+	ts, err := b.targets(o.ID)
 	if err != nil {
 		return err
 	}
+	if len(ts) != 1 {
+		return fmt.Errorf("set: %s names %d things: name one", o.ID, len(ts))
+	}
+	u := ts[0].u
 	if u.world {
 		return fmt.Errorf("set: %s is a world brush: keys are an entity's", o.ID)
 	}
@@ -232,7 +322,7 @@ func (b *batch) set(i int, o *SetOp) error {
 		}
 	}
 	setKeys(u.ent, o.Keys)
-	u.state, u.op = changed, i
+	u.touched(i)
 	return nil
 }
 
@@ -243,19 +333,30 @@ func (b *batch) each(i int, ids []string, fn func(*unit, *mapfile.Brush) error) 
 		return fmt.Errorf("no ids")
 	}
 	for _, id := range ids {
-		u, br, err := b.resolve(id)
+		ts, err := b.targets(id)
 		if err != nil {
 			return err
 		}
-		if err := fn(u, br); err != nil {
-			return fmt.Errorf("%s: %w", id, err)
+		for _, t := range ts {
+			if err := fn(t.u, t.br); err != nil {
+				return fmt.Errorf("%s: %w", id, err)
+			}
+			t.u.touched(i)
 		}
-		if u.state != deleted {
-			u.state = changed
-		}
-		u.op = i
 	}
 	return nil
+}
+
+// touched marks a unit op i changed: one of the map's is sent again, under
+// that op; what the batch made stays new, and its maker's.
+func (u *unit) touched(i int) {
+	if u.guid == "" {
+		return
+	}
+	if u.state == kept {
+		u.state = changed
+	}
+	u.op = i
 }
 
 func (b *batch) resolve(id string) (*unit, *mapfile.Brush, error) {

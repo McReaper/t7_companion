@@ -42,7 +42,7 @@ func TestABatchIsOneEditAndItsResultsAreReadBack(t *testing.T) {
 		{"set": {"id": "5ec8de46", "keys": {"name": "probe_renamed", "box": null}}},
 		{"material": {"ids": ["af3c9c64"], "material": "caulk"}},
 		{"delete": ["76780cea"]}
-	]`), "")
+	]`), "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestAPointEntityIsReplacedInPlaceAndKeepsItsID(t *testing.T) {
 	d, err := Edit(context.Background(), c, snap, ops(t, `[
 		{"set": {"id": "0a000000", "keys": {"targetname": "spot"}}},
 		{"move": {"ids": ["0a000000"], "by": [1, 2, 3]}}
-	]`), "move the spot")
+	]`), "move the spot", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestOpsOnABrushEntityRebuildIt(t *testing.T) {
 	d, err := Edit(context.Background(), c, snap, ops(t, `[
 		{"move": {"ids": ["6e73936d"], "by": [10, 0, 0]}},
 		{"material": {"ids": ["6e73936c"], "material": "clip"}}
-	]`), "")
+	]`), "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ func TestOpsOnABrushEntityRebuildIt(t *testing.T) {
 		t.Errorf("the volume after: %+v", hits)
 	}
 	snap = d.After
-	d, err = Edit(context.Background(), c, snap, ops(t, `[{"delete": ["`+snap.IDs.Short(hits[0].Entity.Brushes()[0].Guid())+`"]}]`), "")
+	d, err = Edit(context.Background(), c, snap, ops(t, `[{"delete": ["`+snap.IDs.Short(hits[0].Entity.Brushes()[0].Guid())+`"]}]`), "", nil)
 	if err != nil || len(d.Made) != 1 || d.Made[0].Class != "volume_sun" || d.Made[0].Box.Ok {
 		t.Errorf("deleting an entity's one brush rebuilds it without: %+v, %v", d, err)
 	}
@@ -169,7 +169,7 @@ func TestEditRefusals(t *testing.T) {
 		`[{"material": {"ids": ["5ec8de46"], "material": "caulk"}}]`:                 "has no brush to give a material",
 		`[{"material": {"ids": ["5ec8de49"], "material": ""}}]`:                      `material ""`,
 	} {
-		if _, err := Edit(context.Background(), c, snap, ops(t, js), ""); err == nil || !strings.Contains(err.Error(), want) {
+		if _, err := Edit(context.Background(), c, snap, ops(t, js), "", nil); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: err = %v, want %q", js, err, want)
 		}
 	}
@@ -180,7 +180,7 @@ func TestEditPassesOnTheBridgesAnswer(t *testing.T) {
 	f.Handle("edit", func(*radianttest.Fake, string, []byte) radianttest.Reply {
 		return radianttest.Err("busy", "Entity Info")
 	})
-	_, err := Edit(context.Background(), c, snap, ops(t, `[{"delete": ["76780cea"]}]`), "")
+	_, err := Edit(context.Background(), c, snap, ops(t, `[{"delete": ["76780cea"]}]`), "", nil)
 	if err == nil || !strings.Contains(err.Error(), "busy: Entity Info") {
 		t.Errorf("busy: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestEditPassesOnTheBridgesAnswer(t *testing.T) {
 		f.Dialog = "Save As"
 		return radianttest.OK("deleted=1", nil)
 	})
-	_, err = Edit(context.Background(), c, snap, ops(t, `[{"delete": ["76780cea"]}]`), "")
+	_, err = Edit(context.Background(), c, snap, ops(t, `[{"delete": ["76780cea"]}]`), "", nil)
 	if err == nil || !strings.Contains(err.Error(), "the edit is done (one Ctrl+Z undoes it), but the map could not be read back") {
 		t.Errorf("no read back: %v", err)
 	}

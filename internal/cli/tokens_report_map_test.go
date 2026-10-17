@@ -105,6 +105,42 @@ func mapSamples(t *testing.T, root string, add func(key, s string), addImage fun
 	moved, _ := decodeOps([]byte(`[{"move": {"ids": ["` + start + `"], "by": [0, 64, 0]}}]`))
 	v, err = mapEdit(ctx, moved, "", 0)
 	run("map_edit|move the player start (a point entity, in place)", v, err)
+	textured := `[` +
+		`{"box": {"min": [900, -1400, -16], "max": [1400, -900, 0], "material": "t7_wood_plank_floor_02"}},` +
+		`{"box": {"min": [900, -1400, 0], "max": [908, -900, 112], "material": "t7_brick_worn_dirty_red_wet"}},` +
+		`{"box": {"min": [1392, -1400, 0], "max": [1400, -900, 112], "material": "t7_brick_worn_dirty_red_wet"}},` +
+		`{"texture": {"ids": ["@1", "@2"], "faces": "top,bottom", "material": "caulk"}},` +
+		`{"box": {"min": [1000, -1150, 0], "max": [1032, -1118, 112], "material": "t7_concrete_poured_bunker_dirty_01_wet"}},` +
+		`{"copy": {"ids": ["@4"], "by": [96, 0, 0], "count": 3}}]`
+	add("map_edit|the ops sent: a floor, 2 walls caulked top and bottom, a pillar copied 3 times", textured)
+	tops, err := decodeOps([]byte(textured))
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err = mapEdit(ctx, tops, "textures and copies", 0)
+	run("map_edit|its answer (with each material's tile)", v, err)
+	roomOp := `[{"room": {"min": [-1400, 900, 0], "max": [-888, 1284, 112], "material": "t7_brick_worn_dirty_red_wet", ` +
+		`"floor": "t7_wood_plank_floor_02", "holes": [{"side": "+x", "at": 192}]}}]`
+	add("map_edit|the op sent: a room with a door", roomOp)
+	rooms, err := decodeOps([]byte(roomOp))
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err = mapEdit(ctx, rooms, "a room", 0)
+	run("map_edit|its answer (8 pieces)", v, err)
+	v, err = mapCheck(ctx, nil, "", 0, 0)
+	run("map_check|the template and the rooms above (50 listed)", v, err)
+	v, err = mapCheck(ctx, nil, "seam,stretched,unknown", 0, 0)
+	run("map_check|seams, stretch and unknown materials only", v, err)
+
+	v, err = mapMaterials0(ctx, mapMaterialsArgs{ToolsPath: root, Usage: "wall", Surface: "brick"})
+	run("map_materials|brick walls (20 listed)", v, err)
+	if out, png, err := mapMaterials(ctx, mapMaterialsArgs{Usage: "floor", Name: "wood", Limit: 6, Show: true}); err == nil {
+		add("map_materials|6 wood floors shown: the JSON", mcpJSON(t, out))
+		addImage(fmt.Sprintf("map_materials|6 wood floors shown: the %d×%d image", out.W, out.H), out.W, out.H, len(png))
+	} else {
+		t.Logf("map_materials show: %v", err)
+	}
 
 	v, err = mapCommand(ctx, "", nil, "Selection/CSG", 0)
 	run("map_command|list Selection/CSG", v, err)
@@ -155,4 +191,10 @@ func hollow(f *radianttest.Fake, args string, _ []byte) radianttest.Reply {
 		return radianttest.OK("", nil)
 	}
 	return radianttest.Err("disabled", args+" is disabled")
+}
+
+// mapMaterials0 is mapMaterials' answer alone, for a list with no image.
+func mapMaterials0(ctx context.Context, a mapMaterialsArgs) (*mapMaterialsOut, error) {
+	out, _, err := mapMaterials(ctx, a)
+	return out, err
 }

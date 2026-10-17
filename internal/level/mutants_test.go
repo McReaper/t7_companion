@@ -209,7 +209,8 @@ func TestAShotWhoseCornersAllFellBehindIsNotRetaken(t *testing.T) {
 	f, c, snap := viewing(t, 404)
 	f.Handle("capture", func(_ *radianttest.Fake, _ string, body []byte) radianttest.Reply {
 		n := strings.Count(string(body), "\n")
-		return radianttest.OK("w=2 h=2 origin=0,0,0 angles=0,0,0 game_view=0", append(make([]byte, 16), strings.Repeat("-\n", n)...))
+		frame := []byte{0, 0, 0, 255, 9, 9, 9, 255, 0, 0, 0, 255, 0, 0, 0, 255}
+		return radianttest.OK("w=2 h=2 origin=0,0,0 angles=0,0,0 game_view=0", append(frame, strings.Repeat("-\n", n)...))
 	})
 	if _, err := View(context.Background(), c, snap, ViewOptions{IDs: []string{"5ec8de49"}}); err != nil {
 		t.Fatal(err)
@@ -292,12 +293,12 @@ func TestBatchesThatCountedToNothing(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := Edit(context.Background(), c, snap, ops(t, js), ""); err != nil {
+		if _, err := Edit(context.Background(), c, snap, ops(t, js), "", nil); err != nil {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
 	snap, _ := Read(context.Background(), c)
-	b := newBatch(snap)
+	b := newBatch(snap, nil)
 	if err := b.apply(ops(t, `[{"delete": ["f2d51a52"]}]`)); err != nil {
 		t.Fatal(err)
 	}
@@ -320,7 +321,7 @@ func TestMovingAnEntityMovesAllItsBrushes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, err := Edit(context.Background(), c, snap, ops(t, `[{"move": {"ids": ["{0B100000-0000-0000-0000-000000000000}"], "by": [100, 0, 0]}}]`), "")
+	d, err := Edit(context.Background(), c, snap, ops(t, `[{"move": {"ids": ["{0B100000-0000-0000-0000-000000000000}"], "by": [100, 0, 0]}}]`), "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

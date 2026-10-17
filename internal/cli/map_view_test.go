@@ -75,6 +75,11 @@ func TestMapViewToolGivesTextThenImage(t *testing.T) {
 	if _, err := png.Decode(bytes.NewReader(b)); err != nil {
 		t.Errorf("not a png: %v", err)
 	}
+	// No size: the default's, not a pixel; the volumes hidden for the shot.
+	res, err = mapViewTool().Handler(context.Background(), mcpRequest("map_view", map[string]any{"view": "top", "hide": "volumes"}))
+	if err != nil || res.IsError || json.Unmarshal([]byte(res.Content[0].(mcp.TextContent).Text), &out) != nil || out.H != 160 {
+		t.Errorf("the default size, volumes hidden: %+v, %v", out, err)
+	}
 	bad, _ := mapViewTool().Handler(context.Background(), mcpRequest("map_view", map[string]any{"view": "iso"}))
 	if !bad.IsError || !strings.Contains(resultText(bad), `view "iso"`) {
 		t.Errorf("a bad view: %s", resultText(bad))
@@ -108,5 +113,12 @@ func TestMapViewCommandWritesThePNG(t *testing.T) {
 	cmd.SetArgs([]string{"view", "--out", filepath.Join(t.TempDir(), "no", "such", "dir", "v.png")})
 	if err := cmd.Execute(); err == nil {
 		t.Error("writing into a missing directory succeeded")
+	}
+	cmd = newMapCmd()
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"view", "--hide", "lights", "--out", path})
+	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), `hide "lights"`) {
+		t.Errorf("--hide lights: %v", err)
 	}
 }
