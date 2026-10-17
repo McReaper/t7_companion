@@ -53,6 +53,29 @@ It builds each answer with the same functions the MCP handlers use and counts to
 
 Paging costs answer quality only when the matched passage sits past the first page: of the bench queries' 48 top-3 hits, 41 fit in one page, and of the 7 paged ones the snippet's passage was on page 1 for 4. With `find` set to a phrase from the snippet, it is in the page returned for all 7.
 
+### The map tools
+
+Measured on the stock ZM Mod Level template's map (33 entities, 20 world brushes), what a map made by `create` holds, served by `radianttest`'s fake Radiant with the views of a real one: a 1648×869 3D view, a 693×1165 2D view (`mapSamples` in `internal/cli/tokens_report_map_test.go`). An image counts as Claude prices it, about width × height / 750 tokens; the JSON beside it, and the ops an agent writes, as text.
+
+| Tool | Call | Tokens | Bytes |
+|---|---|---:|---:|
+| `radiant_open` | the map already open | 53 | 183 |
+| `map_find` | every entity (33) | 1598 | 5334 |
+| `map_find` | class `script_struct` (15) | 766 | 2842 |
+| `map_find` | near the player start, 256 units | 690 | 2319 |
+| `map_find` | worldspawn's 20 brushes | 667 | 1716 |
+| `map_find` | one entity, all keys | 85 | 265 |
+| `map_view` | top, framed on the start zone: JSON + 457×768 image | 48 + 467 | 117 + 3477 |
+| `map_view` | 3D, framed, `render fake`: JSON + 768×405 image | 52 + 414 | 129 + 2610 |
+| `map_view` | 3D as it is, `size 1568`: JSON + 1568×827 image | 84 + 1728 | 190 + 8402 |
+| `map_edit` | the ops an agent writes for a room (floor, 4 walls, ceiling, a light) | 254 | 643 |
+| `map_edit` | the answer to them | 212 | 507 |
+| `map_edit` | moving a point entity | 49 | 140 |
+| `map_command` | listing `Selection/CSG` | 32 | 111 |
+| `map_command` | `CSG Hollow` on a box | 206 | 579 |
+
+A room costs about a thousand tokens: its ops (254), the answer (212), a top view to check it (515). The whole map's `map_find` is the dearest call, about 48 tokens an entity, so `class`, `near` or `ids` narrow it; the default image, 768 pixels on the long side, stays near 450 tokens, and `size 1568` quadruples it.
+
 ## Retrieval quality
 
 How well search ranks, and every ranking change tried and rejected: [retrieval-quality.md](retrieval-quality.md).

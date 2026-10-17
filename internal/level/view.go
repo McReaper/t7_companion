@@ -1,0 +1,341 @@
+package level
+
+import (
+	"context"
+	"fmt"
+	"image"
+	"math"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/radiant"
+)
+
+// ViewOptions say what View shows.
+type ViewOptions struct {
+	View   string        // 3d (default), top, front or side; xy, xz and yz too
+	IDs    []string      // frame these entities or brushes
+	At     *mapfile.Vec3 // or frame the box of Radius around this point
+	Radius float64
+	Camera *Pose  // or shoot the 3D view from here
+	Size   int    // the image's longer side, at most
+	Render string // the 3D view's render method for the shot, put back after
+	Labels bool   // write ids on the image
+}
+
+// Shot is what View saw.
+type Shot struct {
+	View   string // 3d, xy, xz or yz
+	Image  *image.RGBA
+	Pose   *Pose         // a 3D shot's camera
+	Centre *mapfile.Vec3 // a 2D shot's centre
+	Scale  float64       // a 2D shot's image pixels per unit
+	Labels []Label       // the ids in the image, where their points landed
+	Notes  []string      // what View could not put back as it was
+}
+
+// views are the names View takes, by bridge name.
+var views = map[string]string{"": "3d", "3d": "3d", "top": "xy", "xy": "xy", "front": "xz", "xz": "xz", "side": "yz", "yz": "yz"}
+
+// renders are the render methods by the short names map_view takes; the
+// menu's own names are taken too.
+var renders = map[string]string{"wireframe": "Wireframe", "fullbright": "Fullbright", "fake": "Normal-based Fake Lighting",
+	"normal": "Normal-based Fake Lighting", "view": "View-Based Fake Lighting", "real": "Real Lighting", "density": "Tri Density"}
+
+// maxLabels bounds the ids written on one image, nearest the centre first.
+const maxLabels = 40
+
+// View captures a view of the map open in the Radiant: framed on a target,
+// shot from a pose, or as it is; then scales it and writes ids on it. It puts
+// back what it changed of the user's views (render method, 2D axis, zoom and
+// centre, camera) and notes what it could not.
+func View(ctx context.Context, c *radiant.Client, snap *Snapshot, o ViewOptions) (*Shot, error) {
+	view, ok := views[strings.ToLower(strings.TrimSpace(o.View))]
+	if !ok {
+		return nil, fmt.Errorf("view %q: 3d, top, front or side", o.View)
+	}
+	if o.Camera != nil && view != "3d" {
+		return nil, fmt.Errorf("a camera pose is for the 3d view")
+	}
+	target, err := targetBox(snap, o)
+	if err != nil {
+		return nil, err
+	}
+	var pts []labelPoint
+	if o.Labels {
+		pts = labelPoints(snap, o, target)
+	}
+	if o.Render != "" && view != "3d" {
+		return nil, fmt.Errorf("render is the 3d view's: a 2D view draws outlines")
+	}
+	s := &session{c: c, pid: c.Hello.PID}
+	var f *frame
+	if view == "3d" {
+		f, err = s.view3D(ctx, target, o, points(pts))
+	} else {
+		axis, _ := AxisNamed(view)
+		f, err = s.view2D(ctx, axis, target, points(pts))
+	}
+	s.undo(ctx)
+	if err != nil {
+		if len(s.notes) > 0 {
+			return nil, fmt.Errorf("%w; and %s", err, strings.Join(s.notes, "; "))
+		}
+		return nil, err
+	}
+	shot, err := compose(f, view, pts, o.Size)
+	if err != nil {
+		return nil, err
+	}
+	shot.Notes = s.notes
+	return shot, nil
+}
+
+// targetBox is what the shot frames, nil for the view as it is.
+func targetBox(snap *Snapshot, o ViewOptions) (*Box, error) {
+	var b Box
+	switch {
+	case len(o.IDs) > 0:
+		boxes, err := boxesOf(snap, o.IDs)
+		if err != nil {
+			return nil, err
+		}
+		for _, x := range boxes {
+			b.Union(x)
+		}
+		if !b.Ok {
+			return nil, fmt.Errorf("%s: nothing there to frame", strings.Join(o.IDs, ", "))
+		}
+		b = b.Grown(minFrame)
+	case o.At != nil:
+		r := o.Radius
+		if r <= 0 {
+			r = 256
+		}
+		r = math.Max(r, 16)
+		b.Add(mapfile.Vec3{o.At[0] - r, o.At[1] - r, o.At[2] - r})
+		b.Add(mapfile.Vec3{o.At[0] + r, o.At[1] + r, o.At[2] + r})
+	default:
+		return nil, nil
+	}
+	return &b, nil
+}
+
+// minFrame is the least a target framed by ids spans on each axis, in units:
+// a point entity shows with the room around it.
+const minFrame = 256
+
+// boxesOf are the boxes of the entities and brushes the ids name, by GUID.
+func boxesOf(snap *Snapshot, ids []string) (map[string]Box, error) {
+	want := map[string]bool{}
+	for _, id := range ids {
+		g, err := snap.IDs.Resolve(id)
+		if err != nil {
+			return nil, err
+		}
+		want[hexOf(g)] = true
+	}
+	out := map[string]Box{}
+	for _, e := range snap.Map.Entities {
+		if want[hexOf(e.Guid())] {
+			out[e.Guid()] = EntityBox(e)
+		}
+		for _, b := range e.Brushes() {
+			if want[hexOf(b.Guid())] {
+				out[b.Guid()] = BrushBox(b)
+			}
+		}
+	}
+	return out, nil
+}
+
+// labelPoint is an id and the point its label marks.
+type labelPoint struct {
+	id string
+	p  mapfile.Vec3
+}
+
+func points(pts []labelPoint) []mapfile.Vec3 {
+	out := make([]mapfile.Vec3, len(pts))
+	for i, p := range pts {
+		out[i] = p.p
+	}
+	return out
+}
+
+// labelPoints are what gets an id on the image: the named entities and
+// brushes, else every entity but worldspawn, at its origin or its box's
+// centre; the nearest the target's centre first, when there are too many to
+// project.
+func labelPoints(snap *Snapshot, o ViewOptions, target *Box) []labelPoint {
+	var out []labelPoint
+	if len(o.IDs) > 0 {
+		boxes, _ := boxesOf(snap, o.IDs)
+		for g, b := range boxes {
+			if b.Ok {
+				out = append(out, labelPoint{snap.IDs.Short(g), b.Centre()})
+			}
+		}
+	} else {
+		for _, e := range snap.Map.Entities {
+			if e.Class() == "worldspawn" {
+				continue
+			}
+			p, ok := Origin(e)
+			if b := EntityBox(e); !ok && b.Ok {
+				p, ok = b.Centre(), true
+			}
+			if ok {
+				out = append(out, labelPoint{snap.IDs.Short(e.Guid()), p})
+			}
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].id < out[j].id })
+	if target != nil && len(out) > 1000 {
+		c := target.Centre()
+		sort.SliceStable(out, func(i, j int) bool { return dist(out[i].p, c) < dist(out[j].p, c) })
+		out = out[:1000]
+	}
+	return out
+}
+
+func dist(a, b mapfile.Vec3) float64 { d := sub(a, b); return math.Sqrt(dot(d, d)) }
+
+// session is one View's calls to Radiant: what it changed of the user's
+// views, to undo, and what it could not put back.
+type session struct {
+	c        *radiant.Client
+	pid      int
+	restores []restore
+	notes    []string
+}
+
+// restore is the calls that put one thing back as the user had it.
+type restore struct {
+	what  string
+	lines []string
+}
+
+func (s *session) call(ctx context.Context, line string) error {
+	_, err := s.c.Call(ctx, line, nil)
+	return err
+}
+
+// undo puts back what the session changed, last change first, even once the
+// caller's context has ended; a failure is noted.
+func (s *session) undo(ctx context.Context) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), restoreTimeout)
+	defer cancel()
+	for i := len(s.restores) - 1; i >= 0; i-- {
+		for _, line := range s.restores[i].lines {
+			if err := s.call(ctx, line); err != nil {
+				s.notes = append(s.notes, fmt.Sprintf("could not put back the %s: %v", s.restores[i].what, err))
+				break
+			}
+		}
+	}
+}
+
+// restoreTimeout bounds putting the user's views back.
+const restoreTimeout = 10 * time.Second
+
+// lenses are the 3D views' lenses as last measured, by Radiant pid; until
+// one is, the lens of a 1648×869 view Radiant drew.
+var (
+	lensMu sync.Mutex
+	lenses = map[int]Lens{}
+	guess  = Lens{W: 1648, H: 869, F: 1212.4}
+)
+
+func (s *session) lens() Lens {
+	lensMu.Lock()
+	defer lensMu.Unlock()
+	if l, ok := lenses[s.pid]; ok {
+		return l
+	}
+	return guess
+}
+
+func (s *session) remember(l Lens) {
+	lensMu.Lock()
+	defer lensMu.Unlock()
+	lenses[s.pid] = l
+}
+
+// view3D shoots the 3D view: from the pose given, framed on the target (a
+// second shot when the lens it assumed was off), or as it is.
+func (s *session) view3D(ctx context.Context, target *Box, o ViewOptions, pts []mapfile.Vec3) (*frame, error) {
+	if err := s.setRender(ctx, o.Render); err != nil {
+		return nil, err
+	}
+	pose := o.Camera
+	var corners []mapfile.Vec3
+	if pose == nil && target != nil {
+		corners = target.Corners()
+		p := FrameBox(s.lens(), Looking, *target)
+		pose = &p
+	}
+	f, err := shoot(ctx, s.c, "3d", pose, append(corners, pts...))
+	if err == nil && corners != nil && !fits(f.At[:len(corners)], f.W, f.H) {
+		if l := (Lens{f.W, f.H, FocalFrom(f.W, f.H, f.Pose, corners, f.At[:len(corners)])}); l.F > 0 {
+			s.remember(l)
+			p := FrameBox(l, Looking, *target)
+			f, err = shoot(ctx, s.c, "3d", &p, append(corners, pts...))
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	f.At = f.At[len(corners):]
+	return f, nil
+}
+
+// setRender switches the 3D view's render method for the shot; the session
+// puts the user's back.
+func (s *session) setRender(ctx context.Context, render string) error {
+	if render == "" {
+		return nil
+	}
+	want, ok := renders[strings.ToLower(render)]
+	if !ok {
+		for _, m := range renders {
+			if strings.EqualFold(m, render) {
+				want, ok = m, true
+			}
+		}
+	}
+	if !ok {
+		return fmt.Errorf("render %q: wireframe, fullbright, fake, view, real or density", render)
+	}
+	st, err := s.c.State(ctx)
+	if err != nil {
+		return err
+	}
+	if st.Render == want {
+		return nil
+	}
+	if err := s.call(ctx, "command View/Render Method/"+want); err != nil {
+		return err
+	}
+	if st.Render != "" {
+		s.restores = append(s.restores, restore{"render method", []string{"command View/Render Method/" + st.Render}})
+	}
+	return nil
+}
+
+// fits reports whether the points all landed in the view and span more than
+// half of it one way.
+func fits(at [][2]float64, w, h int) bool {
+	minX, minY, maxX, maxY := math.Inf(1), math.Inf(1), math.Inf(-1), math.Inf(-1)
+	for _, p := range at {
+		if math.IsNaN(p[0]) {
+			return false
+		}
+		minX, minY, maxX, maxY = math.Min(minX, p[0]), math.Min(minY, p[1]), math.Max(maxX, p[0]), math.Max(maxY, p[1])
+	}
+	fw, fh := float64(w), float64(h)
+	return minX >= 0 && minY >= 0 && maxX <= fw && maxY <= fh && (maxX-minX > fw/2 || maxY-minY > fh/2)
+}

@@ -78,6 +78,7 @@ func TestTokenReport(t *testing.T) {
 	ctx := context.Background()
 	samples := map[string][][2]int{} // "tool|what" -> (tokens, bytes)
 	add := func(key, s string) { samples[key] = append(samples[key], [2]int{count(s), len(s)}) }
+	addImage := func(key string, w, h, size int) { samples[key] = append(samples[key], [2]int{w * h / 750, size}) }
 	var lat []time.Duration
 	for _, q := range benchQueries {
 		start := time.Now()
@@ -111,6 +112,7 @@ func TestTokenReport(t *testing.T) {
 	if root := os.Getenv("TA_TOOLS_PATH"); root != "" {
 		gdtSamples(t, root, add)
 		zoneSamples(t, root, add)
+		mapSamples(t, root, add, addImage)
 		for _, tpl := range []string{"ZM Mod Level", "ZM Advanced Level"} { // dry runs: nothing is written
 			if v, err := createOp(root, "zm_token_report_sample", tpl, nil, false); err == nil {
 				add("create|dry run, "+tpl, mcpJSON(t, v))

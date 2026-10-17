@@ -44,17 +44,22 @@ type Fake struct {
 	Modified    bool
 	PrefabDepth int
 	Entities    int
-	Selected    int
 	Minimised   bool
 	Dialog      string // a modal dialog's title: every command but hello, state and menus is busy
 	Render      string
 	View2D      string
-	LoadAfter   time.Duration // how long reload takes to show the new map in state
+	LoadAfter   time.Duration     // how long reload takes to show the new map in state
+	Text        string            // the map's entities, as entities gives them
+	Selection   []string          // the selected brushes' GUIDs
+	Menus       map[string]string // menus' entries by path, as menus gives them: "label	enabled	submenu" lines
+	UndoLabel   string            // the undo menu's entry: what the last edit was labelled
+	views
 
 	mu       sync.Mutex
 	handlers map[string]Handler
 	requests []string
 	conns    map[*conn]bool
+	made     int // GUIDs given
 }
 
 type conn struct {
@@ -66,8 +71,10 @@ type conn struct {
 // New is a Radiant with the plugin's commands and the map open.
 func New(pid int, mapPath string) *Fake {
 	f := &Fake{PID: pid, Plugin: "1.0.0", Map: mapPath, Render: "Real Lighting", View2D: "XY (Top)",
-		conns: map[*conn]bool{}}
-	f.handlers = map[string]Handler{"hello": hello, "state": state, "reload": reload, "subscribe": subscribe}
+		views: views{W3: 160, H3: 90, Focal: 120, W2: 90, H2: 160, Scale2D: 1}, conns: map[*conn]bool{}}
+	f.handlers = map[string]Handler{"hello": hello, "state": state, "reload": reload, "subscribe": subscribe,
+		"entities": entities, "selection": selection, "camera": camera, "capture": capture, "command": command, "action": action,
+		"edit": edit, "select": selectCmd, "deselect": deselect, "menus": menus}
 	return f
 }
 
@@ -217,7 +224,7 @@ func state(f *Fake, _ string, _ []byte) Reply {
 		}
 		return 0
 	}
-	entities, selected := fmt.Sprint(f.Entities), fmt.Sprint(f.Selected)
+	entities, selected := fmt.Sprint(f.Entities), fmt.Sprint(len(f.Selection))
 	if f.Dialog != "" {
 		entities, selected = "", ""
 	}
@@ -238,7 +245,7 @@ func reload(f *Fake, args string, _ []byte) Reply {
 	if _, err := os.Stat(path); err != nil {
 		return Err("not-found", path)
 	}
-	open := func() { f.Map, f.Modified, f.Selected = path, false, 0 }
+	open := func() { f.Map, f.Modified, f.Selection = path, false, nil }
 	if f.LoadAfter == 0 {
 		open()
 	} else {

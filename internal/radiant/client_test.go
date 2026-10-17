@@ -116,7 +116,8 @@ func TestADialogMakesEditsBusyWhileStateStillAnswers(t *testing.T) {
 
 func TestStateReadsEveryKey(t *testing.T) {
 	f := radianttest.New(1, `D:\BO3\map_source\zm\zm_a.map`)
-	f.Modified, f.PrefabDepth, f.Entities, f.Selected, f.Minimised = true, 2, 31, 4, true
+	f.Modified, f.PrefabDepth, f.Entities, f.Minimised = true, 2, 31, true
+	f.Selection = []string{"{A}", "{B}", "{C}", "{D}"}
 	f.Render, f.View2D = "Fullbright", "YZ"
 	st, err := connect(t, f).State(ctx(t))
 	want := radiant.State{Map: `D:\BO3\map_source\zm\zm_a.map`, Modified: true, PrefabDepth: 2, Entities: 31, Selected: 4,
