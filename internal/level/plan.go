@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant"
 )
 
@@ -103,7 +104,7 @@ type Made struct {
 	ID    string // its GUID now
 	Was   string // its GUID before, when it was rebuilt under a new one
 	Class string // "" for a world brush
-	Box   Box
+	Box   geom.Box
 	Part  string // what of a layout it is: "hall floor", "hall|kitchen wall"
 }
 
@@ -220,36 +221,36 @@ func (p *plan) match(got map[string]bool, after *Snapshot) []Made {
 }
 
 // shape is a unit's class ("" for a world brush) and box, from the text sent.
-func (u *unit) shape() (string, Box) {
+func (u *unit) shape() (string, geom.Box) {
 	if u.world {
-		return "", BrushBox(u.brush)
+		return "", geom.BrushBox(u.brush)
 	}
-	return u.ent.Class(), EntityBox(u.ent)
+	return u.ent.Class(), geom.EntityBox(u.ent)
 }
 
 // findShape is the GUID of the first thing read back, among those imported and
 // not yet matched, with that class and box.
-func findShape(after *Snapshot, got, taken map[string]bool, class string, box Box, world bool) string {
+func findShape(after *Snapshot, got, taken map[string]bool, class string, box geom.Box, world bool) string {
 	for _, e := range after.Map.Entities {
 		if world {
 			if e.Class() != "worldspawn" {
 				continue
 			}
 			for _, br := range e.Brushes() {
-				if h := hexOf(br.Guid()); got[h] && !taken[h] && sameBox(BrushBox(br), box) {
+				if h := hexOf(br.Guid()); got[h] && !taken[h] && sameBox(geom.BrushBox(br), box) {
 					return br.Guid()
 				}
 			}
 			continue
 		}
-		if h := hexOf(e.Guid()); got[h] && !taken[h] && e.Class() == class && sameBox(EntityBox(e), box) {
+		if h := hexOf(e.Guid()); got[h] && !taken[h] && e.Class() == class && sameBox(geom.EntityBox(e), box) {
 			return e.Guid()
 		}
 	}
 	return ""
 }
 
-func sameBox(a, b Box) bool {
+func sameBox(a, b geom.Box) bool {
 	if a.Ok != b.Ok {
 		return false
 	}

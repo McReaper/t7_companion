@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // Query says which entities Find returns; every filter given must hold.
@@ -42,7 +43,7 @@ func (s Selection) Brush(guid string) bool { return s.Brushes[hexOf(guid)] }
 // Hit is one entity Find matched.
 type Hit struct {
 	Entity   *mapfile.Entity
-	Box      Box
+	Box      geom.Box
 	Selected bool
 	Named    []*mapfile.Brush // the brushes of it the query named by id
 }
@@ -83,7 +84,7 @@ func (q Query) matches(e *mapfile.Entity, named map[string]bool, h *Hit) bool {
 	if (q.Class != "" && !glob(q.Class, e.Class())) || (q.Selected && !h.Selected) || !q.keyMatches(e) {
 		return false
 	}
-	h.Box = EntityBox(e)
+	h.Box = geom.EntityBox(e)
 	return q.Near == nil || (h.Box.Ok && h.Box.Distance(*q.Near) <= q.Radius)
 }
 

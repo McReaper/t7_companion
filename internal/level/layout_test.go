@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // layoutPieces are a layout's pieces, its defaults filled as the batch fills
@@ -165,7 +166,7 @@ func TestALayoutsWallsMeetWithoutGapsOrOverlaps(t *testing.T) {
 
 func overlap(a, b piece) bool {
 	for k := range 3 {
-		if min(a.hi[k], b.hi[k])-max(a.lo[k], b.lo[k]) <= eps {
+		if min(a.hi[k], b.hi[k])-max(a.lo[k], b.lo[k]) <= geom.Eps {
 			return false
 		}
 	}

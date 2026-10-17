@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // LayoutOp builds a storey from its plan: named rooms, rectangles on the
@@ -173,7 +174,7 @@ func (b *batch) layoutZones(i int, l *LayoutOp) error {
 // pieceBrush is a piece's box brush, its faces textured.
 func (b *batch) pieceBrush(p piece) (*mapfile.Brush, error) {
 	t := b.tile(p.material)
-	m, err := mapfile.Parse([]byte(EntityText("worldspawn", nil, boxBrush(Box{Min: p.lo, Max: p.hi, Ok: true}, p.material, "", texNumbers(t.W, t.H)))))
+	m, err := mapfile.Parse([]byte(EntityText("worldspawn", nil, boxBrush(geom.Box{Min: p.lo, Max: p.hi, Ok: true}, p.material, "", texNumbers(t.W, t.H)))))
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +218,7 @@ func (l *LayoutOp) pieces() ([]piece, error) {
 	for _, s := range segs {
 		slices.SortFunc(s.holes, func(a, b hole) int { return cmp.Compare(a.u0, b.u0) })
 		for k := 1; k < len(s.holes); k++ {
-			if s.holes[k].u0 < s.holes[k-1].u1+eps {
+			if s.holes[k].u0 < s.holes[k-1].u1+geom.Eps {
 				return nil, fmt.Errorf("two openings in the %s meet: leave wall between them, or make one wider", l.part(s))
 			}
 		}
@@ -251,7 +252,7 @@ func (l *LayoutOp) check() (map[string]int, error) {
 		}
 		idx[r.Name] = i
 		for k := range 2 {
-			if r.Max[k]-r.Min[k] <= l.Wall+eps {
+			if r.Max[k]-r.Min[k] <= l.Wall+geom.Eps {
 				return nil, fmt.Errorf("room %s: %v to %v leaves no inside between walls %v thick", r.Name, r.Min, r.Max, l.Wall)
 			}
 		}
@@ -268,7 +269,7 @@ func (l *LayoutOp) check() (map[string]int, error) {
 func (l *LayoutOp) checkOverlaps() error {
 	for i, a := range l.Rooms {
 		for _, b := range l.Rooms[i+1:] {
-			if math.Min(a.Max[0], b.Max[0])-math.Max(a.Min[0], b.Min[0]) > eps && math.Min(a.Max[1], b.Max[1])-math.Max(a.Min[1], b.Min[1]) > eps {
+			if math.Min(a.Max[0], b.Max[0])-math.Max(a.Min[0], b.Min[0]) > geom.Eps && math.Min(a.Max[1], b.Max[1])-math.Max(a.Min[1], b.Min[1]) > geom.Eps {
 				return fmt.Errorf("rooms %s and %s overlap: rooms meet along their edges", a.Name, b.Name)
 			}
 		}
@@ -310,7 +311,7 @@ func (l *LayoutOp) segs() []*seg {
 			s := &seg{along: k.along, c: k.c, lo: pts[j-1], hi: pts[j], minus: -1, plus: -1}
 			for _, e := range lines[k] {
 				switch {
-				case e.lo > s.lo+eps || e.hi < s.hi-eps:
+				case e.lo > s.lo+geom.Eps || e.hi < s.hi-geom.Eps:
 				case e.plus:
 					s.plus = e.room
 				default:
@@ -399,10 +400,10 @@ func (l *LayoutOp) wallOf(k int, o *Opening, idx map[string]int) (wallRef, error
 		n := 1 - along
 		lo, hi := math.Max(r.Min[along], to.Min[along]), math.Min(r.Max[along], to.Max[along])
 		switch {
-		case hi-lo <= eps:
-		case math.Abs(r.Max[n]-to.Min[n]) <= eps:
+		case hi-lo <= geom.Eps:
+		case math.Abs(r.Max[n]-to.Min[n]) <= geom.Eps:
 			return wallRef{along, r.Max[n], false, t, lo, hi}, nil
-		case math.Abs(r.Min[n]-to.Max[n]) <= eps:
+		case math.Abs(r.Min[n]-to.Max[n]) <= geom.Eps:
 			return wallRef{along, r.Min[n], true, t, lo, hi}, nil
 		}
 	}
@@ -421,7 +422,7 @@ func (l *LayoutOp) place(k int, idx map[string]int, segs []*seg) error {
 		return fmt.Errorf("opening %d: width, height and sill can't be below 0", k)
 	}
 	o.defaults()
-	if o.Sill+o.Height > l.Height+eps {
+	if o.Sill+o.Height > l.Height+geom.Eps {
 		return fmt.Errorf("opening %d: a sill of %v and %v high is taller than the storey's %v", k, o.Sill, o.Height, l.Height)
 	}
 	w, err := l.wallOf(k, o, idx)
@@ -442,10 +443,10 @@ func (l *LayoutOp) place(k int, idx map[string]int, segs []*seg) error {
 		if w.plus {
 			mine, across = across, mine
 		}
-		if s.along != w.along || math.Abs(s.c-w.c) > eps || mine != r || (w.to >= 0 && across != w.to) {
+		if s.along != w.along || math.Abs(s.c-w.c) > geom.Eps || mine != r || (w.to >= 0 && across != w.to) {
 			continue
 		}
-		if a, b := s.lo+l.Wall/2, s.hi-l.Wall/2; h.u0 < a-eps || h.u1 > b+eps {
+		if a, b := s.lo+l.Wall/2, s.hi-l.Wall/2; h.u0 < a-geom.Eps || h.u1 > b+geom.Eps {
 			stretches = append(stretches, fmt.Sprintf("%v to %v", a, b))
 			continue
 		}
@@ -500,18 +501,18 @@ func (l *LayoutOp) wall(s *seg) []piece {
 	part := l.part(s)
 	var out []piece
 	add := func(a, b, z0, z1 float64, material string) {
-		if b-a <= eps || z1-z0 <= eps {
+		if b-a <= geom.Eps || z1-z0 <= geom.Eps {
 			return
 		}
 		p := piece{material: material, faces: [][2]string{{"-" + axis, side(s.minus)}, {"+" + axis, side(s.plus)}}, part: part}
-		if z1 >= top-eps {
+		if z1 >= top-geom.Eps {
 			p.faces = append(p.faces, [2]string{"+z", roof})
 		}
-		if s.along == 0 && s.first && a <= e0+eps {
-			p.faces = append(p.faces, [2]string{"-x", l.beyond(e0-eps, s.c)})
+		if s.along == 0 && s.first && a <= e0+geom.Eps {
+			p.faces = append(p.faces, [2]string{"-x", l.beyond(e0-geom.Eps, s.c)})
 		}
-		if s.along == 0 && s.last && b >= e1-eps {
-			p.faces = append(p.faces, [2]string{"+x", l.beyond(e1+eps, s.c)})
+		if s.along == 0 && s.last && b >= e1-geom.Eps {
+			p.faces = append(p.faces, [2]string{"+x", l.beyond(e1+geom.Eps, s.c)})
 		}
 		p.lo[s.along], p.hi[s.along] = a, b
 		p.lo[1-s.along], p.hi[1-s.along] = s.c-l.Wall/2, s.c+l.Wall/2

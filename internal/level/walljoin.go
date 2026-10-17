@@ -4,6 +4,8 @@ import (
 	"math"
 	"slices"
 	"strconv"
+
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // The walls op's joints. A wall piece is a strip of the wall's thickness
@@ -19,23 +21,6 @@ import (
 // A turn too sharp to mitre (its point would sit more than three half-walls
 // out) keeps the old overlap: the strip runs half a wall past the point.
 
-func sub2(a, b pt2) pt2             { return pt2{a.x - b.x, a.y - b.y} }
-func cross2v(a, b pt2) float64      { return a.x*b.y - a.y*b.x }
-func unit2(a, b pt2) pt2            { l := dist2(a, b); return pt2{(b.x - a.x) / l, (b.y - a.y) / l} }
-func along(p, u pt2, s float64) pt2 { return pt2{p.x + u.x*s, p.y + u.y*s} }
-
-// side is p moved half a wall to the left of direction u (side 1) or right (-1).
-func aside(p, u pt2, h, s float64) pt2 { return pt2{p.x - u.y*h*s, p.y + u.x*h*s} }
-
-// meetLines is where p + s d meets q + t e, or false when they are parallel.
-func meetLines(p, d, q, e pt2) (pt2, bool) {
-	den := cross2v(d, e)
-	if math.Abs(den) < 1e-9 {
-		return pt2{}, false
-	}
-	return along(p, d, cross2v(sub2(q, p), e)/den), true
-}
-
 // splitCrossings cuts, where two walls cross away from their ends, the
 // later one in two; its pieces then stop on the other's faces.
 func splitCrossings(pieces []wpiece, thick float64) []wpiece {
@@ -46,9 +31,9 @@ func splitCrossings(pieces []wpiece, thick float64) []wpiece {
 		}
 		p := pieces[k]
 		a := wpiece{pts: append(slices.Clone(p.pts[:s+1]), x), line: p.line}
-		b := wpiece{pts: append([]pt2{x}, p.pts[s+1:]...), line: p.line}
+		b := wpiece{pts: append([]geom.P2{x}, p.pts[s+1:]...), line: p.line}
 		if p.ring {
-			pts := append([]pt2{x}, p.pts[s+1:len(p.pts)-1]...)
+			pts := append([]geom.P2{x}, p.pts[s+1:len(p.pts)-1]...)
 			pieces = slices.Concat(pieces[:k], []wpiece{{pts: append(append(pts, p.pts[:s+1]...), x), line: p.line}}, pieces[k+1:])
 			continue
 		}
@@ -58,7 +43,7 @@ func splitCrossings(pieces []wpiece, thick float64) []wpiece {
 
 // firstCrossing is the first piece another wall crosses well inside one of
 // its segments: that piece, the segment, and the crossing.
-func firstCrossing(pieces []wpiece, thick float64) (int, int, pt2, bool) {
+func firstCrossing(pieces []wpiece, thick float64) (int, int, geom.P2, bool) {
 	for i, p := range pieces {
 		for j := i + 1; j < len(pieces); j++ {
 			q := pieces[j]
@@ -67,35 +52,21 @@ func firstCrossing(pieces []wpiece, thick float64) (int, int, pt2, bool) {
 			}
 			for s1 := range len(p.pts) - 1 {
 				for s2 := range len(q.pts) - 1 {
-					x, ok := properCrossing(p.pts[s1], p.pts[s1+1], q.pts[s2], q.pts[s2+1])
-					if ok && dist2(x, q.pts[s2]) > thick && dist2(x, q.pts[s2+1]) > thick {
+					x, ok := geom.ProperCrossing(p.pts[s1], p.pts[s1+1], q.pts[s2], q.pts[s2+1])
+					if ok && geom.Dist2(x, q.pts[s2]) > thick && geom.Dist2(x, q.pts[s2+1]) > thick {
 						return j, s2, x, true
 					}
 				}
 			}
 		}
 	}
-	return 0, 0, pt2{}, false
-}
-
-func properCrossing(a, c, p, q pt2) (pt2, bool) {
-	r, s := sub2(c, a), sub2(q, p)
-	den := cross2v(r, s)
-	if math.Abs(den) < 1e-9 {
-		return pt2{}, false
-	}
-	t := cross2v(sub2(p, a), s) / den
-	v := cross2v(sub2(p, a), r) / den
-	if t <= 1e-3 || t >= 1-1e-3 || v <= 1e-3 || v >= 1-1e-3 {
-		return pt2{}, false
-	}
-	return along(a, r, t), true
+	return 0, 0, geom.P2{}, false
 }
 
 // pend names an end of a piece: the piece, and 0 its first point, 1 its last.
 type pend struct{ piece, end int }
 
-func endPoint(pieces []wpiece, e pend) pt2 {
+func endPoint(pieces []wpiece, e pend) geom.P2 {
 	p := pieces[e.piece].pts
 	if e.end == 0 {
 		return p[0]
@@ -104,24 +75,24 @@ func endPoint(pieces []wpiece, e pend) pt2 {
 }
 
 // endDir is the way an end's segment runs, from the end into the wall.
-func endDir(pieces []wpiece, e pend) pt2 {
+func endDir(pieces []wpiece, e pend) geom.P2 {
 	p := pieces[e.piece].pts
 	if e.end == 0 {
-		return unit2(p[0], p[1])
+		return geom.Unit2(p[0], p[1])
 	}
-	return unit2(p[len(p)-1], p[len(p)-2])
+	return geom.Unit2(p[len(p)-1], p[len(p)-2])
 }
 
 // wcut is how an end is finished; a wface is a face it stops on: a point on
 // it, its direction, and which of its sides the wall runs into.
 type wcut struct {
 	kind  byte // 's' square, 'm' mitre with dir, 'b' butt on faces[0], 'c' clipped by faces, 'o' overlap
-	dir   pt2
+	dir   geom.P2
 	faces []wface
 }
 
 type wface struct {
-	at, dir pt2
+	at, dir geom.P2
 	side    float64
 }
 
@@ -135,7 +106,7 @@ func endCut(pieces []wpiece, e pend, h float64) wcut {
 		}
 		for end := range 2 {
 			o := pend{k, end}
-			if o != e && dist2(endPoint(pieces, o), p) < 0.5 {
+			if o != e && geom.Dist2(endPoint(pieces, o), p) < 0.5 {
 				others = append(others, o)
 			}
 		}
@@ -173,7 +144,7 @@ func distinctLines(pieces []wpiece, e pend, others []pend) bool {
 
 // hostOf is the other wall's segment the end lies on: piece, segment, the
 // end's share along it, and whether it lies on it at all.
-func hostOf(pieces []wpiece, e pend, p pt2) (int, int, float64, bool) {
+func hostOf(pieces []wpiece, e pend, p geom.P2) (int, int, float64, bool) {
 	best, bk, bs, bt := 0.5, -1, -1, 0.0
 	for k, q := range pieces {
 		if q.line == pieces[e.piece].line {
@@ -209,10 +180,10 @@ func butt(pieces []wpiece, e pend, host, s int, t, h float64) wcut {
 	}
 	into := endDir(pieces, e)
 	for _, s2 := range segs {
-		u := unit2(line[s2], line[s2+1])
-		if c := cross2v(u, into); math.Abs(c) > 0.1 {
+		u := geom.Unit2(line[s2], line[s2+1])
+		if c := geom.CrossV(u, into); math.Abs(c) > 0.1 {
 			sd := math.Copysign(1, c)
-			return wcut{kind: 'b', faces: []wface{{at: aside(line[s2], u, h, sd), dir: u, side: sd}}}
+			return wcut{kind: 'b', faces: []wface{{at: geom.Aside(line[s2], u, h, sd), dir: u, side: sd}}}
 		}
 	}
 	return wcut{kind: 's'} // running on along it
@@ -221,8 +192,8 @@ func butt(pieces []wpiece, e pend, host, s int, t, h float64) wcut {
 // threeWay: the two of three walls at a point turning widest mitre; the
 // third is cut by both their faces.
 func threeWay(pieces []wpiece, e pend, others []pend, h float64) wcut {
-	dirs := []pt2{endDir(pieces, e), endDir(pieces, others[0]), endDir(pieces, others[1])}
-	angle := func(a, b pt2) float64 { return math.Acos(math.Max(-1, math.Min(1, a.x*b.x+a.y*b.y))) }
+	dirs := []geom.P2{endDir(pieces, e), endDir(pieces, others[0]), endDir(pieces, others[1])}
+	angle := func(a, b geom.P2) float64 { return math.Acos(math.Max(-1, math.Min(1, a.X*b.X+a.Y*b.Y))) }
 	pair, widest := [2]int{}, -1.0
 	for i := range 3 {
 		for j := i + 1; j < 3; j++ {
@@ -237,43 +208,43 @@ func threeWay(pieces []wpiece, e pend, others []pend, h float64) wcut {
 	var faces []wface
 	p := endPoint(pieces, e)
 	for _, i := range pair {
-		u := pt2{-dirs[i].x, -dirs[i].y} // the corner wall's direction, into the point
-		sd := math.Copysign(1, cross2v(u, dirs[0]))
-		faces = append(faces, wface{at: aside(p, u, h, sd), dir: u, side: sd})
+		u := geom.P2{X: -dirs[i].X, Y: -dirs[i].Y} // the corner wall's direction, into the point
+		sd := math.Copysign(1, geom.CrossV(u, dirs[0]))
+		faces = append(faces, wface{at: geom.Aside(p, u, h, sd), dir: u, side: sd})
 	}
 	return wcut{kind: 'c', faces: faces}
 }
 
 // corner is the mitre of a turn at p from u to v: the left and right points,
 // false when too sharp; straight on, the square ends.
-func corner(p, u, v pt2, h float64) (pt2, pt2, bool) {
-	l, ok1 := meetLines(aside(p, u, h, 1), u, aside(p, v, h, 1), v)
-	r, ok2 := meetLines(aside(p, u, h, -1), u, aside(p, v, h, -1), v)
+func corner(p, u, v geom.P2, h float64) (geom.P2, geom.P2, bool) {
+	l, ok1 := geom.MeetLines(geom.Aside(p, u, h, 1), u, geom.Aside(p, v, h, 1), v)
+	r, ok2 := geom.MeetLines(geom.Aside(p, u, h, -1), u, geom.Aside(p, v, h, -1), v)
 	if !ok1 || !ok2 {
-		return aside(p, v, h, 1), aside(p, v, h, -1), true
+		return geom.Aside(p, v, h, 1), geom.Aside(p, v, h, -1), true
 	}
-	if dist2(l, p) > 3*h || dist2(r, p) > 3*h {
-		return pt2{}, pt2{}, false
+	if geom.Dist2(l, p) > 3*h || geom.Dist2(r, p) > 3*h {
+		return geom.P2{}, geom.P2{}, false
 	}
 	return l, r, true
 }
 
 // wallPolys are the pieces' strips, segment by segment, each a convex
 // outline on the ground.
-func wallPolys(pieces []wpiece, thick float64) [][]pt2 {
+func wallPolys(pieces []wpiece, thick float64) [][]geom.P2 {
 	h := thick / 2
-	var out [][]pt2
+	var out [][]geom.P2
 	for k, p := range pieces {
 		n := len(p.pts) - 1
 		for s := range n {
 			a, c := p.pts[s], p.pts[s+1]
-			if dist2(a, c) < 1 {
+			if geom.Dist2(a, c) < 1 {
 				continue
 			}
-			u := unit2(a, c)
+			u := geom.Unit2(a, c)
 			sl, sr, cl1 := stripEnd(pieces, k, s, 0, a, u, h)
 			el, er, cl2 := stripEnd(pieces, k, s, 1, c, u, h)
-			poly := []pt2{sl, el, er, sr}
+			poly := []geom.P2{sl, el, er, sr}
 			for _, f := range append(cl1, cl2...) {
 				poly = clipHalf(poly, f)
 			}
@@ -285,7 +256,7 @@ func wallPolys(pieces []wpiece, thick float64) [][]pt2 {
 
 // stripEnd is the left and right corners of segment s's strip at its start
 // (end 0, point a) or its end (1), and any faces that clip it.
-func stripEnd(pieces []wpiece, k, s, end int, a, u pt2, h float64) (pt2, pt2, []wface) {
+func stripEnd(pieces []wpiece, k, s, end int, a, u geom.P2, h float64) (geom.P2, geom.P2, []wface) {
 	p := pieces[k]
 	n := len(p.pts) - 1
 	inner := (end == 0 && s > 0) || (end == 1 && s < n-1) || p.ring
@@ -293,7 +264,7 @@ func stripEnd(pieces []wpiece, k, s, end int, a, u pt2, h float64) (pt2, pt2, []
 	if end == 0 {
 		sign = -1
 	}
-	past := along(a, u, sign*h) // half a wall past the point: the overlap of a joint left as it was
+	past := geom.Along(a, u, sign*h) // half a wall past the point: the overlap of a joint left as it was
 	if inner {
 		l, r := innerEnd(p, s, end, a, u, h)
 		return l, r, nil
@@ -301,31 +272,31 @@ func stripEnd(pieces []wpiece, k, s, end int, a, u pt2, h float64) (pt2, pt2, []
 	c := endCut(pieces, pend{k, end}, h)
 	switch c.kind {
 	case 'm':
-		in, out := pt2{-c.dir.x, -c.dir.y}, u
+		in, out := geom.P2{X: -c.dir.X, Y: -c.dir.Y}, u
 		if end == 1 {
 			in, out = u, c.dir
 		}
 		if l, r, ok := corner(a, in, out, h); ok {
 			return l, r, nil
 		}
-		return aside(past, u, h, 1), aside(past, u, h, -1), nil
+		return geom.Aside(past, u, h, 1), geom.Aside(past, u, h, -1), nil
 	case 'b':
 		f := c.faces[0]
-		l, _ := meetLines(aside(a, u, h, 1), u, f.at, f.dir)
-		r, _ := meetLines(aside(a, u, h, -1), u, f.at, f.dir)
+		l, _ := geom.MeetLines(geom.Aside(a, u, h, 1), u, f.at, f.dir)
+		r, _ := geom.MeetLines(geom.Aside(a, u, h, -1), u, f.at, f.dir)
 		return l, r, nil
 	case 'c':
-		far := along(a, u, sign*4*h)
-		return aside(far, u, h, 1), aside(far, u, h, -1), c.faces
+		far := geom.Along(a, u, sign*4*h)
+		return geom.Aside(far, u, h, 1), geom.Aside(far, u, h, -1), c.faces
 	case 'o':
-		return aside(past, u, h, 1), aside(past, u, h, -1), nil
+		return geom.Aside(past, u, h, 1), geom.Aside(past, u, h, -1), nil
 	}
-	return aside(a, u, h, 1), aside(a, u, h, -1), nil
+	return geom.Aside(a, u, h, 1), geom.Aside(a, u, h, -1), nil
 }
 
 // innerEnd is a strip's corners at a turn inside its piece (a ring's first
 // corner too): the mitre, or half a wall past the point when too sharp.
-func innerEnd(p wpiece, s, end int, a, u pt2, h float64) (pt2, pt2) {
+func innerEnd(p wpiece, s, end int, a, u geom.P2, h float64) (geom.P2, geom.P2) {
 	n := len(p.pts) - 1
 	in, out := u, u
 	if end == 0 {
@@ -333,13 +304,13 @@ func innerEnd(p wpiece, s, end int, a, u pt2, h float64) (pt2, pt2) {
 		if s > 0 {
 			prev = p.pts[s-1]
 		}
-		in = unit2(prev, a)
+		in = geom.Unit2(prev, a)
 	} else {
 		next := p.pts[1] // a ring's last point: the turn into its first segment
 		if s < n-1 {
 			next = p.pts[s+2]
 		}
-		out = unit2(a, next)
+		out = geom.Unit2(a, next)
 	}
 	if l, r, ok := corner(a, in, out, h); ok {
 		return l, r
@@ -348,22 +319,22 @@ func innerEnd(p wpiece, s, end int, a, u pt2, h float64) (pt2, pt2) {
 	if end == 0 {
 		sign = -1
 	}
-	past := along(a, u, sign*h)
-	return aside(past, u, h, 1), aside(past, u, h, -1)
+	past := geom.Along(a, u, sign*h)
+	return geom.Aside(past, u, h, 1), geom.Aside(past, u, h, -1)
 }
 
 // clipHalf keeps the part of a convex outline past a face, on the side the
 // wall it is cut from runs into.
-func clipHalf(poly []pt2, f wface) []pt2 {
-	keep := func(p pt2) bool { return cross2v(f.dir, sub2(p, f.at))*f.side >= -1e-9 }
-	var out []pt2
+func clipHalf(poly []geom.P2, f wface) []geom.P2 {
+	keep := func(p geom.P2) bool { return geom.CrossV(f.dir, geom.Sub2(p, f.at))*f.side >= -1e-9 }
+	var out []geom.P2
 	for i, p := range poly {
 		q := poly[(i+1)%len(poly)]
 		if keep(p) {
 			out = append(out, p)
 		}
 		if keep(p) != keep(q) {
-			if x, ok := meetLines(p, sub2(q, p), f.at, f.dir); ok {
+			if x, ok := geom.MeetLines(p, geom.Sub2(q, p), f.at, f.dir); ok {
 				out = append(out, x)
 			}
 		}
@@ -372,9 +343,9 @@ func clipHalf(poly []pt2, f wface) []pt2 {
 }
 
 // quadAlong is the outline from a0 to a1 along u and w0 to w1 across it, from p.
-func quadAlong(p, u pt2, a0, a1, w0, w1 float64) []pt2 {
-	at := func(a, w float64) pt2 { q := along(p, u, a); return pt2{q.x - u.y*w, q.y + u.x*w} }
-	return []pt2{at(a0, w0), at(a1, w0), at(a1, w1), at(a0, w1)}
+func quadAlong(p, u geom.P2, a0, a1, w0, w1 float64) []geom.P2 {
+	at := func(a, w float64) geom.P2 { q := geom.Along(p, u, a); return geom.P2{X: q.X - u.Y*w, Y: q.Y + u.X*w} }
+	return []geom.P2{at(a0, w0), at(a1, w0), at(a1, w1), at(a0, w1)}
 }
 
 // doorParts are a door's brushes: its lintel, the jambs narrowing it for

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant"
 )
 
@@ -51,7 +52,7 @@ var above = Pose{Pitch: -89, Yaw: 90} // at -90 Radiant drops the yaw: the board
 type boardItem struct {
 	name string
 	op   Op
-	box  Box
+	box  geom.Box
 	mark mapfile.Vec3
 }
 
@@ -99,7 +100,7 @@ func showBoard(ctx context.Context, c *radiant.Client, snap *Snapshot, items []b
 	}
 	b := &Board{}
 	var marks []Mark
-	var board Box
+	var board geom.Box
 	for _, m := range done.Made {
 		it := items[m.Op]
 		board.Union(it.box)
@@ -124,7 +125,7 @@ func showBoard(ctx context.Context, c *radiant.Client, snap *Snapshot, items []b
 
 // cornerOf is where a slab's label goes: inside its upper-left corner (-x,
 // +y, the image's), on its top, clear of most of its texture.
-func cornerOf(b Box) mapfile.Vec3 {
+func cornerOf(b geom.Box) mapfile.Vec3 {
 	return mapfile.Vec3{b.Min[0] + 20, b.Max[1] - 20, b.Max[2]}
 }
 
@@ -132,9 +133,9 @@ func cornerOf(b Box) mapfile.Vec3 {
 // units above its top: each place's upper-left corner (the first row at the
 // top of the image), and the height.
 func grid(snap *Snapshot, n int, step, gap float64) ([]mapfile.Vec3, float64) {
-	var world Box
+	var world geom.Box
 	for _, e := range snap.Map.Entities {
-		world.Union(EntityBox(e))
+		world.Union(geom.EntityBox(e))
 	}
 	cols := int(math.Ceil(math.Sqrt(float64(n))))
 	rows := (n + cols - 1) / cols
@@ -153,7 +154,7 @@ func materialItems(snap *Snapshot, materials []string) []boardItem {
 	at, z := grid(snap, len(materials), swatchSide+swatchGap, swatchGap)
 	items := make([]boardItem, len(materials))
 	for i, m := range materials {
-		b := Box{mapfile.Vec3{at[i][0], at[i][1] - swatchSide, z}, mapfile.Vec3{at[i][0] + swatchSide, at[i][1], z + 8}, true}
+		b := geom.Box{Min: mapfile.Vec3{at[i][0], at[i][1] - swatchSide, z}, Max: mapfile.Vec3{at[i][0] + swatchSide, at[i][1], z + 8}, Ok: true}
 		items[i] = boardItem{m, Op{Box: &BoxOp{Min: b.Min, Max: b.Max, Material: m}}, b, cornerOf(b)}
 	}
 	return items
@@ -164,9 +165,9 @@ func materialItems(snap *Snapshot, materials []string) []boardItem {
 // top; each in the middle of its place, its number in the place's front
 // left corner, clear of the model.
 func modelItems(snap *Snapshot, models []string) []boardItem {
-	var world Box
+	var world geom.Box
 	for _, e := range snap.Map.Entities {
-		world.Union(EntityBox(e))
+		world.Union(geom.EntityBox(e))
 	}
 	cols := min(len(models), modelRow)
 	rows := (len(models) + modelRow - 1) / modelRow
@@ -176,7 +177,7 @@ func modelItems(snap *Snapshot, models []string) []boardItem {
 	for i, m := range models {
 		x, y := x0+float64(i%modelRow)*modelStep, y0+float64(i/modelRow)*modelStep
 		o := mapfile.Vec3{x + modelStep/2, y + modelStep/2, z}
-		b := Box{mapfile.Vec3{x, y, z}, mapfile.Vec3{x + modelStep, y + modelStep, z + modelHeight}, true}
+		b := geom.Box{Min: mapfile.Vec3{x, y, z}, Max: mapfile.Vec3{x + modelStep, y + modelStep, z + modelHeight}, Ok: true}
 		items[i] = boardItem{m, Op{Entity: &EntityOp{Class: "misc_model", Origin: o, Keys: map[string]string{"model": m}}}, b, mapfile.Vec3{x + 8, y + 8, z}}
 	}
 	return items

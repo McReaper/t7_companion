@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant"
 )
 
@@ -37,12 +38,12 @@ func TestBrushBoxesMatchRadiants(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ours := map[string]Box{}
+	ours := map[string]geom.Box{}
 	var guids []string
 	for _, e := range m.Entities {
 		for _, b := range e.Brushes() {
 			if b.Kind() != mapfile.KindEmpty {
-				ours[strings.ToUpper(b.Guid())] = BrushBox(b)
+				ours[strings.ToUpper(b.Guid())] = geom.BrushBox(b)
 				guids = append(guids, b.Guid())
 			}
 		}
@@ -90,7 +91,7 @@ func TestBrushBoxesMatchRadiants(t *testing.T) {
 // thinner (a flat patch, a decal): it widens it there about its middle.
 const pad = 0.125
 
-func flatPadded(b Box) Box {
+func flatPadded(b geom.Box) geom.Box {
 	for i := range 3 {
 		if b.Max[i]-b.Min[i] < 2*pad {
 			mid := (b.Min[i] + b.Max[i]) / 2

@@ -10,13 +10,14 @@ import (
 	"testing"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // wbrush is a brush a walls op made, flattened for the tests: its corners
 // on the ground (sorted), its height, its materials and what it is.
 type wbrush struct {
 	part, contents string
-	xy             []pt2
+	xy             []geom.P2
 	z0, z1         float64
 	caulk, faces   int
 }
@@ -47,42 +48,42 @@ func flatten(t *testing.T, part string, br *mapfile.Brush) wbrush {
 	if err != nil {
 		t.Fatal(err)
 	}
-	planes := make([]plane, len(faces))
+	planes := make([]geom.Plane, len(faces))
 	w := wbrush{part: part, contents: br.Contents(), faces: len(faces), z0: math.Inf(1), z1: math.Inf(-1)}
 	for i, f := range faces {
-		planes[i] = planeOf(f.Points)
+		planes[i] = geom.PlaneOf(f.Points)
 		if f.Material == "caulk" {
 			w.caulk++
 		}
 	}
 	seen := map[[2]float64]bool{}
-	for _, v := range vertices(planes) {
+	for _, v := range geom.Vertices(planes) {
 		k := [2]float64{math.Round(v[0]*100)/100 + 0, math.Round(v[1]*100)/100 + 0} // + 0: no -0
 		if !seen[k] {
 			seen[k] = true
-			w.xy = append(w.xy, pt2{k[0], k[1]})
+			w.xy = append(w.xy, geom.P2{X: k[0], Y: k[1]})
 		}
 		w.z0, w.z1 = math.Min(w.z0, v[2]), math.Max(w.z1, v[2])
 	}
 	sort.Slice(w.xy, func(i, j int) bool {
-		if w.xy[i].x != w.xy[j].x {
-			return w.xy[i].x < w.xy[j].x
+		if w.xy[i].X != w.xy[j].X {
+			return w.xy[i].X < w.xy[j].X
 		}
-		return w.xy[i].y < w.xy[j].y
+		return w.xy[i].Y < w.xy[j].Y
 	})
 	return w
 }
 
-func corners(ps ...float64) []pt2 {
-	var out []pt2
+func corners(ps ...float64) []geom.P2 {
+	var out []geom.P2
 	for i := 0; i < len(ps); i += 2 {
-		out = append(out, pt2{ps[i], ps[i+1]})
+		out = append(out, geom.P2{X: ps[i], Y: ps[i+1]})
 	}
 	sort.Slice(out, func(i, j int) bool {
-		if out[i].x != out[j].x {
-			return out[i].x < out[j].x
+		if out[i].X != out[j].X {
+			return out[i].X < out[j].X
 		}
-		return out[i].y < out[j].y
+		return out[i].Y < out[j].Y
 	})
 	return out
 }
@@ -97,15 +98,15 @@ func ofPart(bs []wbrush, part string) []wbrush {
 	return out
 }
 
-func xyText(ps []pt2) string {
+func xyText(ps []geom.P2) string {
 	var s []string
 	for _, p := range ps {
-		s = append(s, fmt.Sprintf("(%g %g)", p.x, p.y))
+		s = append(s, fmt.Sprintf("(%g %g)", p.X, p.Y))
 	}
 	return strings.Join(s, " ")
 }
 
-func wantPieces(t *testing.T, got []wbrush, want ...[]pt2) {
+func wantPieces(t *testing.T, got []wbrush, want ...[]geom.P2) {
 	t.Helper()
 	var g, w []string
 	for _, b := range got {
@@ -239,15 +240,15 @@ func TestWallsJointLandsOnASlantedWall(t *testing.T) {
 		t.Fatalf("%d pieces", len(ws))
 	}
 	v := ws[0]
-	if v.xy[0].x != 196 {
+	if v.xy[0].X != 196 {
 		v = ws[1]
 	}
 	for _, p := range v.xy {
-		if p.x != 196 && p.x != 204 {
+		if p.X != 196 && p.X != 204 {
 			t.Errorf("the upright wall left x 196..204: %s", xyText(v.xy))
 		}
-		if face := p.x/10 + 4/math.Cos(math.Atan(0.1)); p.y < face-0.01 { // the slanted wall's face, above its centreline y = x/10
-			t.Errorf("the upright wall reaches into the slanted one at %g: %s", p.x, xyText(v.xy))
+		if face := p.X/10 + 4/math.Cos(math.Atan(0.1)); p.Y < face-0.01 { // the slanted wall's face, above its centreline y = x/10
+			t.Errorf("the upright wall reaches into the slanted one at %g: %s", p.X, xyText(v.xy))
 		}
 	}
 	assertNoOverlap(t, ws)
@@ -335,34 +336,34 @@ func TestWallsRefuse(t *testing.T) {
 	}
 }
 
-func polyArea(p []pt2) float64 {
+func polyArea(p []geom.P2) float64 {
 	s := 0.0
 	for i := range p {
 		q := p[(i+1)%len(p)]
-		s += p[i].x*q.y - q.x*p[i].y
+		s += p[i].X*q.Y - q.X*p[i].Y
 	}
 	return s / 2
 }
 
 // hull orders a brush's ground corners round their middle.
-func hull(ps []pt2) []pt2 {
-	var c pt2
+func hull(ps []geom.P2) []geom.P2 {
+	var c geom.P2
 	for _, p := range ps {
-		c.x, c.y = c.x+p.x/float64(len(ps)), c.y+p.y/float64(len(ps))
+		c.X, c.Y = c.X+p.X/float64(len(ps)), c.Y+p.Y/float64(len(ps))
 	}
 	out := slices.Clone(ps)
 	sort.Slice(out, func(i, j int) bool {
-		return math.Atan2(out[i].y-c.y, out[i].x-c.x) < math.Atan2(out[j].y-c.y, out[j].x-c.x)
+		return math.Atan2(out[i].Y-c.Y, out[i].X-c.X) < math.Atan2(out[j].Y-c.Y, out[j].X-c.X)
 	})
 	return out
 }
 
-func overlapArea(a, b []pt2) float64 {
+func overlapArea(a, b []geom.P2) float64 {
 	out := hull(a)
 	clipper := hull(b)
 	for i := range clipper {
 		p, q := clipper[i], clipper[(i+1)%len(clipper)]
-		f := wface{at: p, dir: unit2(p, q), side: 1}
+		f := wface{at: p, dir: geom.Unit2(p, q), side: 1}
 		out = clipHalf(out, f)
 		if len(out) < 3 {
 			return 0

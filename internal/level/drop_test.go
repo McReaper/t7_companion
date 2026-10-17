@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // groundOfText is the ground of a worldspawn holding the brushes.
@@ -43,7 +44,7 @@ func TestTheFloorIsTheHighestTopUnderAPointWithRoomAbove(t *testing.T) {
 		{600, 50, -18, 18, 0, false}, // off the map
 	} {
 		got, ok := g.floor(c.x, c.y, c.lo, c.hi)
-		if ok != c.ok || (ok && math.Abs(got-c.want) > eps) {
+		if ok != c.ok || (ok && math.Abs(got-c.want) > geom.Eps) {
 			t.Errorf("at %v,%v from %v to %v: %v %v, want %v %v", c.x, c.y, c.hi, c.lo, got, ok, c.want, c.ok)
 		}
 	}
@@ -53,21 +54,21 @@ func TestTheFloorIsTheHighestTopUnderAPointWithRoomAbove(t *testing.T) {
 // patch's triangles.
 func TestTheFloorFollowsARampAndTerrain(t *testing.T) {
 	m, err := mapfile.Parse([]byte(EntityText("worldspawn", nil,
-		prismBrush([]pt2{{0, 0}, {256, 0}, {256, 128}, {0, 128}}, -16, 0, "brick", texNumbers(64, 64)))))
+		prismBrush([]geom.P2{{X: 0, Y: 0}, {X: 256, Y: 0}, {X: 256, Y: 128}, {X: 0, Y: 128}}, -16, 0, "brick", texNumbers(64, 64)))))
 	if err != nil {
 		t.Fatal(err)
 	}
 	br := m.Entities[0].Brushes()[0]
 	faces, _ := br.Faces()
-	planes := make([]plane, len(faces))
+	planes := make([]geom.Plane, len(faces))
 	for i, f := range faces {
-		planes[i] = planeOf(f.Points)
+		planes[i] = geom.PlaneOf(f.Points)
 	}
-	planes[1] = plane{n: mapfile.Vec3{0.25 / math.Hypot(1, 0.25), 0, -1 / math.Hypot(1, 0.25)}} // the top tilted: z ≤ 0.25·x
-	if lo, hi, ok := column(planes, 128, 64); !ok || math.Abs(hi-32) > 1e-6 || math.Abs(lo+16) > 1e-6 {
+	planes[1] = geom.Plane{N: mapfile.Vec3{0.25 / math.Hypot(1, 0.25), 0, -1 / math.Hypot(1, 0.25)}} // the top tilted: z ≤ 0.25·x
+	if lo, hi, ok := geom.Column(planes, 128, 64); !ok || math.Abs(hi-32) > 1e-6 || math.Abs(lo+16) > 1e-6 {
 		t.Errorf("the ramp at x 128: %v to %v, %v", lo, hi, ok)
 	}
-	if _, _, ok := column(planes, 300, 64); ok {
+	if _, _, ok := geom.Column(planes, 300, 64); ok {
 		t.Error("beside the ramp: the line misses it")
 	}
 	g := &ground{patches: [][3]mapfile.Vec3{{{0, 0, 0}, {100, 0, 20}, {0, 100, 40}}}}
@@ -111,12 +112,12 @@ func TestTheFloorAtItsEdges(t *testing.T) {
 		t.Errorf("a tetrahedron: %d solids", len(g.solids))
 	}
 	// under an overhang, its slope bounds the line from below: z ≥ 0.5·x + 10
-	over := []plane{{n: mapfile.Vec3{-0.5 / math.Hypot(1, 0.5), 0, 1 / math.Hypot(1, 0.5)}, d: 10 / math.Hypot(1, 0.5)}, {n: mapfile.Vec3{0, 0, -1}, d: -200}}
-	if lo, hi, ok := column(over, 40, 0); !ok || math.Abs(lo-30) > 1e-6 || hi != 200 {
+	over := []geom.Plane{{N: mapfile.Vec3{-0.5 / math.Hypot(1, 0.5), 0, 1 / math.Hypot(1, 0.5)}, D: 10 / math.Hypot(1, 0.5)}, {N: mapfile.Vec3{0, 0, -1}, D: -200}}
+	if lo, hi, ok := geom.Column(over, 40, 0); !ok || math.Abs(lo-30) > 1e-6 || hi != 200 {
 		t.Errorf("under an overhang: %v to %v, %v", lo, hi, ok)
 	}
 	tri := [3]mapfile.Vec3{{0, 0, 0}, {100, 20, 20}, {30, 100, 40}}
-	n := cross(sub(tri[1], tri[0]), sub(tri[2], tri[0]))
+	n := geom.Cross(geom.Sub(tri[1], tri[0]), geom.Sub(tri[2], tri[0]))
 	on := func(x, y float64) float64 { return -(n[0]*x + n[1]*y) / n[2] } // the plane through tri, z at (x, y)
 	g := &ground{patches: [][3]mapfile.Vec3{tri}}
 	for _, p := range [][2]float64{{40, 40}, {50, 10}, {15, 50}, {65, 60}} { // inside, then the middles of its three edges

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant"
 )
 
@@ -20,7 +21,7 @@ const nextAxis = "command View/Layout/Next (XY, YZ, XY)"
 // 100% in steps, then centred on the target through the camera, as zooming
 // moves the centre) or as it is. The user's view is read first, on the axis
 // it shows, and put back in that order: axis, zoom, centre.
-func (s *session) view2D(ctx context.Context, axis int, target *Box, pts []mapfile.Vec3) (*frame, error) {
+func (s *session) view2D(ctx context.Context, axis int, target *geom.Box, pts []mapfile.Vec3) (*frame, error) {
 	a := Axes[axis]
 	first := pts
 	if target != nil {
@@ -91,8 +92,8 @@ func (s *session) camera(ctx context.Context) (Pose, error) {
 	if len(f) != 6 {
 		return Pose{}, fmt.Errorf("the camera is %q, not x y z pitch yaw roll", r.Summary)
 	}
-	o, ok1 := ParseVec3(strings.Join(f[:3], " "))
-	a, ok2 := ParseVec3(strings.Join(f[3:], " "))
+	o, ok1 := geom.ParseVec3(strings.Join(f[:3], " "))
+	a, ok2 := geom.ParseVec3(strings.Join(f[3:], " "))
 	if !ok1 || !ok2 {
 		return Pose{}, fmt.Errorf("the camera is %q, not x y z pitch yaw roll", r.Summary)
 	}

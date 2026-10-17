@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // solids are what a player collides with, as the batch leaves the map: the
@@ -17,13 +18,13 @@ import (
 // passes (clip_ai, the bullet and missile clips). With them, the zones'
 // volumes (player_volume), the play space.
 type solids struct {
-	planes  [][]plane
-	boxes   []Box
+	planes  [][]geom.Plane
+	boxes   []geom.Box
 	patches [][3]mapfile.Vec3
 	tiles   map[[2]int][]int // 128-unit tiles of the ground -> the solids over them
 	ptiles  map[[2]int][]int // and the patch triangles
-	bounds  Box
-	zones   [][]plane
+	bounds  geom.Box
+	zones   [][]geom.Plane
 }
 
 const solidTile = 128
@@ -89,9 +90,9 @@ func (x xform) then(outer xform) xform {
 // prefabXform is a misc_prefab's placement: angles pitch yaw roll as Radiant
 // turns an entity (forward, left, up), origin, modelscale.
 func prefabXform(e *mapfile.Entity) xform {
-	o, _ := Origin(e)
+	o, _ := geom.Origin(e)
 	v, _ := e.Key("angles")
-	a, _ := ParseVec3(v)
+	a, _ := geom.ParseVec3(v)
 	s := 1.0
 	if v, ok := e.Key("modelscale"); ok {
 		if f, err := strconv.ParseFloat(v, 64); err == nil && f != 0 {
@@ -137,9 +138,9 @@ func (s *solids) addZone(e *mapfile.Entity, x xform) {
 	}
 	for _, br := range e.Brushes() {
 		if faces, err := br.Faces(); err == nil {
-			planes := make([]plane, len(faces))
+			planes := make([]geom.Plane, len(faces))
 			for i, f := range faces {
-				planes[i] = planeOf([3]mapfile.Vec3{x.apply(f.Points[0]), x.apply(f.Points[1]), x.apply(f.Points[2])})
+				planes[i] = geom.PlaneOf([3]mapfile.Vec3{x.apply(f.Points[0]), x.apply(f.Points[1]), x.apply(f.Points[2])})
 			}
 			s.zones = append(s.zones, planes)
 		}
@@ -149,7 +150,7 @@ func (s *solids) addZone(e *mapfile.Entity, x xform) {
 // inZone tells whether a point is inside a zone's volume.
 func (s *solids) inZone(p mapfile.Vec3) bool {
 	for _, z := range s.zones {
-		if lo, hi, ok := column(z, p[0], p[1]); ok && p[2] >= lo-eps && p[2] <= hi+eps {
+		if lo, hi, ok := geom.Column(z, p[0], p[1]); ok && p[2] >= lo-geom.Eps && p[2] <= hi+geom.Eps {
 			return true
 		}
 	}
@@ -189,16 +190,16 @@ func (s *solids) add(br *mapfile.Brush, x xform) {
 			return
 		}
 		faces, _ := br.Faces()
-		planes := make([]plane, len(faces))
+		planes := make([]geom.Plane, len(faces))
 		for i, f := range faces {
 			var pts [3]mapfile.Vec3
 			for k := range 3 {
 				pts[k] = x.apply(f.Points[k])
 			}
-			planes[i] = planeOf(pts)
+			planes[i] = geom.PlaneOf(pts)
 		}
-		var bx Box
-		for _, v := range vertices(planes) {
+		var bx geom.Box
+		for _, v := range geom.Vertices(planes) {
 			bx.Add(v)
 		}
 		if !bx.Ok {
@@ -216,7 +217,7 @@ func (s *solids) add(br *mapfile.Brush, x xform) {
 			for c := range max(min(len(p.Rows[r]), len(p.Rows[r+1]))-1, 0) {
 				a, b, d, e := x.apply(p.Rows[r][c].Pos), x.apply(p.Rows[r][c+1].Pos), x.apply(p.Rows[r+1][c].Pos), x.apply(p.Rows[r+1][c+1].Pos)
 				for _, t := range [][3]mapfile.Vec3{{a, b, d}, {b, e, d}} {
-					var bx Box
+					var bx geom.Box
 					for _, v := range t {
 						bx.Add(v)
 					}
@@ -228,7 +229,7 @@ func (s *solids) add(br *mapfile.Brush, x xform) {
 	}
 }
 
-func (s *solids) index(tiles map[[2]int][]int, k int, bx Box) {
+func (s *solids) index(tiles map[[2]int][]int, k int, bx geom.Box) {
 	for i := int(math.Floor(bx.Min[0] / solidTile)); i <= int(math.Floor(bx.Max[0]/solidTile)); i++ {
 		for j := int(math.Floor(bx.Min[1] / solidTile)); j <= int(math.Floor(bx.Max[1]/solidTile)); j++ {
 			tiles[[2]int{i, j}] = append(tiles[[2]int{i, j}], k)
@@ -245,15 +246,15 @@ func (s *solids) spans(x, y float64) []span {
 	t := [2]int{int(math.Floor(x / solidTile)), int(math.Floor(y / solidTile))}
 	var out []span
 	for _, k := range s.tiles[t] {
-		if bx := s.boxes[k]; x < bx.Min[0]-eps || x > bx.Max[0]+eps || y < bx.Min[1]-eps || y > bx.Max[1]+eps {
+		if bx := s.boxes[k]; x < bx.Min[0]-geom.Eps || x > bx.Max[0]+geom.Eps || y < bx.Min[1]-geom.Eps || y > bx.Max[1]+geom.Eps {
 			continue
 		}
-		if lo, hi, ok := column(s.planes[k], x, y); ok {
+		if lo, hi, ok := geom.Column(s.planes[k], x, y); ok {
 			out = append(out, span{lo, hi})
 		}
 	}
 	for _, k := range s.ptiles[t] {
-		if h, ok := onTriangle(s.patches[k], x, y); ok {
+		if h, ok := geom.OnTriangle(s.patches[k], x, y); ok {
 			out = append(out, span{h - 1, h})
 		}
 	}
@@ -271,7 +272,7 @@ func mergeSpans(in []span) []span {
 	}
 	out := []span{in[0]}
 	for _, sp := range in[1:] {
-		if last := &out[len(out)-1]; sp.lo <= last.hi+eps {
+		if last := &out[len(out)-1]; sp.lo <= last.hi+geom.Eps {
 			last.hi = math.Max(last.hi, sp.hi)
 		} else {
 			out = append(out, sp)
@@ -283,7 +284,7 @@ func mergeSpans(in []span) []span {
 // inside tells whether a point is inside a solid.
 func (s *solids) inside(p mapfile.Vec3) bool {
 	for _, sp := range s.spans(p[0], p[1]) {
-		if p[2] > sp.lo+eps && p[2] < sp.hi-eps {
+		if p[2] > sp.lo+geom.Eps && p[2] < sp.hi-geom.Eps {
 			return true
 		}
 	}

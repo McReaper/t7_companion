@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // A row from one: a world brush and a brush entity copied three times along
@@ -57,7 +58,7 @@ func TestCopiesMakeARowFromOne(t *testing.T) {
 	}
 	for _, e := range d.After.Map.Entities {
 		for _, br := range e.Brushes() {
-			if b := BrushBox(br); e.Class() == "worldspawn" && b.Min[0] > 700 && b.Max[2] == -16 {
+			if b := geom.BrushBox(br); e.Class() == "worldspawn" && b.Min[0] > 700 && b.Max[2] == -16 {
 				if f := faceTex(t, br)["+z"]; f.Material != "caulk" {
 					t.Errorf("a copy's top is %s", f.Material)
 				}
@@ -94,7 +95,7 @@ func TestCopyRefusals(t *testing.T) {
 	if err != nil || len(d.Made) != 2 {
 		t.Fatalf("%+v, %v", d, err)
 	}
-	o, _ := Origin(snap.Map.Entities[1])
+	o, _ := geom.Origin(snap.Map.Entities[1])
 	for _, m := range d.Made {
 		if k := (m.Box.Min[0] - o[0]) / 8; m.Box.Min != (mapfile.Vec3{o[0] + 8*k, o[1] + 16*k, o[2] + 32*k}) || (k != 1 && k != 2) {
 			t.Errorf("a copy at %v, the probe at %v", m.Box.Min, o)

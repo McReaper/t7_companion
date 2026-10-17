@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/level"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant"
 )
 
@@ -50,7 +51,7 @@ func mapView(ctx context.Context, a mapViewArgs) (*mapViewOut, []byte, error) {
 		return nil, nil, fmt.Errorf("size %d: at most %d pixels", a.Size, maxViewSize)
 	}
 	if a.At != "" {
-		v, ok := level.ParseVec3(strings.ReplaceAll(a.At, ",", " "))
+		v, ok := geom.ParseVec3(strings.ReplaceAll(a.At, ",", " "))
 		if !ok {
 			return nil, nil, fmt.Errorf("at %q: give a point as x y z", a.At)
 		}
@@ -58,8 +59,8 @@ func mapView(ctx context.Context, a mapViewArgs) (*mapViewOut, []byte, error) {
 	}
 	if a.Camera != "" {
 		f := strings.Fields(strings.ReplaceAll(a.Camera, ",", " "))
-		pos, ok1 := level.ParseVec3(strings.Join(f[:min(3, len(f))], " "))
-		ang, ok2 := level.ParseVec3(strings.Join(f[min(3, len(f)):], " "))
+		pos, ok1 := geom.ParseVec3(strings.Join(f[:min(3, len(f))], " "))
+		ang, ok2 := geom.ParseVec3(strings.Join(f[min(3, len(f)):], " "))
 		if !ok1 || !ok2 {
 			return nil, nil, fmt.Errorf("camera %q: give x y z pitch yaw roll", a.Camera)
 		}

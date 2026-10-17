@@ -11,6 +11,7 @@ import (
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
 	"github.com/McReaper/t7_companion/internal/level"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant/radianttest"
 )
 
@@ -25,7 +26,7 @@ func checkedRadiant(t *testing.T) *radianttest.Fake {
 		t.Fatal(err)
 	}
 	brush := func(i int, lo, hi mapfile.Vec3, mat, tex string) string {
-		b := level.BoxBrush(level.Box{Min: lo, Max: hi, Ok: true}, mat, "")
+		b := level.BoxBrush(geom.Box{Min: lo, Max: hi, Ok: true}, mat, "")
 		b = strings.ReplaceAll(b, " 64 64 0 0 0 0 lightmap_gray", " "+tex+" lightmap_gray")
 		return strings.Replace(b, "{\n", fmt.Sprintf("{\n guid \"{0E0000%02X-0000-0000-0000-000000000000}\"\n", i), 1)
 	}

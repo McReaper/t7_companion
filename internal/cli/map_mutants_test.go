@@ -9,6 +9,7 @@ import (
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
 	"github.com/McReaper/t7_companion/internal/level"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // The cases below pin what the CI's mutation run found unchecked.
@@ -18,7 +19,7 @@ func TestBrushListsStopAtTwoHundredRows(t *testing.T) {
 	var text strings.Builder
 	text.WriteString("{\nguid \"{00000000-0000-0000-0000-0000000000F0}\"\n\"classname\" \"worldspawn\"\n")
 	for i := range maxBrushRows {
-		b := level.BoxBrush(level.Box{Min: mapfile.Vec3{float64(i), 0, 0}, Max: mapfile.Vec3{float64(i) + 1, 1, 1}, Ok: true}, "caulk", "")
+		b := level.BoxBrush(geom.Box{Min: mapfile.Vec3{float64(i), 0, 0}, Max: mapfile.Vec3{float64(i) + 1, 1, 1}, Ok: true}, "caulk", "")
 		text.WriteString(strings.Replace(b, "{\n", fmt.Sprintf("{\n guid \"{%08X-0000-0000-0000-000000000000}\"\n", 0x20000000+i), 1))
 	}
 	text.WriteString("}\n{\nguid \"{0FFFFFFF-0000-0000-0000-000000000000}\"\n\"classname\" \"light\"\n\"origin\" \"0 0 0\"\n}\n")

@@ -11,6 +11,7 @@ import (
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
 	"github.com/McReaper/t7_companion/internal/level"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 	"github.com/McReaper/t7_companion/internal/radiant/radianttest"
 )
 
@@ -186,7 +187,7 @@ func hollow(f *radianttest.Fake, args string, _ []byte) radianttest.Reply {
 		if it.Brush == nil || !strings.EqualFold(it.Brush.Guid(), f.Selection[0]) {
 			continue
 		}
-		b, mat := level.BrushBox(it.Brush), level.Material(it.Brush)
+		b, mat := geom.BrushBox(it.Brush), level.Material(it.Brush)
 		world.Items = slices.Delete(world.Items, i, i+1)
 		lo, hi := b.Min, b.Max
 		walls := [6][2]mapfile.Vec3{
@@ -198,7 +199,7 @@ func hollow(f *radianttest.Fake, args string, _ []byte) radianttest.Reply {
 		f.Selection = nil
 		for k, w := range walls {
 			g := fmt.Sprintf("{0E%06X-0000-0000-0000-000000000000}", k)
-			text.WriteString(strings.Replace(level.BoxBrush(level.Box{Min: w[0], Max: w[1], Ok: true}, mat, ""), "{\n", "{\n guid \""+g+"\"\n", 1))
+			text.WriteString(strings.Replace(level.BoxBrush(geom.Box{Min: w[0], Max: w[1], Ok: true}, mat, ""), "{\n", "{\n guid \""+g+"\"\n", 1))
 			f.Selection = append(f.Selection, g)
 		}
 		wm, _ := mapfile.Parse([]byte("{\n" + text.String() + "}\n"))

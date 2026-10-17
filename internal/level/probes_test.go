@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // A probe the op made: its box and keys.
@@ -32,11 +33,11 @@ func probesRun(t *testing.T, pid int, opsJSON string, opts ...EditOption) (*Done
 			if hexOf(e.Guid()) != hexOf(m.ID) {
 				continue
 			}
-			o, _ := Origin(e)
+			o, _ := geom.Origin(e)
 			mn, _ := e.Key("size_min")
 			mx, _ := e.Key("size_max")
-			a, _ := ParseVec3(mn)
-			b, _ := ParseVec3(mx)
+			a, _ := geom.ParseVec3(mn)
+			b, _ := geom.ParseVec3(mx)
 			p := madeProbe{origin: o, lo: mapfile.Vec3{o[0] - a[0], o[1] - a[1], o[2] - a[2]}, hi: mapfile.Vec3{o[0] + b[0], o[1] + b[1], o[2] + b[2]}, keys: map[string]string{}}
 			for _, k := range []string{"resolution", "ao_range", "blend_mins", "blend_maxs", "box", "lighting_state"} {
 				p.keys[k], _ = e.Key(k)
@@ -227,7 +228,7 @@ func TestProbesMoveTheGlobalProbe(t *testing.T) {
 	found := false
 	for _, e := range d.After.Map.Entities {
 		if v, _ := e.Key("targetname"); e.Class() == "info_null" && v == "global_probe" {
-			null, _ = Origin(e)
+			null, _ = geom.Origin(e)
 			found = true
 		}
 		if v, _ := e.Key("target"); e.Class() == "volume_sun" && v != "global_probe" {

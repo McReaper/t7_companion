@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
+	"github.com/McReaper/t7_companion/internal/level/geom"
 )
 
 // ZoneOp makes a zone of the zone manager's (_zm_zonemgr.gsc): an
@@ -54,8 +55,8 @@ type Link struct {
 // area is a zone's area as built: its outline on the ground and the convex
 // pieces it is cut in, from z0 to z1.
 type area struct {
-	outline []pt2
-	parts   [][]pt2
+	outline []geom.P2
+	parts   [][]geom.P2
 	z0, z1  float64
 }
 
@@ -136,11 +137,11 @@ func (b *batch) areaOf(a ZoneArea) ([]area, error) {
 	case len(a.Floors) > 0:
 		return b.floorAreas(a.Floors, h)
 	case len(a.Outline) > 0:
-		poly, err := outlineOf(a.Outline)
+		poly, err := geom.OutlineOf(a.Outline)
 		if err != nil {
 			return nil, err
 		}
-		parts, err := convexParts(poly)
+		parts, err := geom.ConvexParts(poly)
 		return []area{{poly, parts, a.Z, a.Z + h}}, err
 	case a.Min == nil || a.Max == nil:
 		return nil, fmt.Errorf("a box takes both min and max")
@@ -151,8 +152,8 @@ func (b *batch) areaOf(a ZoneArea) ([]area, error) {
 			return nil, fmt.Errorf("max %v must exceed min %v on every axis", hi, lo)
 		}
 	}
-	rect := []pt2{{lo[0], lo[1]}, {hi[0], lo[1]}, {hi[0], hi[1]}, {lo[0], hi[1]}}
-	return []area{{rect, [][]pt2{rect}, lo[2], hi[2]}}, nil
+	rect := []geom.P2{{X: lo[0], Y: lo[1]}, {X: hi[0], Y: lo[1]}, {X: hi[0], Y: hi[1]}, {X: lo[0], Y: hi[1]}}
+	return []area{{rect, [][]geom.P2{rect}, lo[2], hi[2]}}, nil
 }
 
 // floorAreas are the areas over floor brushes: each brush's outline seen
@@ -189,29 +190,29 @@ func floorArea(br *mapfile.Brush, h float64) (area, bool) {
 	if err != nil {
 		return area{}, false
 	}
-	planes := make([]plane, len(faces))
+	planes := make([]geom.Plane, len(faces))
 	for i, f := range faces {
-		planes[i] = planeOf(f.Points)
+		planes[i] = geom.PlaneOf(f.Points)
 	}
-	var pts []pt2
-	for _, v := range vertices(planes) {
-		pts = append(pts, pt2{v[0], v[1]})
+	var pts []geom.P2
+	for _, v := range geom.Vertices(planes) {
+		pts = append(pts, geom.P2{X: v[0], Y: v[1]})
 	}
-	hull := convexHull(pts)
-	if len(hull) < 3 || signedArea(hull) <= eps {
+	hull := geom.ConvexHull(pts)
+	if len(hull) < 3 || geom.SignedArea(hull) <= geom.Eps {
 		return area{}, false
 	}
-	var c pt2
+	var c geom.P2
 	for _, q := range hull {
-		c = pt2{c.x + q.x/float64(len(hull)), c.y + q.y/float64(len(hull))}
+		c = geom.P2{X: c.X + q.X/float64(len(hull)), Y: c.Y + q.Y/float64(len(hull))}
 	}
 	lo, hi := math.Inf(1), math.Inf(-1)
 	for _, p := range hull { // just inside each corner, where a vertical line meets the brush
-		if _, top, ok := column(planes, p.x+(c.x-p.x)*0.01, p.y+(c.y-p.y)*0.01); ok {
+		if _, top, ok := geom.Column(planes, p.X+(c.X-p.X)*0.01, p.Y+(c.Y-p.Y)*0.01); ok {
 			lo, hi = math.Min(lo, top), math.Max(hi, top)
 		}
 	}
-	return area{hull, [][]pt2{hull}, lo, hi + h}, lo <= hi
+	return area{hull, [][]geom.P2{hull}, lo, hi + h}, lo <= hi
 }
 
 // zoneTarget is the name of a zone's spawner structs: the target of its
@@ -268,7 +269,7 @@ func (b *batch) zoneEntities(i int, o *ZoneOp, areas []area, target string) erro
 	}
 	var rooms []int // the areas large enough for a spawner of their own: not a doorway's
 	for k, a := range areas {
-		if signedArea(a.outline) >= roomArea {
+		if geom.SignedArea(a.outline) >= roomArea {
 			rooms = append(rooms, k)
 		}
 	}
@@ -295,15 +296,15 @@ type spot struct {
 func zoneSpots(g *ground, areas []area) []spot {
 	var out []spot
 	for k, a := range areas {
-		lo, hi := pt2{math.Inf(1), math.Inf(1)}, pt2{math.Inf(-1), math.Inf(-1)}
+		lo, hi := geom.P2{X: math.Inf(1), Y: math.Inf(1)}, geom.P2{X: math.Inf(-1), Y: math.Inf(-1)}
 		for _, q := range a.outline {
-			lo, hi = pt2{math.Min(lo.x, q.x), math.Min(lo.y, q.y)}, pt2{math.Max(hi.x, q.x), math.Max(hi.y, q.y)}
+			lo, hi = geom.P2{X: math.Min(lo.X, q.X), Y: math.Min(lo.Y, q.Y)}, geom.P2{X: math.Max(hi.X, q.X), Y: math.Max(hi.Y, q.Y)}
 		}
-		x0, y0 := math.Ceil(lo.x/spawnerSpace)*spawnerSpace, math.Ceil(lo.y/spawnerSpace)*spawnerSpace
-		for i := range int(math.Max(0, math.Floor((hi.x-x0)/spawnerSpace)+1)) { // counted, so no loop can run on
-			for j := range int(math.Max(0, math.Floor((hi.y-y0)/spawnerSpace)+1)) {
+		x0, y0 := math.Ceil(lo.X/spawnerSpace)*spawnerSpace, math.Ceil(lo.Y/spawnerSpace)*spawnerSpace
+		for i := range int(math.Max(0, math.Floor((hi.X-x0)/spawnerSpace)+1)) { // counted, so no loop can run on
+			for j := range int(math.Max(0, math.Floor((hi.Y-y0)/spawnerSpace)+1)) {
 				x, y := x0+float64(i)*spawnerSpace, y0+float64(j)*spawnerSpace
-				if !inOutline(a.outline, pt2{x, y}) {
+				if !inOutline(a.outline, geom.P2{X: x, Y: y}) {
 					continue
 				}
 				if z, ok := g.floor(x, y, a.z0-stepHeight, a.z0+stepHeight); ok && z < a.z1 {
@@ -317,15 +318,15 @@ func zoneSpots(g *ground, areas []area) []spot {
 
 // inOutline tells a point inside a polygon, not on its edge: an even
 // number of edges crossed by a ray to +x outside.
-func inOutline(poly []pt2, p pt2) bool {
+func inOutline(poly []geom.P2, p geom.P2) bool {
 	in := false
 	for i, a := range poly {
 		b := poly[(i+1)%len(poly)]
-		if math.Abs(cross2(a, b, p)) <= eps*math.Hypot(b.x-a.x, b.y-a.y) && p.x >= math.Min(a.x, b.x)-eps && p.x <= math.Max(a.x, b.x)+eps &&
-			p.y >= math.Min(a.y, b.y)-eps && p.y <= math.Max(a.y, b.y)+eps {
+		if math.Abs(geom.Cross2(a, b, p)) <= geom.Eps*math.Hypot(b.X-a.X, b.Y-a.Y) && p.X >= math.Min(a.X, b.X)-geom.Eps && p.X <= math.Max(a.X, b.X)+geom.Eps &&
+			p.Y >= math.Min(a.Y, b.Y)-geom.Eps && p.Y <= math.Max(a.Y, b.Y)+geom.Eps {
 			return false
 		}
-		if (a.y > p.y) != (b.y > p.y) && p.x < a.x+(p.y-a.y)*(b.x-a.x)/(b.y-a.y) {
+		if (a.Y > p.Y) != (b.Y > p.Y) && p.X < a.X+(p.Y-a.Y)*(b.X-a.X)/(b.Y-a.Y) {
 			in = !in
 		}
 	}
@@ -396,7 +397,7 @@ func (b *batch) checkZones() error {
 		if _, ok := all[l.B]; !ok {
 			return fmt.Errorf("zone %s: link to %s: no zone of that name in the map or the batch", l.A, l.B)
 		}
-		if g := apart(all[l.A], all[l.B]); g > eps {
+		if g := apart(all[l.A], all[l.B]); g > geom.Eps {
 			b.notes = append(b.notes, fmt.Sprintf("zones %s and %s are linked but %s units apart: a player crossing between them is in neither, and dies there; grow one to meet the other", l.A, l.B, num(math.Round(g))))
 		}
 	}
@@ -439,7 +440,7 @@ func (b *batch) zoneParts() (made, all map[string][]zpart) {
 
 // zpart is a convex piece of a zone: its outline from above, from z0 to z1.
 type zpart struct {
-	hull   []pt2
+	hull   []geom.P2
 	z0, z1 float64
 }
 
@@ -449,17 +450,17 @@ func brushPart(br *mapfile.Brush) (zpart, bool) {
 	if err != nil {
 		return zpart{}, false
 	}
-	planes := make([]plane, len(faces))
+	planes := make([]geom.Plane, len(faces))
 	for i, f := range faces {
-		planes[i] = planeOf(f.Points)
+		planes[i] = geom.PlaneOf(f.Points)
 	}
 	p := zpart{z0: math.Inf(1), z1: math.Inf(-1)}
-	var pts []pt2
-	for _, v := range vertices(planes) {
-		pts = append(pts, pt2{v[0], v[1]})
+	var pts []geom.P2
+	for _, v := range geom.Vertices(planes) {
+		pts = append(pts, geom.P2{X: v[0], Y: v[1]})
 		p.z0, p.z1 = math.Min(p.z0, v[2]), math.Max(p.z1, v[2])
 	}
-	p.hull = convexHull(pts)
+	p.hull = geom.ConvexHull(pts)
 	return p, len(p.hull) >= 3
 }
 
@@ -468,7 +469,7 @@ func brushPart(br *mapfile.Brush) (zpart, bool) {
 func zonesOverlap(a, b []zpart) bool {
 	for _, p := range a {
 		for _, q := range b {
-			if math.Min(p.z1, q.z1)-math.Max(p.z0, q.z0) > eps && overlapping(p.hull, q.hull) {
+			if math.Min(p.z1, q.z1)-math.Max(p.z0, q.z0) > geom.Eps && geom.Overlapping(p.hull, q.hull) {
 				return true
 			}
 		}
@@ -491,12 +492,12 @@ func apart(a, b []zpart) float64 {
 
 // hullDistance is how far apart two convex hulls are: 0 when they overlap,
 // else the nearest of a corner of one to an edge of the other.
-func hullDistance(a, b []pt2) float64 {
-	if overlapping(a, b) {
+func hullDistance(a, b []geom.P2) float64 {
+	if geom.Overlapping(a, b) {
 		return 0
 	}
 	d := math.Inf(1)
-	for _, h := range [2][2][]pt2{{a, b}, {b, a}} {
+	for _, h := range [2][2][]geom.P2{{a, b}, {b, a}} {
 		for _, p := range h[0] {
 			for i := range h[1] {
 				d = math.Min(d, segmentDistance(p, h[1][i], h[1][(i+1)%len(h[1])]))
@@ -507,11 +508,11 @@ func hullDistance(a, b []pt2) float64 {
 }
 
 // segmentDistance is how far a point is from a segment.
-func segmentDistance(p, a, b pt2) float64 {
-	dx, dy := b.x-a.x, b.y-a.y
+func segmentDistance(p, a, b geom.P2) float64 {
+	dx, dy := b.X-a.X, b.Y-a.Y
 	t := 0.0
 	if l := dx*dx + dy*dy; l > 0 {
-		t = math.Max(0, math.Min(1, ((p.x-a.x)*dx+(p.y-a.y)*dy)/l))
+		t = math.Max(0, math.Min(1, ((p.X-a.X)*dx+(p.Y-a.Y)*dy)/l))
 	}
-	return math.Hypot(p.x-a.x-t*dx, p.y-a.y-t*dy)
+	return math.Hypot(p.X-a.X-t*dx, p.Y-a.Y-t*dy)
 }

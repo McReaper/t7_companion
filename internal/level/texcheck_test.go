@@ -155,24 +155,3 @@ func TestStretchedTilesAndUnknownMaterialsAndWhatIsChecked(t *testing.T) {
 		t.Errorf("a third off is no stretch: %q", s)
 	}
 }
-
-func TestHullsCoverAndTouch(t *testing.T) {
-	sq := convexHull([]pt2{{0, 0}, {2, 0}, {2, 2}, {0, 2}, {1, 1}, {2, 2}})
-	if len(sq) != 4 {
-		t.Fatalf("hull %v: the square's four corners, a point inside and a repeat dropped", sq)
-	}
-	inner := convexHull([]pt2{{0.5, 0.5}, {1, 0.5}, {1, 1}})
-	if !covers(sq, inner) || covers(inner, sq) || !covers(sq, sq) {
-		t.Error("covers")
-	}
-	cross := convexHull([]pt2{{-1, 0.5}, {3, 0.5}, {3, 1.5}, {-1, 1.5}})
-	far := convexHull([]pt2{{3, 3}, {4, 3}, {4, 4}})
-	edge := convexHull([]pt2{{2, 0}, {3, 0}, {2, 2}})
-	corner := convexHull([]pt2{{2, 0}, {3, 0}, {3, 2}})
-	if !touch(sq, cross) || !touch(sq, inner) || touch(sq, far) || !touch(sq, edge) || touch(sq, corner) || !touch(sq, sq) {
-		t.Error("touch: a band across, one inside, one apart, one sharing an edge, one a corner only, itself")
-	}
-	if convexHull([]pt2{{0, 0}, {1, 1}}) != nil || len(convexHull([]pt2{{0, 0}, {1, 1}, {2, 2}})) > 2 {
-		t.Error("fewer than three points, or three in a line, is no hull")
-	}
-}
