@@ -290,3 +290,19 @@ func TestWrapKeepsTheSameTilesInSmallerNumbers(t *testing.T) {
 		}
 	}
 }
+
+// A side wall's texture runs as Radiant lays it, u along -y on an x face and
+// along -x on a y face, so its tiles start on the origin across the wall: an
+// origin 40 in from the corner puts the u offset at 40 on all four sides.
+func TestASideWallsTilesStartOnTheOrigin(t *testing.T) {
+	b := boxOf(t, mapfile.Vec3{0, 0, 0}, mapfile.Vec3{128, 128, 64}, "caulk")
+	textured(t, b, &TextureOp{Faces: "sides", Origin: &[3]float64{40, 40, 0}}, nil)
+	for dir, f := range faceTex(t, b) {
+		if dir == "+z" || dir == "-z" {
+			continue
+		}
+		if f.Tex[2] != 40 || f.Tex[3] != 0 {
+			t.Errorf("%s: offsets %v %v, want 40 0", dir, f.Tex[2], f.Tex[3])
+		}
+	}
+}

@@ -112,3 +112,26 @@ func TestPNGDecodesBack(t *testing.T) {
 		t.Errorf("pixel = %d %d %d", r>>8, g>>8, bl>>8)
 	}
 }
+
+// Shrink gives each pixel the mean of the source pixels under it; along a
+// side that grows instead, each pixel takes the one source row or column
+// under it.
+func TestShrinkMeansThePixelsUnderEach(t *testing.T) {
+	src := image.NewRGBA(image.Rect(0, 0, 4, 2))
+	for x, v := range []uint8{0, 100, 200, 250} {
+		src.Set(x, 0, color.RGBA{v, v, v, 255})
+		src.Set(x, 1, color.RGBA{v / 10, v / 10, v / 10, 255})
+	}
+	tall := Shrink(src, 2, 4) // half as wide, twice as high
+	for _, c := range []struct{ x, y, want int }{{0, 0, 50}, {1, 0, 225}, {0, 1, 50}, {0, 2, 5}, {1, 3, 22}} {
+		if got := int(tall.RGBAAt(c.x, c.y).R); got != c.want {
+			t.Errorf("2×4 at %d,%d: %d, want %d", c.x, c.y, got, c.want)
+		}
+	}
+	wide := Shrink(src, 8, 1) // twice as wide, half as high
+	for _, c := range []struct{ x, want int }{{0, 0}, {1, 0}, {2, 55}, {7, 137}} {
+		if got := int(wide.RGBAAt(c.x, 0).R); got != c.want {
+			t.Errorf("8×1 at %d: %d, want %d", c.x, got, c.want)
+		}
+	}
+}

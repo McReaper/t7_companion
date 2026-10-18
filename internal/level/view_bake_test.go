@@ -38,6 +38,9 @@ func TestViewReportsWhatTheBakeWarnedOf(t *testing.T) {
 	if got := bakeWarnings(lines); len(got) != maxBakeWarnings+1 || got[maxBakeWarnings] != "4 other kinds" {
 		t.Errorf("12 kinds: %q", got)
 	}
+	if got := bakeWarnings(lines[:maxBakeWarnings]); len(got) != maxBakeWarnings || strings.Contains(got[len(got)-1], "other kinds") {
+		t.Errorf("%d kinds, as many as are listed: %q", maxBakeWarnings, got)
+	}
 }
 
 // A bake switches the 3D view to real lighting, runs Radiant's bake, waits

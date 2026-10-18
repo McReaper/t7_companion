@@ -324,3 +324,27 @@ func TestABlankCaptureIsRefused(t *testing.T) {
 }
 
 func abs(n int) int { return max(n, -n) }
+
+// Hiding the sky names the brushes with a sky face and nothing else; hiding
+// the volumes names the volume entities, not the sky.
+func TestHidingTheSkyNamesItsBrushes(t *testing.T) {
+	brush := func(guid, material string, lo, hi mapfile.Vec3) string {
+		return strings.Replace(BoxBrush(box(lo, hi), material, ""), "{\n", "{\n guid \"{"+guid+"-0000-0000-0000-000000000000}\"\n", 1)
+	}
+	text := "{\n\"classname\" \"worldspawn\"\n" +
+		brush("5a5a5a5a", "sky", mapfile.Vec3{-512, -512, 512}, mapfile.Vec3{512, 512, 544}) +
+		brush("c0c0c0c0", "concrete", mapfile.Vec3{0, 0, 0}, mapfile.Vec3{64, 64, 16}) + "}\n" +
+		"{\nguid \"{0f0f0f0f-0000-0000-0000-000000000000}\"\n\"classname\" \"info_volume\"\n" +
+		brush("0e0e0e0e", "volume", mapfile.Vec3{0, 0, 0}, mapfile.Vec3{64, 64, 64}) + "}\n"
+	m, err := mapfile.Parse([]byte(text))
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap := &Snapshot{Map: m}
+	if got := hiddenBy(snap, "sky"); len(got) != 1 || !strings.Contains(got[0], "5a5a5a5a") {
+		t.Errorf("sky hides %q, want the sky brush alone", got)
+	}
+	if got := hiddenBy(snap, "volumes"); len(got) != 1 || !strings.Contains(got[0], "0f0f0f0f") {
+		t.Errorf("volumes hides %q, want the info_volume alone", got)
+	}
+}

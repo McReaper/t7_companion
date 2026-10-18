@@ -27,9 +27,12 @@ func TestACompilesVerdictIsWhatCod2mapLogged(t *testing.T) {
 	dir := t.TempDir()
 	errlog := filepath.Join(dir, "zm_x.errlog")
 	start := time.Now()
-	many := ""
+	many, exact := "", ""
 	for k := range 25 {
 		many += fmt.Sprintf("\"C:\\m\\zm_x.map\" 0 %d 1 2 3 0 0 1 \"Brush %d is bad.\"\n", k, k)
+		if k == maxPlaced-1 {
+			exact = many
+		}
 	}
 	for _, c := range []struct {
 		name, out, errlog string
@@ -44,6 +47,7 @@ func TestACompilesVerdictIsWhatCod2mapLogged(t *testing.T) {
 			[]string{"WARNING: Texture (script_floor_ceiling) repeats more than once per inch. (x1)"}},
 		{"a missing prefab", noPrefab + navNote, "", false, false, []string{"ERROR: Prefab '_prefabs/zm/zm_core/power_switch.map' not found"}, nil},
 		{"many placed", "", many, false, true, nil, nil},
+		{"as many as are listed", "", exact, false, true, nil, nil},
 	} {
 		os.Remove(errlog)
 		if c.errlog != "" {
@@ -61,6 +65,12 @@ func TestACompilesVerdictIsWhatCod2mapLogged(t *testing.T) {
 		compileVerdict(&sr, c.out, errlog, start)
 		if c.name == "many placed" {
 			if len(sr.Warnings) != maxPlaced+1 || !strings.HasPrefix(sr.Warnings[maxPlaced], "and 5 more in ") || sr.Warnings[0] != "entity 0 brush 0 at 1 2 3: Brush 0 is bad." {
+				t.Errorf("%s: %q", c.name, sr.Warnings)
+			}
+			continue
+		}
+		if c.name == "as many as are listed" {
+			if len(sr.Warnings) != maxPlaced || strings.HasPrefix(sr.Warnings[maxPlaced-1], "and ") {
 				t.Errorf("%s: %q", c.name, sr.Warnings)
 			}
 			continue
