@@ -18,7 +18,8 @@
 // every asset as a phantom duplicate. Arguments go through exec, never a
 // shell: git-bash/MSYS mangles /update and +medium and misreports native exit
 // codes. cod2map exits 0 even when it wrote nothing, so the compile stage
-// trusts the .d3dbsp's mtime. The light bake (radiant_modtools -ledSilent)
+// trusts the .d3dbsp's mtime, and on what it logs as a problem, so its
+// verdict is its output and the .errlog beside the map (compilelog.go). The light bake (radiant_modtools -ledSilent)
 // detaches and gives no usable exit code: the stage polls for its .led.
 //
 // # The link's verdict
