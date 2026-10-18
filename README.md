@@ -32,7 +32,7 @@ T7 Companion gives your AI agent everything ten years of the BO3 modding communi
 - **What the build packed** — why an asset is in your fastfile, what each zone line weighs, and which of your stock overrides won't ship.
 - **A headless build** — create, compile, light, link and launch your map, with a short report of every linker error and warning instead of hundreds of lines: *"Relink zm_mymap"*. Windows only.
 - **Radiant integration** — open a map in your Radiant, find what's in it and look at its views, place brushes, patches and entities, run Radiant's own commands, each batch one undo step: [setup](docs/radiant.md).
-- **Shader decompilation** — the game's compiled shaders back to HLSL, to start a custom shader from a stock one.
+- **Shader decompilation** — the game's compiled shaders back to HLSL, to start a custom shader from a stock one, by [t7_dxbc](https://github.com/McReaper/t7_dxbc).
 
 > [!NOTE]
 > <details>
