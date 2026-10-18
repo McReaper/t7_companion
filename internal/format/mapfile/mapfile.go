@@ -100,22 +100,38 @@ func (m *Map) Bytes() []byte {
 	}
 	write(m.Header)
 	for _, e := range m.Entities {
-		write(e.Lead)
-		buf.WriteString(e.Open)
-		for _, it := range e.Items {
-			if it.Brush == nil {
-				buf.WriteString(it.Line)
-				continue
-			}
-			write(it.Brush.Lead)
-			buf.WriteString(it.Brush.Open)
-			write(it.Brush.Body)
-			buf.WriteString(it.Brush.Close)
-		}
-		buf.WriteString(e.Close)
+		e.writeTo(&buf)
 	}
 	write(m.Trailer)
 	return buf.Bytes()
+}
+
+// Bytes returns the entity's text, its lead comments included.
+func (e *Entity) Bytes() []byte {
+	var buf bytes.Buffer
+	e.writeTo(&buf)
+	return buf.Bytes()
+}
+
+func (e *Entity) writeTo(buf *bytes.Buffer) {
+	write := func(lines []string) {
+		for _, l := range lines {
+			buf.WriteString(l)
+		}
+	}
+	write(e.Lead)
+	buf.WriteString(e.Open)
+	for _, it := range e.Items {
+		if it.Brush == nil {
+			buf.WriteString(it.Line)
+			continue
+		}
+		write(it.Brush.Lead)
+		buf.WriteString(it.Brush.Open)
+		write(it.Brush.Body)
+		buf.WriteString(it.Brush.Close)
+	}
+	buf.WriteString(e.Close)
 }
 
 type parser struct {
