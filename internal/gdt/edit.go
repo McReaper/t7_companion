@@ -170,6 +170,9 @@ func nextSteps(created []*EditResult) []string {
 			next = append(next, fmt.Sprintf("Don't zone material %q on its own: it is built through what uses it — an xmodel "+
 				"(as mc/<name>) or map geometry (as wc/<name>), whose techset variants are the precompiled ones. A bare "+
 				"`material,<name>` line asks for an unprefixed variant that isn't in the shader cache and fails to compile", c.Asset))
+		case "ssi":
+			next = append(next, fmt.Sprintf("Don't zone ssi %q: Radiant and the light bake read it, through the volume_sun's "+
+				"ssi1-ssi4 (and their _runtime_override), and the map carries what they baked; the linker never packs an ssi", c.Asset))
 		case "image", "": // an image is pulled in by the material that uses it
 		default:
 			next = append(next, fmt.Sprintf("Add `%s,%s` to the map/mod .zone (or zone something that references it) so the linker packs it", c.Type, c.Asset))
