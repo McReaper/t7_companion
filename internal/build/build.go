@@ -36,8 +36,9 @@ type StageResult struct {
 	Seconds  float64  `json:"seconds"`
 	Errors   []string `json:"errors,omitempty"`
 	Note     string   `json:"note,omitempty"`
-	Warnings []string `json:"warnings,omitempty"` // link: every ^3 entry of the errorlogs it wrote
+	Warnings []string `json:"warnings,omitempty"` // compile: cod2map's WARNING lines and .errlog; link: every ^3 entry of the errorlogs it wrote
 	Missing  []string `json:"missing,omitempty"`  // link: looked up, found in no GDT, linked without
+	output   string   // what the tool printed
 }
 
 // Report is a build's result: OK, or the stage that failed.
@@ -170,6 +171,7 @@ func (p *buildPlan) compileStage() (StageResult, bool) {
 		sr.Errors = append(sr.Errors, "cod2map reported success but "+filepath.Base(p.d3dbsp)+" was not written")
 	default:
 		sr.Note = "wrote " + filepath.Base(p.d3dbsp)
+		compileVerdict(&sr, sr.output, strings.TrimSuffix(p.mapSrc, filepath.Ext(p.mapSrc))+".errlog", start)
 	}
 	return sr, true
 }
@@ -230,7 +232,7 @@ func runStage(label, dir, exe string, timeout time.Duration, verbose bool, stdou
 	}
 
 	err := c.Run()
-	sr := StageResult{Name: label, Seconds: round1(time.Since(start).Seconds())}
+	sr := StageResult{Name: label, Seconds: round1(time.Since(start).Seconds()), output: buf.String()}
 	switch {
 	case ctx.Err() == context.DeadlineExceeded:
 		sr.OK = false
