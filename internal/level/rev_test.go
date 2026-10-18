@@ -126,3 +126,23 @@ func fixtureWithAZone(t *testing.T, pid int) (*radiant.Client, *Snapshot) {
 	}
 	return c, snap
 }
+
+// A rev reads past blank lines and comments, so text rewritten around the
+// same keys keeps its rev, and a changed key changes it.
+func TestARevSkipsBlankLinesAndComments(t *testing.T) {
+	rev := func(text string) string {
+		t.Helper()
+		m, err := mapfile.Parse([]byte(text))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return Rev(m.Entities[0])
+	}
+	plain := rev("{\n\"classname\" \"light\"\n\"origin\" \"0 0 0\"\n}\n")
+	if spaced := rev("{\n\n\"classname\" \"light\"\n   \n// a note\n\"origin\" \"0 0 0\"\n}\n"); spaced != plain {
+		t.Errorf("blank lines and a comment changed the rev: %s, %s", spaced, plain)
+	}
+	if moved := rev("{\n\"classname\" \"light\"\n\"origin\" \"0 0 8\"\n}\n"); moved == plain {
+		t.Error("a moved light kept its rev")
+	}
+}

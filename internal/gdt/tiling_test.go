@@ -32,13 +32,14 @@ func TestMaterialTilingIsItsTilingOrItsLargestImage(t *testing.T) {
 		mat("m_auto", "tilingWidth", "<auto>", "colorMap", "i_tall", "specColorMap", "i_wide")+
 		mat("m_half", "tilingWidth", "256", "tilingHeight", "<auto>", "colorMap", "i_wide")+
 		mat("m_builtin", "colorMap", "$white_diffuse", "specColorMap", "i_gone")+
-		img("i_line", "line.tif", "")+img("i_tiny", "tiny.tif", "1/16")+
+		img("i_line", "line.tif", "")+img("i_tiny", "tiny.tif", "1/16")+img("i_zero", "wide.tif", "1/0")+
 		mat("m_tall", "colorMap", "i_tall")+
 		mat("m_wauto", "tilingWidth", "<auto>", "tilingHeight", "64", "colorMap", "i_wide")+
 		mat("m_wonly", "tilingWidth", "256", "colorMap", "i_gone")+
 		mat("m_honly", "tilingHeight", "64", "colorMap", "i_gone")+
 		mat("m_line", "colorMap", "i_line")+
 		mat("m_tiny", "colorMap", "i_tiny")+
+		mat("m_zero", "colorMap", "i_zero")+
 		mat("m_mixed", "colorMap", "$white_diffuse", "specColorMap", "i_wide")+
 		mat("m_gonefirst", "colorMap", "i_gone", "specColorMap", "i_wide")+
 		"\t\"i_nobase\" ( \"image.gdf\" )\r\n\t{\r\n\t}\r\n"+
@@ -51,7 +52,8 @@ func TestMaterialTilingIsItsTilingOrItsLargestImage(t *testing.T) {
 		"m_child":     {1024, 128, "tiling"},
 		"m_tall":      {256, 1024, "images"},
 		"m_line":      {1, 64, "images"},
-		"m_tiny":      {1, 1, "images"}, // 8 texels at mipBase 1/16 still load one
+		"m_tiny":      {1, 1, "images"},      // 8 texels at mipBase 1/16 still load one
+		"m_zero":      {1024, 256, "images"}, // a mipBase of 1/0 divides nothing
 		"m_mixed":     {1024, 256, "images"},
 		"m_gonefirst": {1024, 256, "images"},
 	} {

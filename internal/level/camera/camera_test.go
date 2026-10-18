@@ -196,3 +196,13 @@ func TestFramingFromAboveFramesAFlatBoxAwayFromTheOrigin(t *testing.T) {
 		}
 	}
 }
+
+// A box zooms by its size, not by where it is: one far from the origin takes
+// the steps the same box at the origin does.
+func TestZoomStepsCountABoxsSizeNotItsPlace(t *testing.T) {
+	at := geom.Box{Min: mapfile.Vec3{0, 0, 0}, Max: mapfile.Vec3{64, 512, 0}, Ok: true}
+	far := geom.Box{Min: mapfile.Vec3{3000, 1000, 0}, Max: mapfile.Vec3{3064, 1512, 0}, Ok: true}
+	if a, b := ZoomSteps(Axes[0], 768, 768, at), ZoomSteps(Axes[0], 768, 768, far); a != 1 || b != 1 {
+		t.Errorf("512 high in a 768 view: %d steps at the origin, %d away from it; want 1", a, b)
+	}
+}

@@ -122,6 +122,11 @@ func TestAPatchIsItsControlPoints(t *testing.T) {
 	if v := p.Rows[1][1]; v.Pos != (mapfile.Vec3{32, 32, 32}) || math.Abs(v.UV[0]-diag) > 0.001 || math.Abs(v.UV[1]+diag) > 0.001 {
 		t.Errorf("the middle control point %+v", v)
 	}
+	// Its lightmap coordinates count 1, 3, 5 down the rows and across, as
+	// Radiant writes a patch's.
+	if a, b := p.Rows[1][1].LM, p.Rows[2][0].LM; a != [2]float64{3, 3} || b != [2]float64{5, 1} {
+		t.Errorf("lightmap coordinates %v and %v, want [3 3] and [5 1]", a, b)
+	}
 	e, mesh := madeBrushes(t, d, 1)
 	q, err := mesh[0].Patch()
 	if err != nil || q.Kind != mapfile.KindMesh || q.Dims != [4]int{2, 4, 0, 8} || e == nil || e.Class() != "func_group" {
@@ -136,7 +141,9 @@ func TestAPatchIsItsControlPoints(t *testing.T) {
 func TestPatchRefusals(t *testing.T) {
 	_, c, snap := viewing(t, 643)
 	row3 := `[[0, 0, 0], [8, 0, 0], [16, 0, 0]]`
+	row4 := `[[0, 0, 0], [8, 0, 0], [16, 0, 0], [24, 0, 0]]`
 	for js, want := range map[string]string{
+		`[{"patch": {"rows": [` + row4 + `, ` + row4 + `, ` + row4 + `], "material": "x"}}]`:                     "odd counts each way",
 		`[{"patch": {"rows": [], "material": "x"}}]`:                                                             "no rows",
 		`[{"patch": {"rows": [` + row3 + `, ` + row3 + `], "material": "x"}}]`:                                   "3 each way at least",
 		`[{"patch": {"rows": [` + row3 + `, ` + row3 + `, [[0, 0, 0]]], "material": "x"}}]`:                      "row 2 has 1 points",
@@ -191,20 +198,57 @@ func TestRawTextLandsAsWritten(t *testing.T) {
 }
 
 // Raw text must read: an entity at least, each brush 4 faces or more or a
-// patch.
+// patch whose rows match its header.
 func TestRawRefusals(t *testing.T) {
 	_, c, snap := viewing(t, 645)
 	three := "{\n\"classname\" \"func_group\"\n{\n ( 0 0 0 ) ( 1 0 0 ) ( 0 1 0 ) x 64 64 0 0 0 0 lightmap_gray 16384 16384 0 0 0 0\n ( 0 0 8 ) ( 0 1 8 ) ( 1 0 8 ) x 64 64 0 0 0 0 lightmap_gray 16384 16384 0 0 0 0\n ( 0 0 0 ) ( 0 1 0 ) ( 0 0 1 ) x 64 64 0 0 0 0 lightmap_gray 16384 16384 0 0 0 0\n}\n}\n"
 	for text, want := range map[string]string{
-		"":                   "no entity",
-		"// nothing\n":       "no entity",
-		three:                "a brush of 3 faces",
+		"":             "no entity",
+		"// nothing\n": "no entity",
+		three:          "a brush of 3 faces",
+		"{\n\"classname\" \"func_group\"\n{\n curve\n {\n  metal\n  lightmap_gray\n  3 3 16 8\n  (\n   v 0 0 0 t 0 0 1 1\n  )\n }\n}\n}\n": "patch has 1 rows, its header says 3",
 		"{\n\"classname\"\n": "raw:",
 	} {
 		raw, _ := json.Marshal(text)
 		if _, err := Edit(context.Background(), c, snap, ops(t, `[{"raw": `+string(raw)+`}]`), "", nil); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%q: %v, want %q", text, err, want)
 		}
+	}
+}
+
+// Four corners are the least a brush takes: a tetrahedron of 4 faces, which
+// raw text may carry too.
+func TestATetrahedronIsTheLeastBrush(t *testing.T) {
+	_, c, snap := viewing(t, 647)
+	d, err := Edit(context.Background(), c, snap, ops(t, `[{"brush": {"points": [[0, 0, 0], [32, 0, 0], [0, 32, 0], [0, 0, 32]], "material": "rock", "class": "func_group"}}]`), "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e, brs := madeBrushes(t, d, 0)
+	if faces, err := brs[0].Faces(); err != nil || len(faces) != 4 {
+		t.Fatalf("the tetrahedron: %d faces, %v", len(faces), err)
+	}
+	raw, _ := json.Marshal(string(e.Bytes()))
+	if _, err := Edit(context.Background(), c, d.After, ops(t, `[{"raw": `+string(raw)+`}]`), "", nil); err != nil {
+		t.Errorf("a brush of 4 faces in raw text: %v", err)
+	}
+}
+
+// A patch whose rows don't match its header is refused while the batch is
+// built, before anything reaches Radiant.
+func TestRawRefusesAnUnreadablePatchBeforeSending(t *testing.T) {
+	_, _, snap := viewing(t, 648)
+	b := newBatch(snap, nil)
+	text := "{\n\"classname\" \"func_group\"\n{\n curve\n {\n  metal\n  lightmap_gray\n  3 3 16 8\n  (\n   v 0 0 0 t 0 0 1 1\n  )\n }\n}\n}\n"
+	err := b.raw(0, text)
+	made := 0
+	for _, u := range b.units {
+		if u.state == created {
+			made++
+		}
+	}
+	if err == nil || !strings.Contains(err.Error(), "its header says 3") || made != 0 {
+		t.Errorf("%v, %d units made to send", err, made)
 	}
 }
 
