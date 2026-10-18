@@ -1,11 +1,11 @@
-Detail for **t7kb:mapping** (`plugin/skills/mapping/SKILL.md`) — building in the user's running Radiant through t7kb's map tools. Read the parent skill first; come here for the sizes to build to, what a new map already holds, the zone op, and the traps of each tool; turning a plan into walls and doors (the `walls` and `layout` ops) is in `map-plans.md`, materials, props, views and light in `map-looks.md`.
+Detail for **t7kb:mapping** (`plugin/skills/mapping/SKILL.md`) — building in the user's running Radiant through t7kb's map tools. Read the parent skill first; come here for the sizes to build to, what a new map already holds, zoning, and the traps of each tool; turning a plan into brushes is in `map-plans.md`, materials, views and light in `map-looks.md`.
 
 Contents:
 
 - [Build to the official scale standards](#build-to-the-official-scale-standards)
 - [A new map is the template's room in a sky box: build inside it](#a-new-map-is-the-templates-room-in-a-sky-box-build-inside-it)
 - [One batch per step the user would undo](#one-batch-per-step-the-user-would-undo)
-- [Zone every space players reach: a `zone` op each, then the script's links](#zone-every-space-players-reach-a-zone-op-each-then-the-scripts-links)
+- [Zone every space players reach: volumes, spawners, then the script's links](#zone-every-space-players-reach-volumes-spawners-then-the-scripts-links)
 - [An edited world brush or brush entity comes back under a new id](#an-edited-world-brush-or-brush-entity-comes-back-under-a-new-id)
 - [Build one, then copy it](#build-one-then-copy-it)
 - [CSG Hollow walls are as thick as the grid](#csg-hollow-walls-are-as-thick-as-the-grid)
@@ -28,7 +28,7 @@ One unit is one inch, and BO3's world runs at about 120% of real sizes. Treyarch
 | Stairs | 8 rise, 12 run, 80 wide at least |
 | Jump | standing ~100 far, 39 high; sprinting ~220 far, 50 high |
 
-So a room's floor is a 16-unit slab, its walls 8 thick and 112 high above it, its ceiling another slab: the boxes `t7kb:map_edit` takes are those numbers, on the 8-unit grid.
+So a room's floor is a 16-unit slab, its walls 8 thick and 112 high above it, its ceiling another slab: the brushes the agent places are those numbers, on the 8-unit grid.
 
 ## A new map is the template's room in a sky box: build inside it
 
@@ -39,15 +39,15 @@ So a room's floor is a 16-unit slab, its walls 8 thick and 112 high above it, it
 - the **start zone**, an `info_volume` (`targetname` `start_zone`, `script_noteworthy` `player_volume`) over x and y ±1536, z 0 to 320, with its rising-zombie structs (`start_zone_spawners`) and the player spawns (`initial_spawn_points`, one `player_respawn_point`);
 - a `volume_sun` (±1920, up to 896), an `umbra_volume`, a `volume_fpstool`, a `reflection_probe`, an `info_player_start`, the perk machines and box as `misc_prefab`s.
 
-Build the blockout inside the sky box and the start zone first: it seals and plays with nothing else moved. A floor laid inside the template's slab flickers against it in game (`t7kb:map_check`'s `zfight`, verified in a test Radiant): delete the slab, or rebuild it around what you build, before laying floors there. Replacing the start room moves its contents too: its spawners, player spawns and prefabs stand where its floor was, and zombies need a floor from their structs to the player (the navmesh is compiled from floors) — a blockout run that deleted the room and built beside it left them floating, and its zombies had no path in game. A room outside the start zone is a new zone: a `zone` op, below. A map larger than the box needs the six `sky` brushes rebuilt around it and the three volumes grown with it — there is no resize op: delete and add boxes in one batch.
+Build the blockout inside the sky box and the start zone first: it seals and plays with nothing else moved. A floor laid inside the template's slab flickers against it in game (`t7kb:map_check`'s `zfight`, verified in a test Radiant): delete the slab, or rebuild it around what you build, before laying floors there. Replacing the start room moves its contents too: its spawners, player spawns and prefabs stand where its floor was, and zombies need a floor from their structs to the player (the navmesh is compiled from floors) — a blockout run that deleted the room and built beside it left them floating, and its zombies had no path in game. A room outside the start zone is a new zone, below. A map larger than the box needs the six `sky` brushes rebuilt around it and the three volumes grown with it — delete and place brushes in one batch.
 
 ## One batch per step the user would undo
 
 `t7kb:map_edit` lands a whole batch as one entry in Radiant's undo menu, its `label` the name the user reads there ("t7kb: kitchen"). Make a batch of what the user would take back together — a room's floor, walls and ceiling, a corridor, the lights of one space — not one call per brush: each call is its own undo step and its own read of the map. A batch lands whole or not at all: an op that fails refuses the batch before Radiant sees it.
 
-## Zone every space players reach: a `zone` op each, then the script's links
+## Zone every space players reach: volumes, spawners, then the script's links
 
-A zone is what the zone manager reads: every `info_volume` named for it, the riser spawners its first volume targets, and an `add_adjacent_zone` call in the map's script for each passage (verified in the install's `_zm_zonemgr.gsc`). `t7kb:map_edit`'s `zone` op builds the map's part. Its `areas` are boxes, any `outline` on the ground (concave too: it is cut into convex brushes) or the `floors` of brush ids, followed at their own outline: real zones aren't rectangles (Treyarch's `zm_giant` has 12 zones of 32 volumes, some angled). Its `spawners` (4) stand on the floor found under each area, clear of walls, so build the floor first; a `node_pathnode` goes on the floor too, so the navmesh grows there even where that floor isn't joined to the player's (community). A layout room's `zone` makes the zone over its rooms, linked through its doors. The answer's `script` names the function and the `add_adjacent_zone` calls the map's script still lacks: add them there, as map_edit writes no script; `always_on` opens a link from the start, a door's flag when it is bought. Its `notes` name zones that overlap (the template's `start_zone` covers ±1536: shrink or delete its volume once the start room moves), linked zones that don't meet and rooms in no zone, where a player dies within 3 seconds. A `nav_volume` serves flying AI only (the compiler's warning says so); zombies walk the navmesh built from the floors.
+A zone is what the zone manager reads: every `info_volume` named for it, the riser spawners its first volume targets, and an `add_adjacent_zone` call in the map's script for each passage (verified in the install's `_zm_zonemgr.gsc`). Place each volume as a `brush` with `class` `info_volume` and the keys the template's start zone carries (`targetname` the zone's name, `target` its spawners', `script_noteworthy` `player_volume`), over the floor players reach: real zones aren't rectangles (Treyarch's `zm_giant` has 12 zones of 32 volumes, some angled). For the spawners, copy one of the template's `start_zone_spawners` structs (`t7kb:map_find` `key` `targetname=start_zone_spawners`) onto the new floor, clear of walls, and give the copies the new zone's target; a `node_pathnode` on the floor makes the navmesh grow there even where that floor isn't joined to the player's (community). Then write the `add_adjacent_zone` calls in the map's script, as map_edit writes no script: `always_on` opens a link from the start, a door's flag when it is bought. A player in no zone dies within 3 seconds, and the template's `start_zone` covers ±1536: shrink or delete its volume once the start room moves. A `nav_volume` serves flying AI only (the compiler's warning says so); zombies walk the navmesh built from the floors.
 
 ## An edited world brush or brush entity comes back under a new id
 

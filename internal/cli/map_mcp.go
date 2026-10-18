@@ -59,48 +59,31 @@ func mapCommandTool() server.ServerTool {
 func mapEditTool() server.ServerTool {
 	return server.ServerTool{Tool: mcp.NewTool("map_edit",
 		mcp.WithDescription("Edit the map open in Radiant: a batch of ops, applied in order, lands as ONE undo step "+
-			"(the answer's undo names it; one Ctrl+Z in Radiant takes it all back) or not at all. Ops, each an object with "+
-			"one key: {\"box\": {\"min\": [x,y,z], \"max\": [x,y,z], \"material\": m, \"contents\"?: flags as Treyarch's brushes carry, \"weaponClip detail\" (only bullets hit it: trims, frames) or \"nonColliding\", "+
-			"\"class\"?: c, \"keys\"?: {…}}} a box brush, in worldspawn or as a new brush entity of class (volume_sun, "+
-			"trigger_multiple); {\"shape\": {\"outline\": [[x,y]…], \"z\": [z0,z1], \"material\": m, \"contents\"?: as box, \"class\"?: c, \"keys\"?: {…}}} a solid on any "+
-			"outline, concave too (cut into convex brushes): an angled wall, a hexagonal floor; "+
-			"{\"walls\": {\"lines\": [{\"points\": [[x,y]…], \"closed\"?: true}…], \"doors\"?: [{\"at\": [x,y], \"width\"?: 72, "+
-			"\"height\"?: 96, \"seen\"?: 56}…], \"material\": m, \"z\"?: [0,112], \"thickness\"?: 8, \"grid\"?: 8}} walls along "+
-			"a plan's lines, centrelines as drawn: corners snap to the grid, a line a few units off an axis runs on it, an end "+
-			"near another wall lands on it; corners are mitred, a wall ending on another's side stops on its face, walls "+
-			"crossing split, nothing overlaps; each door is cut in the wall nearest at: width clear for the AI, nonColliding "+
-			"jambs and clip_player narrowing it to seen for the eye and players only, a lintel, a weaponClip detail trim; "+
+			"(the answer's undo names it; one Ctrl+Z in Radiant takes it all back) or not at all. The agent places each "+
+			"element as it means it; nothing is laid out for it. Ops, each an object with one key: "+
+			"{\"brush\": {\"points\": [[x,y,z]…], \"material\": m, \"contents\"?: flags as Treyarch's brushes carry, "+
+			"\"weaponClip detail\" (only bullets hit it: trims, frames) or \"nonColliding\", \"class\"?: c, \"keys\"?: {…}}} "+
+			"a convex brush through its corners (its faces are their hull: a box is its 8 corners, a wedge its 6, a column of "+
+			"n sides its 2n; 4 to 64 points that enclose a volume), each face in the material at its own tile, in worldspawn "+
+			"or as a new brush entity of class (info_volume, trigger_multiple, script_brushmodel); "+
+			"{\"patch\": {\"rows\": [[[x,y,z]…]…], \"material\": m, \"mesh\"?: false, \"contents\"?, \"class\"?, "+
+			"\"keys\"?}} a patch through its control points, rows of as many each: a curve (Radiant's Bézier: 3, 5, 7… "+
+			"each way) or a mesh (terrain: 2 or more), its texture laid along the rows and columns by their length "+
+			"(map_command runs Radiant's patch tools on it after); {\"raw\": text} map text as Radiant writes it, "+
+			"entities with their brushes and patches (a worldspawn's brushes go to the world), its guid lines dropped "+
+			"(the import gives new ones), every brush 4 faces or more or one patch; "+
 			"{\"entity\": {\"class\": c, \"origin\": [x,y,z], \"angles\"?: [p,y,r], \"keys\"?: {…}}} a "+
 			"point entity; {\"delete\": [ids]}; {\"set\": {\"id\": id, \"keys\": {k: v, k2: null}}} (null removes); "+
 			"{\"move\": {\"ids\": [ids], \"by\": [dx,dy,dz]}}; {\"copy\": {\"ids\": [ids], \"by\": [dx,dy,dz], "+
-			"\"count\"?: n}} n copies, each by further than the last (a row of pillars or wall panels from one); "+
+			"\"count\"?: n}} n copies, each by further than the last; "+
 			"{\"material\": {\"ids\": [ids], \"material\": m}} swaps the material, each face keeping its tile; "+
 			"{\"texture\": {\"ids\": [ids], \"faces\"?: \"top\"|\"bottom\"|\"sides\"|\"+x,-y\"…, \"material\"?: m, "+
-			"\"tile\"?: [u,v], \"scale\"?: s, \"origin\"?: [x,y,z], \"fit\"?: [nu,nv], \"rotate\"?: deg, \"flip\"?: "+
-			"\"u\"|\"v\"|\"uv\"}} lays a material on faces (all by default; \"hidden\": the faces other brushes hide, by face, caulk by "+
-			"default, the way to caulk what nobody sees): tile is the world units one repeat spans "+
-			"(default the material's own, as the install's maps use it), tiles start on origin (default 0 0 0, so faces "+
-			"given the same tile line up across brushes), fit makes nu repeats span each face (0 sizes that axis as the "+
-			"other) starting at its edge. New boxes get their material's own tile too. {\"layout\": {\"rooms\": [{\"name\": n, "+
-			"\"min\": [x,y], \"max\": [x,y], \"material\"?: m, \"floor\"?: m, \"ceiling\"?: m, \"outdoor\"?: true, \"zone\"?: z}], "+
-			"\"openings\"?: [{\"room\": n, \"to\": n2 | \"side\": \"-y\", \"at\"?: u, \"width\"?: 72, \"height\"?: 96, "+
-			"\"sill\"?: 0}], \"material\": m, \"floor\"?: m, \"ceiling\"?: m, \"exterior\"?: m, \"z\"?: 0, \"height\"?: 112, "+
-			"\"wall\"?: 8, \"slab\"?: 16, \"spawners\"?: 4}} builds a storey from its plan: rooms are rectangles meeting along "+
-			"their edges, from wall centre to wall centre (a room 256 wide is 248 inside); a wall stands on every edge, one where two "+
-			"rooms meet, each side of it in the material of the room it looks into (exterior outside, and in an outdoor room); each room gets a floor slab "+
-			"under z and a ceiling height above (outdoor: none); an opening is a door to "+
-			"the room it opens on, or on a side of its room, 72 wide (two abreast), a window with a sill (56 by 64 then), at the world x or y u of its middle "+
-			"(default the middle of the shared wall or side), the walls built around it; the faces the pieces hide of each other are "+
-			"caulk, and the answer's part names each piece (\"hall floor\", \"hall|kitchen wall\"); rooms naming a zone get it, its "+
-			"links through their doors. {\"zone\": {\"name\": z, \"areas\": [{\"min\": [x,y,z], \"max\": [x,y,z]} | {\"outline\": [[x,y]…], \"z\"?: 0, "+
-			"\"height\"?: 128} | {\"floors\": [ids], \"height\"?: 128}], \"spawners\"?: 4, \"pathnode\"?: true, \"links\"?: [{\"zone\": z2, "+
-			"\"flag\"?: \"always_on\", \"one_way\"?: false}]}} makes a zombies zone: an info_volume (player_volume) over each area, "+
-			"any outline (cut into convex brushes) or the floor brushes' own; riser spawners spread on the floor found under it, clear "+
-			"of walls; a node_pathnode for the navmesh to grow from; a zone the map has keeps its spawners' name. The answer's "+
-			"script lists the add_adjacent_zone calls the map's script lacks (map_edit writes no script), its notes overlapping "+
-			"zones and rooms in none. "+
+			"\"tile\"?: [u,v], \"scale\"?: s, \"origin\"?: [x,y,z], \"rotate\"?: deg, \"flip\"?: \"u\"|\"v\"|\"uv\"}} "+
+			"lays a material on faces (all by default): tile is the world units one repeat spans (default the material's own, "+
+			"as the install's maps use it), tiles start on origin (default 0 0 0, so faces given the same tile line up across "+
+			"brushes). "+
 			"Ids are map_find's, or @n: what op "+
-			"n of this batch made (every copy of a copy op), so a box built, textured and copied is one undo step. A point "+
+			"n of this batch made (every copy of a copy op), so a brush placed, textured and copied is one undo step. A point "+
 			"entity keeps its id; a world brush or an entity that owns brushes is rebuilt and gets a new one (was gives "+
 			"the old). Every entity or brush of the map an op names needs the rev map_find gave it, in revs: the user works in the "+
 			"same Radiant, and a batch naming something they changed or deleted since it was read is refused whole, nothing sent. "+

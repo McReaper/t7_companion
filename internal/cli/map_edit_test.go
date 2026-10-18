@@ -13,8 +13,8 @@ import (
 
 func TestDecodeOpsRefusesWhatNoOpHas(t *testing.T) {
 	for js, want := range map[string]string{
-		`{"box": {}}`:                        "a JSON array of ops",
-		`[{"box": {"mn": [0,0,0]}}]`:         `op 0: json: unknown field "mn"`,
+		`{"brush": {}}`:                      "a JSON array of ops",
+		`[{"brush": {"pts": [0,0,0]}}]`:      `op 0: json: unknown field "pts"`,
 		`[{"delete": ["a"]}, {"paint": {}}]`: `op 1: json: unknown field "paint"`,
 		`[{"set": {"id": "a", "keys": 1}}]`:  "op 0:",
 	} {
@@ -57,7 +57,7 @@ func TestMapEditAnswersEachOpsID(t *testing.T) {
 func TestMapEditSaysWhatItCouldNotFindBack(t *testing.T) {
 	f := testRadiant(t)
 	f.Handle("edit", func(*radianttest.Fake, string, []byte) radianttest.Reply { return radianttest.OK("deleted=0", nil) })
-	ops, _ := decodeOps([]byte(`[{"box": {"min": [0,0,0], "max": [8,8,8], "material": "caulk"}}]`))
+	ops, _ := decodeOps([]byte(`[{"brush": {"points": [[0, 0, 0], [8, 0, 0], [0, 8, 0], [8, 8, 0], [0, 0, 8], [8, 0, 8], [0, 8, 8], [8, 8, 8]], "material": "caulk"}}]`))
 	out, err := mapEdit(context.Background(), ops, nil, "", 0)
 	if err != nil || len(out.Made) != 1 || out.Made[0].ID != "" || !strings.Contains(out.Made[0].Note, "not found in the map read back") {
 		t.Errorf("answer %+v, %v", out, err)

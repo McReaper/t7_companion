@@ -90,41 +90,6 @@ func newChecker(short func(string) string, info func(string) MaterialInfo) *chec
 	return &checker{short: short, info: info, byPlane: map[geom.PlaneKey][]*cface{}, hid: map[*cface]string{}}
 }
 
-// selfHidden is, by brush index, the directions of the faces of each brush
-// the others hide, every brush taken as opaque.
-func selfHidden(brushes []*mapfile.Brush) map[int][]string {
-	out := map[int][]string{}
-	for _, f := range hiddenAmong(brushes) {
-		out[f.bi] = append(out[f.bi], f.dir)
-	}
-	return out
-}
-
-// selfHiddenFaces is the same by face index: faces at an angle can share a
-// direction.
-func selfHiddenFaces(brushes []*mapfile.Brush) map[int][]int {
-	out := map[int][]int{}
-	for _, f := range hiddenAmong(brushes) {
-		out[f.bi] = append(out[f.bi], f.fi)
-	}
-	return out
-}
-
-// hiddenAmong are the faces of brushes the others hide.
-func hiddenAmong(brushes []*mapfile.Brush) []*cface {
-	c := newChecker(func(g string) string { return g }, func(string) MaterialInfo { return MaterialInfo{Known: true, Opaque: true, Drawn: true} })
-	for _, b := range brushes {
-		c.add(b)
-	}
-	var out []*cface
-	for _, f := range c.faces {
-		if c.hidden(f) != "" {
-			out = append(out, f)
-		}
-	}
-	return out
-}
-
 // check is one face's findings.
 func (c *checker) check(f *cface, checked func(string) bool) []Finding {
 	fi := c.info(f.material)

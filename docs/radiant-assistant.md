@@ -1,18 +1,15 @@
 # The agent in your Radiant
 
-**The map is yours; the agent takes the layout and the chores you hand it.** Its geometry detail, materials, props, light fixtures, reflection probes and mood stay the mapper's choice. The agent works in the Radiant you have open, through the T7RadiantBridge plugin (hosted by MTPlugins), and every batch it sends is one entry in Radiant's undo menu, named `t7kb: …`, so one Ctrl+Z takes it back. The tools are `radiant_open`, `map_find`, `map_view`, `map_edit`, `map_command` and `map_check`; the `t7kb:mapping` and `t7kb:lighting` skills hold the method.
+**The map is yours; the agent places only what you ask, each element its own.** Its geometry detail, materials, props, light fixtures, reflection probes and mood stay the mapper's choice. The agent works in the Radiant you have open, through the T7RadiantBridge plugin (hosted by MTPlugins), and every batch it sends is one entry in Radiant's undo menu, named `t7kb: …`, so one Ctrl+Z takes it back. The tools are `radiant_open`, `map_find`, `map_view`, `map_edit`, `map_command` and `map_check`; the `t7kb:mapping` and `t7kb:lighting` skills hold the method.
 
 ## What it takes on now
 
-- **A layout from a plan**: walls and doors drawn from a plan's lines, corners on the grid, joints mitred, every door the same size (72 clear for zombies, narrowed to 56 for players by `clip_player`, with a lintel and a trim); or a storey of rectangle rooms meeting along their edges.
-- **Zones**: `info_volume`s over the floor players reach, riser spawners on it, a pathnode for the navmesh, and the `add_adjacent_zone` calls your script still lacks.
-- **Caulk and lint**: caulk on the faces nobody sees; `map_check` lists faces left drawn where nothing sees them, z-fighting, seams, stretched tiles and unknown materials, by brush and face.
-- **Radiant's own commands** (CSG and the like) on what it names, and the build and a launch of the game.
+- **Placing what you ask, with nothing laid out for it**: a brush through its corners (a box, a wedge, a slanted wall, a column), a patch through its control points, map text pasted as is, entities. A blockout from a plan, or zones, go in brush by brush, each one in the batch for you to read.
+- **Edits** on what it names: keys, moves, copies, deletes, materials and per-face textures.
+- **Lint**: `map_check` lists faces left drawn where nothing sees them, z-fighting, seams, stretched tiles and unknown materials, by brush and face.
+- **Radiant's own commands** (CSG, patch tools) on what it names, and the build and a launch of the game.
 - **No edit over yours**: a batch naming something you changed or deleted since the agent read it is refused whole, so it reads again before acting.
 
 ## Planned
 
-- `map_check` reporting floor no zone covers.
-- Lights placed room by room from the fixture you choose: the spot under it and a probe-only fill.
-- The lighting set as one: the map's SSI and exposure, the sun's shadow resolution, fog and lights tuned together.
-- Clip hulls over finished detail.
+- `map_check` reporting floor no zone covers, and passages the compiled navmesh leaves too narrow for the zombies.

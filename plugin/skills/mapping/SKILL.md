@@ -17,21 +17,16 @@ t7kb's map tools edit the map open in the user's Radiant, through the T7RadiantB
 
 1. `t7kb:radiant_open` the map: the Radiant that has it open, or a new one started on it.
 2. `t7kb:map_find` what is there: short ids, their `rev`s, bounds, the naming keys; `class`, `key` and `near` narrow it.
-3. `t7kb:map_edit` a batch of ops (a plan's `walls` and doors, a storey's `layout` of rooms, boxes, entities, deletes, keys, moves, copies, materials and per-face textures) for one step the user would undo as a whole, with `revs`: the `rev` map_find gave each entity and brush the ops name. The user works in the same Radiant: a batch naming something they changed since it was read is refused whole, so `map_find` it again and check the plan still holds before resending.
-4. `t7kb:map_view` the result: `top` for the layout, `3d` with `render` `fake` for the shapes of an unbaked map.
+3. `t7kb:map_edit` a batch of ops (brushes through their corners, patches through their control points, map text, entities, deletes, keys, moves, copies, materials and per-face textures) for one step the user would undo as a whole, with `revs`: the `rev` map_find gave each entity and brush the ops name. The user works in the same Radiant: a batch naming something they changed since it was read is refused whole, so `map_find` it again and check the plan still holds before resending.
+4. `t7kb:map_view` the result: `top` for a blockout, `3d` with `render` `fake` for the shapes of an unbaked map.
 5. `t7kb:map_command` for Radiant's own tools (`Selection/CSG/CSG Hollow`, patch and texture tools) on the ids given.
 6. Before `t7kb:build`, `t7kb:map_command` `File/Save`: the build compiles the file on disk, not Radiant's memory.
 
-The sizes to build to (Treyarch's scale standards), what a new map already holds, which edits change an id, and the traps are in `references/map-tools.md`; a plan's walls and doors (the `walls` and `layout` ops, and why **CSG Subtract carves the zone and sun volumes too**) in `references/map-plans.md`; texturing face by face, the views and the light in `references/map-looks.md`.
+The sizes to build to (Treyarch's scale standards), what a new map already holds, which edits change an id, and the traps are in `references/map-tools.md`; turning a plan into brushes (doors, and why **CSG Subtract carves the zone and sun volumes too**) in `references/map-plans.md`; texturing face by face, the views and the light in `references/map-looks.md`.
 
-## The mapper owns the map; the agent takes the layout and the chores
+## The mapper owns the map; the agent places only what it is asked, each element its own
 
-The map's details are the mapper's: its geometry, materials, props, light fixtures, reflection probes and mood. Don't texture, prop, restyle or reshape what the mapper built unless they ask for that piece of work; when a task needs a look decided, ask. What the agent is handed:
-
-- **A layout from a plan**: walls and doors from a plan's lines (`walls`), a storey of rectangle rooms (`layout`), to Treyarch's scale standards (`references/map-plans.md`).
-- **Zones**: volumes over the reachable floor, spawners on it, a pathnode, and the `add_adjacent_zone` calls the script lacks (`zone`).
-- **Caulk** on the faces nobody sees (a `texture` op with `faces` `hidden`), and `t7kb:map_check`'s lint: faces left drawn where nothing sees them, z-fighting, seams, stretched tiles, unknown materials.
-- Radiant's own tools on the ids given (`t7kb:map_command`), the build and a run (**t7kb:compiling**).
+The map's details are the mapper's: its geometry, materials, props, light fixtures, reflection probes and mood. Don't texture, prop, restyle or reshape what the mapper built unless they ask for that piece of work; when a task needs a look decided, ask. No op lays anything out: the agent places every element itself — a `brush` through its corners (a box is 8, a wedge 6, a column of n sides 2n), a `patch` through its control points, `raw` map text (a stock prefab's brushes), an `entity` — so each one is a choice it can name and the user can read in the batch. What it may be handed: a blockout from a plan (`references/map-plans.md`, to Treyarch's scale standards), zones (`references/map-tools.md`), caulk on the faces it names, `t7kb:map_check`'s lint (faces left drawn where nothing sees them, z-fighting, seams, stretched tiles, unknown materials), Radiant's own tools on the ids given (`t7kb:map_command`), the build and a run (**t7kb:compiling**).
 
 ## Grid discipline and brush basics
 
@@ -61,7 +56,7 @@ Models have **no collision by default**, but they aren't limited to it — an xm
 
 ## Treyarch draws with detail and collides with clip
 
-In Treyarch's shipped sources (zm_giant, mp_combine, mp_sector and their prefabs) 60% of the brushes carry a `contents` flag: `nonColliding` (11,482: trims, beams and ironwork nobody bumps into), `weaponClip detail`, with `ai_nosight` or not (about 19,000: bullets hit them, nobody walks into them), `detail` (1,496). Movement collides with a few big hulls laid over that detail: zm_giant has 576 `clip` brushes (median 41 × 163 × 216), 93 `clip_player`, 36 `clip_ai` (verified in the install). The flags are Selection > Make Geo (Make Non-Colliding, Make Weapon Clip, Make Detail); through `t7kb:map_edit`, a `box`'s or `shape`'s `contents`.
+In Treyarch's shipped sources (zm_giant, mp_combine, mp_sector and their prefabs) 60% of the brushes carry a `contents` flag: `nonColliding` (11,482: trims, beams and ironwork nobody bumps into), `weaponClip detail`, with `ai_nosight` or not (about 19,000: bullets hit them, nobody walks into them), `detail` (1,496). Movement collides with a few big hulls laid over that detail: zm_giant has 576 `clip` brushes (median 41 × 163 × 216), 93 `clip_player`, 36 `clip_ai` (verified in the install). The flags are Selection > Make Geo (Make Non-Colliding, Make Weapon Clip, Make Detail); through `t7kb:map_edit`, a `brush`'s or `patch`'s `contents`.
 
 **A doorway is an opening with a lintel and a trim frame, not a gap to the ceiling.** zm_giant's `tp_east_door`: a 12-thick wall with an opening 128 between its faces and 104 high, wall continuing above it as a lintel; a 2-unit trim of `weaponClip detail` round the opening; `clip` hulls 27 thick on each side; the buyable door a `clip` `script_brushmodel` filling the opening, its look a `script_model` (verified in the install). The trim never narrows the way through: players and zombies stop on the same clip. A blockout's plain walls collide as they are; give a finished room's detail its flags and the movement its hulls.
 

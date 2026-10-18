@@ -60,8 +60,8 @@
 //
 // # Editing
 //
-// Edit applies a batch of ops (box, entity, delete, set, move, material,
-// texture, copy) in order to a copy of the snapshot, unit by unit (a world
+// Edit applies a batch of ops (brush, patch, raw, entity, delete, set, move,
+// material, texture, copy) in order to a copy of the snapshot, unit by unit (a world
 // brush, or an entity with its brushes; "@n" names what op n made, every copy
 // of a copy op), and sends what changed as the bridge's one edit: one
 // undo step, applied whole or not at all. A point entity of the map is
@@ -82,12 +82,22 @@
 // ceilings, -y, +z on x walls, -x, +z on y walls, turned by the rotation (at
 // 90, U runs where -V ran). So W and H are the world units one repeat spans (a
 // negative one mirrors it), the offsets are world units, and faces given the
-// same W, H and offsets line up across brushes. Radiant's own Fit Texture on a
-// test box at 0, 90 and 30 degrees pins these (TestAFitLands…, TestAt30…); at
-// 30 it sizes v along the face's bounding box's diagonal, so a fit here, over
-// the face's corners, is the true one. A texture op's default tile, and a new
-// box's, is what Tiles gives: map_edit's is the size the install's maps use the
-// material at most, else its GDT's tiling at 16 texels a unit.
+// same W, H and offsets line up across brushes. A texture op's default tile,
+// and a new brush's, is what Tiles gives: map_edit's is the size the
+// install's maps use the material at most, else its GDT's tiling at 16
+// texels a unit.
+//
+// # Placing
+//
+// The agent places each element as it means it; no op lays anything out for
+// it. A brush op's faces are the convex hull of its corners: every three
+// corners whose plane has all the others on one side make a face, wound into
+// the hull, one per plane. A patch op writes its control points as Radiant
+// does, row by row (a curve's rows of 16 8, a mesh's of 0 8 on its size
+// line), each point's texture coordinates its length along the columns and
+// the rows at 16 a unit, as the stock mesh patches carry them. A raw op
+// imports map text as written, its GUIDs dropped. All three refuse what
+// Radiant's import couldn't read before anything is sent.
 //
 // # Checks
 //
@@ -107,57 +117,6 @@
 // edge or overlapping, whose tiles differ (size, rotation, mirror, or offset
 // modulo a tile): faces meeting at a corner alone show none. Coplanar faces
 // are found by their rounded plane, so the checks scale with a map.
-//
-// # Layouts
-//
-// A layout op builds a storey from a plan of rooms, rectangles meeting along
-// their edges. Every line a room's edge lies on is cut where an edge on it
-// starts or ends, so each stretch of wall has one room, or the outside, on
-// either side, and a wall across it meets it at each end (a room's corner is
-// on both its edges). A stretch is a box centred on its line, through the
-// floor and ceiling slabs; the walls along x run on half a wall past the end
-// of their line's run and take the corners, the walls along y stop half a
-// wall short of every end, against them: no two pieces overlap, no corner is
-// left open. Slabs fill each room between its walls. An opening sits in the
-// stretch that holds it between those end walls, the stretch cut in strips
-// around it, a sill under it (a door's threshold, of its room's floor) and a
-// lintel over it. A stretch's sides take the material of the room each looks
-// into; the faces the pieces hide of each other (selfHidden, the checks' own
-// test) are caulk.
-//
-// # Shapes
-//
-// A shape op stands a solid on an outline, cut into convex pieces as a zone's
-// is (below), a prism brush each: faces wound as a box's, its sides left of
-// each edge of the counter-clockwise outline.
-//
-// # Zones
-//
-// A zone op builds what the stock zone manager (_zm_zonemgr.gsc, in the
-// install) reads: every info_volume whose targetname is the zone's name, the
-// spawner structs the first of them targets (riser_location and
-// spawn_location are zombies' spots; a zone the map has keeps its first
-// volume's target), and add_adjacent_zone links in the map's script under a
-// flag (always_on, which the template sets, for an open passage). An area is
-// a box, an outline (cleaned, wound counter-clockwise, cut by ear clipping
-// and merged back into convex pieces, one brush each: a brush is convex), or
-// floor brushes, each one's outline from above from the lowest point of its
-// top. Spawners stand on a 32-unit grid over each area's outline where the
-// ground (world and func_group brushes, exact along a vertical line; mesh
-// and curve patches as their control grids' triangles; never sky or brush
-// entities) has a floor within a step (18) of the area's bottom and a body's
-// room (72 high, 32 wide, tried every 8 units across) above it. A
-// node_pathnode stands 2 above the spot nearest the middle, for
-// the compiler to grow the navmesh from where the floor isn't joined to the
-// player's (community: a pathnode seeds it; cod2map prunes regions far from
-// its seed points); the spawners take the other spots, one in each area of
-// a room's size (128 × 128 or more, not a doorway's) first while there are
-// enough, each the farthest from those picked. A
-// nav_volume is for flying AI (cod2map's warning names
-// it), not the zombies' navmesh, so zones make none. Links are checked
-// against the zones of the map and the batch; zones are compared by their
-// convex pieces (their bounds would have two zones winding round each other
-// overlap), and those that overlap, or are linked and don't meet, are noted.
 //
 // # Commands
 //

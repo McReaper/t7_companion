@@ -44,8 +44,8 @@ func TestMapEditSizesTilesFromTheInstall(t *testing.T) {
 	onMachine(t, f)
 
 	ops, err := decodeOps([]byte(`[
-		{"box": {"min": [0, 0, 0], "max": [64, 64, 64], "material": "brick"}},
-		{"box": {"min": [0, 0, 64], "max": [64, 64, 72], "material": "rare"}},
+		{"brush": {"points": [[0, 0, 0], [64, 0, 0], [0, 64, 0], [64, 64, 0], [0, 0, 64], [64, 0, 64], [0, 64, 64], [64, 64, 64]], "material": "brick"}},
+		{"brush": {"points": [[0, 0, 64], [64, 0, 64], [0, 64, 64], [64, 64, 64], [0, 0, 72], [64, 0, 72], [0, 64, 72], [64, 64, 72]], "material": "rare"}},
 		{"texture": {"ids": ["@1"], "faces": "top", "material": "none_such"}}
 	]`))
 	if err != nil {

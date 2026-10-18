@@ -89,12 +89,12 @@ func mapSamples(t *testing.T, root string, add func(key, s string), addImage fun
 	}
 
 	room := `[` +
-		`{"box": {"min": [-1400, -1400, -16], "max": [-900, -900, 0], "material": "script_floor_ceiling"}},` +
-		`{"box": {"min": [-1400, -1400, 0], "max": [-1392, -900, 112], "material": "script_wall"}},` +
-		`{"box": {"min": [-908, -1400, 0], "max": [-900, -900, 112], "material": "script_wall"}},` +
-		`{"box": {"min": [-1392, -1400, 0], "max": [-908, -1392, 112], "material": "script_wall"}},` +
-		`{"box": {"min": [-1392, -908, 0], "max": [-908, -900, 112], "material": "script_wall"}},` +
-		`{"box": {"min": [-1400, -1400, 112], "max": [-900, -900, 128], "material": "script_floor_ceiling"}},` +
+		`{"brush": {"points": [[-1400, -1400, -16], [-900, -1400, -16], [-1400, -900, -16], [-900, -900, -16], [-1400, -1400, 0], [-900, -1400, 0], [-1400, -900, 0], [-900, -900, 0]], "material": "script_floor_ceiling"}},` +
+		`{"brush": {"points": [[-1400, -1400, 0], [-1392, -1400, 0], [-1400, -900, 0], [-1392, -900, 0], [-1400, -1400, 112], [-1392, -1400, 112], [-1400, -900, 112], [-1392, -900, 112]], "material": "script_wall"}},` +
+		`{"brush": {"points": [[-908, -1400, 0], [-900, -1400, 0], [-908, -900, 0], [-900, -900, 0], [-908, -1400, 112], [-900, -1400, 112], [-908, -900, 112], [-900, -900, 112]], "material": "script_wall"}},` +
+		`{"brush": {"points": [[-1392, -1400, 0], [-908, -1400, 0], [-1392, -1392, 0], [-908, -1392, 0], [-1392, -1400, 112], [-908, -1400, 112], [-1392, -1392, 112], [-908, -1392, 112]], "material": "script_wall"}},` +
+		`{"brush": {"points": [[-1392, -908, 0], [-908, -908, 0], [-1392, -900, 0], [-908, -900, 0], [-1392, -908, 112], [-908, -908, 112], [-1392, -900, 112], [-908, -900, 112]], "material": "script_wall"}},` +
+		`{"brush": {"points": [[-1400, -1400, 112], [-900, -1400, 112], [-1400, -900, 112], [-900, -900, 112], [-1400, -1400, 128], [-900, -1400, 128], [-1400, -900, 128], [-900, -900, 128]], "material": "script_floor_ceiling"}},` +
 		`{"entity": {"class": "light", "origin": [-1150, -1150, 96], "keys": {"radius": "400"}}}]`
 	add("map_edit|the ops sent: a room (floor, 4 walls, ceiling, a light)", room)
 	ops, err := decodeOps([]byte(room))
@@ -107,11 +107,11 @@ func mapSamples(t *testing.T, root string, add func(key, s string), addImage fun
 	v, err = mapEdit(ctx, moved, map[string]string{start: startRev}, "", 0)
 	run("map_edit|move the player start (a point entity, in place)", v, err)
 	textured := `[` +
-		`{"box": {"min": [900, -1400, -16], "max": [1400, -900, 0], "material": "t7_wood_plank_floor_02"}},` +
-		`{"box": {"min": [900, -1400, 0], "max": [908, -900, 112], "material": "t7_brick_worn_dirty_red_wet"}},` +
-		`{"box": {"min": [1392, -1400, 0], "max": [1400, -900, 112], "material": "t7_brick_worn_dirty_red_wet"}},` +
+		`{"brush": {"points": [[900, -1400, -16], [1400, -1400, -16], [900, -900, -16], [1400, -900, -16], [900, -1400, 0], [1400, -1400, 0], [900, -900, 0], [1400, -900, 0]], "material": "t7_wood_plank_floor_02"}},` +
+		`{"brush": {"points": [[900, -1400, 0], [908, -1400, 0], [900, -900, 0], [908, -900, 0], [900, -1400, 112], [908, -1400, 112], [900, -900, 112], [908, -900, 112]], "material": "t7_brick_worn_dirty_red_wet"}},` +
+		`{"brush": {"points": [[1392, -1400, 0], [1400, -1400, 0], [1392, -900, 0], [1400, -900, 0], [1392, -1400, 112], [1400, -1400, 112], [1392, -900, 112], [1400, -900, 112]], "material": "t7_brick_worn_dirty_red_wet"}},` +
 		`{"texture": {"ids": ["@1", "@2"], "faces": "top,bottom", "material": "caulk"}},` +
-		`{"box": {"min": [1000, -1150, 0], "max": [1032, -1118, 112], "material": "t7_concrete_poured_bunker_dirty_01_wet"}},` +
+		`{"brush": {"points": [[1000, -1150, 0], [1032, -1150, 0], [1000, -1118, 0], [1032, -1118, 0], [1000, -1150, 112], [1032, -1150, 112], [1000, -1118, 112], [1032, -1118, 112]], "material": "t7_concrete_poured_bunker_dirty_01_wet"}},` +
 		`{"copy": {"ids": ["@4"], "by": [96, 0, 0], "count": 3}}]`
 	add("map_edit|the ops sent: a floor, 2 walls caulked top and bottom, a pillar copied 3 times", textured)
 	tops, err := decodeOps([]byte(textured))
@@ -120,33 +120,34 @@ func mapSamples(t *testing.T, root string, add func(key, s string), addImage fun
 	}
 	v, err = mapEdit(ctx, tops, nil, "textures and copies", 0)
 	run("map_edit|its answer (with each material's tile)", v, err)
-	layoutOp := `[{"layout": {"material": "t7_brick_worn_dirty_red_wet", "floor": "t7_wood_plank_floor_02", "rooms": [` +
-		`{"name": "hall", "min": [-1400, 900], "max": [-1144, 1284]}, {"name": "kitchen", "min": [-1144, 900], "max": [-888, 1284]}], ` +
-		`"openings": [{"room": "hall", "to": "kitchen"}, {"room": "kitchen", "side": "+x", "sill": 32}]}}]`
-	add("map_edit|the op sent: a layout, two rooms with a door between and a window", layoutOp)
-	rooms, err := decodeOps([]byte(layoutOp))
+	placed := `[{"brush": {"points": [[-1400, 900, 0], [-1144, 900, 0], [-1400, 1028, 0], [-1144, 1028, 0], [-1144, 900, 64], [-1144, 1028, 64]], ` +
+		`"material": "t7_concrete_poured_bunker_dirty_01_wet"}}, {"brush": {"points": [[-1000, 960, 0], [-1016, 988, 0], [-1048, 988, 0], ` +
+		`[-1064, 960, 0], [-1048, 932, 0], [-1016, 932, 0], [-1000, 960, 128], [-1016, 988, 128], [-1048, 988, 128], [-1064, 960, 128], ` +
+		`[-1048, 932, 128], [-1016, 932, 128]], "material": "t7_concrete_poured_bunker_dirty_01_wet"}}]`
+	add("map_edit|the ops sent: a ramp (6 corners) and a hexagonal column (12)", placed)
+	brushes, err := decodeOps([]byte(placed))
 	if err != nil {
 		t.Fatal(err)
 	}
-	v, err = mapEdit(ctx, rooms, nil, "two rooms", 0)
-	run("map_edit|its answer (17 pieces)", v, err)
-	zoneOp := `[{"zone": {"name": "house_zone", "areas": [{"outline": [[-1400, 900], [-888, 900], [-888, 1284], [-1144, 1284], ` +
-		`[-1144, 1092], [-1400, 1092]]}], "links": [{"zone": "start_zone"}]}}]`
-	add("map_edit|the op sent: a zone over an L outline, linked to the start zone", zoneOp)
-	zoned, err := decodeOps([]byte(zoneOp))
+	v, err = mapEdit(ctx, brushes, nil, "a ramp and a column", 0)
+	run("map_edit|its answer (two brushes)", v, err)
+	arch := `[{"patch": {"rows": [[[-1400, 1200, 0], [-1400, 1200, 96], [-1400, 1264, 96]], [[-1336, 1200, 0], [-1336, 1200, 96], [-1336, 1264, 96]], ` +
+		`[[-1272, 1200, 0], [-1272, 1200, 96], [-1272, 1264, 96]]], "material": "t7_brick_worn_dirty_red_wet"}}]`
+	add("map_edit|the op sent: a curve patch of 3 by 3 (a vault's quarter)", arch)
+	curve, err := decodeOps([]byte(arch))
 	if err != nil {
 		t.Fatal(err)
 	}
-	v, err = mapEdit(ctx, zoned, nil, "a zone", 0)
-	run("map_edit|its answer (a volume, 4 spawners, a pathnode, the script's call, a note)", v, err)
+	v, err = mapEdit(ctx, curve, nil, "a curve", 0)
+	run("map_edit|its answer (one patch)", v, err)
 	v, err = mapCheck(ctx, nil, "", 0, 0)
-	run("map_check|the template and the rooms above (50 listed)", v, err)
+	run("map_check|the template and the brushes above", v, err)
 	v, err = mapCheck(ctx, nil, "seam,stretched,unknown", 0, 0)
 	run("map_check|seams, stretch and unknown materials only", v, err)
 
 	v, err = mapCommand(ctx, "", nil, "Selection/CSG", 0)
 	run("map_command|list Selection/CSG", v, err)
-	box, _ := decodeOps([]byte(`[{"box": {"min": [900, 900, 0], "max": [1400, 1400, 128], "material": "script_wall"}}]`))
+	box, _ := decodeOps([]byte(`[{"brush": {"points": [[900, 900, 0], [1400, 900, 0], [900, 1400, 0], [1400, 1400, 0], [900, 900, 128], [1400, 900, 128], [900, 1400, 128], [1400, 1400, 128]], "material": "script_wall"}}]`))
 	f.Handle("command", hollow) // the views above needed the fake's own commands
 	if made, err := mapEdit(ctx, box, nil, "a box", 0); err == nil && len(made.Made) == 1 {
 		v, err = mapCommand(ctx, "Selection/CSG/CSG Hollow", []string{made.Made[0].ID}, "", 0)

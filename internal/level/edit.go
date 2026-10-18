@@ -10,7 +10,9 @@ import (
 
 // Op is one edit of a batch: exactly one of its fields is set.
 type Op struct {
-	Box      *BoxOp      `json:"box,omitempty"`
+	Brush    *BrushOp    `json:"brush,omitempty"`
+	Patch    *PatchOp    `json:"patch,omitempty"`
+	Raw      *string     `json:"raw,omitempty"`
 	Entity   *EntityOp   `json:"entity,omitempty"`
 	Delete   []string    `json:"delete,omitempty"`
 	Set      *SetOp      `json:"set,omitempty"`
@@ -18,35 +20,20 @@ type Op struct {
 	Material *MaterialOp `json:"material,omitempty"`
 	Texture  *TextureOp  `json:"texture,omitempty"`
 	Copy     *CopyOp     `json:"copy,omitempty"`
-	Layout   *LayoutOp   `json:"layout,omitempty"`
-	Zone     *ZoneOp     `json:"zone,omitempty"`
-	Shape    *ShapeOp    `json:"shape,omitempty"`
-	Walls    *WallsOp    `json:"walls,omitempty"`
 }
 
 // opKinds are the names of an op's fields, in Op's order.
-var opKinds = []string{"box", "entity", "delete", "set", "move", "material", "texture", "copy", "layout", "zone", "shape", "walls"}
+var opKinds = []string{"brush", "patch", "raw", "entity", "delete", "set", "move", "material", "texture", "copy"}
 
 // kinds are which of its fields an op sets, by their index in opKinds.
 func (op Op) kinds() []int {
 	var out []int
-	for i, set := range []bool{op.Box != nil, op.Entity != nil, op.Delete != nil, op.Set != nil, op.Move != nil, op.Material != nil, op.Texture != nil, op.Copy != nil, op.Layout != nil, op.Zone != nil, op.Shape != nil, op.Walls != nil} {
+	for i, set := range []bool{op.Brush != nil, op.Patch != nil, op.Raw != nil, op.Entity != nil, op.Delete != nil, op.Set != nil, op.Move != nil, op.Material != nil, op.Texture != nil, op.Copy != nil} {
 		if set {
 			out = append(out, i)
 		}
 	}
 	return out
-}
-
-// BoxOp adds an axis-aligned box: a world brush, or the brush of a new brush
-// entity of class.
-type BoxOp struct {
-	Min      [3]float64        `json:"min"`
-	Max      [3]float64        `json:"max"`
-	Material string            `json:"material"`
-	Contents string            `json:"contents,omitempty"`
-	Class    string            `json:"class,omitempty"`
-	Keys     map[string]string `json:"keys,omitempty"`
 }
 
 // EntityOp adds a point entity.
@@ -85,8 +72,7 @@ type unit struct {
 	world bool            // a world brush
 	point bool            // a point entity of the map, which Radiant replaces in place
 	state state
-	op    int    // the op that made it, or changed it last
-	part  string // what of a layout it is
+	op    int // the op that made it, or changed it last
 }
 
 type state int
@@ -106,12 +92,8 @@ type batch struct {
 	brush       map[string]*mapfile.Brush // GUID hex -> the brush, for an entity's brush named alone
 	world       string                    // worldspawn's GUID hex
 	tiles       Tiles                     // sizes a material's tile; nil assumes one
-	info        func(string) MaterialInfo // which materials hide what is behind them; nil, all
 	used        map[string]Tile           // the tile each material was given
 	faces       map[int]int               // texture op -> faces it textured
-	zones       []madeZone                // the zones it made
-	links       []Link                    // the add_adjacent_zone calls they need
-	notes       []string                  // what the answer should say of them
 	revs        map[string]string         // what was read, by id (WithRevs)
 	requireRevs bool
 }
@@ -143,14 +125,14 @@ func newBatch(snap *Snapshot, tiles Tiles) *batch {
 // apply runs the ops in order over the batch.
 func (b *batch) apply(ops []Op) error {
 	if len(ops) == 0 {
-		return fmt.Errorf("no ops: give box, entity, delete, set, move, material, texture, copy, layout, zone, shape or walls ops")
+		return fmt.Errorf("no ops: give brush, patch, raw, entity, delete, set, move, material, texture or copy ops")
 	}
 	for i, op := range ops {
 		if err := b.applyOne(i, op); err != nil {
 			return fmt.Errorf("op %d: %w", i, err)
 		}
 	}
-	return b.checkZones()
+	return nil
 }
 
 func (b *batch) applyOne(i int, op Op) error {
@@ -158,8 +140,12 @@ func (b *batch) applyOne(i int, op Op) error {
 		return fmt.Errorf("an op is exactly one of %s (this one has %d)", strings.Join(opKinds, ", "), n)
 	}
 	switch {
-	case op.Box != nil:
-		return b.box(i, op.Box)
+	case op.Brush != nil:
+		return b.brushOp(i, op.Brush)
+	case op.Patch != nil:
+		return b.patchOp(i, op.Patch)
+	case op.Raw != nil:
+		return b.raw(i, *op.Raw)
 	case op.Entity != nil:
 		return b.entity(i, op.Entity)
 	case op.Delete != nil:
@@ -172,46 +158,12 @@ func (b *batch) applyOne(i int, op Op) error {
 		return b.texture(i, op.Texture)
 	case op.Copy != nil:
 		return b.copies(i, op.Copy)
-	case op.Layout != nil:
-		return b.layout(i, op.Layout)
-	case op.Zone != nil:
-		return b.zone(i, op.Zone)
-	case op.Shape != nil:
-		return b.shape(i, op.Shape)
-	case op.Walls != nil:
-		return b.walls(i, op.Walls)
 	default:
 		if !word(op.Material.Material) {
 			return fmt.Errorf("material %q: one word, a material's name", op.Material.Material)
 		}
 		return b.each(i, op.Material.IDs, func(u *unit, br *mapfile.Brush) error { return paint(u, br, op.Material.Material) })
 	}
-}
-
-func (b *batch) box(i int, o *BoxOp) error {
-	for k := range 3 {
-		if o.Max[k] <= o.Min[k] {
-			return fmt.Errorf("box: max %v must exceed min %v on every axis", o.Max, o.Min)
-		}
-	}
-	if !word(o.Material) {
-		return fmt.Errorf("box: material %q: one word, a material's name", o.Material)
-	}
-	if err := checkContents(o.Contents); err != nil {
-		return fmt.Errorf("box: %w", err)
-	}
-	t := b.tile(o.Material)
-	brush := boxBrush(geom.Box{Min: o.Min, Max: o.Max, Ok: true}, o.Material, o.Contents, texNumbers(t.W, t.H))
-	if o.Class == "" {
-		if len(o.Keys) > 0 {
-			return fmt.Errorf("box: keys belong to a brush entity: give its class")
-		}
-		return b.made(i, EntityText("worldspawn", nil, brush), true)
-	}
-	if err := checkKeys(o.Class, o.Keys); err != nil {
-		return fmt.Errorf("box: %w", err)
-	}
-	return b.made(i, EntityText(o.Class, o.Keys, brush), false)
 }
 
 // made adds the unit op i creates, from its text: an entity, or worldspawn
@@ -250,9 +202,6 @@ func (b *batch) tile(material string) Tile {
 
 // texture runs a texture op over what its ids name.
 func (b *batch) texture(i int, o *TextureOp) error {
-	if strings.EqualFold(strings.TrimSpace(o.Faces), "hidden") {
-		return b.textureHidden(i, o)
-	}
 	t, err := newTexturing(o, b.tile)
 	if err != nil {
 		return fmt.Errorf("texture: %w", err)

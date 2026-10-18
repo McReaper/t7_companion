@@ -208,7 +208,7 @@ func TestBatchesThatCountedToNothing(t *testing.T) {
 	})
 	for name, js := range map[string]string{
 		"a delete and a replace": `[{"delete": ["76780cea"]}, {"set": {"id": "0a000000", "keys": {"a": "1"}}}]`,
-		"a replace and a box":    `[{"set": {"id": "0a000000", "keys": {"b": "2"}}}, {"box": {"min": [0,0,0], "max": [8,8,8], "material": "caulk"}}]`,
+		"a replace and a box":    `[{"set": {"id": "0a000000", "keys": {"b": "2"}}}, {"brush": {"points": [[0, 0, 0], [8, 0, 0], [0, 8, 0], [8, 8, 0], [0, 0, 8], [8, 0, 8], [0, 8, 8], [8, 8, 8]], "material": "caulk"}}]`,
 	} {
 		snap, err := Read(context.Background(), c)
 		if err != nil {

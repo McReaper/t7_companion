@@ -16,14 +16,10 @@ type mapEditOut struct {
 	Undo    string    `json:"undo"` // the entry in Radiant's undo menu: one Ctrl+Z undoes the whole batch
 	Deleted int       `json:"deleted,omitempty"`
 	Made    []madeOut `json:"made,omitempty"`
-	// Tiles is the tile each material new boxes and texture ops sized was
+	// Tiles is the tile each material new brushes and texture ops sized was
 	// given, and Textured how many faces each texture op textured.
 	Tiles    map[string]tileOut `json:"tiles,omitempty"`
 	Textured []texturedOut      `json:"textured,omitempty"`
-	// Script is what the zones made need of the map's script, Notes what
-	// else they leave to see to.
-	Script *scriptOut `json:"script,omitempty"`
-	Notes  []string   `json:"notes,omitempty"`
 }
 
 // tileOut is a material's tile: world units across and down, and its source.
@@ -46,7 +42,6 @@ type madeOut struct {
 	Class  string    `json:"class,omitempty"` // none for a world brush
 	Origin []float64 `json:"origin,omitempty"`
 	Bounds []float64 `json:"bounds,omitempty"`
-	Part   string    `json:"part,omitempty"` // what of a layout it is
 	Note   string    `json:"note,omitempty"`
 }
 
@@ -76,20 +71,11 @@ func mapEdit(ctx context.Context, ops []level.Op, revs map[string]string, label 
 	if err != nil {
 		return nil, err
 	}
-	var info func(string) level.MaterialInfo
-	if root := installOf(snap.State.Map); root != "" {
-		if w, err := workspace(root); err == nil {
-			info = materialInfo(w, tilesIn(root))
-		}
-	}
-	d, err := level.EditWith(ctx, c, snap, ops, label, mapTiles(snap.State.Map), info, level.WithRevs(revs, true))
+	d, err := level.EditWith(ctx, c, snap, ops, label, mapTiles(snap.State.Map), level.WithRevs(revs, true))
 	if err != nil {
 		return nil, err
 	}
-	out := &mapEditOut{Map: baseName(d.After.State.Map), Undo: d.Label, Deleted: d.Deleted, Notes: d.Notes}
-	if len(d.Links) > 0 {
-		out.Script = zoneScript(d.After.State.Map, d.Links)
-	}
+	out := &mapEditOut{Map: baseName(d.After.State.Map), Undo: d.Label, Deleted: d.Deleted}
 	for m, t := range d.Tiles {
 		if out.Tiles == nil {
 			out.Tiles = map[string]tileOut{}
@@ -102,7 +88,7 @@ func mapEdit(ctx context.Context, ops []level.Op, revs map[string]string, label 
 		}
 	}
 	for _, m := range d.Made {
-		mo := madeOut{Op: m.Op, Class: m.Class, Part: m.Part}
+		mo := madeOut{Op: m.Op, Class: m.Class}
 		if m.ID == "" {
 			mo.Note = "not found in the map read back: map_find to see what Radiant made"
 		} else {

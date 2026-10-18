@@ -68,11 +68,6 @@ func (o Op) names() []string {
 	for _, ids := range [][]string{idsOf(o.Move), idsOf(o.Material), idsOf(o.Texture), idsOf(o.Copy)} {
 		out = append(out, ids...)
 	}
-	if o.Zone != nil {
-		for _, a := range o.Zone.Areas {
-			out = append(out, a.Floors...)
-		}
-	}
 	return out
 }
 

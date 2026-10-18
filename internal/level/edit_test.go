@@ -30,13 +30,13 @@ func made(d *Done, op int) Made {
 	return Made{Op: -1}
 }
 
-// The batch the live run sent: boxes, entities, a moved world brush, a
+// The batch the live run sent: brushes, entities, a moved world brush, a
 // renamed probe, a retextured curve, a delete.
 func TestABatchIsOneEditAndItsResultsAreReadBack(t *testing.T) {
 	f, c, snap := viewing(t, 201)
 	d, err := Edit(context.Background(), c, snap, ops(t, `[
-		{"box": {"min": [-512, -512, -80], "max": [-256, -256, -64], "material": "aac_wood_mahogany_01"}},
-		{"box": {"min": [0, 0, 0], "max": [64, 64, 64], "material": "trigger", "contents": "nonColliding", "class": "trigger_multiple", "keys": {"targetname": "t1"}}},
+		{"brush": {"points": [[-512, -512, -80], [-256, -512, -80], [-512, -256, -80], [-256, -256, -80], [-512, -512, -64], [-256, -512, -64], [-512, -256, -64], [-256, -256, -64]], "material": "aac_wood_mahogany_01"}},
+		{"brush": {"points": [[0, 0, 0], [64, 0, 0], [0, 64, 0], [64, 64, 0], [0, 0, 64], [64, 0, 64], [0, 64, 64], [64, 64, 64]], "material": "trigger", "contents": "nonColliding", "class": "trigger_multiple", "keys": {"targetname": "t1"}}},
 		{"entity": {"class": "light", "origin": [-384, -384, 32], "keys": {"radius": "256"}}},
 		{"entity": {"class": "info_player_start", "origin": [-384, -384, -64], "angles": [0, 90, 0]}},
 		{"move": {"ids": ["5ec8de49"], "by": [0, 0, 8]}},
@@ -47,10 +47,10 @@ func TestABatchIsOneEditAndItsResultsAreReadBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := sent(f, "edit"); len(got) != 1 || got[0] != "edit t7kb: 2 box, 2 entity, 1 delete, 1 set, 1 move, 1 material" {
+	if got := sent(f, "edit"); len(got) != 1 || got[0] != "edit t7kb: 2 brush, 2 entity, 1 delete, 1 set, 1 move, 1 material" {
 		t.Errorf("edits = %q", got)
 	}
-	if d.Label != "t7kb: 2 box, 2 entity, 1 delete, 1 set, 1 move, 1 material" || d.Deleted != 4 || len(d.Made) != 7 {
+	if d.Label != "t7kb: 2 brush, 2 entity, 1 delete, 1 set, 1 move, 1 material" || d.Deleted != 4 || len(d.Made) != 7 {
 		t.Errorf("done = %+v", d)
 	}
 	for i, m := range d.Made {
@@ -149,20 +149,20 @@ func TestEditRefusals(t *testing.T) {
 	_, c, snap := viewing(t, 204)
 	for js, want := range map[string]string{
 		`[]`: "no ops",
-		`[{"box": {"min": [0,0,0], "max": [1,1,1], "material": "x"}, "delete": ["5ec8de46"]}]`: "op 0: an op is exactly one of",
+		`[{"brush": {"points": [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]], "material": "x"}, "delete": ["5ec8de46"]}]`: "op 0: an op is exactly one of",
 		`[{}]`: "this one has 0",
-		`[{"box": {"min": [0,0,0], "max": [0,1,1], "material": "x"}}]`:                                      "max [0 1 1] must exceed min",
-		`[{"box": {"min": [0,0,0], "max": [1,1,1], "material": "two words"}}]`:                              `material "two words"`,
-		`[{"box": {"min": [0,0,0], "max": [1,1,1], "material": "x", "keys": {"a": "b"}}}]`:                  "keys belong to a brush entity",
-		`[{"box": {"min": [0,0,0], "max": [1,1,1], "material": "x", "contents": "a\"b"}}]`:                  "contents",
-		`[{"box": {"min": [0,0,0], "max": [1,1,1], "material": "x", "class": "t", "keys": {"guid": "x"}}}]`: `key "guid"`,
-		`[{"entity": {"class": "", "origin": [0,0,0]}}]`:                                                    `class ""`,
-		`[{"entity": {"class": "light", "origin": [0,0,0], "keys": {"a": "b\"c"}}}]`:                        `key "a"`,
-		`[{"set": {"id": "5ec8de46", "keys": {}}}]`:                                                         "set: no keys",
-		`[{"set": {"id": "5ec8de46", "keys": {"classname": "light"}}}]`:                                     `"classname" cannot be set`,
-		`[{"set": {"id": "5ec8de46", "keys": {"a": "b\nc"}}}]`:                                              "double quote or a line break",
-		`[{"set": {"id": "5ec8de49", "keys": {"a": "b"}}}]`:                                                 "is a world brush",
-		`[{"set": {"id": "8d452111", "keys": {"a": "b"}}}]`:                                                 "is worldspawn",
+		`[{"brush": {"points": [[0, 0, 0], [0, 0, 0], [0, 1, 0], [0, 1, 0], [0, 0, 1], [0, 0, 1], [0, 1, 1], [0, 1, 1]], "material": "x"}}]`:                                      "the points enclose no volume",
+		`[{"brush": {"points": [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]], "material": "two words"}}]`:                              `material "two words"`,
+		`[{"brush": {"points": [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]], "material": "x", "keys": {"a": "b"}}}]`:                  "keys belong to an entity: give its class",
+		`[{"brush": {"points": [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]], "material": "x", "contents": "a\"b"}}]`:                  "contents",
+		`[{"brush": {"points": [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]], "material": "x", "class": "t", "keys": {"guid": "x"}}}]`: `key "guid"`,
+		`[{"entity": {"class": "", "origin": [0,0,0]}}]`:                             `class ""`,
+		`[{"entity": {"class": "light", "origin": [0,0,0], "keys": {"a": "b\"c"}}}]`: `key "a"`,
+		`[{"set": {"id": "5ec8de46", "keys": {}}}]`:                                  "set: no keys",
+		`[{"set": {"id": "5ec8de46", "keys": {"classname": "light"}}}]`:              `"classname" cannot be set`,
+		`[{"set": {"id": "5ec8de46", "keys": {"a": "b\nc"}}}]`:                       "double quote or a line break",
+		`[{"set": {"id": "5ec8de49", "keys": {"a": "b"}}}]`:                          "is a world brush",
+		`[{"set": {"id": "8d452111", "keys": {"a": "b"}}}]`:                          "is worldspawn",
 		`[{"delete": []}]`: "delete: no ids",
 		`[{"delete": ["76780cea"]}, {"move": {"ids": ["76780cea"], "by": [1,0,0]}}]`: "deleted by an earlier op",
 		`[{"move": {"ids": ["00000001"], "by": [1,0,0]}}]`:                           "no entity or brush 00000001",

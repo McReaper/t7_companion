@@ -15,12 +15,11 @@ import (
 // brushes, seamless.
 type TextureOp struct {
 	IDs      []string    `json:"ids"`
-	Faces    string      `json:"faces,omitempty"`    // all (the default), top, bottom, sides, or +x, -x, +y, -y, +z, -z, comma separated; or hidden
+	Faces    string      `json:"faces,omitempty"`    // all (the default), top, bottom, sides, or +x, -x, +y, -y, +z, -z, comma separated
 	Material string      `json:"material,omitempty"` // none keeps each face's
 	Tile     *[2]float64 `json:"tile,omitempty"`     // world units one repeat spans, u then v; none: the material's own
 	Scale    float64     `json:"scale,omitempty"`    // multiplies the tile; none: 1
 	Origin   *[3]float64 `json:"origin,omitempty"`   // a world point a tile's corner sits on; none: 0 0 0
-	Fit      *[2]float64 `json:"fit,omitempty"`      // repeats across each face, u then v, 0 to size that axis as the other
 	Rotate   float64     `json:"rotate,omitempty"`   // degrees
 	Flip     string      `json:"flip,omitempty"`     // u, v or uv: mirrors the texture
 }
@@ -47,8 +46,6 @@ func newTexturing(o *TextureOp, tile func(string) Tile) (*texturing, error) {
 		return nil, fmt.Errorf("tile %v: two sizes above 0, world units across and down", *o.Tile)
 	case o.Scale < 0:
 		return nil, fmt.Errorf("scale %v: above 0 (2 makes the tiles twice as large)", o.Scale)
-	case o.Fit != nil && (o.Fit[0] < 0 || o.Fit[1] < 0 || o.Fit[0]+o.Fit[1] == 0):
-		return nil, fmt.Errorf("fit %v: repeats across each face, u then v, one of them above 0", *o.Fit)
 	}
 	switch strings.ToLower(o.Flip) {
 	case "":
@@ -139,12 +136,6 @@ func (t *texturing) face(w []string, planes []geom.Plane, i int) error {
 		o = *t.op.Origin
 	}
 	ou, ov := -geom.Dot(o, u), -geom.Dot(o, v)
-	if t.op.Fit != nil {
-		var err error
-		if tw, th, ou, ov, err = t.fitted(faceVertices(planes, i), u, v, tw, th, ou, ov); err != nil {
-			return fmt.Errorf("its %s face: %w", dir, err)
-		}
-	}
 	sw, sh := tw, th
 	if t.flipU {
 		sw = -sw
@@ -171,35 +162,6 @@ func (t *texturing) size(mat string) (float64, float64) {
 		tw, th = tw*t.op.Scale, th*t.op.Scale
 	}
 	return tw, th
-}
-
-// fitted sizes the tile so the op's repeats span the face's corners along u
-// and v (an axis at 0 is sized as the other, keeping the tile's shape), and
-// starts the tiles at the face's edge on each fitted axis.
-func (t *texturing) fitted(pts []mapfile.Vec3, u, v mapfile.Vec3, tw, th, ou, ov float64) (float64, float64, float64, float64, error) {
-	if len(pts) < 3 {
-		return 0, 0, 0, 0, fmt.Errorf("no area to fit")
-	}
-	u0, u1 := extent(pts, u)
-	v0, v1 := extent(pts, v)
-	fu, fv := t.op.Fit[0], t.op.Fit[1]
-	nw, nh := tw, th
-	if fu > 0 {
-		nw, ou = (u1-u0)/fu, -u0
-	}
-	if fv > 0 {
-		nh, ov = (v1-v0)/fv, -v0
-	}
-	switch {
-	case fv == 0:
-		nh = th * nw / tw
-	case fu == 0:
-		nw = tw * nh / th
-	}
-	if nw < 1e-3 || nh < 1e-3 {
-		return 0, 0, 0, 0, fmt.Errorf("too thin to fit")
-	}
-	return nw, nh, ou, ov, nil
 }
 
 // texAxes are the direction an outward normal is closest to (z first, then x,
@@ -255,16 +217,6 @@ func faceVertices(planes []geom.Plane, i int) []mapfile.Vec3 {
 	return out
 }
 
-// extent is the span of the points along a direction.
-func extent(pts []mapfile.Vec3, d mapfile.Vec3) (float64, float64) {
-	lo, hi := math.Inf(1), math.Inf(-1)
-	for _, p := range pts {
-		x := geom.Dot(p, d)
-		lo, hi = math.Min(lo, x), math.Max(hi, x)
-	}
-	return lo, hi
-}
-
 // wrap is an offset brought into [0, size): the same tiles, smaller numbers.
 func wrap(x, size float64) float64 {
 	x = math.Mod(x, size)
@@ -275,64 +227,4 @@ func wrap(x, size float64) float64 {
 		return 0
 	}
 	return x
-}
-
-// textureHidden lays a material, caulk by default, on the faces of the ids'
-// world brushes that other world brushes hide, as the batch leaves the map:
-// against an opaque face or inside an opaque brush, the checks' own test. A
-// face is named by its index, as faces at an angle can share a direction.
-// A face that draws nothing (a clip's, a trigger's) keeps its material: a
-// face's material is also what collides, and caulk is solid to all, so a
-// clip_player brush with a caulk face stops the AI and its navmesh too.
-func (b *batch) textureHidden(i int, o *TextureOp) error {
-	mat := o.Material
-	if mat == "" {
-		mat = "caulk"
-	}
-	switch {
-	case !word(mat):
-		return fmt.Errorf("texture: material %q: one word, a material's name", mat)
-	case o.Tile != nil || o.Scale != 0 || o.Origin != nil || o.Fit != nil || o.Rotate != 0 || o.Flip != "":
-		return fmt.Errorf("texture: faces hidden takes a material only: nobody sees how it lies")
-	}
-	info := b.info
-	if info == nil {
-		info = toolsByName
-	}
-	c := newChecker(func(g string) string { return g }, info)
-	index := map[*mapfile.Brush]int{}
-	for _, u := range b.units {
-		if u.world && u.state != deleted {
-			index[u.brush] = len(c.solids)
-			c.add(u.brush)
-		}
-	}
-	hidden := map[int][]int{}
-	for _, f := range c.faces {
-		if c.hidden(f) != "" && info(f.material).Drawn {
-			hidden[f.bi] = append(hidden[f.bi], f.fi)
-		}
-	}
-	n := 0
-	err := b.each(i, o.IDs, func(u *unit, br *mapfile.Brush) error {
-		for _, x := range u.brushes(br) {
-			if k, ok := index[x]; ok {
-				if err := setFaces(x, hidden[k], mat, b.tile(mat)); err != nil {
-					return err
-				}
-				n += len(hidden[k])
-			}
-		}
-		return nil
-	})
-	b.faces[i] = n
-	return err
-}
-
-// toolsByName is what a batch without the install's catalog knows of a
-// material: caulk, clips and triggers are tools and draw nothing; of them,
-// caulk alone hides what is behind it.
-func toolsByName(m string) MaterialInfo {
-	tool := m == "caulk" || strings.HasPrefix(m, "clip") || strings.HasPrefix(m, "trigger")
-	return MaterialInfo{Known: true, Opaque: m == "caulk" || !tool, Drawn: !tool}
 }
