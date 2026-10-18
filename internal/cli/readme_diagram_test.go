@@ -168,6 +168,9 @@ func detailedDiagram(t *testing.T) *diagram {
 	if err != nil {
 		t.Fatal(err)
 	}
+	for _, p := range quoteBreaks(string(b)) {
+		t.Error(p)
+	}
 	// The diagram sits in a GitHub alert, a blockquote: read it without the "> " markers.
 	src := regexp.MustCompile(`(?m)^> ?`).ReplaceAllString(string(b), "")
 	for _, m := range regexp.MustCompile("(?s)```mermaid\n(.*?)```").FindAllStringSubmatch(src, -1) {
@@ -177,6 +180,28 @@ func detailedDiagram(t *testing.T) *diagram {
 	}
 	t.Fatalf("README.md has no mermaid diagram with a %q box", serverBox)
 	return nil
+}
+
+// quoteBreaks lists the lines of a quoted mermaid block (its opening fence in
+// a blockquote, as the diagram is in its alert) that lack the ">" marker: such
+// a line ends the blockquote and GitHub draws no diagram, though the block,
+// read without its markers, still parses.
+func quoteBreaks(src string) []string {
+	var out []string
+	quoted := false
+	for i, line := range strings.Split(src, "\n") {
+		bare := strings.TrimSpace(strings.TrimPrefix(line, ">"))
+		if !quoted {
+			quoted = strings.HasPrefix(line, ">") && bare == "```mermaid"
+			continue
+		}
+		if !strings.HasPrefix(line, ">") {
+			out = append(out, fmt.Sprintf("README.md:%d: %q, inside the quoted diagram, has no \">\": it ends the blockquote, "+
+				"and GitHub stops drawing the diagram", i+1, line))
+		}
+		quoted = bare != "```"
+	}
+	return out
 }
 
 func parseDiagram(src string) *diagram {
@@ -267,4 +292,29 @@ func sortedKeys[V any](m map[string]V) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// Inside a quoted diagram, each line that drops its ">" is reported, the
+// closing fence included, and nothing after the block; a diagram outside a
+// blockquote has no markers to drop.
+func TestQuoteBreaksFindTheLinesOutOfTheBlockquote(t *testing.T) {
+	for src, want := range map[string][]int{
+		"> [!NOTE]\n> ```mermaid\n> flowchart TB\n    a[\"A\"]\n> b\n> ```\nafter\n": {4},
+		"> ```mermaid\n> a\n```\nafter\n":                                            {3},
+		"```mermaid\nflowchart TB\n  a\n```\n":                                       nil,
+		"> ```mermaid\n> a\n> ```\n```mermaid\nb\n```\n":                             nil,
+	} {
+		got := quoteBreaks(src)
+		var lines []int
+		for _, p := range got {
+			var n int
+			if _, err := fmt.Sscanf(p, "README.md:%d:", &n); err != nil {
+				t.Fatalf("%q names no line: %v", p, err)
+			}
+			lines = append(lines, n)
+		}
+		if fmt.Sprint(lines) != fmt.Sprint(want) {
+			t.Errorf("%q: lines %v, want %v (%q)", src, lines, want, got)
+		}
+	}
 }
