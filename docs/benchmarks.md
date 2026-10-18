@@ -53,6 +53,10 @@ It builds each answer with the same functions the MCP handlers use and counts to
 
 Paging costs answer quality only when the matched passage sits past the first page: of the bench queries' 48 top-3 hits, 41 fit in one page, and of the 7 paged ones the snippet's passage was on page 1 for 4. With `find` set to a phrase from the snippet, it is in the page returned for all 7.
 
+### The map tools
+
+What each map tool's call costs, measured on the stock ZM Mod Level template's map: [map-tools-tokens.md](map-tools-tokens.md).
+
 ## Retrieval quality
 
 How well search ranks, and every ranking change tried and rejected: [retrieval-quality.md](retrieval-quality.md).

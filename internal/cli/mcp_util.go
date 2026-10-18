@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -34,6 +36,29 @@ func jsonHandler(fn func(context.Context, mcp.CallToolRequest) (any, error)) ser
 		}
 		return jsonResult(v), nil
 	}
+}
+
+// strictArgs makes each tool refuse an argument its schema doesn't name, saying
+// which it takes: a handler reading its arguments one by one would otherwise
+// drop a misspelt or another tool's key without a word.
+func strictArgs(tools []server.ServerTool) []server.ServerTool {
+	for i, t := range tools {
+		next, props := t.Handler, t.Tool.InputSchema.Properties
+		tools[i].Handler = func(ctx context.Context, r mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			for k := range r.GetArguments() {
+				if _, ok := props[k]; !ok {
+					known := make([]string, 0, len(props))
+					for p := range props {
+						known = append(known, p)
+					}
+					slices.Sort(known)
+					return mcp.NewToolResultError(fmt.Sprintf("%s takes no %q: it takes %s", t.Tool.Name, k, strings.Join(known, ", "))), nil
+				}
+			}
+			return next(ctx, r)
+		}
+	}
+	return tools
 }
 
 // decodeArg re-marshals a loosely typed MCP argument into a Go value, rejecting

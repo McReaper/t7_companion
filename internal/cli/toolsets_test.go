@@ -41,7 +41,8 @@ func TestToolsetsHaveUniqueDescribedToolsWithCLICommands(t *testing.T) {
 
 // Skills name MCP tools as t7kb:<tool>, and check_skills.py accepts only the
 // names in its TOOL_NAMES: it must list every registered tool, or a skill that
-// names a new tool fails validation.
+// names a new tool fails validation, and nothing else but the setup-or-update
+// skill, or a skill can name a tool that's gone.
 func TestSkillValidatorKnowsEveryTool(t *testing.T) {
 	src, err := os.ReadFile("../../plugin/skills/contribute/scripts/check_skills.py")
 	if err != nil {
@@ -55,11 +56,18 @@ func TestSkillValidatorKnowsEveryTool(t *testing.T) {
 	for _, q := range regexp.MustCompile(`"([^"]+)"`).FindAllSubmatch(m[1], -1) {
 		known[string(q[1])] = true
 	}
+	registered := map[string]bool{"setup-or-update": true}
 	for _, ts := range toolsets(nil, nil) {
 		for _, tool := range ts.tools {
+			registered[tool.Tool.Name] = true
 			if !known[tool.Tool.Name] {
 				t.Errorf("check_skills.py's TOOL_NAMES lacks %q", tool.Tool.Name)
 			}
+		}
+	}
+	for name := range known {
+		if !registered[name] {
+			t.Errorf("check_skills.py's TOOL_NAMES lists %q, which is no MCP tool: remove it", name)
 		}
 	}
 }
