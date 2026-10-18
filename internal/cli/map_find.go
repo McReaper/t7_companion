@@ -61,6 +61,9 @@ type foundBrush struct {
 	Bounds   []float64 `json:"bounds,omitempty"`
 	Contents string    `json:"contents,omitempty"`
 	Selected bool      `json:"selected,omitempty"`
+	// Rows are a patch's control points, row by row, as map_edit's patch op
+	// takes them, when its id was named.
+	Rows [][][3]float64 `json:"rows,omitempty"`
 }
 
 // namingKeys are the keys map_find shows unless asked for others: what names
@@ -135,7 +138,7 @@ func foundOf(h level.Hit, snap *level.Snapshot, a mapFindArgs) foundEnt {
 	if f.Count > 0 && h.Box.Ok {
 		f.Bounds = append(vec(h.Box.Min), vec(h.Box.Max)...)
 	}
-	list := h.Named
+	list, named := h.Named, len(h.Named) > 0
 	if a.Brushes && len(list) == 0 {
 		list = e.Brushes()
 	}
@@ -147,6 +150,9 @@ func foundOf(h level.Hit, snap *level.Snapshot, a mapFindArgs) foundEnt {
 			Selected: snap.Sel.Brush(b.Guid())}
 		if k := b.Kind(); k != mapfile.KindFaces {
 			fb.Kind = level.KindName(k)
+			if named {
+				fb.Rows = patchRows(b)
+			}
 		}
 		if box := geom.BrushBox(b); box.Ok {
 			fb.Bounds = append(vec(box.Min), vec(box.Max)...)
@@ -198,4 +204,19 @@ func vec(v mapfile.Vec3) []float64 {
 // baseName is a Windows or slash path's last element.
 func baseName(p string) string {
 	return p[strings.LastIndexAny(p, `/\`)+1:]
+}
+
+// patchRows are a patch's control points, row by row.
+func patchRows(b *mapfile.Brush) [][][3]float64 {
+	p, err := b.Patch()
+	if err != nil {
+		return nil
+	}
+	out := make([][][3]float64, len(p.Rows))
+	for r, row := range p.Rows {
+		for _, v := range row {
+			out[r] = append(out[r], [3]float64(v.Pos))
+		}
+	}
+	return out
 }

@@ -27,7 +27,9 @@ func mapCheckTool() server.ServerTool {
 			"laid inside the template's ground does; detail is the other face: delete or cut one); seam (faces of one material on one plane, both seen, sharing an edge, whose tiles don't meet; detail is the "+
 			"other face: give both the same tile, rotation and origin); stretched (a tile more than half again longer one way "+
 			"than the material's; detail is both tiles); hidden (a drawn face against an opaque brush's face, or inside an "+
-			"opaque brush; detail says which: texture it caulk, as it can't be seen and still draws). Each finding names the "+
+			"opaque brush; detail says which: texture it caulk, as it can't be seen and still draws). Patches, wherever they are, "+
+			"are unknown on such a material, stretched when their texture repeats more than once a unit (cod2map warns of it; "+
+			"Radiant's patch Cap Texture fixes it), with no face. Each finding names the "+
 			"brush's id, the face (+x … -z, as map_edit's texture op takes faces) and the material; counts has every kind's "+
 			"total. Run it after texturing, and fix with map_edit."),
 		mcp.WithString("ids", mcp.Description("The brushes or entities to check, comma- or space-separated (default every world brush).")),
@@ -68,7 +70,8 @@ func mapEditTool() server.ServerTool {
 			"or as a new brush entity of class (info_volume, trigger_multiple, script_brushmodel); "+
 			"{\"patch\": {\"rows\": [[[x,y,z]…]…], \"material\": m, \"mesh\"?: false, \"contents\"?, \"class\"?, "+
 			"\"keys\"?}} a patch through its control points, rows of as many each: a curve (Radiant's Bézier: 3, 5, 7… "+
-			"each way) or a mesh (terrain: 2 or more), its texture laid along the rows and columns by their length "+
+			"each way) or a mesh (terrain: 2 or more), drawn on the side (next row's point - point) × (next point of the row - point) "+
+			"points to (Radiant's own cylinder faces out so), its texture laid along the rows and columns by their length "+
 			"(map_command runs Radiant's patch tools on it after); {\"raw\": text} map text as Radiant writes it, "+
 			"entities with their brushes and patches (a worldspawn's brushes go to the world), its guid lines dropped "+
 			"(the import gives new ones), every brush 4 faces or more or one patch; "+
@@ -158,7 +161,8 @@ func mapFindTool() server.ServerTool {
 			"(the map tools' name for it: a GUID's first 8 hex digits) and its rev (what map_edit's revs want back), class, origin, and for brush entities their bounds "+
 			"(min x y z, max x y z) and brush count; keys are the naming ones (targetname, target, script_noteworthy, "+
 			"script_string, script_int, name, model) unless keys asks for others. brushes lists each one's brushes and "+
-			"patches (id, rev, material, bounds, contents, curve/mesh); naming a brush's id lists just it. near sorts by distance. "+
+			"patches (id, rev, material, bounds, contents, curve/mesh); naming a brush's id lists just it, a patch with its "+
+			"control points as rows, as map_edit's patch op takes them. near sorts by distance. "+
 			"No face is shown: Radiant holds the geometry."),
 		mcp.WithString("ids", mcp.Description("Entity or brush ids (or GUIDs, or any start of one), comma- or space-separated.")),
 		mcp.WithString("class", mcp.Description("Classname; * matches any run of characters (light*, script_*).")),

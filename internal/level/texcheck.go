@@ -83,7 +83,7 @@ func CheckTextures(snap *Snapshot, ids []string, info func(material string) Mate
 			out = append(out, c.check(f, checked)...)
 		}
 	}
-	return out, nil
+	return append(out, checkPatches(snap, checked, info)...), nil
 }
 
 func newChecker(short func(string) string, info func(string) MaterialInfo) *checker {

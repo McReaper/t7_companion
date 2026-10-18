@@ -103,9 +103,16 @@ func TestMapFindListsBrushes(t *testing.T) {
 	if list[1].ID != "af3c9c64" || list[1].Kind != "curve" || !slices.Equal(list[1].Bounds, []float64{-96, -64, -16, 96, 64, 200}) {
 		t.Errorf("arch = %+v", list[1])
 	}
+	if list[1].Rows != nil {
+		t.Errorf("listed, not named, the arch gives no points: %v", list[1].Rows)
+	}
 	named := find(t, mapFindArgs{IDs: []string{"af3c9c64"}})
 	if len(named.Found) != 1 || named.Found[0].ID != "8d452111" || len(named.Found[0].List) != 1 || named.Found[0].List[0].ID != "af3c9c64" {
-		t.Errorf("a brush by id = %+v", named.Found)
+		t.Fatalf("a brush by id = %+v", named.Found)
+	}
+	rows := named.Found[0].List[0].Rows // named, the arch's control points, as the patch op takes them
+	if len(rows) != 3 || len(rows[0]) != 3 || rows[0][1] != [3]float64{0, -64, 200} || rows[1][0] != [3]float64{-96, 0, -16} {
+		t.Errorf("the arch's rows %v", rows)
 	}
 }
 
