@@ -16,29 +16,7 @@ import (
 // tools refuse an argument they don't take: their options share names
 // (board, show) that mean different things from tool to tool.
 func mapToolset() toolset {
-	return toolset{name: "map", tools: strictArgs([]server.ServerTool{radiantOpenTool(), mapFindTool(), mapViewTool(), mapEditTool(), mapCommandTool(), mapCheckTool()})}
-}
-
-func mapCheckTool() server.ServerTool {
-	return server.ServerTool{Tool: mcp.NewTool("map_check",
-		mcp.WithDescription("Check the textures of the map open in Radiant, its world brushes (all, or those ids names), "+
-			"for what draws badly, the worst kinds first: unknown (a material no GDT defines: the missing-texture pattern); "+
-			"zfight (two opaque drawn faces on one plane, facing the same way, overlapping: they flicker in game, as a floor "+
-			"laid inside the template's ground does; detail is the other face: delete or cut one); seam (faces of one material on one plane, both seen, sharing an edge, whose tiles don't meet; detail is the "+
-			"other face: give both the same tile, rotation and origin); stretched (a tile more than half again longer one way "+
-			"than the material's; detail is both tiles); hidden (a drawn face against an opaque brush's face, or inside an "+
-			"opaque brush; detail says which: texture it caulk, as it can't be seen and still draws). Patches, wherever they are, "+
-			"are unknown on such a material, stretched when their texture repeats more than once a unit (cod2map warns of it; "+
-			"Radiant's patch Cap Texture fixes it), with no face. Each finding names the "+
-			"brush's id, the face (+x … -z, as map_edit's texture op takes faces) and the material; counts has every kind's "+
-			"total. Run it after texturing, and fix with map_edit."),
-		mcp.WithString("ids", mcp.Description("The brushes or entities to check, comma- or space-separated (default every world brush).")),
-		mcp.WithString("kinds", mcp.Description("Only these kinds, comma-separated: unknown, zfight, seam, stretched, hidden.")),
-		mcp.WithNumber("limit", mcp.Description("How many findings to list (default 50, at most 200); counts has them all.")),
-		mcp.WithNumber("pid", mcp.Description("The Radiant to use when several run."))),
-		Handler: jsonHandler(func(ctx context.Context, r mcp.CallToolRequest) (any, error) {
-			return mapCheck(ctx, splitIDs(r.GetString("ids", "")), r.GetString("kinds", ""), r.GetInt("limit", 0), r.GetInt("pid", 0))
-		})}
+	return toolset{name: "map", tools: strictArgs([]server.ServerTool{radiantOpenTool(), mapFindTool(), mapViewTool(), mapEditTool(), mapCommandTool()})}
 }
 
 func mapCommandTool() server.ServerTool {

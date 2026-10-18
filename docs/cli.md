@@ -18,7 +18,6 @@ t7kb map edit --ops <file|->  a batch of edits, one undo step  (--label)
 t7kb map command <path> [id…] a Radiant menu entry on what the ids name  (--menu)
 t7kb map materials           materials to texture with, most used first  (--usage · --surface · --name · --show · --board)
 t7kb map models              models to place, most placed first  (--name · --board)
-t7kb map check [id…]         texture problems: seams, stretch, uncaulked hidden faces  (--kinds)
 t7kb mcp                     run the MCP server
 t7kb update-check            is a newer release out? is the plugin behind?
 ```

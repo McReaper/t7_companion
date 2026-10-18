@@ -200,23 +200,6 @@ func turned(u, v mapfile.Vec3, deg float64) (mapfile.Vec3, mapfile.Vec3) {
 	return tu, tv
 }
 
-// faceVertices are face i's corners: where it meets two other planes inside
-// every plane.
-func faceVertices(planes []geom.Plane, i int) []mapfile.Vec3 {
-	var out []mapfile.Vec3
-	for j := range planes {
-		for k := j + 1; k < len(planes); k++ {
-			if j == i || k == i {
-				continue
-			}
-			if v, ok := geom.Meet(planes[i], planes[j], planes[k]); ok && geom.Inside(v, planes) {
-				out = append(out, v)
-			}
-		}
-	}
-	return out
-}
-
 // wrap is an offset brought into [0, size): the same tiles, smaller numbers.
 func wrap(x, size float64) float64 {
 	x = math.Mod(x, size)

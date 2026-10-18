@@ -99,25 +99,6 @@
 // imports map text as written, its GUIDs dropped. All three refuse what
 // Radiant's import couldn't read before anything is sent.
 //
-// # Checks
-//
-// CheckTextures reads the world brushes' faces for what draws badly. A drawn
-// face is hidden when the opaque brushes' faces on its plane, facing it,
-// cover it whole, one alone or several together (what is left of it once
-// each is clipped away is nothing, slivers under eps aside), or when it lies
-// inside an opaque brush; on the stock prefabs' geometry 86% of the faces it
-// calls hidden are caulk or another tool material, against 56% of all faces
-// (TestHiddenFacesAreTheOnesTreyarchCaulked).
-// Two opaque drawn faces on one plane, facing the same way, overlapping by
-// an area and drawing otherwise (another material, or tiles that don't
-// meet) fight: the engine flickers between them (community, t7kb video
-// 0.30), as a floor laid inside the template's ground does; the stock
-// prefabs hold 570 such pairs among 117,778 faces, left in by hand. A seam
-// is two faces of one material on one plane, both seen, sharing an
-// edge or overlapping, whose tiles differ (size, rotation, mirror, or offset
-// modulo a tile): faces meeting at a corner alone show none. Coplanar faces
-// are found by their rounded plane, so the checks scale with a map.
-//
 // # Commands
 //
 // Command runs a Radiant menu entry (a CSG, a patch tool) on what the ids

@@ -8,7 +8,7 @@ Contents:
 
 ## Place each wall where the plan draws it, nothing overlapping
 
-Nothing lays a plan out for the agent: each wall is a `brush` through its corners, 8 thick on the plan's line, corners on the 8-unit grid; a slanted wall's corners follow the plan, so it keeps its angle. Where walls meet nothing overlaps: mitre a corner (each wall's two corners there on the mitre line), stop a wall that ends on another at its face. Floors and ceilings are slabs, none over another (two slabs over one spot z-fight: `t7kb:map_check`'s `zfight`), a concave floor cut into convex brushes. Doors come from the plan's own marks — a gap between jambs, a swing arc — never from gaps a trace left: those are a trace's errors, and a door there is a wall missing. An exit to the outside stays a wall: past it there is no floor. One batch per room or corridor keeps each one undo step.
+Nothing lays a plan out for the agent: each wall is a `brush` through its corners, 8 thick on the plan's line, corners on the 8-unit grid; a slanted wall's corners follow the plan, so it keeps its angle. Where walls meet nothing overlaps: mitre a corner (each wall's two corners there on the mitre line), stop a wall that ends on another at its face. Floors and ceilings are slabs, none over another (two slabs over one spot z-fight, flickering in game), a concave floor cut into convex brushes. Doors come from the plan's own marks — a gap between jambs, a swing arc — never from gaps a trace left: those are a trace's errors, and a door there is a wall missing. An exit to the outside stays a wall: past it there is no floor. One batch per room or corridor keeps each one undo step.
 
 ## A door is an opening with a lintel, clear for the zombies
 

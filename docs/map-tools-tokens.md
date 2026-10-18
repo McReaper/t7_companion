@@ -26,7 +26,5 @@ Measured on the stock ZM Mod Level template's map (33 entities, 20 world brushes
 | `map_edit` | moving a point entity | 57 | 157 |
 | `map_command` | listing `Selection/CSG` | 32 | 111 |
 | `map_command` | `CSG Hollow` on a box | 206 | 579 |
-| `map_check` | the template and the brushes above, 50 findings listed | 1625 | 5173 |
-| `map_check` | seams, stretch and unknown materials only | 210 | 608 |
 
-A room costs about fifteen hundred tokens: its ops (602, a brush being its corners, eight for a box), the answer (430), a top view to check it (515); a ramp and a hexagonal column are 236, their answer 132; a curve patch of 3 by 3 is 126, its answer 56. The whole map's `map_find` is the dearest call, about 56 tokens an entity, so `class`, `near` or `ids` narrow it; the default image, 768 pixels on the long side, stays near 450 tokens, and `size 1568` quadruples it. A finding of `map_check` costs about 32: `kinds` narrows a long one.
+A room costs about fifteen hundred tokens: its ops (602, a brush being its corners, eight for a box), the answer (430), a top view to check it (515); a ramp and a hexagonal column are 236, their answer 132; a curve patch of 3 by 3 is 126, its answer 56. The whole map's `map_find` is the dearest call, about 56 tokens an entity, so `class`, `near` or `ids` narrow it; the default image, 768 pixels on the long side, stays near 450 tokens, and `size 1568` quadruples it.

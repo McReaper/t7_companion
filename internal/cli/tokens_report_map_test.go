@@ -140,10 +140,6 @@ func mapSamples(t *testing.T, root string, add func(key, s string), addImage fun
 	}
 	v, err = mapEdit(ctx, curve, nil, "a curve", 0)
 	run("map_edit|its answer (one patch)", v, err)
-	v, err = mapCheck(ctx, nil, "", 0, 0)
-	run("map_check|the template and the brushes above", v, err)
-	v, err = mapCheck(ctx, nil, "seam,stretched,unknown", 0, 0)
-	run("map_check|seams, stretch and unknown materials only", v, err)
 
 	v, err = mapCommand(ctx, "", nil, "Selection/CSG", 0)
 	run("map_command|list Selection/CSG", v, err)

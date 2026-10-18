@@ -51,22 +51,8 @@ func newMapCmd() *cobra.Command {
 	fl.StringVar(&a.Keys, "keys", "", "which keys to show: all, or a comma list (default the naming keys)")
 	fl.IntVar(&a.Limit, "limit", 0, "how many entities at most (default 50)")
 	fl.IntVar(&a.PID, "pid", 0, "the Radiant to read when several run")
-	root.AddCommand(find, newMapViewCmd(), newMapEditCmd(), newMapCommandCmd(), newMapCheckCmd())
+	root.AddCommand(find, newMapViewCmd(), newMapEditCmd(), newMapCommandCmd())
 	return root
-}
-
-func newMapCheckCmd() *cobra.Command {
-	var kinds string
-	var limit, pid int
-	check := &cobra.Command{Use: "check [id…]",
-		Short: "Check the open map's textures: unknown materials, seams, stretched tiles, hidden faces left uncaulked",
-		RunE: func(c *cobra.Command, ids []string) error {
-			return printIndented(c.OutOrStdout())(mapCheck(c.Context(), ids, kinds, limit, pid))
-		}}
-	check.Flags().StringVar(&kinds, "kinds", "", "only these kinds, comma-separated: unknown, zfight, seam, stretched, hidden")
-	check.Flags().IntVar(&limit, "limit", 0, "how many findings to list (default 50, at most 200)")
-	check.Flags().IntVar(&pid, "pid", 0, "the Radiant to use when several run")
-	return check
 }
 
 func newMapCommandCmd() *cobra.Command {
