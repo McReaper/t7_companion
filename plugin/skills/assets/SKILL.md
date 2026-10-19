@@ -69,7 +69,7 @@ A GDT is plain text, so entries can be written directly (and versioned). **Copy 
 
 ## `export2bin` resolves its argument against its own working directory
 
-`export2bin.exe path/to/model.xmodel_export` fails with `ERROR: Failed to read file .\model.xmodel_export` — it ignores the directory you gave it. **Run it with the working directory set to the model's own folder** and pass the bare filename. It writes `.XMODEL_BIN` in caps; rename to lowercase to match the `model_export/` convention. 
+`export2bin.exe path/to/model.xmodel_export` fails with `ERROR: Failed to read file .\model.xmodel_export`: **run it from the model's own folder with the bare filename**, as for an anim (**t7kb:animation** has why). It writes `.XMODEL_BIN` in caps; rename to lowercase to match the `model_export/` convention.
 
 ## After editing a GDT, index it from `gdtdb`'s own folder — and know what "everything missing" means
 
