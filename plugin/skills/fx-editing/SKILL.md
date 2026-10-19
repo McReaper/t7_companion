@@ -9,7 +9,7 @@ BO3 effects are **`.efx` files in the `iwfx` text format** (header `iwfx 2` or `
 
 ## Getting an FX out of an older CoD: Kobra, not Greyhound
 
-**Greyhound has no XEffect (FX) or GDT export** — it emits models/anims/images/sounds only, **zero `.efx`**. **Kobra** (VenomModding's Greyhound fork) adds XEffect + GDT, so **BO1/older FX come out of Kobra**, under `.../black_ops_1/fx/**.efx`. If a `find` for `*.efx` in your extraction is empty, you ripped with Greyhound — re-rip that title with Kobra. (Same split noted in **t7kb:assets**/**t7kb:animation**: Kobra for FX and GDTs.)
+**Greyhound has no XEffect (FX) or GDT export** — it emits models/anims/images/sounds only, **zero `.efx`**. **Kobra** (VenomModding's Greyhound fork) adds XEffect + GDT, so **BO1/older FX come out of Kobra**, under `.../black_ops_1/fx/**.efx`. If a `find` for `*.efx` in your extraction is empty, you ripped with Greyhound — re-rip that title with Kobra.
 
 BO1 `.efx` are `iwfx 2` — **identical field schema to stock BO3 `iwfx 2`** (BO3 ships both — ~8,400 `iwfx 2` and ~1,500 `iwfx 3`), so a copied BO1 effect loads in BO3 **as-is**, no format conversion. Copy it into your own folder under `share/raw/fx/` (e.g. `share/raw/fx/_mymap/…`); the only work is importing the models/materials it references (below).
 
@@ -37,7 +37,7 @@ A sprite/model material can be a **texture atlas** (multiple frames in one image
 A model/sprite FX visual needs an **Effect** material, not a lit Geometry one:
 
 - `materialCategory` **Effect**, `materialType` **`effect_lit_emissive_blend`** (or `…_nocull` to render both faces), `sort` **`effect - auto sort`**, `surfaceType` **`<none>`**.
-- Its color image asset must have **`semantic` = `effectMap`** (a diffuse image's `diffuseMap` triggers a **"type mismatch" warning** on the Color Map in APE and can render wrong) and be **RGBA** (alpha for the blend). Setting `effectMap` also sets `premulAlpha` 1 and `streamable` 0, in APE and in `t7kb:gdt_edit`; `t7kb:gdt_check` warns when a texture slot holds an image of the wrong semantic.
+- Its color image asset must have **`semantic` = `effectMap`** (a diffuse image's `diffuseMap` triggers a **"type mismatch" warning** on the Color Map in APE and can render wrong) and be **RGBA** (alpha for the blend). Setting `effectMap` also sets `premulAlpha` 1 and `streamable` 0, as APE does.
 - **Keep the compression `compressed high color`** (the stock fx-sprite format). Do **not** switch it to `uncompressed`: a sprite goes through the **compute-sprite path**, which builds a **combo texture** from all sprite textures and requires them to be a compatible/compressed type — an uncompressed one fails the link with `Some textures are the wrong type for creating fx combo texture used in the compute sprite and decal rendering`. If you need uncompressed, tick **"Don't use compute sprites"** on the element instead. (Blocky green/blue/red discoloration on a blur is almost always the **material color settings** — `colorObjMin/Max` tints, `desaturationAmount` — not the compression; fix those first, below.)
 
 **If you author the material by cloning a stock fx material, it drags that material's settings** and they will bite:
