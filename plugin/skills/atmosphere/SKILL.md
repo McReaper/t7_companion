@@ -63,4 +63,4 @@ Weather isn't one system, and none of it runs off a generic `level.weather_*` va
 
 ## Don't invent
 
-CSV column names, KVPs, and dvars named here are shipped tokens — confirm them against files dated with the raw install (`share/raw/scripts`, `bin/t7.def.json`, `deffiles/*.awi`, Treyarch's `map_source/_prefabs/`), not against alias CSVs, sound templates, or Radiant templates a community pack replaced. If neither t7kb nor the raw install supports an alias column, FX behavior, or lighting field, don't assert it exists.
+CSV column names, KVPs, and dvars named here are shipped tokens — confirm them against files dated with the raw install (`share/raw/scripts`, `bin/t7.def.json`, `deffiles/*.awi`, Treyarch's `map_source/_prefabs/`), not against alias CSVs, sound templates, or Radiant templates a community pack replaced. If neither t7kb nor the raw install supports an alias column, FX behavior, or fog field, don't assert it exists.
