@@ -44,7 +44,7 @@ Contribution:
 
 ## First: does this actually need a new skill?
 
-There are already 14 domain skills (plus `setup-or-update` and `contribute`) over one fairly narrow domain, so **the marginal cost of a new one is trigger competition**: a skill that overlaps a sibling makes *both* fire less reliably. Default to **extending an existing skill**. A new one earns its place only when all three hold:
+Every craft of this fairly narrow domain already has its domain skill (plus `setup-or-update` and `contribute`), so **the marginal cost of a new one is trigger competition**: a skill that overlaps a sibling makes *both* fire less reliably. Default to **extending an existing skill**. A new one earns its place only when all three hold:
 
 - **Its own toolchain or workflow.** `anim-retarget` split from `animation` because Maya/HumanIK retargeting is a different tool and failure mode than the export→APE→linker pipeline — not because there was a lot to say.
 - **Silent-failure traps of its own.** If the answers are all "look up the right name", that's a `t7kb:search`, not a skill.
@@ -83,6 +83,8 @@ How to <do the craft> — <sub-topics in real BO3 jargon>. Use when <symptom-sid
 - **Open with the thesis, not a definition** — one sentence naming what the craft *actually is*, phrased as the correction to the wrong mental model. Then the standing pointers: exact tokens in **t7kb** (`t7kb:search` then `t7kb:get`), and the siblings that own the neighbouring stages.
 - **Make every `##` heading the conclusion, not the topic**: `## Prefabs: rotate the prefab, not the brush`, not `## Prefabs`. It's what lets an agent skim-and-act.
 - **Each trap states symptom → cause → fix → why.** The *why* lets the model generalise to the variant you didn't write about. Explain the mechanism instead of shouting — reaching for ALL-CAPS `MUST` usually means a missing reason.
+- **Name a tool, don't restate it.** A t7kb tool's parameters, defaults, output fields and what it writes are in its own description, which the agent reads on every call and which changes with the code. A skill names the tool for each step and keeps what no description says — which tool when, the order of work, the traps around it — so it can't drift from the tool.
+- **Each fact has one owner.** A setting, a trap or a rule lives in the skill whose craft it belongs to; a neighbour that needs it points there in a clause (`the settings are **t7kb:animation**'s`) instead of copying it, or the copies drift apart.
 - **Tag a fact's provenance in a few words** — "verified on a real build", "verified in the install", "community, t7kb 0.25" — but never narrate how it was found; the discovery story goes in the commit message / PR body. The tag tells the next editor what they may rewrite.
 - **Mechanics:** backtick every shipped token; bold the load-bearing claim and sibling names (**t7kb:debugging**); fully-qualified MCP tools (`t7kb:search`, `t7kb:get`, `t7kb:build`); close a domain skill with `## Don't invent`; **never hard-wrap** — one line per paragraph or list item.
 
