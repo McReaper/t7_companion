@@ -87,10 +87,10 @@ On a `script_model`, **`AnimScripted` is the primitive** (it needs `UseAnimTree(
 
 ## Code style & conventions
 
-Write your own scripts in this style. **A stock script you take over keeps Treyarch's** — tabs, `( padded )` calls — so edit it in that style, which keeps its diff against stock readable; and never carry that style into a new file:
+Write your own scripts, new files included, in this style. **A stock script you take over keeps Treyarch's** — tabs, `( padded )` calls — so edit it in that style, which keeps its diff against stock readable:
 
-- **4 spaces, never tabs.**
-- **Braces always, each on its own line**, under the statement it opens — never `if (x) doThing();`, and never `{` at the end of a line:
+- **4 spaces** for each indent level.
+- **Braces always, each on its own line**, under the statement it opens, a one-line body included:
   ```gsc
   if (isdefined(level.fn_custom_spawner))
   {
@@ -101,7 +101,7 @@ Write your own scripts in this style. **A stock script you take over keeps Treya
       spawner = array::random(level.zombie_spawners);
   }
   ```
-- **No padding inside parentheses or brackets.** `func(arg)` and `arr[i]`, never `func( arg )` or `arr[ i ]`; a function-pointer call keeps GSC's own `[[ ptr ]]()`.
+- **Tight parentheses and brackets**: `func(arg)`, `arr[i]`; a function-pointer call keeps GSC's own `[[ ptr ]]()`.
 - **A header in groups**: the engine and stdlib `#using`s first, then the feature's own, each group under a `//` line saying what it is for, then the inserts, `#precache`, `#namespace` and `REGISTER_SYSTEM_EX("<name>", &init, &main, undefined)` (the order above).
 - **Naming.** `snake_case` functions and variables; a function only its file calls is `function private`; system entry points are `init` and `main`; `#define` constants are `UPPER_SNAKE` with the feature's prefix (`<FEATURE>_SPAWN_DELAY`), arrays of names as `array("a", "b")`.
 - **Regions.** Group areas of a file with `/* region name */ … /* endregion */`.
