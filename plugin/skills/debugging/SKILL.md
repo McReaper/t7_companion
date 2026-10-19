@@ -9,7 +9,7 @@ Most "it just fails" reports are a **visibility** problem — the fix is to make
 
 ## Tooling: catch it before you build
 
-The fastest debugging is not reaching the game. Script in **VS Code with the GSCode extension** (Blakintosh's language server) — its inline diagnostics flag undefined functions, bad calls, and syntax errors as you type, killing a whole class of compile/link errors before a build. Don't skip this.
+The fastest debugging is not reaching the game: the GSCode extension **t7kb:scripting** recommends flags undefined functions, bad calls and syntax errors as you type, a whole class of compile and link errors gone before a build.
 
 ## Make errors visible first
 
@@ -21,7 +21,7 @@ In **Launcher → dvars** (or `+set …` on the command line), set:
 Reproduce, then read the **S.R.E. (script runtime error)** — the console prints the error plus a **call stack** naming the file for each frame. Cheats/dev need the map launched via `devmap` or a loaded mod (`sv_cheats`).
 
 - **`assert`, `assertmsg` and `/# … #/` dev blocks need `scr_mod_enable_devblock 1`** — not `developer`. `GSC_Language.pdf`: *"Assert – Only tested when devblocks are enabled"*; the Launcher's tooltip: *"Developer blocks are executed in mods"* — and on a **usermap** it doesn't take (maintainer-verified). So on a usermap, `assert`s and `/# #/` blocks effectively never run: an assert that never fires says nothing about whether its code path ran — instrument with `IPrintLnBold` or a `#define`-gated print instead, or build as a mod.
-- **These dvars reach a run only if something passes them.** The Launcher's Dvars dialog applies to *its* Run; a raw `BlackOps3.exe +devmap` line passes none of them, so it has no `logfile` and writes no new log. `t7kb:build`'s run stage passes them when asked: `launcher_dvars: true` reuses the ones saved in the Launcher's dialog, and `dvars: {"developer": "2", "logfile": "2"}` sets them directly (CLI `--launcher-dvars`, `--dvar logfile=2`). For a debug run, ask for `developer 2` and `logfile 2` (plus `scr_mod_enable_devblock 1` if you need asserts). By hand, it's `+set developer 2 +set logfile 2` before `+set fs_game <map> +devmap <map>`.
+- **These dvars reach a run only if something passes them.** The Launcher's Dvars dialog applies to *its* Run; a headless run gets them only when asked for (`t7kb:build` takes them, **t7kb:compiling**), and a raw `BlackOps3.exe` line passes none, so it has no `logfile` and writes no new log. For a debug run, ask for `developer 2` and `logfile 2` (plus `scr_mod_enable_devblock 1` if you need asserts); by hand, `+set developer 2 +set logfile 2` before `+set fs_game <map> +devmap <map>`.
 - **Check the Launcher's persisted dvars when AI never spawns.** `ai_disableSpawn` is one of them and easy to leave on; the log then floods with `SpawnFromSpawner( <unnamed> ) spawn prevented by ai_disableSpawn or g_spawnai.`
 
 Turn this on **before** theorizing: get the real message and call stack first.
@@ -30,7 +30,7 @@ Turn this on **before** theorizing: get the real message and call stack first.
 
 `logfile` writes the **whole console to a file on disk** — so read and grep it directly instead of asking the user to copy the console or screenshot an error. Always do this before asking them to re-describe a symptom.
 
-It lands at the **`fs_game` root**: a **mod** run → `mods/<modname>/console_mp.log`; a **usermap** (no `fs_game`) → the **game root** `<bo3_root>/console_mp.log` (*not* `usermaps/<map>/`). Don't assume which — a mod run whose `fs_game` folder is missing falls back to the root, and stale copies from earlier sessions sit in both places. **Glob `<bo3_root>/console_mp.log` plus `<bo3_root>/mods/*/console_mp.log` and take the newest by mtime.**
+Where it lands depends on the target: a **mod** run → `mods/<modname>/console_mp.log`; a **usermap** run → the **game root** `<bo3_root>/console_mp.log` (*not* `usermaps/<map>/`), though it is started with `fs_game` too (verified on real runs). Don't assume which — a mod run whose `fs_game` folder is missing falls back to the root, and stale copies from earlier sessions sit in both places. **Glob `<bo3_root>/console_mp.log` plus `<bo3_root>/mods/*/console_mp.log` and take the newest by mtime.**
 
 **The file may hold several sessions, or be from a previous run.** Both make you read a past run as the current one:
 
