@@ -5,7 +5,7 @@ description: How to port a model, material or rig into Black Ops 3 and author or
 
 # Assets: models, materials, and porting
 
-**A port that looks right in APE can still be wrong in places APE doesn't show** — a donor's leftover fields, a material slot named nothing like its job, collision that was never baked. This skill is the pipeline and those traps; look up APE fields, GDT syntax and material settings in **t7kb** (`t7kb:search` then `t7kb:get`), weighing `reliability` per hit (Discord ~0.25, UGX/ModMe/T7-wiki ~0.70, schema-verified references ~0.90). Ground on the APE schemas in `deffiles/*.awi` and stock GDTs dated with the install. For the *source* game — its engine lineage and script dumps — see **t7kb:crossref**.
+**A port that looks right in APE can still be wrong in places APE doesn't show** — a donor's leftover fields, a material slot named nothing like its job, collision that was never baked. This skill is the pipeline and those traps; look up APE fields, GDT syntax and material settings in **t7kb** (`t7kb:search` then `t7kb:get`), weighing each hit's `reliability` (**t7kb:knowledge-base**). Ground on the APE schemas in `deffiles/*.awi` and stock GDTs dated with the install. For the *source* game — its engine lineage and script dumps — see **t7kb:crossref**.
 
 ## Extraction tools aren't interchangeable — pick by source game and by the output you need
 
@@ -44,7 +44,7 @@ Same shape as weapons, plus rigging: extract the **factory zombie/character rig*
 
 For wiring a rigged zombie into custom AI behavior (archetypes, spawners) rather than the modeling/rigging itself, see **t7kb:zombies-ai**.
 
-Swapping the **stock Zombies player model** is a separate, simpler task from custom-character porting: swap to another stock crew member via `zm_usermap.gsc`'s character-index override, or build a fully custom player model via `customizationtable`/`playerbodytype`/`playerbodystyle` duplication in APE (body `multiplayer body`, arms `viewhands`, legs `animated`). **From a usermap, your copied `customizationtable` is silently skipped** — stock `core_common.csv` contributes `customizationtable,zm_character_customization`, the same upstream-asset skip **t7kb:debugging** explains; comment that line out.
+Swapping the **stock Zombies player model** is a separate, simpler task from custom-character porting: swap to another stock crew member via `zm_usermap.gsc`'s character-index override, or build a fully custom player model via `customizationtable`/`playerbodytype`/`playerbodystyle` duplication in APE (body `multiplayer body`, arms `viewhands`, legs `animated`). **From a usermap, your copied `customizationtable` is silently skipped** — stock `core_common.csv` contributes `customizationtable,zm_character_customization`, the same upstream-asset skip **t7kb:compiling** explains; comment that line out.
 
 ## Collision: ported/custom models have zero collision by default
 
@@ -58,7 +58,7 @@ Scene/cinematic, vehicle, killstreak and collectible data lives in **script bund
 
 ## Hand-authoring a GDT entry: copy a working one, then scrub what you didn't mean to inherit
 
-**Over MCP, use the `gdt_*` tools instead of editing the text:** `t7kb:gdt_find` / `t7kb:gdt_get` to locate and read an asset, `t7kb:gdt_schema` for what APE declares for a type (and a material type's real texture slots), `t7kb:gdt_edit` to create or change assets (validated, dry run by default, several at once, images straight from textures), `t7kb:gdt_check` to diagnose a whole GDT before building, and `t7kb:gdt_refs` before renaming or deleting an asset. What each one checks, and how to make a material from your own textures in one call: **`references/gdt-tools.md`**. The traps below are what they guard against, and still apply by hand. `gdt_edit` keeps one `.bak` per GDT, not a history: in a git-tracked root each write is a one-asset diff to commit on its own. **If the `t7kb` server lists `search`/`get` but no `gdt_*` tool, its binary predates them (they ship from 2.1.0):** tell the user and offer `/t7kb:setup-or-update` to update it, rather than silently editing the GDT text instead.
+**Over MCP, use the `gdt_*` tools instead of editing the text** (`t7kb:gdt_find`, `gdt_get`, `gdt_schema`, `gdt_edit`, `gdt_check`, `gdt_refs`; each description says what it does). The traps below are what they guard against, and still apply by hand; the GDT rules behind their refusals are in **`references/gdt-tools.md`**. A write keeps one `.bak` per GDT, not a history: in a git-tracked root, commit each one on its own. A server with `search` but no `gdt_*` tool is an older binary: offer `/t7kb:setup-or-update` rather than editing the GDT text instead.
 
 A GDT is plain text, so entries can be written directly (and versioned). **Copy an existing entry of the same asset type and substitute** — an xmodel entry carries ~70 fields and a `zbarrier` ~140, and hand-listing invites a missing-field failure. But a copied entry drags the donor's asset paths along, and the errors point at the *donor* (verified porting a BO2 vehicle):
 
@@ -100,7 +100,7 @@ Where a rip stops looking like the original (verified porting a BO2 vehicle):
 - **`lit_advanced_fullspec` silently refuses to expose `colorMap`** if `aoMap` and `glossMap` are missing — which a rip never has. Error reads `material '<name>' using technique '...' doesn't expose a 'colorMap' texture`. Drop to `lit`.
 - **The `colorMap` slot needs `coreSemantic` `sRGB3chAlpha`.** Switching a diffuse to `sRGB3ch` to dodge a packed alpha breaks the binding entirely, with the same "doesn't expose a colorMap" error.
 - **`baseImage` is relative to the install root**, so it includes the `texture_assets\\` prefix — not relative to `texture_assets/` itself.
-- **Old-title `SurfaceType` values don't transliterate.** `PAINTED_METAL` → `paintedmetal` (no underscore), and `default` → `<none>`, else the linker aborts with `surfaceTypeName 'default' not in surfaceTypeParms array`. `t7kb:gdt_edit` and `t7kb:gdt_check` reject a value that isn't in APE's list and warn on one left on `<error>`, APE's default, which stops the linker the same way once the material reaches collision.
+- **Old-title `SurfaceType` values don't transliterate.** `PAINTED_METAL` → `paintedmetal` (no underscore), and `default` → `<none>`, else the linker aborts with `surfaceTypeName 'default' not in surfaceTypeParms array`; one left on `<error>`, APE's default, stops it the same way once the material reaches collision (`references/gdt-tools.md`).
 
 ## Emissive, double-sided and packed alpha each look like a different bug
 
