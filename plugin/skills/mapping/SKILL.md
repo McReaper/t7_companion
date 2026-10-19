@@ -40,7 +40,7 @@ The game's tools say what is wrong before the mapper has to look: the build's re
 
 ## Grid discipline and brush basics
 
-Work on the standard **8-unit grid** (hotkeys 1–4 step the grid size; `~` drops to 0.5, `[`/`]` go finer/coarser) — staying grid-aligned is what keeps brushes meeting cleanly instead of leaving micro-gaps that cause leaks or bad lighting seams. Draw a brush by dragging on the 2D view; copy with Ctrl+C/Ctrl+V rather than the old space-bar nudge from earlier CoD titles.
+Work on the standard **8-unit grid** (keys 1–9 pick a grid of 1, 2, 4, 8, 16, 32, 64, 256 or 512, so 8 is key 4; the `` ` `` key picks 0.5, `[` and `]` step finer and coarser; Radiant's key bindings, verified in its settings) — staying grid-aligned is what keeps brushes meeting cleanly instead of leaving micro-gaps that cause leaks or bad lighting seams. Draw a brush by dragging on the 2D view; copy with Ctrl+C/Ctrl+V rather than the old space-bar nudge from earlier CoD titles.
 
 **Structural vs detail matters for compile, not just organization.** Structural brushes define the level's portal/visibility skeleton (walls, floors — anything that should block visibility); detail brushes (Radiant's Make Detail) are excluded from that calculation. Build the structure in structural brushes first, cosmetic detail on top — mixing them makes the level harder to portal and slower to compile. Texture anything the player won't see with **caulk** (invisible, doesn't render — check with F9) to cut triangle count; **mitre corners** to 45° where structural brushes meet to save texture seams and keep portaling clean.
 
@@ -50,7 +50,7 @@ A **BSP leak** means the level isn't fully sealed — compile writes a `.lin` **
 
 ## Terrain, curves, and patches
 
-Terrain and curved detail use **patches**, not brushes — drag one out, pick a row×column grid size, then edit verts (hold `V`). Extend a patch with Alt+scroll on a selected edge; join two patches by selecting both (parent first, then child), hitting `V`, then `W` to weld matching verts, or Ctrl+Shift+J for a **tolerant weld** across a looser vert selection. Curve patches build roads and arches the same way, with more control points. A patch draws on one side only: seen from its back it is invisible.
+Terrain and curved detail use **patches**, not brushes — drag one out, pick a row×column grid size, then drag its vertices (`V`). Extend a patch with Alt+scroll on a selected edge (community). Join two patches by welding their shared points (Radiant's Weld Equal Patch Pts, which has no key), or toggle a **tolerant weld** (Ctrl+Shift+J) for points that only nearly meet (verified in Radiant's key bindings). Curve patches build roads and arches the same way, with more control points. A patch draws on one side only: seen from its back it is invisible.
 
 ## Prefabs: rotate the prefab, not the brush
 
