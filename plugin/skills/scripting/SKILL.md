@@ -11,7 +11,7 @@ Script in **VS Code with the GSCode extension** (`blakintosh.gscode`, [marketpla
 
 ## Header: `#using`, `#insert`, `#namespace` — and the call prefix is the namespace, not the file
 
-Top of file, in order: `#using` each script you call into (grouped: stdlib, feature scripts, AI) → `#insert scripts\shared\shared.gsh;` (`WAIT_SERVER_FRAME`, `IS_TRUE`, `DEFAULT`, …) → `#namespace` → optional `#precache` → system registration.
+Top of file, in order: `#using` each script you call into (grouped: stdlib, feature scripts, AI) → `#insert scripts\shared\shared.gsh;` (`WAIT_SERVER_FRAME`, `IS_TRUE`, `DEFAULT`, …) and the feature's own `.gsh` → optional `#precache` → `#namespace` → system registration.
 
 - **The prefix you call with is the target file's `#namespace`, not its filename.** `_zm_utility.gsc` declares `#namespace zm_utility;`, so it is `zm_utility::`; `_zm_score.gsc` → `zm_score::`; `callbacks_shared.gsc` → `callback::` (singular). The obvious filename-shaped prefix fails at link as an unresolved external. Read the target's `#namespace` line before writing the call.
 - **A `#using` only makes a call resolvable** — the target script must also be in your `.zone`, or you get `Could not find scriptparsetree "scripts/…"` despite the `#using`.
@@ -49,7 +49,7 @@ Features that outgrow a few functions get their own `_<feature>.gsc`/`.csc` (own
 
 ## System registration, structs, and KVPs
 
-`REGISTER_SYSTEM("name", &__init__, undefined)` runs one init entry point at the system-init phase; `REGISTER_SYSTEM_EX("name", &init, &main, undefined)` adds a runtime `main`. Put `clientfield::register` (before the first network frame), `flag::init`, state `class`es, callbacks and `#precache` in init; loops and behavior in `main`. A small map-local feature can skip the system and be called from the map's `main()` — a coupling choice, not a timing one.
+`REGISTER_SYSTEM("name", &init, undefined)` runs one init entry point at the system-init phase; `REGISTER_SYSTEM_EX("name", &init, &main, undefined)` adds a runtime `main`. Put `clientfield::register` (before the first network frame), `flag::init`, state `class`es, callbacks and `#precache` in init; loops and behavior in `main`. A small map-local feature can skip the system and be called from the map's `main()` — a coupling choice, not a timing one.
 
 Map-placed entities and structs already exist when either phase runs — but they are fetched differently:
 
@@ -87,13 +87,26 @@ On a `script_model`, **`AnimScripted` is the primitive** (it needs `UseAnimTree(
 
 ## Code style & conventions
 
-Match these exactly — and when **editing an existing file, don't infer style from it**: stock scripts and usermap templates use tabs and `( padded )` calls.
+Write your own scripts in this style. **A stock script you take over keeps Treyarch's** — tabs, `( padded )` calls — so edit it in that style, which keeps its diff against stock readable; and never carry that style into a new file:
 
 - **4 spaces, never tabs.**
-- **Always braces.** Never `if (x) doThing();` — write `if (x) { doThing(); }` with the body on its own line(s). Same for loops.
-- **No padding inside brackets.** `func(arg)` and `arr[i]`, never `func( arg )` or `arr[ i ]`.
-- **Naming.** `snake_case` functions and variables; `UPPER_SNAKE` for `#define`; prefix private functions with `_` (and use `private`); system entry points are often `__init__` / `__main__`.
-- **Regions.** Group areas of a file with `/* region NAME */ … /* endregion */`.
+- **Braces always, each on its own line**, under the statement it opens — never `if (x) doThing();`, and never `{` at the end of a line:
+  ```gsc
+  if (isdefined(level.fn_custom_spawner))
+  {
+      spawner = [[ level.fn_custom_spawner ]]();
+  }
+  else
+  {
+      spawner = array::random(level.zombie_spawners);
+  }
+  ```
+- **No padding inside parentheses or brackets.** `func(arg)` and `arr[i]`, never `func( arg )` or `arr[ i ]`; a function-pointer call keeps GSC's own `[[ ptr ]]()`.
+- **A header in groups**: the engine and stdlib `#using`s first, then the feature's own, each group under a `//` line saying what it is for, then the inserts, `#precache`, `#namespace` and `REGISTER_SYSTEM_EX("<name>", &init, &main, undefined)` (the order above).
+- **Naming.** `snake_case` functions and variables; a function only its file calls is `function private`; system entry points are `init` and `main`; `#define` constants are `UPPER_SNAKE` with the feature's prefix (`<FEATURE>_SPAWN_DELAY`), arrays of names as `array("a", "b")`.
+- **Regions.** Group areas of a file with `/* region name */ … /* endregion */`.
+- **Comments say what a block is for**: a `//` line above it, and a blank line between steps.
+- **A loop that must run once at a time** starts with `level endon("end_game"); level notify("<loop>"); level endon("<loop>");`, so a second call ends the first.
 - **Debug prints: a `#define`-gated macro** in the feature `.gsh` — `#define DEBUG_X 0` then `#define PRINT_X_DEBUG(__str) if(DEBUG_X) IPrintLnBold(__str)`, called as `PRINT_X_DEBUG("msg " + val);` (Treyarch gates debug code with `#define` flags the same way, e.g. `_siegebot.gsc`'s `DEBUG_ON`). It needs no dvar to fire — unlike `/# … #/` dev blocks and `assert`, which need `scr_mod_enable_devblock 1` and don't run on a usermap at all (**t7kb:debugging**). Keep live call sites few and gate categories separately; dozens of per-frame prints bury the one you need.
 - **A macro invocation must fit on one line, with no comma anywhere in an argument.** Both fail identically: `Preprocessor error, No generated data for <file>` — no line, no token, just the file. The comma rule bites inside **string literals** (`PRINT_X_DEBUG("goal set, waiting")` breaks; `"goal set" + " waiting"` is fine). When a build dies on that message, look at the last macro call you touched.
 - **Runtime debug triggers: a `ModVar`, not a plain dvar.** A plain dvar can only be set at launch in a shipped usermap, so typing it in the console never reaches a `GetDvarInt` loop. `ModVar("name", "")` registers a console-settable variable; poll `GetDvarString("name", "")` each `WAIT_SERVER_FRAME`, act on a non-empty value, and reset it with `ModVar("name", "")` so it fires once per entry. (Verified on a real map; `ModVar` appears in no Treyarch script, so this is community practice, not a stock pattern.)
