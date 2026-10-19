@@ -33,7 +33,7 @@ Top of file, in order: `#using` each script you call into (grouped: stdlib, feat
    ```
    //scriptparsetree,scripts/zm/_zm_behavior.gsc
    ```
-   That CSV is shared and **install-wide**: back it up, and the change affects every map built from that tree until reverted. Override the **narrowest** script that covers the change — overriding `array_shared` breaks every dependent, and every override diverges from stock going forward.
+   Override the **narrowest** script that covers the change — overriding `array_shared` breaks every dependent, and every override diverges from stock going forward.
 
 ## Entry files: `zm_usermap::main()` reads some settings, then overwrites others
 
