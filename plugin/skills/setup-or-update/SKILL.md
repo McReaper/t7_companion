@@ -11,7 +11,7 @@ Download the t7kb tool + database, register it as an MCP server so it auto-start
 
 Detect the OS and run the matching command. It downloads the binary, the embedding model, and the ~0.9 GB database archive into one folder, and prints the install path. Both installers are idempotent: if a binary + database are already present at the target path, they skip the download — safe to run even after a manual or earlier install.
 
-If a binary already exists at the target path (the case the idempotency check would otherwise just skip), run `<path>/t7kb update-check` (`.exe` on Windows) first — it's a lightweight, on-demand-only network check (no automatic/background calls anywhere else in `t7kb`), and reports one of three things:
+If a binary already exists at the target path (the case the idempotency check would otherwise just skip), run `<path>/t7kb update-check` (`.exe` on Windows) first — it's a lightweight, on-demand-only network check (no automatic/background calls anywhere else in `t7kb`) — and act on what it reports:
 
 - **Up to date** — proceed to skip the install as usual.
 - **"Running a local/dev build"** — the binary at the install path was built from source, not downloaded from a release, so it may lack tools the skills name. Unless the user says they put it there on purpose, treat it like an available update and offer `-Force`/`--force`.
@@ -57,7 +57,7 @@ claude mcp add t7kb -e T7KB_VECTOR_INDEX=0 -- "/absolute/path/to/t7kb" mcp
 
 ## 3. Record the BO3 mod-tools root in a `CLAUDE.md` there — t7kb:knowledge-base reads it
 
-Walk up from the current directory to find the **BO3 mod-tools root** — the folder containing `raw/`, `share_raw/`, `usermaps/`, or `mods/` as siblings (a map/mod project usually lives *inside* that tree, e.g. `usermaps/<name>/`, not at the root itself). That root is also where Treyarch's shipped files live: the ground truth `t7kb:knowledge-base`'s "verify against ground truth" section has the agent check. Record it so nobody repeats the search. Claude Code loads every `CLAUDE.md` from that root down to wherever a session starts, so one file there covers the whole install and every `usermaps/<map>`/`mods/<mod>` under it; a per-project `CLAUDE.md` still layers on top. Skip this step entirely if no BO3-root markers are found — don't write into unrelated repos.
+Walk up from the current directory to find the **BO3 mod-tools root** — the folder holding `bin/`, `share/` and `map_source/`, with `usermaps/` or `mods/` beside them (a map/mod project usually lives *inside* that tree, e.g. `usermaps/<name>/`, not at the root itself). That root is also where Treyarch's shipped files live: the ground truth `t7kb:knowledge-base`'s "verify against ground truth" section has the agent check. Record it so nobody repeats the search. Claude Code loads every `CLAUDE.md` from that root down to wherever a session starts, so one file there covers the whole install and every `usermaps/<map>`/`mods/<mod>` under it; a per-project `CLAUDE.md` still layers on top. Skip this step entirely if no BO3-root markers are found — don't write into unrelated repos.
 
 - **No `CLAUDE.md` at the root:** write this stub, `<root>` being the absolute path:
   ```markdown

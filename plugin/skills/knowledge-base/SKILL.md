@@ -9,12 +9,12 @@ You have a local knowledge base of the Black Ops 3 modding community via the **t
 
 _If the `t7kb` tools aren't available, the knowledge base isn't installed — run `/t7kb:setup-or-update` first._
 
-_If you're working under a BO3 mod-tools root (has `raw/`, `share_raw/`, `usermaps/`, or `mods/`) whose `CLAUDE.md` doesn't record it yet, offer `/t7kb:setup-or-update`: its step 3 writes a short `CLAUDE.md` stub there naming the root, which covers every map/mod under it._
+_If you're working under a BO3 mod-tools root (it holds `bin/`, `share/` and `map_source/`, with `usermaps/` or `mods/`) whose `CLAUDE.md` doesn't record it yet, offer `/t7kb:setup-or-update`: its step 3 writes a short `CLAUDE.md` stub there naming the root, which covers every map/mod under it._
 
 ## Query it well
 
 - **Search broad, then narrow.** Issue several short, differently-phrased `t7kb:search` queries (symptom-side, mechanism-side, exact-jargon-side). The full-text index is conjunctive, so a single phrasing misses the long tail.
-- **Narrow by source when you know the kind of answer.** `source` takes a group — `api` (a function's exact signature and parameters), `scripts` (how Treyarch's own code does it), `docs` (official docs, asset and entity schemas), `wiki` and `forums` (tutorials), `discord`, `video` — or several (`wiki,forums`). Unfiltered, Discord threads (70% of the corpus) can fill the whole top 10: `clientfield register set lua` returns no API page until `source: api`, where `RegisterClientField` is third. Search unfiltered first for a symptom or an error message, where the threads are often the answer.
+- **Narrow by source when you know the kind of answer.** `source` takes a group — `api` (a function's exact signature and parameters), `scripts` (how Treyarch's own code does it), `docs` (official docs, asset and entity schemas), `wiki` and `forums` (tutorials), `discord`, `video`, `workspace` (the files of a mod-tools install) — or several (`wiki,forums`). Unfiltered, Discord threads (70% of the corpus) can fill the whole top 10: `clientfield register set lua` returns no API page until `source: api`, where `RegisterClientField` is third. Search unfiltered first for a symptom or an error message, where the threads are often the answer.
 - **Read full bodies.** `t7kb:get` the top `doc_id`s — don't answer from snippets. A long document (a whole script, GDT or transcript) comes a page at a time, ending with the `offset` for the next part. To reach the passage the search matched, pass `find` with a phrase from its snippet: the page then starts at it, wherever it sits — rather than paging through everything.
 - **Weigh reliability.** Each result carries a `reliability` score. On conflict, prefer higher-reliability sources and surface the disagreement when it matters.
 - **Cite.** When a claim comes from the corpus, name the `source` + `url`.
