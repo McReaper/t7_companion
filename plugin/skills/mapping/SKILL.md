@@ -78,7 +78,7 @@ Beyond geometric leaks, a **zone** is the unit of playable space in a custom zom
 - **Power-ups only drop where a zone covers the kill.** `_zm_powerups.gsc` keeps a drop only if it `istouching` a `player_volume` — so zombies killed in an un-zoned area never drop anything, and a volume that spills past a window barrier drops power-ups where nobody can reach them. Zone exactly the reachable space.
 - **A `player_respawn_point` must name its zone** in `script_noteworthy`, or `_zm_zonemgr` asserts `player_respawn_point: You must specify a script noteworthy with the zone name`. A typo'd name gives no error at all — the point simply never unlocks (inferred from the unlock-by-name logic).
 
-**Door and debris clips don't need `DYNAMICPATH`.** `_zm_blockers.gsc` calls `DisconnectPaths()` on every door `script_brushmodel` at init and `ConnectPaths()` on the `script_noteworthy "clip"` piece when it opens — the community fix of ticking `DYNAMICPATH` on the clip is not the missing piece. A door zombies still won't path through after opening is usually a clip too thin to cut the navmesh cleanly (community report: use thick clip brushes).
+**`DYNAMICPATH` isn't what makes an opened door passable.** `_zm_blockers.gsc` calls `DisconnectPaths()` on every door `script_brushmodel` at init and `ConnectPaths()` on the `script_noteworthy "clip"` piece when it opens, so the community fix of ticking `DYNAMICPATH` on the clip is not the missing piece (zm_giant's one door clip carries it, beside the script's own calls). A door zombies still won't path through after opening is usually a clip too thin to cut the navmesh cleanly (community report: use thick clip brushes).
 
 ## Compile errors and triangle budget
 
