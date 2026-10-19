@@ -34,7 +34,7 @@ Only ~36 of the 66 animated bones match by name. Rebuild the table from the two 
 
 Because the offset is *constant*, push it down into the arms with no change to the animation: after the bake, **zero `tag_torso`'s rotation, then restore the shoulders' world transforms** (sample them per frame first). Everything below the shoulders keeps its local keys and follows. Verify: torso local rotation → `(0,0,0)`, shoulder world positions **unchanged to the decimal**, shoulder local rotation moves into the same range as a working reference.
 
-## Dead ends — measured, do not repeat
+## Dead ends, measured
 
 Each of these made the in-game result worse:
 

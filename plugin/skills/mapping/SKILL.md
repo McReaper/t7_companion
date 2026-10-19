@@ -15,7 +15,7 @@ A usermap needs more than its `.map` — its zone, scripts and sound config — 
 
 Radiant holds the open map, and its next save overwrites the file on disk, so every change goes through t7kb's map tools into the Radiant the mapper has open, where they watch it land and take it back from Radiant's undo menu. The order of work:
 
-1. Open the map (`t7kb:radiant_open`); never drop the mapper's unsaved changes without their yes.
+1. Open the map (`t7kb:radiant_open`); drop the mapper's unsaved changes only on their yes.
 2. Find what is there (`t7kb:map_find`) before touching it.
 3. Edit in batches the mapper would undo as a whole (`t7kb:map_edit`). A batch refused because the mapper changed something since it was read means read again and check the request still holds before resending.
 4. Look at the result (`t7kb:map_view`).

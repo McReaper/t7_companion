@@ -71,7 +71,7 @@ Zone it with `fx,_mymap/fx_huey_main_blade_full` — that pulls the effect and i
 
 ## The Radiant FX Editor ↔ disk `.efx` sync trap
 
-The FX Editor **loads its own copy and re-saves the whole `.efx`** (often upgrading `iwfx 2`→`3`). So: edits you make to the `.efx` **on disk are invisible to an open editor**, and **saving from the editor overwrites your disk edits**. Don't fight it — split the work: **element properties (rotation, spawn angle, life, atlas index) in the FX Editor**; **materials/images in APE/GDT** (picked up on re-link, not live in the FX viewport). If you must hand-edit the `.efx`, do it with the **editor closed**, and preserve its **CRLF** line endings.
+The FX Editor **loads its own copy and re-saves the whole `.efx`** (often upgrading `iwfx 2`→`3`). So: edits you make to the `.efx` **on disk are invisible to an open editor**, and **saving from the editor overwrites your disk edits**. Split the work between them: **element properties (rotation, spawn angle, life, atlas index) in the FX Editor**; **materials/images in APE/GDT** (picked up on re-link, not live in the FX viewport). If you must hand-edit the `.efx`, do it with the **editor closed**, and preserve its **CRLF** line endings.
 
 ## Don't invent
 

@@ -7,7 +7,7 @@ description: How to install, update, or repair the t7kb Black Ops 3 knowledge-ba
 
 Download the t7kb tool + database, register it as an MCP server so it auto-starts in future sessions, record the BO3 root, and keep the plugin current. Do these steps for the user's OS, reporting what you run. On an update, every step still applies: each one checks what is already in place.
 
-## 1. Run the installer — it's idempotent, don't force a redownload
+## 1. Run the installer — it's idempotent, so force it only to update
 
 Detect the OS and run the matching command. It downloads the binary, the embedding model, and the ~0.9 GB database archive into one folder, and prints the install path. Both installers are idempotent: if a binary + database are already present at the target path, they skip the download — safe to run even after a manual or earlier install.
 
@@ -57,24 +57,24 @@ claude mcp add t7kb -e T7KB_VECTOR_INDEX=0 -- "/absolute/path/to/t7kb" mcp
 
 ## 3. Record the BO3 mod-tools root in a `CLAUDE.md` there — t7kb:knowledge-base reads it
 
-Walk up from the current directory to find the **BO3 mod-tools root** — the folder holding `bin/`, `share/` and `map_source/`, with `usermaps/` or `mods/` beside them (a map/mod project usually lives *inside* that tree, e.g. `usermaps/<name>/`, not at the root itself). That root is also where Treyarch's shipped files live: the ground truth `t7kb:knowledge-base`'s "verify against ground truth" section has the agent check. Record it so nobody repeats the search. Claude Code loads every `CLAUDE.md` from that root down to wherever a session starts, so one file there covers the whole install and every `usermaps/<map>`/`mods/<mod>` under it; a per-project `CLAUDE.md` still layers on top. Skip this step entirely if no BO3-root markers are found — don't write into unrelated repos.
+Walk up from the current directory to find the **BO3 mod-tools root** — the folder holding `bin/`, `share/` and `map_source/`, with `usermaps/` or `mods/` beside them (a map/mod project usually lives *inside* that tree, e.g. `usermaps/<name>/`, not at the root itself). That root is also where Treyarch's shipped files live: the ground truth `t7kb:knowledge-base`'s "verify against ground truth" section has the agent check. Record it so nobody repeats the search. Claude Code loads every `CLAUDE.md` from that root down to wherever a session starts, so one file there covers the whole install and every `usermaps/<map>`/`mods/<mod>` under it; a per-project `CLAUDE.md` still layers on top. Skip this step entirely if no BO3-root markers are found.
 
 - **No `CLAUDE.md` at the root:** write this stub, `<root>` being the absolute path:
   ```markdown
   # Black Ops 3 mod-tools root
 
-  - Raw mod-tools root: `<root>` (this file's directory) — confirmed present; don't search for it.
+  - Raw mod-tools root: `<root>` (this file's directory) — confirmed present; use it as is.
   - BO3 modding goes through the t7kb skills and MCP tools; if the tools are missing, run `/t7kb:setup-or-update`.
   ```
   Everything else an agent needs comes from the MCP server's instructions and the skills, which update with t7kb; what the stub records never changes, so it never needs updating.
 - **A `CLAUDE.md` without the root fact:** offer to append the first bullet (with confirmation). Check first, so a re-run doesn't add it twice.
-- **The old primer:** an `AGENTS.md` starting `# AGENTS.md — Black Ops 3 modding workspace`, usually beside a `CLAUDE.md` holding only `@AGENTS.md`, which t7kb 2.x fetched. It digests the skills into always-loaded context, and that copy never updated, so an agent acts on it and never loads the skill. Tell the user it is superseded and offer to replace it with the stub, keeping the root it recorded under `## This install`. Before deleting, compare it with the primer's last version (`https://raw.githubusercontent.com/McReaper/t7_companion/v2.9.0/templates/AGENTS.md`) and show the user anything beyond it — lines of their own go into the new `CLAUDE.md` if they want them. In a `CLAUDE.md` with more than the import, remove only the `@AGENTS.md` line. **Never delete either file without the user's yes.**
+- **The old primer:** an `AGENTS.md` starting `# AGENTS.md — Black Ops 3 modding workspace`, usually beside a `CLAUDE.md` holding only `@AGENTS.md`, which t7kb 2.x fetched. It digests the skills into always-loaded context, and that copy never updated, so an agent acts on it and never loads the skill. Tell the user it is superseded and offer to replace it with the stub, keeping the root it recorded under `## This install`. Before deleting, compare it with the primer's last version (`https://raw.githubusercontent.com/McReaper/t7_companion/v2.9.0/templates/AGENTS.md`) and show the user anything beyond it — lines of their own go into the new `CLAUDE.md` if they want them. In a `CLAUDE.md` with more than the import, remove only the `@AGENTS.md` line. **Delete either file only on the user's yes.**
 
 ### Offer to keep that root in git
 
 Modding edits **shared, install-wide files** — an assetlist line commented out to override a stock asset, a GDT `gdt_edit` rewrites, files a community pack drops into `source_data/` or `deffiles/` — and Steam's "verify files" and APE saves overwrite files silently. A git history of the install root makes each change reviewable and revertible, and lets you read `git log`/`git diff` to see what changed since the last good build. `gdt_edit` keeps only one `.bak`.
 
-- **The root is not a git repository** (`git -C "<root>" rev-parse` fails): explain that, and offer to set it up. **Never run `git init` without the user's yes.** With it: `git init` at the root, then fetch the default ignore and LFS rules beside it (skip a file that already exists), then suggest committing in steps — the install is ~10 GB — starting with `zone_source/all/assetlist/`, `deffiles/`, `source_data/`, `share/raw/`, `usermaps/` and `mods/`.
+- **The root is not a git repository** (`git -C "<root>" rev-parse` fails): explain that, and offer to set it up. **Run `git init` only on the user's yes.** With it: `git init` at the root, then fetch the default ignore and LFS rules beside it (skip a file that already exists), then suggest committing in steps — the install is ~10 GB — starting with `zone_source/all/assetlist/`, `deffiles/`, `source_data/`, `share/raw/`, `usermaps/` and `mods/`.
   ```bash
   curl -fsSL https://raw.githubusercontent.com/McReaper/t7_companion/main/templates/bo3.gitignore -o "<root>/.gitignore"
   curl -fsSL https://raw.githubusercontent.com/McReaper/t7_companion/main/templates/bo3.gitattributes -o "<root>/.gitattributes"
@@ -104,7 +104,7 @@ Nothing else tells the user a release exists: a third-party marketplace such as 
 - **Not `true`:** explain the above in a sentence and offer to set `"autoUpdate": true` on that entry. Write it only on the user's yes, editing the JSON in place and keeping every other key. If they'd rather do it themselves: `/plugin` → Marketplaces → `t7-reapy` → Enable auto-update.
 - **When it can't take effect:** with `DISABLE_UPDATES`, `DISABLE_AUTOUPDATER` or `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` set and `FORCE_AUTOUPDATE_PLUGINS=1` not set, Claude Code skips the plugin auto-update pass whatever the setting says. Say so rather than setting it, and leave the choice of environment to the user.
 
-## 5. Confirm — never claim success if a step failed
+## 5. Confirm what was done, and report a failed step as failed
 
 Tell the user what was done. After a first install, the `t7kb:search` and `t7kb:get` MCP tools become available in the **next session** (or after `/reload-plugins`); after an update, a restart of Claude Code loads the new binary and skills. Either way, the ~3.8 GB database unpacks itself the first time the server starts, about 20 s once.
 
