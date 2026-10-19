@@ -30,7 +30,7 @@ Turn this on **before** theorizing: get the real message and call stack first.
 
 `logfile` writes the **whole console to a file on disk** — so read and grep it directly instead of asking the user to copy the console or screenshot an error. Always do this before asking them to re-describe a symptom.
 
-Where it lands depends on the target: a **mod** run → `mods/<modname>/console_mp.log`; a **usermap** run → the **game root** `<bo3_root>/console_mp.log` (*not* `usermaps/<map>/`), though it is started with `fs_game` too (verified on real runs). Don't assume which — a mod run whose `fs_game` folder is missing falls back to the root, and stale copies from earlier sessions sit in both places. **Glob `<bo3_root>/console_mp.log` plus `<bo3_root>/mods/*/console_mp.log` and take the newest by mtime.**
+Where it lands depends on the target: a **mod** run → `mods/<modname>/console_mp.log`; a **usermap** run → the **game root** `<bo3_root>/console_mp.log` (*not* `usermaps/<map>/`), though it is started with `fs_game` too (verified on real runs). Either can hold the current one: a mod run whose `fs_game` folder is missing falls back to the root, and stale copies from earlier sessions sit in both places. **Glob `<bo3_root>/console_mp.log` plus `<bo3_root>/mods/*/console_mp.log` and take the newest by mtime.**
 
 **The file may hold several sessions, or be from a previous run.** Both make you read a past run as the current one:
 

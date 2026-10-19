@@ -70,7 +70,7 @@ One linker pass covers one language: it writes the language-neutral `<map>.ff` *
 
 The corollary is the real trap: **a string no compiled GSC references is never found that way.** Text asked for only by Lua (`Engine.Localize("…")`), by a stock HUD widget you loaded, or by an asset prints its raw reference — `ZOMBIE_ROCKET_HINT`, `ZM_CASTLE_TRAM_TOKEN_POWERUP` — with a clean link and an empty `.errorlog`. For those, `localize,<file>` **is** the fix; for a stock ref, author a `.str` whose filename reproduces its prefix (`zm_castle.str` with `REFERENCE TRAM_TOKEN_POWERUP`). (community, t7kb 0.70)
 
-`linkerflag,noloc` is the opposite lever: it skips generating the per-language loc files (`en_`, `fr_`, …) entirely, saving a fastfile slot when nothing in the map or mod is localized. Don't reach for it if you rely on localized strings anywhere. Notifies are unaffected either way.
+`linkerflag,noloc` is the opposite lever: it skips generating the per-language loc files (`en_`, `fr_`, …) entirely, saving a fastfile slot: use it only when nothing in the map or mod is localized. Notifies are unaffected either way.
 
 ## Diagnosing a string that won't resolve
 

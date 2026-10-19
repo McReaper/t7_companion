@@ -27,7 +27,7 @@ Check the BO3 root's `CLAUDE.md` first for a "Raw mod-tools root" fact (`/t7kb:s
 
 ### When the raw install isn't available
 
-The raw mod-tools install is the preferred ground truth, but it may be absent (not installed, on another machine, or a headless run). Do not silently fall back to low-reliability sources:
+The raw mod-tools install is the preferred ground truth, but it may be absent (not installed, on another machine, or a headless run). Then say so, and fall back in this order:
 
 - **Detect and disclose.** If you cannot locate the install, say so in your answer, and mark any shipped-token claim (function name, KVP, asset field, error string, path) as corroborated by community sources only — not verified against shipped files.
 - **Last-resort web supplement.** When the corpus is thin and the install is unavailable, a targeted web search may fill gaps. Rank it strictly below the corpus and the install, never as ground truth. Prefer higher-reliability sources (e.g. UGX, resolved/accepted threads) over random posts, keep the "may be paraphrased or subtly wrong" caution, and state in the answer what was verified versus merely corroborated.
