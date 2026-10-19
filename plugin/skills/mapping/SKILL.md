@@ -36,7 +36,7 @@ How a thing is built in BO3 is in Treyarch's own sources: the shipped maps and p
 
 ## Check against the game's own tools, then with the mapper
 
-The game's tools say what is wrong before the mapper has to look: the build's report (cod2map's problems with where they are, the link's errors and warnings: **t7kb:compiling**), the bake's warnings (a probe out of range, a shadow dropped), and the compiled navmesh, `share/raw/maps/<mode>/<map>_navmesh.hkt` (vertices as float4 in metres, so divide by 0.0254), where a passage it doesn't cover is one zombies never take. Then the mapper walks the map in game: their eyes are the last check, not the first.
+The game's tools say what is wrong before the mapper has to look: the build's report (cod2map's problems with where they are, the link's errors and warnings: **t7kb:compiling**), the bake's warnings (a probe out of range, a shadow dropped), and the compiled navmesh, where a passage it doesn't cover is one zombies never take (**t7kb:zombies-ai** has where it is and how to read it). Then the mapper walks the map in game: their eyes are the last check, not the first.
 
 ## Grid discipline and brush basics
 

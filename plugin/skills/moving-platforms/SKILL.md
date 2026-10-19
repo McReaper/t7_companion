@@ -63,7 +63,7 @@ Three consequences of that island being separate:
 
 - **`GetClosestPointOnNavMesh` answers from the static mesh only** (measured). It cannot see the mover's island, so using it to validate or snap a goal on a deck rejects perfectly good points. Don't gate a rider's goal on it.
 - **Overlapping `moving_platform_enabled` brushes generate competing meshes** (measured), and the console fills with navmesh errors at over a hundred a second. Where the walkable surface is one volume, model it as **one convex brush** — the flood stops.
-- **The mesh has to fit an AI.** `bin/default_navmesh_settings.json` sets `characterHeight 72`, `minCharacterWidth 31`, `simplification.minCorridorWidth 30`, `maxStepHeight 18` — a gangway or bus aisle narrower than ~31 units silently produces no mesh at all, reading as "the platform doesn't work" rather than "the corridor is too tight".
+- **The mesh has to fit an AI.** A gangway or bus aisle narrower than the navmesh's minimum width (**t7kb:zombies-ai**) silently produces no mesh at all, reading as "the platform doesn't work" rather than "the corridor is too tight".
 
 **Treyarch never pathfinds an AI on a moving vehicle.** `vehicleriders_shared` puts every rider in `PathMode( "dont move" )` for the ride; no shipped script walks an actor around on a moving mover. Riders holding a valid accepted goal on a moving deck frequently just stand still with every readable state healthy (`pathmode move allowed`, `scripted 0`, `enemy 1`, goal accepted, `ignoreall 0`), even with the vehicle stopped. Use the tank's model instead: park the rider (`setgoalpos( self.origin )` with a generous radius) and script movement between authored, vehicle-local points.
 
