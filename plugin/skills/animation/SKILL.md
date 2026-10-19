@@ -82,7 +82,7 @@ Create a new `xanim` asset (don't derive from a stock one):
 - **Use Bones** → checked for everything except viewmodels.
 - **Looping** → checked only for looping anims (idle/slide/sprint loops).
 
-With the MCP tools, `t7kb:gdt_edit` creates it: asset type `xanim`, and in `set` the GDT keys behind those APE labels — `filename` (Anim File), `model` (Model File), `type`, `useBones`, `looping` (verified in `deffiles/xanim.awi`; `t7kb:gdt_schema` lists the rest). `t7kb:gdt_check` then confirms the Anim File exists under `xanim_export/`, which catches the path-root mistake above. It doesn't check that `model` is set: do that yourself.
+Through `t7kb:gdt_edit`, the GDT keys behind those APE labels are `filename` (Anim File), `model` (Model File), `type`, `useBones` and `looping` (verified in `deffiles/xanim.awi`). `t7kb:gdt_check` catches an Anim File that isn't under `xanim_export/`; nothing before the link catches an empty Model File, so set it every time.
 
 Then add `xanim,<name>` (plus any model/scriptbundle it depends on) to the map/mod **`.zone`** and **Link** — no map recompile unless geometry changed (**t7kb:compiling**).
 
@@ -103,9 +103,7 @@ For anything played on a character, `delta` is close to mandatory:
 - **The animation selector tables enforce it.** A xanim reached through an `.ai_ast` fails at link with `… is being used in the animation selector table "<x>" in "<map>.ai_ast" which **requires "delta" type animations**`.
 - **`AnimScripted` depends on it.** A delta anim carries the root's motion as its own track, which is what `GetMoveDelta` / `GetAngleDelta` read and, above all, what **`GetStartOrigin`** needs — *"get the starting origin for an animation, in world coordinates, given its current position and angles"*, i.e. place the entity so the clip **ends** where you want. BO2's TranZit bus does exactly that (`start_origin = getstartorigin(...)` then `animscripted(start_origin, ...)`). In `relative`/`absolute` there is no separate root track: the bones move, the entity stays put.
 
-On **`has bad angle delta on frame N`**, do **not** switch to `relative`: it links, then breaks once the anim enters a selector table. **Try `delta3d`**: same root-motion family; on one BO2→BO3 batch it converted 10 anims `delta` refused.
-
-The fix is empirical, not understood. Ruled out: corrupt data (rotation matrices orthonormal to 1e-6), an Euler flip (`filterCurve -euler`), the file format (`XANIM_EXPORT` and `XANIM_BIN` rejected alike), and root tilt (constant 3.35°, a `tag_origin` bind offset). The only pattern: all 10 were "character detaches from the vehicle" clips. If the selector table also refuses `delta3d`, the problem is the anim data.
+On **`has bad angle delta on frame N`**, do **not** switch to `relative`: it links, then breaks once the anim enters a selector table. **Try `delta3d`**: same root-motion family, and it converts anims `delta` refuses (verified on a BO2 port). Why `delta` refuses them isn't known, and these don't change it: the rotations are sound (orthonormal to 1e-6), an Euler filter (`filterCurve -euler`), the text or the binary format, the root's tilt. If the selector table also refuses `delta3d`, the problem is the anim data.
 
 `delta3d` is common in stock: in the stock GDTs under `xanim_export/` and `model_export/`, `ai_*` anims are `delta`/useBones 1 (665), the viewmodel GDTs' `vm_*` are `relative`/useBones 0 (plus a few movement-bob `additive`), and **33 of 46 Treyarch fxanim props are `delta3d`**.
 
