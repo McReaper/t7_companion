@@ -8,13 +8,15 @@
 //
 // Each Radiant with the plugin serves the pipe \\.\pipe\t7_radiant_bridge_<pid>.
 // A Client is one connection to it: frames of a 4-byte little-endian length and
-// a payload, a header line and a body; hello first. Its requests run in
-// Radiant's main thread one after the other, so replies come in request order;
-// a reader goroutine hands each to its caller by id, and events to Events. A
-// caller that gives up on a reply (its context ended) leaves the request
-// running: closing the connection is what drops the requests still queued.
-// While a modal dialog is open, everything but hello, state and menus fails
-// with the code busy.
+// a payload, a header line and a body; hello first, which refuses a plugin
+// older than MinPlugin, the first with every command the client sends (the
+// protocol's number changes only when a command changes meaning; a new command
+// raises the plugin's version). Its requests run in Radiant's main thread one
+// after the other, so replies come in request order; a reader goroutine hands
+// each to its caller by id, and events to Events. A caller that gives up on a
+// reply (its context ended) leaves the request running: closing the connection
+// is what drops the requests still queued. While a modal dialog is open,
+// everything but hello, state and menus fails with the code busy.
 //
 // # Machines
 //

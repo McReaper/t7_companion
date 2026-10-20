@@ -14,6 +14,13 @@ import (
 // Protocol is the bridge protocol this client speaks.
 const Protocol = 1
 
+// MinPlugin is the oldest plugin serving every command this client sends: the
+// first release, 1.1.0, which brought edit.
+const MinPlugin = "1.1.0"
+
+// Releases is where the plugin is downloaded.
+const Releases = "https://github.com/McReaper/t7_radiant_bridge/releases/latest"
+
 // maxFrame bounds a frame from the bridge: a capture of a large view or a
 // whole map's text is tens of MiB, a corrupt length is not.
 var maxFrame uint32 = 512 << 20
@@ -85,10 +92,35 @@ func NewClient(ctx context.Context, rw io.ReadWriteCloser) (*Client, error) {
 		return nil, err
 	}
 	c.Hello = parseHello(r.Summary)
+	if !versionAtLeast(c.Hello.Plugin, MinPlugin) {
+		c.Close()
+		return nil, fmt.Errorf("this Radiant's bridge plugin is %q, older than %s, the first one with every command t7kb sends: close Radiant and install the latest from %s", c.Hello.Plugin, MinPlugin, Releases)
+	}
 	return c, nil
 }
 
-// parseHello reads "1 plugin=1.0.0 host=1.1.0 pid=123".
+// versionAtLeast reports whether the dotted version v is min or later, a
+// missing part counting as 0; a part that isn't a number is never later.
+func versionAtLeast(v, min string) bool {
+	vs, ms := strings.Split(v, "."), strings.Split(min, ".")
+	for i, m := range ms {
+		have := 0
+		if i < len(vs) {
+			n, err := strconv.Atoi(vs[i])
+			if err != nil {
+				return false
+			}
+			have = n
+		}
+		want, _ := strconv.Atoi(m)
+		if have != want {
+			return have > want
+		}
+	}
+	return true
+}
+
+// parseHello reads "1 plugin=1.1.0 host=1.1.0 pid=123".
 func parseHello(s string) Hello {
 	var h Hello
 	for _, kv := range strings.Fields(s) {

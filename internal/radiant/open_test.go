@@ -57,7 +57,7 @@ func TestOpenUsesTheRadiantThatHasTheMapOpen(t *testing.T) {
 	other.Modified = true
 	has := radianttest.New(12, strings.ToUpper(a)) // Radiant's case, not ours
 	got, err := open(t, radianttest.NewMachine(other, has), radiant.OpenOptions{Root: root, Map: a})
-	if err != nil || got != (radiant.Opened{PID: 12, Map: strings.ToUpper(a), How: radiant.AlreadyOpen, Plugin: "1.0.0"}) {
+	if err != nil || got != (radiant.Opened{PID: 12, Map: strings.ToUpper(a), How: radiant.AlreadyOpen, Plugin: "1.1.0"}) {
 		t.Errorf("open = %+v, %v", got, err)
 	}
 	if r := append(reloads(other), reloads(has)...); len(r) != 0 {

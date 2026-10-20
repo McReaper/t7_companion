@@ -102,7 +102,7 @@ func TestRadiantOpenCommand(t *testing.T) {
 	if err != nil || json.Unmarshal([]byte(out), &got) != nil {
 		t.Fatalf("open --discard: %v\n%s", err, out)
 	}
-	if want := (radiantOpenOut{PID: 31, Map: filepath.Join(root, "map_source", "zm", "zm_b.map"), Opened: "reloaded", Plugin: "1.0.0"}); got != want {
+	if want := (radiantOpenOut{PID: 31, Map: filepath.Join(root, "map_source", "zm", "zm_b.map"), Opened: "reloaded", Plugin: "1.1.0"}); got != want {
 		t.Errorf("open = %+v, want %+v", got, want)
 	}
 }
