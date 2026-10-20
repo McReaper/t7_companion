@@ -77,7 +77,7 @@ type conn struct {
 
 // New is a Radiant with the plugin's commands and the map open.
 func New(pid int, mapPath string) *Fake {
-	f := &Fake{PID: pid, Plugin: "1.0.0", Map: mapPath, Render: "Real Lighting", View2D: "XY (Top)",
+	f := &Fake{PID: pid, Plugin: "1.1.0", Map: mapPath, Render: "Real Lighting", View2D: "XY (Top)",
 		views: views{W3: 160, H3: 90, Focal: 120, W2: 90, H2: 160, Scale2D: 1}, conns: map[*conn]bool{}}
 	f.handlers = map[string]Handler{"hello": hello, "state": state, "reload": reload, "subscribe": subscribe,
 		"entities": entities, "selection": selection, "camera": camera, "capture": capture, "command": command, "action": action,

@@ -5,7 +5,7 @@ Your agent works in the Radiant you have open: it opens a map, finds what's in i
 ## What you need
 
 - **[MTPlugins](https://github.com/Aidan601/MTPlugins)**, which loads plugins into Radiant.
-- **[T7RadiantBridge](https://github.com/McReaper/t7_radiant_bridge)**, the plugin t7kb talks to. It has no release yet: its first version is in review in [McReaper/t7_radiant_bridge#3](https://github.com/McReaper/t7_radiant_bridge/pull/3).
+- **[T7RadiantBridge](https://github.com/McReaper/t7_radiant_bridge)** 1.1.0 or later, the plugin t7kb talks to: [its install](https://github.com/McReaper/t7_radiant_bridge#install) is one zip unzipped into `bin/plugins/`.
 - t7kb itself, [installed](../README.md#-install) with its MCP server in your agent.
 
 ## What the agent can do
