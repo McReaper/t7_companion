@@ -114,8 +114,8 @@ func launch(ctx context.Context, m Machine, o OpenOptions) (Opened, error) {
 	}
 	plugin := filepath.Join(bin, "plugins", "T7RadiantBridge", "T7RadiantBridge.dll")
 	if _, err := os.Stat(plugin); err != nil {
-		return Opened{}, fmt.Errorf("the T7RadiantBridge plugin is not installed (%s): t7kb drives Radiant through it, "+
-			"see github.com/McReaper/t7_radiant_bridge", plugin)
+		return Opened{}, fmt.Errorf("the T7RadiantBridge plugin is not installed (%s): t7kb drives Radiant through it; "+
+			"install MTPlugins, then unzip T7RadiantBridge.zip from %s into bin/plugins/", plugin, Releases)
 	}
 	pid, err := m.Start(exe, bin, o.Map)
 	if err != nil {
