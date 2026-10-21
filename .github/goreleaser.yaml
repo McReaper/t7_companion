@@ -44,8 +44,8 @@ archives:
       - LICENSE
       - models/**/* # the bundled embedding model (offline)
 
-# Auto-generated changelog, sandwiched between the hand-curated header/footer
-# below. Only what a user would notice makes it in: features, fixes, speed-ups (perf) and skill
+# Auto-generated changelog, followed by the hand-curated footer below; no
+# header, as whoever reads a release page already knows the tool. Only what a user would notice makes it in: features, fixes, speed-ups (perf) and skill
 # knowledge (docs(skills) ships to plugin users). ci/chore/test/refactor and
 # repo docs match no group, so GoReleaser drops them. Each line shows the
 # subject without its "type(scope):" prefix, the scope kept as a bold label.
@@ -74,8 +74,6 @@ changelog:
 release:
   # owner/repo are auto-detected from the git remote.
   name_template: "t7kb {{ .Tag }}"
-  header: |
-    Black Ops 3 modding knowledge, grounded skills and a headless build pipeline for your AI agent. One local binary, `t7kb`, serves over MCP (and a small CLI) a knowledge base of the BO3 modding community, tools to check and edit your GDTs, build your map and read what the linker packed, and the game's shaders as HLSL. The knowledge base is its own download, `t7kb.db.zip`; everything then runs offline.
   footer: |
     ## Install
 
