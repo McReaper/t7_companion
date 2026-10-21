@@ -147,9 +147,6 @@ Pick the **User** scope: a project-scope install doesn't load in `usermaps/<map>
 > [!WARNING]
 > **The skills are Claude Code only, for now.** Other clients get the knowledge base and every tool, but not the skills. They are plain [`SKILL.md` files](plugin/skills): if your harness can load skills, a pull request that wires them in is welcome.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/McReaper/t7_companion/main/install/install.sh | bash
-```
 ```powershell
 irm https://raw.githubusercontent.com/McReaper/t7_companion/main/install/install.ps1 | iex
 ```

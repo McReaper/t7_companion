@@ -14,46 +14,40 @@ Detect the OS and run the matching command. It downloads the binary, the embeddi
 If a binary already exists at the target path (the case the idempotency check would otherwise just skip), run `<path>/t7kb update-check` (`.exe` on Windows) first — it's a lightweight, on-demand-only network check (no automatic/background calls anywhere else in `t7kb`) — and act on what it reports:
 
 - **Up to date** — proceed to skip the install as usual.
-- **"Running a local/dev build"** — the binary at the install path was built from source, not downloaded from a release, so it may lack tools the skills name. Unless the user says they put it there on purpose, treat it like an available update and offer `-Force`/`--force`.
-- **Update available** — tell the user, and offer to re-run with `-Force`/`--force` below. That refreshes the binary + database only, never the plugin. **Tell the user first that it stops t7kb's MCP server in every open session** (Windows can't replace the binary or the database while one runs) and deletes the old database: they restart Claude Code afterwards, and the first session to start unpacks the new one, about 20 s once.
+- **"Running a local/dev build"** — the binary at the install path was built from source, not downloaded from a release, so it may lack tools the skills name. Unless the user says they put it there on purpose, treat it like an available update and offer `-Force`.
+- **Update available** — tell the user, and offer to re-run with `-Force` below. That refreshes the binary + database only, never the plugin. **Tell the user first that it stops t7kb's MCP server in every open session** (Windows can't replace the binary or the database while one runs) and deletes the old database: they restart Claude Code afterwards, and the first session to start unpacks the new one, about 20 s once.
 - **"The t7kb Claude Code plugin (its skills) is behind …"** (with either verdict above) — one or more installs of this plugin, per scope, are on an older version. Relay the listed installs and offer to run the printed `claude plugin marketplace update` / `claude plugin update … --scope …` commands (a `project`/`local` one from the project path it names); after they succeed, tell the user to restart Claude Code, which is what loads the new skills. Step 4 keeps it from falling behind again.
 - **Check failed** (e.g. offline) — don't block setup on it; fall back to skipping the install as before, with a one-line note that the check itself couldn't run.
 
 When the SessionStart hook sent the user here (the binary and the plugin versions differ), the update-check above says which side is behind. Otherwise, only pass the force flag below if the user explicitly wants to reinstall/update.
 
-- **Linux / macOS / WSL:**
-  ```bash
-  curl -fsSL https://raw.githubusercontent.com/McReaper/t7_companion/main/install/install.sh | bash
-  ```
-  Installs to `~/.t7kb`; binary at `~/.t7kb/t7kb`. Add `--force` (piped: `... | bash -s -- --force`) to reinstall/update.
+Releases are Windows-only, like the mod tools. In PowerShell:
 
-- **Windows (PowerShell):**
-  ```powershell
-  irm https://raw.githubusercontent.com/McReaper/t7_companion/main/install/install.ps1 | iex
-  ```
-  Installs to `%LOCALAPPDATA%\t7kb`; binary at `%LOCALAPPDATA%\t7kb\t7kb.exe`. Add `-Force` (run the script directly, not piped, to pass args) to reinstall/update.
+```powershell
+irm https://raw.githubusercontent.com/McReaper/t7_companion/main/install/install.ps1 | iex
+```
+
+It installs to `%LOCALAPPDATA%\t7kb`; the binary is `%LOCALAPPDATA%\t7kb\t7kb.exe`. Add `-Force` (run the script directly, not piped, to pass args) to reinstall/update.
 
 **Validate before moving on:** check the command's output for an error (network failure, permission denied, disk space) rather than assuming success. If it failed, stop and report the exact error — don't proceed to step 2 and register an MCP server for a binary that was never installed.
 
 ## 2. Register the MCP server — always double-quote the path
 
-Skip this step when `claude mcp list` already shows `t7kb` with the installed binary's full path. Otherwise use the **absolute path** to the installed binary from step 1 (include `.exe` on Windows — a path without the extension fails to spawn on Windows). **Always double-quote the path**, even if it looks safe unquoted:
+Skip this step when `claude mcp list` already shows `t7kb` with the installed binary's full path. Otherwise use the **absolute path** to `t7kb.exe` from step 1, `.exe` included: a path without it fails to spawn. **Always double-quote the path**, even if it looks safe unquoted:
 
 ```bash
-claude mcp add t7kb -- "/absolute/path/to/t7kb" mcp
+claude mcp add t7kb -- "C:\Users\<you>\AppData\Local\t7kb\t7kb.exe" mcp
 ```
 
-Example paths: `~/.t7kb/t7kb` (Linux/macOS, expand `~` to the real home) or `C:\Users\<you>\AppData\Local\t7kb\t7kb.exe` (Windows).
-
-On Windows this command still runs through a POSIX-style shell (the Bash tool is git-bash), which treats an unquoted backslash as an escape character and silently drops it before a non-special letter — `C:\Users\<you>\AppData\Local\t7kb\t7kb.exe` becomes `C:Users<you>AppDataLocalt7kbt7kb.exe`, a path that can't spawn. Double-quoting the argument (as above) prevents this.
+This command runs through a POSIX-style shell (the Bash tool is git-bash), which treats an unquoted backslash as an escape character and silently drops it before a non-special letter — `C:\Users\<you>\AppData\Local\t7kb\t7kb.exe` becomes `C:Users<you>AppDataLocalt7kbt7kb.exe`, a path that can't spawn. Double-quoting the argument (as above) prevents this.
 
 **Memory:** the server keeps the knowledge base's vectors in memory, about 570 MB, so a search answers in ~0.1 s instead of ~2 s. On a machine short of memory (8 GB, with the game and the mod tools open), or if the user asks for it, register it with that turned off — searches then read the vectors from the database:
 
 ```bash
-claude mcp add t7kb -e T7KB_VECTOR_INDEX=0 -- "/absolute/path/to/t7kb" mcp
+claude mcp add t7kb -e T7KB_VECTOR_INDEX=0 -- "C:\Users\<you>\AppData\Local\t7kb\t7kb.exe" mcp
 ```
 
-**Validate the registration before moving on:** run `claude mcp list` and confirm the `t7kb` entry shows the full path with backslashes intact (Windows) or the full absolute path (Linux/macOS). If the server fails to connect, check this first — re-run the `claude mcp add` command above with the quoted path to fix it.
+**Validate the registration before moving on:** run `claude mcp list` and confirm the `t7kb` entry shows the full path with backslashes intact. If the server fails to connect, check this first — re-run the `claude mcp add` command above with the quoted path to fix it.
 
 ## 3. Record the BO3 mod-tools root in a `CLAUDE.md` there — t7kb:knowledge-base reads it
 
