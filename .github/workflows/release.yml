@@ -1,5 +1,5 @@
 # Cuts a GitHub Release via GoReleaser when a v* tag is pushed: builds the
-# pure-Go binaries (Windows + Linux), bundles the embedding model, and generates
+# pure-Go Windows binary, bundles the embedding model, and generates
 # the changelog from conventional commits. See .github/goreleaser.yaml.
 name: release
 
