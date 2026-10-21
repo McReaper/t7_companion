@@ -41,6 +41,7 @@ func toolsets(st *store.Store, emb *embed.Embedder) []toolset {
 		createToolset(),
 		shaderToolset(),
 		mapToolset(),
+		gameToolset(),
 	}
 }
 

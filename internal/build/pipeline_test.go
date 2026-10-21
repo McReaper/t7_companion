@@ -15,6 +15,7 @@ import (
 type fakePipeline struct {
 	root, fail string
 	noBSP      bool
+	gameLog    string // what the game writes in its root's console_mp.log, none when ""
 	calls      []string
 	timeouts   map[string]time.Duration // each stage's, by label
 }
@@ -57,6 +58,9 @@ func (f *fakePipeline) install(t *testing.T) {
 	}
 	gameRunner = func(game string, args []string) StageResult {
 		f.calls = append(f.calls, "run "+rel(game)+" "+strings.Join(args, " "))
+		if f.gameLog != "" {
+			writeFile(t, filepath.Join(game, "console_mp.log"), f.gameLog)
+		}
 		return StageResult{Name: "run", OK: true}
 	}
 }
@@ -73,6 +77,7 @@ func TestRunBuildReportPipeline(t *testing.T) {
 		ok           bool
 		failed       string
 		notes        map[string]string // stage -> note or first error it must contain
+		gameLog      string            // the game's console_mp.log, none when ""
 		zones        []string          // a mod's zone files to lay out under mods/zm_test/zone_source
 		localization string            // the game's localization.txt, none when ""
 	}{
@@ -84,10 +89,10 @@ func TestRunBuildReportPipeline(t *testing.T) {
 				"compile bin cod2map64.exe -platform pc -navmesh -navvolume -loadFrom map_source/zm/zm_test.map share/raw/maps/zm/zm_test.d3dbsp",
 				"light bin map_source/zm/zm_test.map share/raw/maps/zm/zm_test.led high",
 				"link bin linker_modtools.exe -language english -modsource zm_test",
-				"run . +set fs_game zm_test +devmap zm_test",
+				"run . +set logfile 2 +set fs_game zm_test +devmap zm_test",
 			},
 			ok:    true,
-			notes: map[string]string{"compile": "wrote zm_test.d3dbsp"},
+			notes: map[string]string{"compile": "wrote zm_test.d3dbsp", "run": "the game wrote no console_mp.log"},
 		},
 		{
 			name:  "onlyents, rebuild the gdt db",
@@ -125,6 +130,14 @@ func TestRunBuildReportPipeline(t *testing.T) {
 			opts:   Options{Stages: "link", Light: "medium", Mod: true, SkipGDT: true},
 			failed: "link",
 			notes:  map[string]string{"link": "no core_mod, mp_mod, cp_mod or zm_mod .zone"},
+		},
+		{
+			name:    "the run names the log the game wrote",
+			opts:    Options{Stages: "run", Light: "medium", SkipGDT: true},
+			gameLog: "logfile opened on Tue Oct 20 01:52:15 2026",
+			calls:   []string{"run . +set logfile 2 +set fs_game zm_test +devmap zm_test"},
+			ok:      true,
+			notes:   map[string]string{"run": "console_mp.log (game_log reads it)"},
 		},
 		{
 			name:  "skip gdt, run only",
@@ -167,7 +180,7 @@ func TestRunBuildReportPipeline(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			f := &fakePipeline{root: root, fail: tc.fail, noBSP: tc.noBSP}
+			f := &fakePipeline{root: root, fail: tc.fail, noBSP: tc.noBSP, gameLog: tc.gameLog}
 			f.install(t)
 			if tc.localization != "" {
 				if err := os.WriteFile(filepath.Join(root, "localization.txt"), []byte(tc.localization), 0o644); err != nil {
@@ -218,7 +231,7 @@ func TestRunBuildReportUsesTheGamePath(t *testing.T) {
 	if _, err := Run(&Options{ToolsPath: root, Stages: "light,run", Light: "medium", SkipGDT: true}, "mp_test", io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	want := "light bin game/map_source/mp/mp_test.map game/share/raw/maps/mp/mp_test.led medium\nrun game +set fs_game mp_test +devmap mp_test"
+	want := "light bin game/map_source/mp/mp_test.map game/share/raw/maps/mp/mp_test.led medium\nrun game +set logfile 2 +set fs_game mp_test +devmap mp_test"
 	if got := strings.Join(f.calls, "\n"); got != want {
 		t.Errorf("the map source and game come from TA_GAME_PATH:\n%s\nwant:\n%s", got, want)
 	}

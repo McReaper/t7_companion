@@ -42,7 +42,7 @@ func newBuildCmd() *cobra.Command {
 	f.BoolVar(&o.FreshXpak, "fresh-xpak", false, "link: write the .xpak from scratch, dropping the data earlier links replaced (it only grows otherwise, and uploads with zone/); use before publishing")
 	f.BoolVar(&jsonOut, "json", false, "emit the report as JSON")
 	f.BoolVar(&o.Verbose, "verbose", false, "stream each tool's full output as it runs")
-	f.StringArrayVar(&o.Dvars, "dvar", nil, "run: start the game with this dvar, name=value (repeatable; e.g. developer=2, logfile=2)")
+	f.StringArrayVar(&o.Dvars, "dvar", nil, "run: start the game with this dvar, name=value (repeatable; e.g. developer=2; logfile is 2 unless set)")
 	f.BoolVar(&o.LauncherDvars, "launcher-dvars", false, "run: start the game with the dvars saved in the mod tools Launcher's Dvars dialog (--dvar overrides them)")
 	return cmd
 }
