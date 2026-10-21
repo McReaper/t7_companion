@@ -44,10 +44,8 @@ jobs:
           version: v2.14.0
       - name: build
         run: go build ./...
-      - name: cross-compile (release targets)
-        run: |
-          GOOS=windows GOARCH=amd64 go build -o /dev/null ./cmd/t7kb
-          GOOS=linux GOARCH=amd64 go build -o /dev/null ./cmd/t7kb
+      - name: cross-compile (the release target)
+        run: GOOS=windows GOARCH=amd64 go build -o /dev/null ./cmd/t7kb
       - name: test # uncached: a cached package's profile keeps the old lines of every package -coverpkg covers
         run: go test -count=1 -coverpkg=./... -coverprofile=cover.out ./...
       - name: coverage of the changed lines
