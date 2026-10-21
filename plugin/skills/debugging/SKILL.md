@@ -46,7 +46,7 @@ tail -n +$start console_mp.log | grep -c "your error"
 
 The tell that you're reading the wrong window: **an occurrence count that grows run over run** while the first hit's timestamp never changes. Count per session; a cumulative count is history.
 
-Lines are prefixed with an engine timestamp + subsystem tag (`[<ms>][<SUBSYSTEM>]`). What to grep:
+With `developer` on, lines are prefixed with an engine timestamp + subsystem tag (`[<ms>][<SUBSYSTEM>]`); without it they are bare (verified on real logs). What to grep:
 
 - **`script error`** — the S.R.E. block, tagged `SCRIPTERROR`: `******* script error *******`, the message, then `******* Call stack *******` and one `file 'scripts/…'` line per frame (`- missing line information` on a usermap — see below).
 - **`Could not find`** — a missing asset/material/rawfile, tagged `DB`: not in the `.zone`, or never converted.
