@@ -25,7 +25,7 @@ func newUpdateCheckCmd() *cobra.Command {
 		Long: "Reports whether a newer t7kb release exists, and which installs of the t7kb Claude Code\n" +
 			"plugin (per scope, via `claude plugin list`) are behind it, with the commands to update\n" +
 			"them. It never downloads or updates anything itself: re-run the installer with\n" +
-			"-Force/--force for the binary (see the README or the setup-or-update skill).",
+			"-Force for the binary (see the README or the setup-or-update skill).",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runUpdateCheck(cmd)
@@ -52,7 +52,7 @@ func runUpdateCheck(cmd *cobra.Command) error {
 		fmt.Fprintf(out, "Up to date (%s).\n", rel.TagName)
 	default:
 		fmt.Fprintf(out, "Update available: %s -> %s\n%s\n\n", Version(), rel.TagName, rel.HTMLURL)
-		fmt.Fprintf(out, "Re-run the installer with -Force/--force to fetch the new binary + database\n"+
+		fmt.Fprintf(out, "Re-run the installer with -Force to fetch the new binary + database\n"+
 			"(a new release may bundle an updated database, uploaded separately). The installer\n"+
 			"doesn't touch the Claude Code plugin; it is checked below.\n")
 	}
