@@ -21,21 +21,21 @@ In **Launcher → dvars** (or `+set …` on the command line), set:
 Reproduce, then read the **S.R.E. (script runtime error)** — the console prints the error plus a **call stack** naming the file for each frame. Cheats/dev need the map launched via `devmap` or a loaded mod (`sv_cheats`).
 
 - **`assert`, `assertmsg` and `/# … #/` dev blocks need `scr_mod_enable_devblock 1`** — not `developer`. `GSC_Language.pdf`: *"Assert – Only tested when devblocks are enabled"*; the Launcher's tooltip: *"Developer blocks are executed in mods"* — and on a **usermap** it doesn't take (maintainer-verified). So on a usermap, `assert`s and `/# #/` blocks effectively never run: an assert that never fires says nothing about whether its code path ran — instrument with `IPrintLnBold` or a `#define`-gated print instead, or build as a mod.
-- **These dvars reach a run only if something passes them.** The Launcher's Dvars dialog applies to *its* Run; a headless run gets them only when asked for (`t7kb:build` takes them, **t7kb:compiling**), and a raw `BlackOps3.exe` line passes none, so it has no `logfile` and writes no new log. For a debug run, ask for `developer 2` and `logfile 2` (plus `scr_mod_enable_devblock 1` if you need asserts); by hand, `+set developer 2 +set logfile 2` before `+set fs_game <map> +devmap <map>`.
+- **These dvars reach a run only if something passes them.** The Launcher's Dvars dialog applies to *its* Run; a headless run gets them only when asked for (`t7kb:build` takes them and sets `logfile 2` itself, **t7kb:compiling**), and a raw `BlackOps3.exe` line passes none, so it has no `logfile` and writes no new log. For a debug run, ask for `developer 2` (plus `scr_mod_enable_devblock 1` if you need asserts); by hand, `+set developer 2 +set logfile 2` before `+set fs_game <map> +devmap <map>`.
 - **Check the Launcher's persisted dvars when AI never spawns.** `ai_disableSpawn` is one of them and easy to leave on; the log then floods with `SpawnFromSpawner( <unnamed> ) spawn prevented by ai_disableSpawn or g_spawnai.`
 
 Turn this on **before** theorizing: get the real message and call stack first.
 
 ## Read `console_mp.log` yourself
 
-`logfile` writes the **whole console to a file on disk** — so read and grep it directly instead of asking the user to copy the console or screenshot an error. Always do this before asking them to re-describe a symptom.
+`logfile` writes the **whole console to a file on disk** — so read and grep it directly instead of asking the user to copy the console or screenshot an error. Always do this before asking them to re-describe a symptom. **`t7kb:game_log` reads it for you:** the current file, its last launch sorted into script errors with their stack, the map's own problems and a count of the stock lookups every load fails, each with its line number, and grep or tail on request. Its sorting is a first pass, so when it misses the symptom, read around its lines in the file it names, or grep the whole launch.
 
 Where it lands depends on the target: a **mod** run → `mods/<modname>/console_mp.log`; a **usermap** run → the **game root** `<bo3_root>/console_mp.log` (*not* `usermaps/<map>/`), though it is started with `fs_game` too (verified on real runs). Either can hold the current one: a mod run whose `fs_game` folder is missing falls back to the root, and stale copies from earlier sessions sit in both places. **Glob `<bo3_root>/console_mp.log` plus `<bo3_root>/mods/*/console_mp.log` and take the newest by mtime.**
 
 **The file may hold several sessions, or be from a previous run.** Both make you read a past run as the current one:
 
 - **Several sessions in one file.** A fresh game launch rewrites the log (one `logfile opened on <date>` header at the top), but every map reload inside the same game process (`devmap` again, `map_restart`) appends another session below it — so the first match you grep is the *oldest*, very likely from before the fix you are testing. (verified on real logs) `log_append` makes it accumulate across launches too.
-- **A file from a previous process.** If the run you just did never opened a log — `logfile` wasn't set, which is the default for a **headless** launch that passes no dvars (above) — the file on disk is the last run's, untouched. Compare the `logfile opened on` header and the file's mtime with when you launched before reading anything.
+- **A file from a previous process.** If the run you just did never opened a log — `logfile` wasn't set, which is the default for a raw `BlackOps3.exe` launch (above) — the file on disk is the last run's, untouched. Compare the `logfile opened on` header and the file's mtime with when you launched before reading anything.
 
 Always cut to the last session first:
 

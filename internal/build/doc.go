@@ -56,4 +56,10 @@
 // while it loads, and no dialog is ever answered. It is read with WM_GETTEXT
 // (window_windows.go), as GetWindowText reads no other process's controls. The
 // game keeps running whatever the stage says.
+//
+// The game says the rest in console_mp.log, written only with the logfile
+// dvar, so the stage sets logfile 2 unless the run sets logfile itself and
+// names the log it wrote in its note. Reading it is internal/gamelog's, which
+// the game_log tool serves: what a run's log holds comes as the game plays,
+// long after the watch, so it is read when someone asks.
 package build

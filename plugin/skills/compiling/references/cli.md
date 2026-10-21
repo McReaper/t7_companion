@@ -8,7 +8,7 @@ Referenced from `plugin/skills/compiling/SKILL.md`. Read that file first — thi
 t7kb build zm_mymap                          # usermap: compile,light,link (reads $TA_TOOLS_PATH)
 t7kb build zm_mymap --stages link            # script-only iteration — just re-link
 t7kb build my_mod --mod --stages link        # a mod's zone
-t7kb build zm_mymap --stages link,run --dvar developer=2 --dvar logfile=2   # relink, then play with a fresh log
+t7kb build zm_mymap --stages link,run --dvar developer=2   # relink, then play; t7kb game log reads what it printed
 ```
 
 It exits non-zero when a stage fails and prints the parsed error (a linker `SCRIPT ERROR … line N`, the dialog the game stopped on): hand that to **t7kb:debugging**.

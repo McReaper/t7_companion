@@ -77,6 +77,7 @@ T7 Companion gives your AI agent everything ten years of the BO3 modding communi
 >             t5["zone_explain<br/>zone_contents<br/>zone_check"]
 >             t6["shader_decompile"]
 >             t7["radiant_open<br/>map_find<br/>map_view<br/>map_edit<br/>map_command"]
+>             t8["game_log"]
 >         end
 >         K[("10 years of BO3<br/>modding knowledge")]
 >     end
@@ -101,6 +102,7 @@ T7 Companion gives your AI agent everything ten years of the BO3 modding communi
 >             o3[".ff / .xpak fastfiles"]
 >             o4["Link reports"]
 >             o5["Shader cache"]
+>             o6["Game logs"]
 >         end
 >     end
 >     A -->|"loads"| SK
@@ -114,6 +116,7 @@ T7 Companion gives your AI agent everything ten years of the BO3 modding communi
 >     t5 -.->|"reads"| OUT
 >     t6 -.->|"decompiles"| o5
 >     t7 -->|"drives"| radiant_modtools
+>     t8 -.->|"reads"| o6
 > ```
 >
 > Solid arrows change something, dotted ones only read, and the thick one runs Treyarch's tools.
