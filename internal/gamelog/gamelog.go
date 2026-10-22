@@ -206,16 +206,8 @@ func (s *sorter) endSRE() {
 
 // sortError files an Error line: the map's, or stock noise.
 func (s *sorter) sortError(l Line) {
-	if m := notFound.FindStringSubmatch(l.Text); m != nil {
-		s.lookup(l, m[1], m[2])
-		return
-	}
-	if m := waited.FindStringSubmatch(l.Text); m != nil {
-		s.lookup(l, "asset", m[1])
-		return
-	}
-	if m := unknownWeapon.FindStringSubmatch(l.Text); m != nil {
-		s.lookup(l, "weapon", m[1])
+	if kind, name, ok := lookupOf(l.Text); ok {
+		s.lookup(l, kind, name)
 		return
 	}
 	switch {
@@ -225,6 +217,20 @@ func (s *sorter) sortError(l Line) {
 	case errorLine.MatchString(l.Text):
 		s.addOwn(l)
 	}
+}
+
+// lookupOf reads a failed lookup: the asset's type and name.
+func lookupOf(t string) (kind, name string, ok bool) {
+	if m := notFound.FindStringSubmatch(t); m != nil {
+		return m[1], m[2], true
+	}
+	if m := waited.FindStringSubmatch(t); m != nil {
+		return "asset", m[1], true
+	}
+	if m := unknownWeapon.FindStringSubmatch(t); m != nil {
+		return "weapon", m[1], true
+	}
+	return "", "", false
 }
 
 // lookup files a failed lookup: the map's when its zones list the asset.

@@ -36,4 +36,19 @@
 // asset the map's or mod's own zones list, and an Error line of any other kind;
 // the rest it counts by asset type. A fatal error's dialog line is in the log
 // as `Com_ERROR: ERROR: …`.
+//
+// # Watching
+//
+// A Watcher (t7kb game watch, which the t7kb plugin's monitor runs for the
+// whole of a Claude Code session) says each problem once, as one line, as it
+// happens: whatever the game's run, a reload from its console (devmap,
+// map_restart) included. It follows every console_mp.log from its end, and a
+// log a new launch rewrote (its header changed) from its start, reading only
+// complete lines. It says a script error once per launch; a fatal error
+// (Com_ERROR); once the map has loaded, the assets its zone lists that the
+// game didn't find, else the Error lines of no known kind; a dialog the game
+// shows, unless it repeats a fatal error the log said; and a process that
+// ended with an error code. Stock noise is never said, and a launch says at
+// most maxEvents lines, the last one pointing to game_log: a monitor that
+// prints too much is stopped.
 package gamelog
