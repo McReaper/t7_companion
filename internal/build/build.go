@@ -187,12 +187,15 @@ func (p *buildPlan) lightStage() (StageResult, bool) {
 	return lightRunner(p.bin, p.mapSrc, p.led, p.quality), true
 }
 
-// gameStage starts the game on the build.
+// gameStage starts the game on the build, and names the log it wrote.
 func (p *buildPlan) gameStage() (StageResult, bool) {
 	if !p.stages["run"] {
 		return StageResult{}, false
 	}
-	return gameRunner(p.game, append(dvarArgs(p.dvars), gameArgs(p.name, p.o.Mod)...)), true
+	start := time.Now()
+	sr := gameRunner(p.game, append(dvarArgs(withGameLog(p.dvars)), gameArgs(p.name, p.o.Mod)...))
+	noteRunLog(&sr, p.game, p.name, start)
+	return sr, true
 }
 
 // gameDvars are the dvars the run stage starts the game with: the Launcher's
