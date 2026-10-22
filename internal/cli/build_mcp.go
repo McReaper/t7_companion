@@ -33,7 +33,7 @@ func buildToolDef() mcp.Tool {
 		mcp.WithString("name", mcp.Required(),
 			mcp.Description("Map or mod name, e.g. \"zm_mymap\".")),
 		mcp.WithString("stages",
-			mcp.Description("Comma list of stages to run: compile,light,link,run (default \"compile,light,link\"). Use \"link\" alone for a script-only change. run starts the game with logfile 2 and watches its first 90 s: a dialog it opens there (a fatal error, or a question like safe mode, which it waits on) fails the stage with its text and the game console's last lines. Its note names the console_mp.log the game writes, which game_log reads.")),
+			mcp.Description("Comma list of stages to run: compile,light,link,run (default \"compile,light,link\"). Use \"link\" alone for a script-only change. run starts the game with logfile 2 and watches its start (8 s): a dialog it opens there, or the game quitting at once (Steam not attached), fails the stage. What the game does next, its load included, the t7kb plugin's game monitor tells you as it happens, and game_log investigates.")),
 		mcp.WithBoolean("mod",
 			mcp.Description("Target is a mod (mods/<name>) instead of a usermap; skips compile+light (default false).")),
 		mcp.WithString("light",

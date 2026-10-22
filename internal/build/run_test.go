@@ -209,9 +209,9 @@ func TestRunLight(t *testing.T) {
 }
 
 func TestRunGame(t *testing.T) {
-	oldStartup, oldWatch, oldPoll, oldWindows := gameStartup, gameWatch, gamePoll, gameWindows
-	t.Cleanup(func() { gameStartup, gameWatch, gamePoll, gameWindows = oldStartup, oldWatch, oldPoll, oldWindows })
-	gameStartup, gameWatch, gamePoll = 300*time.Millisecond, time.Second, 20*time.Millisecond
+	oldStartup, oldPoll, oldWindows := gameStartup, gamePoll, gameWindows
+	t.Cleanup(func() { gameStartup, gamePoll, gameWindows = oldStartup, oldPoll, oldWindows })
+	gameStartup, gamePoll = time.Second, 20*time.Millisecond
 	var asked []int
 	gameWindows = func(pid int) []window { asked = append(asked, pid); return nil }
 
@@ -221,10 +221,10 @@ func TestRunGame(t *testing.T) {
 	t.Setenv("T7KB_FAKE_OUT", out)
 	t.Setenv("SteamAppId", "1") // Steam set something else: the game's own id wins
 
-	t.Run("a game still up and showing no dialog after the watch launched", func(t *testing.T) {
+	t.Run("a game still up and showing no dialog after its start launched", func(t *testing.T) {
 		t.Setenv("T7KB_FAKE_TOOL", "stay")
 		sr := runGame(game, []string{"+set", "fs_game", "zm_test", "+devmap", "zm_test"})
-		if !sr.OK || sr.Name != "run" || sr.Note != "launched BlackOps3.exe: no dialog in its first 1s" || sr.Errors != nil || sr.Seconds < 1 || sr.Seconds > 2 {
+		if !sr.OK || sr.Name != "run" || sr.Note != "launched BlackOps3.exe: it stayed up its first 1s" || sr.Errors != nil || sr.Seconds < 1 || sr.Seconds > 2 {
 			t.Errorf("%+v", sr)
 		}
 		if len(asked) < 10 || asked[0] == os.Getpid() || asked[0] != asked[len(asked)-1] {
@@ -256,22 +256,6 @@ func TestRunGame(t *testing.T) {
 		}
 		gameWindows = func(int) []window { return nil }
 		time.Sleep(3 * time.Second) // the fake game exits, so its directory can be removed
-	})
-
-	t.Run("a game that crashes while it loads failed", func(t *testing.T) {
-		t.Setenv("T7KB_FAKE_TOOL", "late")
-		sr := runGame(game, nil)
-		if sr.OK || len(sr.Errors) != 1 || sr.Errors[0] != "the game closed 1s after starting (exit status 2)" {
-			t.Errorf("%+v", sr)
-		}
-	})
-
-	t.Run("a game quit cleanly while it was watched launched", func(t *testing.T) {
-		t.Setenv("T7KB_FAKE_TOOL", "quit-later")
-		sr := runGame(game, nil)
-		if !sr.OK || sr.Errors != nil || sr.Note != "launched BlackOps3.exe: it showed no dialog and quit cleanly 1s after starting" {
-			t.Errorf("%+v", sr)
-		}
 	})
 
 	t.Run("a game that exits at once failed", func(t *testing.T) {

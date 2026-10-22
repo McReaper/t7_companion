@@ -1,13 +1,26 @@
 package cli
 
 import (
+	"context"
+	"fmt"
+	"io"
+	"os"
+	"os/signal"
+	"time"
+
 	"github.com/spf13/cobra"
+
+	"github.com/McReaper/t7_companion/internal/gamelog"
 )
+
+// gameWatchEvery is how often the watcher looks at the logs and the game's
+// processes; a variable so tests can wait less.
+var gameWatchEvery = time.Second
 
 func newGameCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:   "game",
-		Short: "What the game printed while it ran",
+		Short: "What the game printed and showed while it ran",
 	}
 	var a gameLogArgs
 	log := &cobra.Command{Use: "log [map-or-mod]", Short: "Sort the game's console_mp.log, grep or tail it",
@@ -25,6 +38,28 @@ func newGameCmd() *cobra.Command {
 	f.IntVar(&a.Context, "context", 0, "lines before and after each grep match (default 2, at most 10)")
 	f.IntVar(&a.Max, "max", 0, "grep matches given at most (default 50, at most 200)")
 	f.IntVar(&a.Tail, "tail", 0, "the last launch's last lines (at most 500)")
-	root.AddCommand(log)
+	f.IntVar(&a.After, "after", 0, "read only the lines after this line of the file: what is new since an earlier read")
+
+	var toolsPath string
+	watch := &cobra.Command{Use: "watch", Short: "Say each problem the game has as it happens, one line each, until stopped",
+		Args: cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			ctx, stop := signal.NotifyContext(c.Context(), os.Interrupt)
+			defer stop()
+			return gameWatch(ctx, toolsPath, c.OutOrStdout(), gameProcs())
+		}}
+	watch.Flags().StringVar(&toolsPath, "tools-path", "", "BO3 mod-tools root (default: $TA_TOOLS_PATH; $TA_GAME_PATH wins for the game root)")
+	root.AddCommand(log, watch)
 	return root
+}
+
+// gameWatch says the game's problems to out as they happen, until ctx ends.
+func gameWatch(ctx context.Context, toolsPath string, out io.Writer, g gamelog.Game) error {
+	root, err := gameRoot(toolsPath)
+	if err != nil {
+		return err
+	}
+	w := &gamelog.Watcher{Root: root, Game: g, Out: func(s string) { fmt.Fprintln(out, s) }}
+	w.Run(ctx, gameWatchEvery)
+	return nil
 }

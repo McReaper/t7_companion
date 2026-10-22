@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 )
 
 // The windows a French game showed on a map linked in English only, as read
@@ -80,30 +79,16 @@ func TestDialogErrorsReadEveryDialog(t *testing.T) {
 	}
 }
 
-func TestGameExitSaysWhenItEnded(t *testing.T) {
-	old := gameStartup
-	t.Cleanup(func() { gameStartup = old })
-	gameStartup = 8 * time.Second
+func TestGameExitSaysSteamRefusedIt(t *testing.T) {
 	for _, c := range []struct {
-		err   error
-		after time.Duration
-		ok    bool
-		want  string // the error, or the note of a clean quit
+		err  error
+		want string
 	}{
-		{errors.New("exit status 1"), time.Second, false, "the game exited right after starting (exit status 1) — is Steam running"},
-		{nil, 7999 * time.Millisecond, false, "the game exited right after starting — is Steam running"},
-		{nil, 8 * time.Second, true, "launched BlackOps3.exe: it showed no dialog and quit cleanly 8s after starting"},
-		{nil, 71300 * time.Millisecond, true, "launched BlackOps3.exe: it showed no dialog and quit cleanly 1m11s after starting"},
-		{errors.New("exit status 0xc0000005"), 8 * time.Second, false, "the game closed 8s after starting (exit status 0xc0000005)"},
-		{errors.New("exit status 3221225477"), 41600 * time.Millisecond, false, "the game closed 42s after starting (exit status 3221225477)"},
+		{errors.New("exit status 1"), "the game exited right after starting (exit status 1) — is Steam running"},
+		{nil, "the game exited right after starting — is Steam running"},
 	} {
-		sr := gameExit(c.err, c.after)
-		got := sr.Note
-		if !c.ok {
-			got = strings.Join(sr.Errors, "; ")
-		}
-		if sr.OK != c.ok || !strings.HasPrefix(got, c.want) || (c.ok && sr.Errors != nil) || (!c.ok && sr.Note != "") {
-			t.Errorf("%v after %s: %+v, want ok=%v %q", c.err, c.after, sr, c.ok, c.want)
+		if sr := gameExit(c.err); sr.OK || len(sr.Errors) != 1 || !strings.HasPrefix(sr.Errors[0], c.want) {
+			t.Errorf("%v: %+v, want %q", c.err, sr, c.want)
 		}
 	}
 }
