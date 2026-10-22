@@ -5,9 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/McReaper/t7_companion/internal/build"
 	"github.com/McReaper/t7_companion/internal/gamelog"
 )
 
@@ -25,7 +27,7 @@ const (
 // or a log by path, and the raw lines wanted.
 type gameLogArgs struct {
 	ToolsPath, Name, Path, Grep string
-	Context, Max, Tail          int
+	Context, Max, Tail, After   int
 }
 
 type gameFileOut struct {
@@ -48,8 +50,13 @@ type gameLogOut struct {
 	Matches      []gamelog.Match `json:"matches,omitempty"`
 	MoreMatches  int             `json:"more_matches,omitempty"`
 	Tail         []gamelog.Line  `json:"tail,omitempty"`
+	Dialogs      []string        `json:"dialogs,omitempty"`
 	Others       []gameFileOut   `json:"other_logs,omitempty"`
 }
+
+// gameProcs are the running game's processes, for the dialogs they show; a
+// variable so tests can stand in.
+var gameProcs = func() gamelog.Game { return build.NewGames() }
 
 // gameRoot is the game's root: $TA_GAME_PATH, else the mod-tools root, as the
 // build's run stage takes it.
@@ -77,7 +84,14 @@ func gameLog(a gameLogArgs) (*gameLogOut, error) {
 	if err != nil {
 		return nil, err
 	}
+	l.Lines = slices.DeleteFunc(l.Lines, func(ln gamelog.Line) bool { return ln.N <= a.After })
 	out := &gameLogOut{gameFileOut: fileOut(cur), Opened: l.Opened, Lines: launchLines(l)}
+	if a.Path == "" {
+		g := gameProcs()
+		for _, pid := range g.Running() {
+			out.Dialogs = append(out.Dialogs, g.Dialogs(pid)...)
+		}
+	}
 	for _, o := range others {
 		out.Others = append(out.Others, fileOut(o))
 	}
@@ -143,10 +157,10 @@ func fileOut(f gamelog.File) gameFileOut {
 	return gameFileOut{f.Path, f.Modified.Format(time.DateTime)}
 }
 
-// launchLines is the line range the last launch spans in the file.
+// launchLines is the line range read of the last launch.
 func launchLines(l gamelog.Launch) string {
 	if len(l.Lines) == 0 {
-		return fmt.Sprintf("none after line %d", l.Total)
+		return fmt.Sprintf("none to read, of %d", l.Total)
 	}
 	return fmt.Sprintf("%d-%d of %d (the last launch)", l.Lines[0].N, l.Lines[len(l.Lines)-1].N, l.Total)
 }

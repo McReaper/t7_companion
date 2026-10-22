@@ -7,8 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/McReaper/t7_companion/internal/gamelog"
 )
 
 // gameFixture is a game root with a usermap's log at the root, an older one
@@ -120,7 +123,7 @@ func TestGameLogReadsALogByPath(t *testing.T) {
 	if err := os.WriteFile(empty, []byte("logfile opened on Tue\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if out, _ := gameLog(gameLogArgs{Path: empty}); out.Lines != "none after line 1" {
+	if out, _ := gameLog(gameLogArgs{Path: empty}); out.Lines != "none to read, of 1" {
 		t.Errorf("an empty launch: %q", out.Lines)
 	}
 }
@@ -169,4 +172,95 @@ func TestGameLogToolAndCommand(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Errorf("command without a name: %v", err)
 	}
+}
+
+// fakeProcs are the game's processes for game_log and the watcher.
+type fakeProcs struct{ dialogs []string }
+
+func (f fakeProcs) Running() []int {
+	if f.dialogs == nil {
+		return nil
+	}
+	return []int{7}
+}
+func (f fakeProcs) Dialogs(int) []string    { return f.dialogs }
+func (f fakeProcs) Exit(int) (uint32, bool) { return 0, true }
+
+func onProcs(t *testing.T, f fakeProcs) {
+	t.Helper()
+	old := gameProcs
+	t.Cleanup(func() { gameProcs = old })
+	gameProcs = func() gamelog.Game { return f }
+}
+
+func TestGameLogReadsOnlyWhatIsNewAndTheDialogsOpen(t *testing.T) {
+	gameFixture(t)
+	onProcs(t, fakeProcs{dialogs: []string{`the game opened a dialog, "Erreur fatale": ERROR: x [OK]`}})
+	out, err := gameLog(gameLogArgs{Name: "zm_test", After: 43})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Lines != "44-49 of 49 (the last launch)" || len(out.MapProblems) != 0 || len(out.ScriptErrors) != 1 || out.Loaded != 49 {
+		t.Errorf("only the lines after 43: %+v", out)
+	}
+	if len(out.Dialogs) != 1 {
+		t.Errorf("the running game's dialogs: %q", out.Dialogs)
+	}
+	if out, _ := gameLog(gameLogArgs{Path: filepath.Join(os.Getenv("TA_GAME_PATH"), "crashes.log")}); out.Dialogs != nil {
+		t.Errorf("a log read by path is no running game's: %q", out.Dialogs)
+	}
+}
+
+func TestGameWatchSaysTheGamesProblemsUntilStopped(t *testing.T) {
+	game := gameFixture(t)
+	old := gameWatchEvery
+	t.Cleanup(func() { gameWatchEvery = old })
+	gameWatchEvery = 10 * time.Millisecond
+	ctx, cancel := context.WithCancel(context.Background())
+	var b safeBuffer
+	done := make(chan error, 1)
+	go func() { done <- gameWatch(ctx, "", &b, fakeProcs{}) }()
+	time.Sleep(50 * time.Millisecond)
+	f, err := os.OpenFile(filepath.Join(game, "console_mp.log"), os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = f.WriteString("******* script error *******\nError: a new one\nError: ****************\n")
+	f.Close()
+	for i := 0; i < 200 && !strings.Contains(b.String(), "script error: a new one, console_mp.log line 50"); i++ {
+		time.Sleep(10 * time.Millisecond)
+	}
+	cancel()
+	if err := <-done; err != nil || b.String() != "script error: a new one, console_mp.log line 50\n" {
+		t.Errorf("one line for the new error, none for what was there: %v %q", err, b.String())
+	}
+	t.Setenv("TA_GAME_PATH", "")
+	if err := gameWatch(context.Background(), "", &b, fakeProcs{}); err == nil {
+		t.Error("no game root")
+	}
+	cmd := newGameCmd()
+	cmd.SetArgs([]string{"watch", "--tools-path", game})
+	c, stop := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer stop()
+	if err := cmd.ExecuteContext(c); err != nil {
+		t.Errorf("the command stops with its context: %v", err)
+	}
+}
+
+// safeBuffer is a strings.Builder the watcher writes from another goroutine.
+type safeBuffer struct {
+	mu sync.Mutex
+	b  strings.Builder
+}
+
+func (s *safeBuffer) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.Write(p)
+}
+
+func (s *safeBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.String()
 }

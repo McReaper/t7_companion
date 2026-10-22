@@ -15,13 +15,13 @@ const bo3AppID = "311210"
 
 // How the run stage watches the game it starts, as variables so tests can
 // wait less. It counts as launched once it stays up gameStartup: without Steam
-// attached it shows "you must launch Steam" and exits at once. Until gameWatch
-// passes, it then looks every gamePoll for a dialog of the game's: the game
-// shows a fatal error in one ("Could not find zone 'fr_<map>'") and asks its
-// questions in one (safe mode), and waits on it either way.
+// attached it shows "you must launch Steam" and exits at once. Meanwhile it
+// looks every gamePoll for a dialog of the game's: the game shows a fatal
+// error in one and asks its questions in one (safe mode after a crash), and
+// waits on it either way. What the game does next is the watcher's
+// (gamelog.Watcher, t7kb game watch).
 var (
 	gameStartup = 8 * time.Second
-	gameWatch   = 90 * time.Second
 	gamePoll    = time.Second
 )
 
@@ -49,8 +49,8 @@ const (
 // carries: the context of an error the dialog states in one line.
 const consoleLines = 5
 
-// runGame starts the game and watches it load: the stage fails if it exits or
-// opens a dialog before gameWatch passes. The game keeps running either way.
+// runGame starts the game and watches its start: the stage fails if it exits or
+// opens a dialog before gameStartup passes. The game keeps running either way.
 func runGame(game string, args []string) StageResult {
 	start := time.Now()
 	exe := filepath.Join(game, "BlackOps3.exe")
@@ -68,17 +68,17 @@ func runGame(game string, args []string) StageResult {
 }
 
 // watchGame waits on the started game until it opens a dialog, exits, or
-// gameWatch passes.
+// gameStartup passes.
 func watchGame(pid int, exited <-chan error, start time.Time) StageResult {
 	tick := time.NewTicker(gamePoll)
 	defer tick.Stop()
-	deadline := time.After(gameWatch)
+	deadline := time.After(gameStartup)
 	for {
 		select {
 		case err := <-exited:
-			return gameExit(err, time.Since(start))
+			return gameExit(err)
 		case <-deadline:
-			return StageResult{OK: true, Note: fmt.Sprintf("launched BlackOps3.exe: no dialog in its first %s", gameWatch)}
+			return StageResult{OK: true, Note: fmt.Sprintf("launched BlackOps3.exe: it stayed up its first %s", gameStartup)}
 		case <-tick.C:
 			if errs := dialogErrors(gameWindows(pid)); errs != nil {
 				return StageResult{Errors: errs}
@@ -87,42 +87,43 @@ func watchGame(pid int, exited <-chan error, start time.Time) StageResult {
 	}
 }
 
-// gameExit says how the game ended: at once is Steam refusing it; later with
-// an exit code a crash (0xc0000005), and without one someone quitting it,
-// which is no failure.
-func gameExit(err error, after time.Duration) StageResult {
+// gameExit says why the game ended at once: Steam refused it.
+func gameExit(err error) StageResult {
 	how := ""
 	if err != nil {
 		how = " (" + err.Error() + ")"
 	}
-	switch {
-	case after < gameStartup:
-		return StageResult{Errors: []string{"the game exited right after starting" + how + " — is Steam running and signed in? A game it shows \"you must launch Steam\" in closes at once"}}
-	case err != nil:
-		return StageResult{Errors: []string{fmt.Sprintf("the game closed %s after starting%s", after.Round(time.Second), how)}}
-	}
-	return StageResult{OK: true, Note: fmt.Sprintf("launched BlackOps3.exe: it showed no dialog and quit cleanly %s after starting", after.Round(time.Second))}
+	return StageResult{Errors: []string{"the game exited right after starting" + how + " — is Steam running and signed in? A game it shows \"you must launch Steam\" in closes at once"}}
 }
 
 // dialogErrors is what the game's dialogs say, nil when it shows none: each
 // one's title, message and buttons, then the last lines of the console the
 // game opens beside a fatal error.
 func dialogErrors(ws []window) []string {
-	var out, console []string
+	out := dialogLines(ws)
+	if out == nil {
+		return nil
+	}
+	var console []string
 	for _, w := range ws {
-		switch w.Class {
-		case dialogClass:
-			out = append(out, dialogLine(w))
-		case consoleClass:
+		if w.Class == consoleClass {
 			for _, c := range w.Controls {
 				console = append(console, strings.Split(c.Text, "\n")...)
 			}
 		}
 	}
-	if out == nil {
-		return nil
-	}
 	return append(out, consoleTail(console, out)...)
+}
+
+// dialogLines are the game's dialogs, one line each.
+func dialogLines(ws []window) []string {
+	var out []string
+	for _, w := range ws {
+		if w.Class == dialogClass {
+			out = append(out, dialogLine(w))
+		}
+	}
+	return out
 }
 
 // dialogLine is a dialog in one line: `the game opened a dialog, "Erreur

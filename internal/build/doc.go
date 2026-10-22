@@ -47,11 +47,13 @@
 // game launched once it stays up 8 s: a game that can't attach to Steam exits
 // at once. Its dvars are Options.Dvars over, with LauncherDvars, the ones
 // saved in the Launcher's Dvars dialog (the Windows registry,
-// dvars_windows.go). It then watches the game's first 90 s (game.go): the game
-// shows its fatal errors, and asks its questions (safe mode after a crash), in
-// a message box, and waits on it, so a dialog of its process fails the stage
+// dvars_windows.go). Meanwhile it watches the game (game.go): the game shows
+// its fatal errors, and asks its questions (safe mode after a crash), in a
+// message box, and waits on it, so a dialog of its process fails the stage
 // with what it says, and the last lines of the console the game opens beside a
-// fatal error; so does a crash (an exit code), not a clean quit. Until a dialog
+// fatal error. What the game does after its start, the load included, is the
+// game watcher's (internal/gamelog's Watcher, which Games feeds the game's
+// processes, dialogs and exit codes): a run ends long before. Until a dialog
 // exists only the windows' classes are read, so nothing is sent to the game
 // while it loads, and no dialog is ever answered. It is read with WM_GETTEXT
 // (window_windows.go), as GetWindowText reads no other process's controls. The

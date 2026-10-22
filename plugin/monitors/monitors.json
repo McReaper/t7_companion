@@ -1,0 +1,7 @@
+[
+  {
+    "name": "game",
+    "command": "sh \"${CLAUDE_PLUGIN_ROOT}/monitors/game-watch.sh\"",
+    "description": "Black Ops III game problems: script errors, fatal errors, crashes, the map's missing assets"
+  }
+]
