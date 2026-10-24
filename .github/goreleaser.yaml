@@ -42,7 +42,7 @@ archives:
         strip_parent: true
       - LICENSE
       - models/**/* # the bundled embedding model (offline)
-      - bridge/**/* # the Radiant bridge (GPLv3, its LICENSE and NOTICE.md inside)
+      - bridge/* # the Radiant bridge (GPLv3, its LICENSE and NOTICE.md inside): its files and its mtplugins/ folder, which goes whole; bridge/**/* would leave out the files at its top, the DLL t7kb injects among them
 
 # Auto-generated changelog, followed by the hand-curated footer below; no
 # header, as whoever reads a release page already knows the tool. Only what a user would notice makes it in: features, fixes, speed-ups (perf) and skill
