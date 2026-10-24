@@ -38,7 +38,7 @@ func TestHelloReadsWhatThePluginSaysOfItself(t *testing.T) {
 	f := radianttest.New(4242, `C:\bo3\map_source\a.map`)
 	f.Plugin = "1.2.3"
 	c := connect(t, f)
-	if want := (radiant.Hello{Plugin: "1.2.3", Host: "1.1.0", PID: 4242}); c.Hello != want {
+	if want := (radiant.Hello{Plugin: "1.2.3", Host: "1.2.0", PID: 4242}); c.Hello != want {
 		t.Errorf("hello = %+v, want %+v", c.Hello, want)
 	}
 	if got := f.Requests(); len(got) != 1 || got[0] != "hello 1" {
@@ -58,15 +58,15 @@ func TestAPluginOfAnotherProtocolIsRefusedByName(t *testing.T) {
 }
 
 func TestAPluginOlderThanTheCommandsSentIsRefusedWithWhereToUpdate(t *testing.T) {
-	for _, v := range []string{"1.0.0", "1.0.9", "1", "0.9.9", "", "dev", "1.x"} {
+	for _, v := range []string{"1.1.0", "1.1.9", "1.0.0", "1", "0.9.9", "", "dev", "1.x"} {
 		f := radianttest.New(1, "")
 		f.Plugin = v
 		_, err := radiant.NewClient(ctx(t), f.Dial())
-		if err == nil || !strings.Contains(err.Error(), "older than "+radiant.MinPlugin) || !strings.Contains(err.Error(), radiant.Releases) {
+		if err == nil || !strings.Contains(err.Error(), "older than "+radiant.MinPlugin) || !strings.Contains(err.Error(), "close Radiant") {
 			t.Errorf("plugin %q: err = %v, want it refused with where to update", v, err)
 		}
 	}
-	for _, v := range []string{"1.1.0", "1.1", "1.1.1", "1.10.0", "2.0.0", "2"} {
+	for _, v := range []string{"1.2.0", "1.2", "1.2.1", "1.10.0", "2.0.0", "2"} {
 		f := radianttest.New(1, "")
 		f.Plugin = v
 		c, err := radiant.NewClient(ctx(t), f.Dial())
@@ -250,7 +250,7 @@ func frame(w io.Writer, payload string) {
 func helloThen(then func(w io.Writer, id, line string) bool) func(w io.Writer, id, line string) bool {
 	return func(w io.Writer, id, line string) bool {
 		if line == "hello 1" {
-			frame(w, id+" ok 1 plugin=1.1.0 host=1.1.0 pid=7\n")
+			frame(w, id+" ok 1 plugin=1.2.0 host=1.2.0 pid=7\n")
 			return true
 		}
 		return then(w, id, line)
@@ -314,7 +314,7 @@ func TestRequestIDsCountFromOne(t *testing.T) {
 	var ids []string
 	c, err := radiant.NewClient(ctx(t), rawBridge(t, func(w io.Writer, id, _ string) bool {
 		ids = append(ids, id)
-		frame(w, id+" ok 1 plugin=1.1.0\n")
+		frame(w, id+" ok 1 plugin=1.2.0\n")
 		return true
 	}))
 	if err != nil {

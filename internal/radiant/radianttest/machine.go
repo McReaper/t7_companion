@@ -4,6 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
+	"slices"
+	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -14,10 +19,12 @@ type Machine struct {
 	// nil Fake) is a Radiant that exits at once.
 	OnStart func(pid int, exe, dir string, args []string) *Started
 
-	mu      sync.Mutex
-	fakes   map[int]*Started
-	started [][]string
-	nextPID int
+	mu       sync.Mutex
+	fakes    map[int]*Started
+	started  [][]string
+	injected [][]string // pid, dll
+	controls [][]string // pid, command
+	nextPID  int
 }
 
 // Started is a Radiant running on a Machine: its Fake, served once its bridge
@@ -28,7 +35,16 @@ type Started struct {
 	// Radiant whose bridge never does (MTPlugins didn't load the plugin).
 	ListenAfter time.Duration
 	Silent      bool
-	at          time.Time
+	// Modules are the modules it reports, its exe first. Unloaded is a
+	// Radiant whose bridge listens only once something loads it: an Inject, or
+	// MTPlugins' host told to enable the plugin (Control).
+	Modules  []string
+	Unloaded bool
+	// ControlAfter is how long after Start MTPlugins' host opens its control
+	// window: it is loaded (listed in Modules) well before.
+	ControlAfter time.Duration
+	at           time.Time
+	loaded       bool
 }
 
 // NewMachine is a computer running these Radiants, their bridges listening.
@@ -40,6 +56,14 @@ func NewMachine(fakes ...*Fake) *Machine {
 	return m
 }
 
+// Run adds a Radiant that runs already, as a Start would have made it.
+func (m *Machine) Run(s *Started) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s.at = time.Now()
+	m.fakes[s.Fake.PID] = s
+}
+
 // Starts are the Start calls made: the program, then its arguments.
 func (m *Machine) Starts() [][]string {
 	m.mu.Lock()
@@ -49,7 +73,7 @@ func (m *Machine) Starts() [][]string {
 
 func (m *Machine) listening(pid int) *Fake {
 	s := m.fakes[pid]
-	if s == nil || s.Silent || time.Now().Before(s.at.Add(s.ListenAfter)) {
+	if s == nil || s.Silent || (s.Unloaded && !s.loaded) || time.Now().Before(s.at.Add(s.ListenAfter)) {
 		return nil
 	}
 	return s.Fake
@@ -100,4 +124,90 @@ func (m *Machine) Running(pid int) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.fakes[pid] != nil
+}
+
+// Radiants are the pids of every Radiant on the machine, listening or not.
+func (m *Machine) Radiants() ([]int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var pids []int
+	for pid := range m.fakes {
+		pids = append(pids, pid)
+	}
+	sort.Ints(pids)
+	return pids, nil
+}
+
+// Modules are the modules the Radiant reports.
+func (m *Machine) Modules(pid int) ([]string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s := m.fakes[pid]
+	if s == nil {
+		return nil, fmt.Errorf("no process %d", pid)
+	}
+	return append([]string(nil), s.Modules...), nil
+}
+
+// Ready is at once for a running Radiant.
+func (m *Machine) Ready(_ context.Context, pid int) error {
+	if !m.Running(pid) {
+		return fmt.Errorf("no process %d", pid)
+	}
+	return nil
+}
+
+// Inject records the call; the Radiant's bridge then listens, and it lists the DLL.
+func (m *Machine) Inject(pid int, dll string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.injected = append(m.injected, []string{strconv.Itoa(pid), dll})
+	s := m.fakes[pid]
+	if s == nil {
+		return fmt.Errorf("no process %d", pid)
+	}
+	s.loaded, s.Modules = true, append(s.Modules, dll)
+	return nil
+}
+
+// Injected are the Inject calls made: the pid, then the DLL.
+func (m *Machine) Injected() [][]string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([][]string(nil), m.injected...)
+}
+
+// Control answers as MTPlugins' host does, in a Radiant that lists
+// RadiantPlugins.dll once its control window is open (ControlAfter): "plugins
+// enable <name>" loads the plugin, so the bridge listens, "plugins disable
+// <name>" unloads it.
+func (m *Machine) Control(pid int, cmd string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s := m.fakes[pid]
+	if s == nil || !slices.ContainsFunc(s.Modules, func(p string) bool { return strings.EqualFold(filepath.Base(p), "RadiantPlugins.dll") }) ||
+		time.Now().Before(s.at.Add(s.ControlAfter)) {
+		return "", fmt.Errorf("MTPlugins' control window isn't in that Radiant")
+	}
+	m.controls = append(m.controls, []string{strconv.Itoa(pid), cmd})
+	switch {
+	case cmd == "plugins list":
+		return "no plugins", nil
+	case strings.HasPrefix(cmd, "plugins enable "):
+		s.loaded = true
+		return strings.TrimPrefix(cmd, "plugins enable ") + " Loaded", nil
+	case strings.HasPrefix(cmd, "plugins disable "):
+		s.loaded = false
+		return strings.TrimPrefix(cmd, "plugins disable ") + " Disabled", nil
+	case cmd == "plugins rescan":
+		return "rescanned", nil
+	}
+	return "unknown command", nil
+}
+
+// Controls are the commands MTPlugins' host received: the pid, then the command.
+func (m *Machine) Controls() [][]string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([][]string(nil), m.controls...)
 }

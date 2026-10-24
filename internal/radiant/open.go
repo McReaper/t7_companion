@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 )
 
@@ -13,8 +14,9 @@ import (
 type OpenOptions struct {
 	Root    string // the mod-tools root, where bin/radiant_modtools.exe is
 	Map     string // the .map file
-	PID     int    // the Radiant to use when several run the bridge, 0 for the only one
+	PID     int    // the Radiant to use when several run, 0 for the only one
 	Discard bool   // reload over unsaved changes
+	Bridge  string // the folder of the bridge DLLs t7kb ships (StandaloneDLL, PluginDLL)
 }
 
 // How a map came to be open.
@@ -51,13 +53,61 @@ func Open(ctx context.Context, m Machine, o OpenOptions) (Opened, error) {
 		}
 	}
 	target, err := pick(insts, o.PID)
+	if err != nil || target != nil {
+		if err != nil {
+			return Opened{}, err
+		}
+		return reload(ctx, m, *target, o)
+	}
+	bare, err := withoutBridge(m, insts, o.PID)
+	switch {
+	case err != nil:
+		return Opened{}, err
+	case bare != 0:
+		return attach(ctx, m, bare, o)
+	case o.PID != 0:
+		return Opened{}, fmt.Errorf("no Radiant with pid %d runs (%s)", o.PID, describe(insts))
+	}
+	return launch(ctx, m, o)
+}
+
+// withoutBridge is the Radiant running without the bridge to load it into: the
+// one of that pid, else the only one; 0 when there is none.
+func withoutBridge(m Machine, insts []Instance, pid int) (int, error) {
+	all, err := m.Radiants()
+	if err != nil {
+		return 0, err
+	}
+	var bare []int
+	for _, p := range all {
+		if !slices.ContainsFunc(insts, func(in Instance) bool { return in.PID == p }) && (pid == 0 || p == pid) {
+			bare = append(bare, p)
+		}
+	}
+	switch len(bare) {
+	case 0:
+		return 0, nil
+	case 1:
+		return bare[0], nil
+	}
+	return 0, fmt.Errorf("%d Radiants run without the bridge (pids %v): pass the pid of the one to open the map in", len(bare), bare)
+}
+
+// attach loads the bridge into a running Radiant, then the map.
+func attach(ctx context.Context, m Machine, pid int, o OpenOptions) (Opened, error) {
+	c, err := loadBridge(ctx, m, pid, o)
 	if err != nil {
 		return Opened{}, err
 	}
-	if target == nil {
-		return launch(ctx, m, o)
+	st, err := c.State(ctx)
+	c.Close()
+	if err != nil {
+		return Opened{}, err
 	}
-	return reload(ctx, m, *target, o)
+	if SamePath(st.Map, o.Map) {
+		return opened(ctx, m, pid, AlreadyOpen)
+	}
+	return reload(ctx, m, Instance{pid, st}, o)
 }
 
 // pick is the Radiant to reload the map in, nil when none runs.
@@ -68,7 +118,7 @@ func pick(insts []Instance, pid int) (*Instance, error) {
 				return &insts[i], nil
 			}
 		}
-		return nil, fmt.Errorf("no Radiant with pid %d runs the bridge (%s)", pid, describe(insts))
+		return nil, nil // a Radiant of that pid may run without it
 	}
 	switch len(insts) {
 	case 0:
@@ -112,16 +162,11 @@ func launch(ctx context.Context, m Machine, o OpenOptions) (Opened, error) {
 	if _, err := os.Stat(exe); err != nil {
 		return Opened{}, fmt.Errorf("no Radiant at %s: is %s a BO3 mod-tools root?", exe, o.Root)
 	}
-	plugin := filepath.Join(bin, "plugins", "T7RadiantBridge", "T7RadiantBridge.dll")
-	if _, err := os.Stat(plugin); err != nil {
-		return Opened{}, fmt.Errorf("the T7RadiantBridge plugin is not installed (%s): t7kb drives Radiant through it; "+
-			"install MTPlugins, then unzip T7RadiantBridge.zip from %s into bin/plugins/", plugin, Releases)
-	}
 	pid, err := m.Start(exe, bin, o.Map)
 	if err != nil {
 		return Opened{}, fmt.Errorf("could not start Radiant: %w", err)
 	}
-	c, err := waitBridge(ctx, m, pid, filepath.Join(bin, "plugins", "RadiantPlugins.log"))
+	c, err := loadBridge(ctx, m, pid, o)
 	if err != nil {
 		return Opened{}, err
 	}
@@ -136,14 +181,14 @@ func launch(ctx context.Context, m Machine, o OpenOptions) (Opened, error) {
 func waitBridge(ctx context.Context, m Machine, pid int, log string) (*Client, error) {
 	for {
 		if !m.Running(pid) {
-			return nil, fmt.Errorf("the Radiant started (pid %d) exited before its bridge answered: see %s", pid, log)
+			return nil, fmt.Errorf("the Radiant of pid %d exited before its bridge answered: see %s", pid, log)
 		}
 		if rw, err := m.Dial(ctx, pid); err == nil {
 			return NewClient(ctx, rw)
 		}
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf("the Radiant started (pid %d) runs, but its bridge never answered: does MTPlugins load it? see %s", pid, log)
+			return nil, fmt.Errorf("the Radiant of pid %d runs, but its bridge never answered: see %s", pid, log)
 		case <-time.After(pollEvery):
 		}
 	}
