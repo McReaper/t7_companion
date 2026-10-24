@@ -15,6 +15,8 @@ before:
     # Populate ./models with the embedding model once, so both archives can
     # bundle it for offline use (the binary loads it from beside itself).
     - sh -c 'HF_HOME="$(pwd)/models" go run ./cmd/t7kb embed warmup'
+    # the Radiant bridge t7kb loads into Radiant, from its own release: the version internal/radiant pins
+    - sh -c 'v=$(sed -n "s/^const BundledBridge = \"\(.*\)\"/\1/p" internal/radiant/load.go) && test -n "$v" && rm -rf bridge && mkdir bridge && curl -fsSL -o bridge.zip "https://github.com/McReaper/t7_radiant_bridge/releases/download/v$v/T7RadiantBridge-$v.zip" && unzip -q bridge.zip -d bridge && rm bridge.zip && test -f "bridge/T7RadiantBridge-$v.dll"'
 
 builds:
   - id: t7kb
@@ -40,6 +42,7 @@ archives:
         strip_parent: true
       - LICENSE
       - models/**/* # the bundled embedding model (offline)
+      - bridge/**/* # the Radiant bridge (GPLv3, its LICENSE and NOTICE.md inside)
 
 # Auto-generated changelog, followed by the hand-curated footer below; no
 # header, as whoever reads a release page already knows the tool. Only what a user would notice makes it in: features, fixes, speed-ups (perf) and skill

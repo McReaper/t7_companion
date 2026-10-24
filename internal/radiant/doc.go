@@ -29,9 +29,30 @@
 //
 // Open finds the Radiant to use: the one with the map open already, else the
 // only one running (or the one named by pid), which reloads the map — never
-// over unsaved changes unless asked, a dialog, or an open prefab. With no
-// Radiant running it starts bin/radiant_modtools.exe on the map from bin/, as
-// the Launcher does, out of the caller's job so it outlives the MCP server, and
-// waits for its bridge and then for the map. The plugin must be installed in
-// bin/plugins/T7RadiantBridge; MTPlugins loads it.
+// over unsaved changes unless asked, a dialog, or an open prefab. A Radiant
+// running without the bridge gets it first. With no Radiant running it starts
+// bin/radiant_modtools.exe on the map from bin/, as the Launcher does, out of
+// the caller's job so it outlives the MCP server, loads the bridge into it,
+// and waits for the bridge and then for the map.
+//
+// # Loading the bridge
+//
+// t7kb ships the bridge beside its binary, in bridge/ (load.go): the user
+// installs nothing else, and t7kb writes nothing into the install unless
+// MTPlugins is there. One host only ever runs in a Radiant, or both would hook
+// the same functions of it:
+//
+//   - MTPlugins installed (its d3d9.dll proxy in bin/ with RadiantLoader.ini,
+//     not turned off) loads its host into every Radiant: t7kb copies its
+//     plugin build into bin/plugins/T7RadiantBridge/ when the install's
+//     differs, and has the host load it through its control window
+//     (WM_COPYDATA, replies in RadiantPlugins.ctl), as MTPlugins' own tools do.
+//   - Otherwise t7kb injects the standalone bridge, which carries its own
+//     host: LoadLibraryW run in Radiant by a remote thread, once Radiant takes
+//     input (its main window exists). Its file name carries its version, as a
+//     running Radiant keeps the one it loaded locked; one already loaded is
+//     never loaded twice, so a Radiant still running an older one is closed
+//     and opened again.
+//
+// The light stage's headless Radiant (-ledSilent) gets no bridge.
 package radiant

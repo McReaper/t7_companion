@@ -4,9 +4,9 @@ Your agent works in the Radiant you have open: it opens a map, finds what's in i
 
 ## What you need
 
-- **[MTPlugins](https://github.com/Aidan601/MTPlugins)**, which loads plugins into Radiant.
-- **[T7RadiantBridge](https://github.com/McReaper/t7_radiant_bridge)** 1.1.0 or later, the plugin t7kb talks to: [its install](https://github.com/McReaper/t7_radiant_bridge#install) is one zip unzipped into `bin/plugins/`.
-- t7kb itself, [installed](../README.md#-install) with its MCP server in your agent.
+Only t7kb itself, [installed](../README.md#-install) with its MCP server in your agent. It comes with [T7RadiantBridge](https://github.com/McReaper/t7_radiant_bridge), the bridge it talks to, and loads it into your Radiant when your agent opens a map: whether t7kb starts Radiant or you did. Nothing is written into your BO3 install.
+
+If you use [MTPlugins](https://github.com/Aidan601/MTPlugins), t7kb goes through it instead: it puts its bridge in `bin/plugins/T7RadiantBridge/` and has MTPlugins load it, like any other plugin.
 
 ## What the agent can do
 

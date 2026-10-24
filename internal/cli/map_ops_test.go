@@ -12,16 +12,16 @@ import (
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
 
+	"github.com/McReaper/t7_companion/internal/radiant"
 	"github.com/McReaper/t7_companion/internal/radiant/radianttest"
 )
 
-// radiantRoot is a mod-tools root with Radiant, the bridge plugin and two
-// maps, map_source/test.map and map_source/zm/zm_b.map.
+// radiantRoot is a mod-tools root with Radiant and two maps,
+// map_source/test.map and map_source/zm/zm_b.map.
 func radiantRoot(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
-	for _, f := range []string{"bin/radiant_modtools.exe", "bin/plugins/T7RadiantBridge/T7RadiantBridge.dll",
-		"map_source/test.map", "map_source/zm/zm_b.map"} {
+	for _, f := range []string{"bin/radiant_modtools.exe", "map_source/test.map", "map_source/zm/zm_b.map"} {
 		p := filepath.Join(root, f)
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
@@ -102,16 +102,26 @@ func TestRadiantOpenCommand(t *testing.T) {
 	if err != nil || json.Unmarshal([]byte(out), &got) != nil {
 		t.Fatalf("open --discard: %v\n%s", err, out)
 	}
-	if want := (radiantOpenOut{PID: 31, Map: filepath.Join(root, "map_source", "zm", "zm_b.map"), Opened: "reloaded", Plugin: "1.1.0"}); got != want {
+	if want := (radiantOpenOut{PID: 31, Map: filepath.Join(root, "map_source", "zm", "zm_b.map"), Opened: "reloaded", Plugin: "1.2.0"}); got != want {
 		t.Errorf("open = %+v, want %+v", got, want)
 	}
 }
 
 func TestRadiantOpenToolOverMCP(t *testing.T) {
 	root := radiantRoot(t)
+	bridge := t.TempDir()
+	for _, p := range []string{radiant.StandaloneDLL(bridge), radiant.PluginDLL(bridge)} {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte("dll"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("T7KB_BRIDGE_DIR", bridge)
 	m := onMachine(t)
 	m.OnStart = func(pid int, _, _ string, args []string) *radianttest.Started {
-		return &radianttest.Started{Fake: radianttest.New(pid, args[0])}
+		return &radianttest.Started{Fake: radianttest.New(pid, args[0]), Unloaded: true}
 	}
 	c, err := client.NewInProcessClient(newMCPServer(nil, nil, false))
 	if err != nil {

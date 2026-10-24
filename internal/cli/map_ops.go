@@ -39,7 +39,7 @@ func radiantOpen(ctx context.Context, toolsPath, mapArg string, pid int, discard
 	}
 	ctx, cancel := context.WithTimeout(ctx, openTimeout)
 	defer cancel()
-	o, err := radiant.Open(ctx, radiantMachine, radiant.OpenOptions{Root: root, Map: mapPath, PID: pid, Discard: discard})
+	o, err := radiant.Open(ctx, radiantMachine, radiant.OpenOptions{Root: root, Map: mapPath, PID: pid, Discard: discard, Bridge: bridgeDir()})
 	if err != nil {
 		return nil, err
 	}
@@ -69,4 +69,17 @@ func mapFile(root, arg string) (string, error) {
 		return "", fmt.Errorf("no map at %s (create makes a new one)", p)
 	}
 	return p, nil
+}
+
+// bridgeDir is where the bridge DLLs t7kb ships are: bridge/ beside its
+// binary, or $T7KB_BRIDGE_DIR (a build of the bridge, for its development).
+func bridgeDir() string {
+	if d := os.Getenv("T7KB_BRIDGE_DIR"); d != "" {
+		return d
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(filepath.Dir(exe), "bridge")
 }

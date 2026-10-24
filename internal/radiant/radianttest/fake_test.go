@@ -30,7 +30,7 @@ func TestTheFakeReadsIDsLikeThePlugin(t *testing.T) {
 		{"0 hello 1\n", "0 err bad-request request ids start at 1 (0 is for events)\n"},
 		{"1234567890123456789 hello 1\n", "0 err bad-request a request starts with its id\n"},
 		{"-1 hello 1\n", "0 err bad-request a request starts with its id\n"},
-		{"123456789012345678 hello 1\n", "123456789012345678 ok 1 plugin=1.1.0 host=1.1.0 pid=1\n"},
+		{"123456789012345678 hello 1\n", "123456789012345678 ok 1 plugin=1.2.0 host=1.2.0 pid=1\n"},
 	})
 }
 
@@ -44,7 +44,7 @@ func TestTheFakeServesInThePluginsOrder(t *testing.T) {
 		{"1 state\n", "1 err bad-request hello first\n"},
 		{"2 hello 2\n", "2 err version this plugin serves protocol 1\n"},
 		{"3 state\n", "3 err bad-request hello first\n"},
-		{"4 hello 1\n", "4 ok 1 plugin=1.1.0 host=1.1.0 pid=7\n"},
+		{"4 hello 1\n", "4 ok 1 plugin=1.2.0 host=1.2.0 pid=7\n"},
 		{"5 frobnicate\n", "5 err bad-request unknown command frobnicate\n"},
 		{"6 subscribe\n", "6 err bad-request subscribe <event>… (console, map)\n"},
 		{"7 reload\n", "7 err bad-request reload <path…>\n"},
@@ -66,7 +66,7 @@ func TestTheFakeGivesEntitiesAndTheSelection(t *testing.T) {
 	rw := f.Dial()
 	defer rw.Close()
 	exchange(t, rw, [][2]string{
-		{"1 hello 1\n", "1 ok 1 plugin=1.1.0 host=1.1.0 pid=1\n"},
+		{"1 hello 1\n", "1 ok 1 plugin=1.2.0 host=1.2.0 pid=1\n"},
 		{"2 entities {e2} {nope}\n", "2 ok missing={nope}\n{\nguid \"{E2}\"\n\"classname\" \"light\"\n}\n"},
 		{"3 entities\n", "3 ok\n" + f.Text},
 		{"4 selection\n", "4 ok\n{b1} {E1} 0 0 0 0 0 0\n"},
@@ -79,7 +79,7 @@ func TestTheFakeNamesNothingMissingWhenAllIsFound(t *testing.T) {
 	rw := f.Dial()
 	defer rw.Close()
 	exchange(t, rw, [][2]string{
-		{"1 hello 1\n", "1 ok 1 plugin=1.1.0 host=1.1.0 pid=1\n"},
+		{"1 hello 1\n", "1 ok 1 plugin=1.2.0 host=1.2.0 pid=1\n"},
 		{"2 entities {E1}\n", "2 ok\n" + f.Text},
 	})
 }

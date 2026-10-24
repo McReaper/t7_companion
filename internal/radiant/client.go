@@ -15,11 +15,8 @@ import (
 const Protocol = 1
 
 // MinPlugin is the oldest plugin serving every command this client sends: the
-// first release, 1.1.0, which brought edit.
-const MinPlugin = "1.1.0"
-
-// Releases is where the plugin is downloaded.
-const Releases = "https://github.com/McReaper/t7_radiant_bridge/releases/latest"
+// first release, 1.2.0.
+const MinPlugin = "1.2.0"
 
 // maxFrame bounds a frame from the bridge: a capture of a large view or a
 // whole map's text is tens of MiB, a corrupt length is not.
@@ -94,7 +91,7 @@ func NewClient(ctx context.Context, rw io.ReadWriteCloser) (*Client, error) {
 	c.Hello = parseHello(r.Summary)
 	if !versionAtLeast(c.Hello.Plugin, MinPlugin) {
 		c.Close()
-		return nil, fmt.Errorf("this Radiant's bridge plugin is %q, older than %s, the first one with every command t7kb sends: close Radiant and install the latest from %s", c.Hello.Plugin, MinPlugin, Releases)
+		return nil, fmt.Errorf("this Radiant's bridge is %q, older than %s, the first one with every command t7kb sends: close Radiant, then open the map again for t7kb to load its own", c.Hello.Plugin, MinPlugin)
 	}
 	return c, nil
 }
@@ -120,7 +117,7 @@ func versionAtLeast(v, min string) bool {
 	return true
 }
 
-// parseHello reads "1 plugin=1.1.0 host=1.1.0 pid=123".
+// parseHello reads "1 plugin=1.2.0 host=1.2.0 pid=123".
 func parseHello(s string) Hello {
 	var h Hello
 	for _, kv := range strings.Fields(s) {

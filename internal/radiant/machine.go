@@ -20,10 +20,20 @@ type Machine interface {
 	Start(exe, dir string, args ...string) (int, error)
 	// Running reports whether the process with that pid still runs.
 	Running(pid int) bool
+	// Radiants are the pids of every Radiant running, its bridge listening or not.
+	Radiants() ([]int, error)
+	// Modules are the paths of the modules the process has loaded, its exe first.
+	Modules(pid int) ([]string, error)
+	// Ready waits until the process takes input.
+	Ready(ctx context.Context, pid int) error
+	// Inject loads the DLL into the process.
+	Inject(pid int, dll string) error
+	// Control sends a command to MTPlugins' host in the process and returns its reply.
+	Control(pid int, cmd string) (string, error)
 }
 
 // ErrNoRadiant is Connect's error when no Radiant runs the bridge.
-var ErrNoRadiant = errors.New("no Radiant with the T7RadiantBridge plugin is running: radiant_open starts one on a map")
+var ErrNoRadiant = errors.New("no Radiant has t7kb's bridge loaded: radiant_open loads it into the Radiant running, or starts one on the map")
 
 // Instance is one Radiant with the bridge, as List found it.
 type Instance struct {

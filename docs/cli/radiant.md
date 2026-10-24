@@ -1,6 +1,6 @@
 # Radiant: the map open in your Radiant
 
-These commands work on the map Radiant has open, as it is now, unsaved edits included, through the [T7RadiantBridge](https://github.com/McReaper/t7_radiant_bridge) plugin (loaded by MTPlugins). [Radiant integration](../radiant.md) has what to install and what stays in your hands. Each command takes `--pid` to pick a Radiant when several run. [All commands](../cli.md).
+These commands work on the map Radiant has open, as it is now, unsaved edits included, through [T7RadiantBridge](https://github.com/McReaper/t7_radiant_bridge), the bridge t7kb loads into it. [Radiant integration](../radiant.md) has what to install and what stays in your hands. Each command takes `--pid` to pick a Radiant when several run. [All commands](../cli.md).
 
 Entities and brushes go by short ids, the first 8 hex digits of their Radiant GUID, as `map find` lists them.
 

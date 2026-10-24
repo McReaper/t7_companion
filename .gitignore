@@ -9,6 +9,7 @@
 *.db-journal
 *.db-wal
 /models/
+/bridge/
 
 # OS / editor noise
 .DS_Store
