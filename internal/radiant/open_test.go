@@ -286,7 +286,7 @@ func TestOpenSaysWhyRadiantCouldNotStart(t *testing.T) {
 		"MTPlugins' host late": {mtplugins: "1", onStart: starting(0, 0), want: "its host never answered in Radiant"},
 		"MTPlugins turned off": {mtplugins: "0", onStart: starting(0, time.Hour), want: `the map Radiant has open is still ""`},
 		"an old bridge in it": {onStart: func(pid int, exe, _ string, _ []string) *radianttest.Started {
-			return &radianttest.Started{Fake: radianttest.New(0, ""), Unloaded: true, Modules: []string{exe, `C:\t7kb\T7RadiantBridge-1.0.0.dll`}}
+			return &radianttest.Started{Fake: radianttest.New(0, ""), Unloaded: true, Modules: []string{exe, filepath.Join("t7kb", "T7RadiantBridge-1.0.0.dll")}}
 		}, want: "runs the bridge T7RadiantBridge-1.0.0.dll, which doesn't answer: close Radiant"},
 	} {
 		t.Run(name, func(t *testing.T) {
