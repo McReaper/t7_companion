@@ -266,6 +266,16 @@ func TestOpenLoadsTheBridgeIntoARadiantRunningWithoutIt(t *testing.T) {
 	if _, err := open(t, m, radiant.OpenOptions{Root: root, Map: a, Bridge: dir, PID: 77}); err == nil || !strings.Contains(err.Error(), "no Radiant with pid 77 runs") {
 		t.Errorf("an unknown pid: %v", err)
 	}
+
+	// beside one running the bridge, the pid names the one without it
+	m = radianttest.NewMachine(radianttest.New(51, b))
+	m.Run(&radianttest.Started{Fake: radianttest.New(52, b), Unloaded: true})
+	if got, err := open(t, m, radiant.OpenOptions{Root: root, Map: a, Bridge: dir, PID: 52}); err != nil || got.PID != 52 {
+		t.Errorf("the pid of the one without the bridge: %+v, %v", got, err)
+	}
+	if in := m.Injected(); len(in) != 1 || in[0][0] != "52" {
+		t.Errorf("injected %q, want only 52", in)
+	}
 }
 
 func TestOpenSaysWhyRadiantCouldNotStart(t *testing.T) {

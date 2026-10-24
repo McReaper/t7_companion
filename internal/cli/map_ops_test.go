@@ -107,6 +107,21 @@ func TestRadiantOpenCommand(t *testing.T) {
 	}
 }
 
+func TestTheBridgeIsBesideTheBinaryUnlessTheEnvironmentNamesABuild(t *testing.T) {
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("T7KB_BRIDGE_DIR", "")
+	if got, want := bridgeDir(), filepath.Join(filepath.Dir(exe), "bridge"); got != want {
+		t.Errorf("bridgeDir() = %q, want %q", got, want)
+	}
+	t.Setenv("T7KB_BRIDGE_DIR", filepath.Join("dev", "build"))
+	if got := bridgeDir(); got != filepath.Join("dev", "build") {
+		t.Errorf("with T7KB_BRIDGE_DIR: %q", got)
+	}
+}
+
 func TestRadiantOpenToolOverMCP(t *testing.T) {
 	root := radiantRoot(t)
 	bridge := t.TempDir()
