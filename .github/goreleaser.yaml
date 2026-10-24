@@ -12,7 +12,7 @@ version: 2
 before:
   hooks:
     - go mod tidy
-    # Populate ./models with the embedding model once, so both archives can
+    # Populate ./models with the embedding model once, so the archive can
     # bundle it for offline use (the binary loads it from beside itself).
     - sh -c 'HF_HOME="$(pwd)/models" go run ./cmd/t7kb embed warmup'
     # the Radiant bridge t7kb loads into Radiant, from its own release: the version internal/radiant pins
