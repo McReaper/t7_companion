@@ -142,13 +142,18 @@ func revsOf(t *testing.T, ids ...string) map[string]string {
 	return revs
 }
 
-// t7kb map edit --help gives map_edit's description, every op of the batch
-// in it with its fields: a CLI user never sees the tool's description.
-func TestMapEditHelpGivesEveryOp(t *testing.T) {
-	long := newMapEditCmd().Long
-	if !strings.Contains(long, mapEditHelp) {
-		t.Error("the help leaves out map_edit's description")
+// Each map command's --help gives its MCP tool's description, which a CLI
+// user never sees: map edit's has every op of the batch with its fields.
+func TestMapCommandsHelpGivesTheirToolsDescription(t *testing.T) {
+	root := newRootCmd()
+	for _, tool := range mapToolset().tools {
+		cmd, _, err := root.Find(strings.SplitN(tool.Tool.Name, "_", 2))
+		if err != nil || !strings.Contains(cmd.Long, tool.Tool.Description) || !strings.HasPrefix(cmd.Long, cmd.Short+".") {
+			t.Errorf("%s: the help of `t7kb %s` leaves out its description: %v", tool.Tool.Name, cmd.CommandPath(), err)
+		}
 	}
+	edit, _, _ := root.Find([]string{"map", "edit"})
+	long := edit.Long
 	ops := reflect.TypeFor[level.Op]()
 	for i := range ops.NumField() {
 		kind, _, _ := strings.Cut(ops.Field(i).Tag.Get("json"), ",")

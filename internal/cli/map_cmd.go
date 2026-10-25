@@ -26,8 +26,22 @@ func newRadiantCmd() *cobra.Command {
 		}}
 	open.Flags().IntVar(&pid, "pid", 0, "the Radiant to use when several run")
 	open.Flags().BoolVar(&discard, "discard", false, "drop the Radiant's unsaved changes to load the map")
-	root.AddCommand(open)
+	root.AddCommand(withToolHelp(open, "radiant_open"))
 	return root
+}
+
+// withToolHelp puts the description of the MCP tool a map command is in its
+// help, where the map tools' rules are written once: a CLI user never sees
+// the tool's.
+func withToolHelp(c *cobra.Command, tool string) *cobra.Command {
+	for _, t := range mapToolset().tools {
+		if t.Tool.Name == tool {
+			c.Long = c.Short + ".\n\nIt is the MCP tool " + tool + ": its flags are the tool's arguments, - for _,\n" +
+				"and the tools the description names are t7kb's commands (map_find is t7kb map find).\n" +
+				tool + "'s description:\n\n" + t.Tool.Description
+		}
+	}
+	return c
 }
 
 func newMapCmd() *cobra.Command {
@@ -52,7 +66,8 @@ func newMapCmd() *cobra.Command {
 	fl.StringVar(&a.Keys, "keys", "", "which keys to show: all, or a comma list (default the naming keys)")
 	fl.IntVar(&a.Limit, "limit", 0, "how many entities at most (default 50)")
 	fl.IntVar(&a.PID, "pid", 0, "the Radiant to read when several run")
-	root.AddCommand(find, newMapViewCmd(), newMapEditCmd(), newMapCommandCmd())
+	root.AddCommand(withToolHelp(find, "map_find"), withToolHelp(newMapViewCmd(), "map_view"),
+		withToolHelp(newMapEditCmd(), "map_edit"), withToolHelp(newMapCommandCmd(), "map_command"))
 	return root
 }
 
@@ -83,10 +98,7 @@ func newMapEditCmd() *cobra.Command {
 	var pid int
 	edit := &cobra.Command{Use: "edit --ops <file|->",
 		Short: "Apply a batch of ops (a JSON array, as map_edit takes) as one undo step",
-		Long: "Apply a batch of ops, a JSON array, as one undo step. It is the MCP tool map_edit: --ops, --revs and\n" +
-			"--label are its ops, revs and label, and the tools it names are t7kb's commands (map_find is\n" +
-			"t7kb map find). map_edit's description:\n\n" + mapEditHelp,
-		Args: cobra.NoArgs,
+		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			var raw []byte
 			var err error
