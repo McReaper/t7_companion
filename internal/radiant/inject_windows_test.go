@@ -28,7 +28,16 @@ func TestLocalInjectLoadsADLLIntoAnotherProcess(t *testing.T) {
 	t.Cleanup(func() { _ = c.Process.Kill(); _ = c.Wait() })
 	pid := c.Process.Pid
 	dll := filepath.Join(os.Getenv("SystemRoot"), "System32", "msimg32.dll") // a small DLL a Go program doesn't load
-	before, err := Local.Modules(pid)
+	// A process just started may list no module yet, or not yet kernel32,
+	// whose LoadLibraryW the inject runs.
+	var before []string
+	var err error
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		before, err = Local.Modules(pid)
+		if err == nil && slices.ContainsFunc(before, func(m string) bool { return strings.EqualFold(filepath.Base(m), "kernel32.dll") }) {
+			break
+		}
+	}
 	if err != nil || len(before) == 0 || !strings.HasSuffix(strings.ToLower(before[0]), ".exe") {
 		t.Fatalf("the child's modules, its exe first: %v %v", before, err)
 	}
