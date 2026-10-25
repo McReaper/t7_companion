@@ -64,13 +64,13 @@ func runSearch(cmd *cobra.Command, query string, num int, bm25, vector, scores b
 	if err != nil {
 		return err
 	}
-	if len(hits) == 0 && bm25 {
+	if len(hits) == 0 {
 		// a question's every word is in no one document: rank those holding some
 		if hits, err = st.SearchAnyWord(cmd.Context(), keywords, num, only...); err != nil {
 			return err
 		}
 		if len(hits) > 0 {
-			fmt.Fprintln(cmd.ErrOrStderr(), "no document holds every word: these hold some of them (fewer words, or no --bm25, search better)")
+			fmt.Fprintln(cmd.ErrOrStderr(), "no document holds every word: these hold some of them (fewer words search better)")
 		}
 	}
 	if len(hits) == 0 {
