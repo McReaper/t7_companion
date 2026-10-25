@@ -157,7 +157,7 @@ func BenchmarkBM25Rank(b *testing.B) {
 			ctx := context.Background()
 			b.ReportAllocs()
 			for b.Loop() {
-				if _, err := st.bm25Rank(ctx, "zombie spawner perk", Pool, nil); err != nil {
+				if _, err := st.bm25Rank(ctx, ftsQuery("zombie spawner perk"), Pool, nil); err != nil {
 					b.Fatal(err)
 				}
 			}
