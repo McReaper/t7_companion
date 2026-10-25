@@ -76,7 +76,7 @@ const mapEditHelp = "Edit the map open in Radiant: a batch of ops, applied in or
 	"the old). Every entity or brush of the map an op names needs its own rev from map_find, in revs: a brush's is the " +
 	"one its brush_list row gives, not its entity's, so a world brush needs no rev of the worldspawn. The user works in the " +
 	"same Radiant, and a batch naming something they changed or deleted since it was read is refused whole, nothing sent. " +
-	"The answer reads the map back: each op's id and rev, class, origin or bounds, the tile each material got " +
+	"The answer reads the map back: each op's id and rev, class, origin or bounds (min x y z, max x y z), the tile each material got " +
 	"and where it came from, the faces each texture op textured. Edits go through Radiant, never the .map file, " +
 	"and the user's selection is kept."
 
