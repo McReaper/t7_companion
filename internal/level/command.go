@@ -138,7 +138,7 @@ func Menu(ctx context.Context, c *radiant.Client, path string) ([]MenuEntry, err
 		out = append(out, MenuEntry{Label: strings.ReplaceAll(f[0], "&", ""), Enabled: f[1] == "1", Submenu: f[2] == "1"})
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("no menu %q: menus are named by their labels from the menu bar (Selection/CSG)", path)
+		return nil, fmt.Errorf("no menu %q: a menu is named by its labels from the menu bar down, joined by / (Selection/CSG)", path)
 	}
 	return out, nil
 }
