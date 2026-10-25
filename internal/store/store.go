@@ -97,7 +97,7 @@ func (s *Store) Close() error { return s.db.Close() }
 // of the whole corpus being filtered afterwards.
 func (s *Store) SearchHybrid(ctx context.Context, query string, qvec []float32, limit int, sources ...string) ([]Hit, error) {
 	only := sourceSet(sources)
-	bm25, err := s.bm25Rank(ctx, query, Pool, only)
+	bm25, err := s.bm25Rank(ctx, ftsQuery(query), Pool, only)
 	if err != nil {
 		return nil, err
 	}
@@ -105,8 +105,22 @@ func (s *Store) SearchHybrid(ctx context.Context, query string, qvec []float32, 
 	if err != nil {
 		return nil, err
 	}
+	return s.hits(ctx, limit, bm25, vec)
+}
 
-	fused, snippet := rrfFuse(bm25, vec)
+// SearchAnyWord ranks by BM25 the documents that hold any word of the query:
+// a keyword-only search of a question finds no document holding every word.
+func (s *Store) SearchAnyWord(ctx context.Context, query string, limit int, sources ...string) ([]Hit, error) {
+	bm25, err := s.bm25Rank(ctx, ftsAnyQuery(query), Pool, sourceSet(sources))
+	if err != nil {
+		return nil, err
+	}
+	return s.hits(ctx, limit, bm25)
+}
+
+// hits fuses the rankings into the top limit hits, reliability breaking ties.
+func (s *Store) hits(ctx context.Context, limit int, rankings ...[]rankItem) ([]Hit, error) {
+	fused, snippet := rrfFuse(rankings...)
 	if len(fused) == 0 {
 		return nil, nil
 	}
@@ -172,7 +186,13 @@ var ftsToken = regexp.MustCompile(`[\p{L}\p{N}_]+`)
 
 // ftsQuery turns free text into a safe FTS5 MATCH expression: each word becomes
 // a quoted term, joined implicitly (AND). Empty if there are no usable tokens.
-func ftsQuery(q string) string {
+func ftsQuery(q string) string { return ftsTerms(q, " ") }
+
+// ftsAnyQuery is ftsQuery with the terms joined by OR: a document holding one
+// of the words matches.
+func ftsAnyQuery(q string) string { return ftsTerms(q, " OR ") }
+
+func ftsTerms(q, join string) string {
 	toks := ftsToken.FindAllString(q, -1)
 	if len(toks) == 0 {
 		return ""
@@ -180,12 +200,12 @@ func ftsQuery(q string) string {
 	for i, t := range toks {
 		toks[i] = `"` + t + `"`
 	}
-	return strings.Join(toks, " ")
+	return strings.Join(toks, join)
 }
 
-// bm25Rank returns up to limit doc_ids ranked by FTS5 BM25, with a snippet.
-func (s *Store) bm25Rank(ctx context.Context, query string, limit int, only map[string]bool) ([]rankItem, error) {
-	match := ftsQuery(query)
+// bm25Rank returns up to limit doc_ids ranked by FTS5 BM25 for an FTS5 MATCH
+// expression, with a snippet.
+func (s *Store) bm25Rank(ctx context.Context, match string, limit int, only map[string]bool) ([]rankItem, error) {
 	if match == "" {
 		return nil, nil
 	}
