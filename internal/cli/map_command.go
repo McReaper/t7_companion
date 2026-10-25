@@ -44,12 +44,14 @@ func mapCommand(ctx context.Context, command string, ids []string, menu *string,
 		return nil, err
 	}
 	out := &mapCommandOut{Map: baseName(snap.State.Map)}
+	command = plainMenuPath(command)
 	if command == "" && menu != nil {
-		entries, err := level.Menu(ctx, c, *menu)
+		path := plainMenuPath(*menu)
+		entries, err := level.Menu(ctx, c, path)
 		if err != nil {
 			return nil, err
 		}
-		out.Menu = *menu
+		out.Menu = path
 		for _, e := range entries {
 			s := e.Label
 			if e.Submenu {
@@ -79,6 +81,18 @@ func mapCommand(ctx context.Context, command string, ids []string, menu *string,
 		}
 	}
 	return out, nil
+}
+
+// plainMenuPath is a menu path with the marks a menu's listing adds to its
+// entries, " >" and " (disabled)", taken off each label, so an entry pasted
+// back from the listing names it.
+func plainMenuPath(path string) string {
+	labels := strings.Split(path, "/")
+	for i, l := range labels {
+		l = strings.TrimSuffix(strings.TrimSpace(l), "(disabled)")
+		labels[i] = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(l), ">"))
+	}
+	return strings.Join(labels, "/")
 }
 
 // sameSet tells whether two GUID lists hold the same GUIDs, in any case.

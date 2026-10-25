@@ -115,6 +115,9 @@ func TestMapCommandListsTheMenuBarOnBothSurfaces(t *testing.T) {
 	if got := tool(map[string]any{"menu": "Brush"}); !strings.Contains(got, `"entries":["Rotate"]`) {
 		t.Errorf("menu Brush: %s", got)
 	}
+	if got := tool(map[string]any{"menu": "Brush >"}); !strings.Contains(got, `"menu":"Brush","entries":["Rotate"]`) {
+		t.Errorf("menu Brush > (pasted from the bar's listing): %s", got)
+	}
 	if got := tool(map[string]any{}); !strings.Contains(got, "no command") {
 		t.Errorf("no menu and no command: %s", got)
 	}
@@ -124,6 +127,29 @@ func TestMapCommandListsTheMenuBarOnBothSurfaces(t *testing.T) {
 	}
 	if out, err := run(); err == nil || !strings.Contains(err.Error(), "--menu= the menu bar") {
 		t.Errorf("no path names the menu bar's spelling: %v\n%s", err, out)
+	}
+}
+
+// An entry pasted back from a menu's listing, its marks on, names it: the
+// labels are sent to Radiant without " >" or " (disabled)".
+func TestPlainMenuPathTakesOffTheListingsMarks(t *testing.T) {
+	for in, want := range map[string]string{
+		"Selection >/CSG > /CSG Subtract": "Selection/CSG/CSG Subtract",
+		"More > (disabled)":               "More",
+		"CSG Merge (disabled)":            "CSG Merge",
+		" Selection / CSG ":               "Selection/CSG",
+		"Make Geo... >":                   "Make Geo...",
+		"/":                               "/",
+		"":                                "",
+	} {
+		if got := plainMenuPath(in); got != want {
+			t.Errorf("plainMenuPath(%q) = %q, want %q", in, got, want)
+		}
+	}
+	f := testRadiant(t)
+	f.Handle("command", splitFloor)
+	if out, err := mapCommand(context.Background(), "Selection >/CSG >/CSG Subtract", []string{"5ec8de49"}, nil, 0); err != nil || out.Command != "Selection/CSG/CSG Subtract" {
+		t.Errorf("a pasted command = %+v, %v", out, err)
 	}
 }
 
