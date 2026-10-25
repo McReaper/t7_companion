@@ -43,8 +43,9 @@ const mapCraft = "Building or changing the map: the craft is in the t7kb:mapping
 func withToolHelp(c *cobra.Command, tool string) *cobra.Command {
 	for _, t := range mapToolset().tools {
 		if t.Tool.Name == tool {
-			c.Long = c.Short + ".\n\n" + mapCraft + "\n\nIt is the MCP tool " + tool + ": its flags are the tool's arguments, - for _,\n" +
-				"and the tools the description names are t7kb's commands (map_find is t7kb map find).\n" +
+			c.Long = c.Short + ".\n\n" + mapCraft + "\n\nIt is the MCP tool " + tool + ": its flags are the tool's arguments, - for _, but for the\n" +
+				"one it takes in place (radiant open's map, map command's menu path; ids go in place or as --ids), and the\n" +
+				"tools the description names are t7kb's commands (map_find is t7kb map find).\n" +
 				tool + "'s description:\n\n" + t.Tool.Description + argumentsHelp(t.Tool.InputSchema.Properties)
 		}
 	}
@@ -74,13 +75,15 @@ func newMapCmd() *cobra.Command {
 		Long:  "Find, see and edit the map open in Radiant.\n\n" + mapCraft,
 	}
 	var a mapFindArgs
+	var findIDs string
 	find := &cobra.Command{Use: "find [id…]",
 		Short: "List the entities that match, with their ids and bounds",
 		RunE: func(c *cobra.Command, ids []string) error {
-			a.IDs = ids
+			a.IDs = append(ids, splitIDs(findIDs)...)
 			return printIndented(c.OutOrStdout())(mapFind(c.Context(), a))
 		}}
 	fl := find.Flags()
+	fl.StringVar(&findIDs, "ids", "", "ids, comma- or space-separated, as after the command")
 	fl.StringVar(&a.Class, "class", "", "classname, * matching any run of characters")
 	fl.StringVar(&a.Key, "key", "", "a key the entity has, or key=value")
 	fl.StringVar(&a.Near, "near", "", "a point x,y,z: what comes within --radius of it by bounds, nearest first; an entity that owns brushes, the worldspawn too, goes by its brushes' and lists those near (its bounds and count stay the whole entity's)")
@@ -96,22 +99,23 @@ func newMapCmd() *cobra.Command {
 }
 
 func newMapCommandCmd() *cobra.Command {
-	var menu string
+	var menu, ids string
 	var pid int
 	command := &cobra.Command{Use: "command <menu path> [id…]",
 		Short: "Run a Radiant menu entry on the entities and brushes named, or list a menu (--menu)",
 		RunE: func(c *cobra.Command, a []string) error {
 			if c.Flags().Changed("menu") {
-				if len(a) > 0 {
-					return fmt.Errorf("--menu takes the menu as its value and nothing after it (got %q): a submenu is --menu=\"Selection/CSG\"", strings.Join(a, " "))
+				if len(a) > 0 || ids != "" {
+					return fmt.Errorf("--menu takes the menu as its value and nothing after it (got %q): a submenu is --menu=\"Selection/CSG\"", strings.TrimSpace(strings.Join(a, " ")+" "+ids))
 				}
 				return printIndented(c.OutOrStdout())(mapCommand(c.Context(), "", nil, &menu, pid))
 			}
 			if len(a) == 0 {
 				return fmt.Errorf("give a menu path (Selection/CSG/CSG Hollow), or --menu to list a menu's entries (--menu= the menu bar)")
 			}
-			return printIndented(c.OutOrStdout())(mapCommand(c.Context(), a[0], a[1:], nil, pid))
+			return printIndented(c.OutOrStdout())(mapCommand(c.Context(), a[0], append(a[1:], splitIDs(ids)...), nil, pid))
 		}}
+	command.Flags().StringVar(&ids, "ids", "", "what to select for it, comma- or space-separated, as after the menu path")
 	command.Flags().StringVar(&menu, "menu", "", "list a menu's entries instead, the menu named by its labels from the menu bar down joined by / (Selection/CSG); --menu= (empty) lists the menu bar")
 	command.Flags().IntVar(&pid, "pid", 0, "the Radiant to use when several run")
 	return command
@@ -155,11 +159,11 @@ func newMapEditCmd() *cobra.Command {
 
 func newMapViewCmd() *cobra.Command {
 	var a mapViewArgs
-	var out string
+	var out, viewIDs string
 	view := &cobra.Command{Use: "view [id…]",
 		Short: "Save an image of a view of the map, with ids on it, and print its projection",
 		RunE: func(c *cobra.Command, ids []string) error {
-			a.IDs = ids
+			a.IDs = append(ids, splitIDs(viewIDs)...)
 			res, png, err := mapView(c.Context(), a)
 			if err != nil {
 				return err
@@ -171,6 +175,7 @@ func newMapViewCmd() *cobra.Command {
 			return printIndented(c.OutOrStdout())(res, nil)
 		}}
 	fl := view.Flags()
+	fl.StringVar(&viewIDs, "ids", "", "ids to frame, comma- or space-separated, as after the command")
 	fl.StringVar(&a.View, "view", "", "3d (default), top, front or side")
 	fl.StringVar(&a.At, "at", "", "a point x,y,z to frame")
 	fl.Float64Var(&a.Radius, "radius", 0, "with --at: how far around it to show (default 256)")
