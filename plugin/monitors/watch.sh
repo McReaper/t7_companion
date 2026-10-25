@@ -1,8 +1,9 @@
 #!/bin/sh
 # The plugin's monitor: runs `t7kb watch`, which prints one line per problem
 # the game has (a script error, a fatal error, a crash, the assets the map's
-# zone lists that the game didn't find) and per build the mod tools run (a
-# link's verdict, a compile's leak), each one a notification to the agent.
+# zone lists that the game didn't find), per build the mod tools run (a
+# link's verdict, a compile's leak) and per thing Radiant reports (its errors,
+# a prefab entered, a bake ended), each one a notification to the agent.
 # Quiet, and gone, when t7kb or the game's root can't be found, or the binary
 # predates the command.
 

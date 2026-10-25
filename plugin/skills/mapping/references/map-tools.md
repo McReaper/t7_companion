@@ -10,6 +10,7 @@ Contents:
 - [Radiant's Patch menu reshapes what it is run on](#radiants-patch-menu-reshapes-what-it-is-run-on)
 - [CSG Hollow walls are as thick as the grid](#csg-hollow-walls-are-as-thick-as-the-grid)
 - [A dialog in Radiant stops the tools](#a-dialog-in-radiant-stops-the-tools)
+- [Radiant's console says what an edit names that no GDT defines](#radiants-console-says-what-an-edit-names-that-no-gdt-defines)
 
 ## A new map's start room: build inside it, mind its floor and its contents
 
@@ -50,3 +51,7 @@ Run through `t7kb:map_command` on a placed brush or patch (verified in a test Ra
 ## A dialog in Radiant stops the tools
 
 A modal dialog open in Radiant blocks every edit until it closes: ask the mapper to close it. A menu entry that opens a dialog (most of those ending in `...`) waits on the mapper, so use the ones that act at once. A minimised Radiant draws nothing, so views need its window restored.
+
+## Radiant's console says what an edit names that no GDT defines
+
+An edit that names a model, material or prefab no GDT or file defines still lands, and `t7kb:map_edit` answers ok: only Radiant's console says it, as `ERROR: Can't find xmodel '<name>' in gdtDB` (`material` alike) or `ERROR: Classname 'misc_prefab', failed to load model '<path>'` (verified in a test Radiant). In Claude Code the plugin's monitor relays those errors, one line per burst, and says when Radiant opens another map, enters or leaves a prefab, finishes a bake or closes: after an edit that names assets, read its line before the next step.
