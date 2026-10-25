@@ -142,3 +142,43 @@ func TestRecordWatcherSaysACompilesLeakAndPlacedProblems(t *testing.T) {
 		t.Errorf("a compile's problems, and nothing for one with none:\n got %q\nwant %q", *said, want)
 	}
 }
+
+// A link's first record can be up to 2 s younger than the others it wrote, as
+// file times are coarse: a .deps or a .lin that much older than the build's
+// first new record is the build's, and one older still is an earlier one's.
+func TestRecordWatcherTakesRecordsUpTo2sOlderThanTheBuildsFirst(t *testing.T) {
+	w, said := recordWatch(t, nil)
+	writeRecord(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps", "version,1,1\nxmodel,m\n\tgdt,image,img_a,\n")
+	writeRecordAt(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_near.deps", "version,1,1\nxmodel,m\n\tgdt,image,img_b,\n", -time.Second/2)
+	writeRecordAt(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_far.deps", "version,1,1\nxmodel,m\n\tgdt,image,img_c,\n", -2*time.Second)
+	writeRecordAt(t, w, "map_source/zm/zm_near.lin", "0 0 0\n", -time.Second/2)
+	writeRecord(t, w, "map_source/zm/zm_near.errlog", `"m" 0 1 1 2 3 0 0 1 "bad plane"`+"\n")
+	writeRecordAt(t, w, "map_source/zm/zm_far.lin", "0 0 0\n", -2*time.Second)
+	writeRecord(t, w, "map_source/zm/zm_far.errlog", `"m" 0 1 1 2 3 0 0 1 "bad plane"`+"\n")
+	w.Tick()
+	want := []string{
+		"link of usermaps/zm_x ok, but 2 asset(s) it named are in no GDT and it linked on without them: image img_b | image img_a",
+		"compile of map_source/zm/zm_far.map: map_source/zm/zm_far.errlog places 1 problem(s): entity 0 brush 1 at 1 2 3: bad plane",
+		"compile of map_source/zm/zm_near.map: the map leaks, and the leakfile map_source/zm/zm_near.lin traces the hole to the void (t7kb:mapping); " +
+			"map_source/zm/zm_near.errlog places 1 problem(s): entity 0 brush 1 at 1 2 3: bad plane",
+	}
+	if !reflect.DeepEqual(*said, want) {
+		t.Errorf("\n got %q\nwant %q", *said, want)
+	}
+}
+
+func TestNamedCountsWhatItLeavesOut(t *testing.T) {
+	for _, c := range []struct {
+		list  []string
+		total int
+		want  string
+	}{
+		{[]string{"a", "b", "c"}, 3, "a | b | c"},
+		{[]string{"a", "b", "c", "d"}, 4, "a | b | c | and 1 more"},
+		{[]string{"a", "b", "c"}, 5, "a | b | c | and 2 more"},
+	} {
+		if got := named(c.list, c.total); got != c.want {
+			t.Errorf("named(%q, %d) = %q, want %q", c.list, c.total, got, c.want)
+		}
+	}
+}
