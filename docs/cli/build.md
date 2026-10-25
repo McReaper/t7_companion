@@ -26,7 +26,7 @@ Runs the build pipeline on a map, or a mod with `--mod`, and prints a short resu
 | `compile` | `cod2map64` turns the `.map` into the `.d3dbsp` |
 | `light` | Radiant's lighting pass, at `--light` quality |
 | `link` | `linker_modtools` packs the fastfile: its errors and warnings come back whole, with what it looked for in no GDT |
-| `run` | starts the game on the map, writing a fresh `console_mp.log`, and checks its start; `game watch` and `game log` take it from there |
+| `run` | starts the game on the map, writing a fresh `console_mp.log`, and checks its start; [`t7kb watch`](../cli.md#t7kb-watch) and `game log` take it from there |
 
 ```
 t7kb build zm_leviathan
@@ -70,11 +70,3 @@ t7kb game log --tail 100
 | `--tail` | the last launch's last lines |
 | `--path` | a log file to read instead of the current one |
 | `--after` | read only the lines after this line of the file: what is new since an earlier read |
-
-## `t7kb game watch`
-
-Says each problem the game has, one line each, as it happens, until you stop it: a script error, a fatal error, a crash, the assets the map's zone lists that the game didn't find once it has loaded. It follows every launch and every reload from the game's console, and says each problem once. In Claude Code, the t7kb plugin runs it for the whole session, so your agent hears of each problem without you telling it; `game log` then investigates.
-
-```
-t7kb game watch
-```

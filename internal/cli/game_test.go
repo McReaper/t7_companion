@@ -211,42 +211,6 @@ func TestGameLogReadsOnlyWhatIsNewAndTheDialogsOpen(t *testing.T) {
 	}
 }
 
-func TestGameWatchSaysTheGamesProblemsUntilStopped(t *testing.T) {
-	game := gameFixture(t)
-	old := gameWatchEvery
-	t.Cleanup(func() { gameWatchEvery = old })
-	gameWatchEvery = 10 * time.Millisecond
-	ctx, cancel := context.WithCancel(context.Background())
-	var b safeBuffer
-	done := make(chan error, 1)
-	go func() { done <- gameWatch(ctx, "", &b, fakeProcs{}) }()
-	time.Sleep(50 * time.Millisecond)
-	f, err := os.OpenFile(filepath.Join(game, "console_mp.log"), os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, _ = f.WriteString("******* script error *******\nError: a new one\nError: ****************\n")
-	f.Close()
-	for i := 0; i < 200 && !strings.Contains(b.String(), "script error: a new one, console_mp.log line 50"); i++ {
-		time.Sleep(10 * time.Millisecond)
-	}
-	cancel()
-	if err := <-done; err != nil || b.String() != "script error: a new one, console_mp.log line 50\n" {
-		t.Errorf("one line for the new error, none for what was there: %v %q", err, b.String())
-	}
-	t.Setenv("TA_GAME_PATH", "")
-	if err := gameWatch(context.Background(), "", &b, fakeProcs{}); err == nil {
-		t.Error("no game root")
-	}
-	cmd := newGameCmd()
-	cmd.SetArgs([]string{"watch", "--tools-path", game})
-	c, stop := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer stop()
-	if err := cmd.ExecuteContext(c); err != nil {
-		t.Errorf("the command stops with its context: %v", err)
-	}
-}
-
 // safeBuffer is a strings.Builder the watcher writes from another goroutine.
 type safeBuffer struct {
 	mu sync.Mutex

@@ -21,7 +21,7 @@ func gameLogTool() server.ServerTool {
 			"kinds) and a count of the stock lookups every load fails, each with its line number; and gives the raw lines "+
 			"asked for (grep, tail), and the dialogs the running game shows. The answer names the file and the other logs "+
 			"beside it (crashes.log, older ones): read around a line yourself when the sorting misses something. In Claude "+
-			"Code the t7kb plugin's monitor (t7kb game watch) tells you each problem as it happens; elsewhere, after reads "+
+			"Code the t7kb plugin's monitor (t7kb watch) tells you each problem as it happens; elsewhere, after reads "+
 			"only what is new."),
 		mcp.WithString("name", mcp.Description("The map or mod the run was of: picks its log and the zone to sort against. Omit for the newest log.")),
 		mcp.WithString("path", mcp.Description("A log file to read instead of finding the current one.")),

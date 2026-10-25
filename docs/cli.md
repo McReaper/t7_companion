@@ -5,7 +5,7 @@ Every tool your agent calls is also a terminal command that does the same thing:
 | Page | Commands | For |
 | --- | --- | --- |
 | [Knowledge](cli/knowledge.md) | `t7kb`, `search`, `get` | looking something up in the modding knowledge base |
-| [Maps and mods](cli/build.md) | `create`, `build`, `game log`, `game watch` | starting a map or mod from a template; compiling, lighting, linking and launching it; what the game printed while it ran |
+| [Maps and mods](cli/build.md) | `create`, `build`, `game log` | starting a map or mod from a template; compiling, lighting, linking and launching it; what the game printed while it ran |
 | [GDT assets](cli/gdt.md) | `gdt find`, `get`, `schema`, `edit`, `check`, `refs` | reading, writing and checking assets without APE |
 | [What a build packs](cli/zone.md) | `zone explain`, `contents`, `check` | why an asset is in your map, what each zone line weighs, what won't ship |
 | [Shaders](cli/shader.md) | `shader decompile` | a stock shader's HLSL, to start a custom one from |
@@ -22,6 +22,14 @@ Every tool your agent calls is also a terminal command that does the same thing:
 ## `t7kb mcp`
 
 Runs the MCP server, the surface your agent uses. Your client starts it; [clients.md](clients.md) has the setup per client.
+
+## `t7kb watch`
+
+Says, one line each, as it happens, until you stop it: each problem the game has (a script error, a fatal error, a crash, the assets the map's zone lists that the game didn't find once it has loaded), and each build the mod tools run, from the Launcher or from t7kb: a link's errors, warnings, and the assets it named that are in no GDT, or that it went fine; a compile's leak and the problems its `.errlog` places. It reads what the game and the tools write, once the tool has quit, and says each thing once. In Claude Code, the t7kb plugin runs it for the whole session, so your agent hears of each without you telling it; `game log` and the `zone` commands then investigate.
+
+```
+t7kb watch
+```
 
 ## `t7kb update-check`
 

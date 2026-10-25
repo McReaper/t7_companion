@@ -2,7 +2,6 @@ package gamelog
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -64,20 +63,6 @@ type launch struct {
 
 func newLaunch() *launch {
 	return &launch{sorter: sorter{Summary: Summary{Noise: map[string]int{}}, seen: map[string]bool{}}, scripts: map[string]bool{}}
-}
-
-// Run ticks every interval until ctx ends.
-func (w *Watcher) Run(ctx context.Context, every time.Duration) {
-	t := time.NewTicker(every)
-	defer t.Stop()
-	for {
-		w.Tick()
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-		}
-	}
 }
 
 // Tick reads what the logs gained and looks at the game's processes once.
