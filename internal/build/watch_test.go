@@ -182,3 +182,61 @@ func TestNamedCountsWhatItLeavesOut(t *testing.T) {
 		}
 	}
 }
+
+func TestRecordWatcherSaysEachBuildT7kbRanOnceItEnds(t *testing.T) {
+	w, said := recordWatch(t, nil)
+	at := w.start.Add(-time.Hour)
+	running := State{Target: "zm_lost", Kind: "usermap", PID: 7, Started: at, Running: "light"}
+	starting := State{Target: "zm_quiet", Kind: "usermap", Started: at}
+	states := []State{
+		running, starting,
+		{Target: "zm_old", Kind: "usermap", Done: true, Started: at, Ended: at.Add(time.Minute)}, // ended before the watch
+		{Target: "zm_never_seen", Kind: "usermap", Lost: true, Started: at},                      // lost before the watch
+	}
+	w.Builds = func() []State { return states }
+	w.Tick()
+	end := w.start.Add(time.Minute)
+	running.Lost, running.Running = true, "light"
+	starting.Lost = true
+	failed := Report{FailedStage: "link", Stages: []StageResult{{Name: "gdt", OK: true}, {Name: "link", Errors: []string{"e1", "e2", "e3", "e4"}}}}
+	states = []State{
+		running, starting,
+		{Target: "zm_ok", Kind: "usermap", Done: true, Started: end.Add(-2 * time.Minute), Ended: end, Report: Report{OK: true, Stages: []StageResult{{Name: "gdt"}, {Name: "link"}}}},
+		{Target: "zm_warned", Kind: "usermap", Done: true, Started: end, Ended: end, Report: Report{OK: true, Stages: []StageResult{
+			{Name: "compile", Warnings: []string{"w1"}}, {Name: "link", Warnings: []string{"w2", "w3"}, Missing: []string{"image img_a (named by material m)"}}}}},
+		{Target: "zm_bad", Kind: "mod", Done: true, Started: end.Add(-time.Minute), Ended: end, Report: failed},
+		{Target: "zm_mute", Kind: "usermap", Done: true, Started: end, Ended: end, Report: Report{FailedStage: "start"}},
+	}
+	w.Tick()
+	w.Tick()
+	want := []string{
+		"build of zm_lost stopped at light: its process ended before the build did; build's status has what it did",
+		"build of zm_quiet stopped at its start: its process ended before the build did; build's status has what it did",
+		"build of zm_ok finished ok in 2m0s: gdt, link",
+		"build of zm_warned finished ok in 0s: compile, link; its compile warned of w1; its link warned of w2 | w3; " +
+			"its link went on without what no GDT defines: image img_a (named by material m)",
+		"build of zm_bad failed at link after 1m0s: e1 | e2 | e3 | and 1 more; build's status has the report",
+		"build of zm_mute failed at start after 0s: no error said; build's status has the report",
+	}
+	if !reflect.DeepEqual(*said, want) {
+		t.Errorf("each build once, as it ended:\n got %q\nwant %q", *said, want)
+	}
+}
+
+func TestRecordWatcherLeavesALinkT7kbRanToItsBuildsLine(t *testing.T) {
+	w, said := recordWatch(t, nil)
+	build := State{Target: "zm_x", Kind: "usermap", PID: 7, Started: w.start}
+	w.Builds = func() []State { return []State{build} }
+	writeRecord(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps", "version,1,1\n")
+	writeRecord(t, w, "mods/zm_x/zone_source/all/assetinfo/zm_mod.deps", "version,1,1\n") // another target of that name
+	w.Tick()
+	if want := []string{"link of mods/zm_x ok"}; !reflect.DeepEqual(*said, want) {
+		t.Errorf("the running build's link is its own line's: %q", *said)
+	}
+	build.Done, build.Ended = true, w.start.Add(2*time.Second)
+	writeRecordAt(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps", "version,1,1\n", time.Minute) // a later link, from the Launcher
+	w.Tick()
+	if len(*said) != 3 || (*said)[1] != "link of usermaps/zm_x ok" {
+		t.Errorf("a link after the build ended is the Launcher's: %q", *said)
+	}
+}

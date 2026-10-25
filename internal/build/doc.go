@@ -65,6 +65,21 @@
 // the game_log tool serves: what a run's log holds comes as the game plays,
 // long after the watch, so it is read when someone asks.
 //
+// # In the background
+//
+// A build takes minutes to half an hour, longer than an agent should wait on
+// one call, so build starts it by default (Start) in a detached t7kb process
+// (Resume) and answers at once; wait runs it in the call (RunTracked). Either
+// way it keeps a State, one JSON file per install and target in the user's
+// cache folder, rewritten whole at each stage: the stages planned, the one
+// running, the report of those ended, done. Three processes read it, none
+// sharing the others' memory: the build's own, the MCP server answering
+// status, and the watch. It outlives the build, so its verdict stays readable,
+// and it holds the target: a build of a target whose state is neither done
+// nor lost is refused. Start writes it as starting (pid 0) and the spawned
+// process writes its own pid at once; a state whose process ended, or still
+// without a pid after startGrace, is lost, and its target free again.
+//
 // # Watching builds
 //
 // A RecordWatcher (t7kb watch, which the t7kb plugin's monitor runs) says each
@@ -78,5 +93,7 @@
 // the other), from the verdicts the stages use: a link's errors, else its
 // warnings or that it went fine, with the assets it named that are in no GDT;
 // a compile's leak and placed problems, and nothing for a compile with
-// neither. Records older than the watch are not news.
+// neither. Records older than the watch are not news. A build t7kb ran is said
+// once more as it ends, from its State: its stages, or the stage that failed
+// and its first errors, or, when its process ended first, that it stopped.
 package build

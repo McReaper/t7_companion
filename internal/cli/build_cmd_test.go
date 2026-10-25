@@ -108,14 +108,14 @@ func TestBuildCommandPreflightError(t *testing.T) {
 // build: every flag lands in its option, and the two surfaces agree.
 func TestBuildCLIAndMCPAskForTheSameBuild(t *testing.T) {
 	var got []build.Options
-	old := buildRun
-	t.Cleanup(func() { buildRun = old })
-	buildRun = func(o *build.Options, name string, _ io.Writer) (build.Report, error) {
+	old := buildStart
+	t.Cleanup(func() { buildStart = old })
+	buildStart = func(o *build.Options, name string) (build.State, error) {
 		if name != "zm_x" {
 			t.Errorf("name %q", name)
 		}
 		got = append(got, *o)
-		return build.Report{OK: true}, nil
+		return build.State{Target: name, Kind: "usermap"}, nil
 	}
 	want := build.Options{ToolsPath: "C:/bo3", GamePath: "D:/game", Mod: true, Stages: "link,run", OnlyEnts: true,
 		Light: "high", Language: "french", SkipGDT: true, GDTRebuild: true, FreshXpak: true,
@@ -133,7 +133,7 @@ func TestBuildCLIAndMCPAskForTheSameBuild(t *testing.T) {
 		"onlyents": true, "light": "high", "language": "french", "skip_gdt": true, "gdt_rebuild": true, "fresh_xpak": true,
 		"dvars": map[string]any{"logfile": float64(2), "developer": "2"}, "launcher_dvars": true})
 	if len(got) != 2 {
-		t.Fatalf("build.Run called %d times", len(got))
+		t.Fatalf("build started %d times", len(got))
 	}
 	cli, mcp := got[0], got[1]
 	if !cli.Verbose || mcp.Verbose {

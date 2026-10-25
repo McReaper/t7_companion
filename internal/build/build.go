@@ -14,19 +14,19 @@ import (
 
 // Options is one build: the target's install, which stages run, and how.
 type Options struct {
-	ToolsPath     string
-	GamePath      string
-	Mod           bool
-	Stages        string
-	OnlyEnts      bool
-	Light         string
-	Language      string
-	SkipGDT       bool
-	GDTRebuild    bool
-	FreshXpak     bool // link: write the .xpak files from scratch
-	Verbose       bool
-	Dvars         []string // run: name=value dvars to start the game with
-	LauncherDvars bool     // run: also the Launcher's saved Dvar Options
+	ToolsPath     string   `json:"tools_path,omitempty"`
+	GamePath      string   `json:"game_path,omitempty"`
+	Mod           bool     `json:"mod,omitempty"`
+	Stages        string   `json:"stages,omitempty"`
+	OnlyEnts      bool     `json:"onlyents,omitempty"`
+	Light         string   `json:"light,omitempty"`
+	Language      string   `json:"language,omitempty"`
+	SkipGDT       bool     `json:"skip_gdt,omitempty"`
+	GDTRebuild    bool     `json:"gdt_rebuild,omitempty"`
+	FreshXpak     bool     `json:"fresh_xpak,omitempty"` // link: write the .xpak files from scratch
+	Verbose       bool     `json:"-"`
+	Dvars         []string `json:"dvars,omitempty"`          // run: name=value dvars to start the game with
+	LauncherDvars bool     `json:"launcher_dvars,omitempty"` // run: also the Launcher's saved Dvar Options
 }
 
 // StageResult is what one stage did; Report.Stages lists them in pipeline order.
@@ -67,24 +67,48 @@ func Run(o *Options, name string, stdout io.Writer) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
-	rep := Report{Target: name, Kind: "usermap", OK: true}
-	if o.Mod {
-		rep.Kind = "mod"
-	}
-	// In pipeline order; each returns false when it doesn't apply. The build stops
-	// at the first stage that fails.
-	for _, stage := range []func() (StageResult, bool){p.gdtStage, p.compileStage, p.lightStage, p.linkStage, p.gameStage} {
-		sr, applies := stage()
-		if !applies {
-			continue
-		}
+	return p.run(nil), nil
+}
+
+// run runs the stages planned, in pipeline order, and stops at the first that
+// fails; t keeps the build's state as it goes.
+func (p *buildPlan) run(t *tracker) Report {
+	rep := Report{Target: p.name, Kind: p.kind(), OK: true}
+	stages := map[string]func() (StageResult, bool){"gdt": p.gdtStage, "compile": p.compileStage, "light": p.lightStage, "link": p.linkStage, "run": p.gameStage}
+	for _, name := range p.planned() {
+		t.running(name)
+		sr, _ := stages[name]()
 		rep.Stages = append(rep.Stages, sr)
 		if !sr.OK {
 			rep.OK, rep.FailedStage = false, sr.Name
 			break
 		}
+		t.ended(rep, false)
 	}
-	return rep, nil
+	t.ended(rep, true)
+	return rep
+}
+
+// planned are the stages the build runs, in pipeline order: gdtdb's first
+// when a stage reads assets.
+func (p *buildPlan) planned() []string {
+	var out []string
+	if p.runsGDT() {
+		out = append(out, "gdt")
+	}
+	for _, s := range []string{"compile", "light", "link", "run"} {
+		if p.stages[s] {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func (p *buildPlan) kind() string {
+	if p.o.Mod {
+		return "mod"
+	}
+	return "usermap"
 }
 
 // buildPlan is a validated build: where the tools and game are, which stages
@@ -133,10 +157,15 @@ func newBuildPlan(o *Options, name string, stdout io.Writer) (*buildPlan, error)
 	return p, nil
 }
 
+// runsGDT reports whether gdtdb /update runs first, as the Launcher does
+// before every build group that reads assets.
+func (p *buildPlan) runsGDT() bool {
+	return !p.o.SkipGDT && (p.stages["compile"] || p.stages["light"] || p.stages["link"])
+}
+
 // gdtStage runs gdtdb /update first, as the Launcher does before every build group.
 func (p *buildPlan) gdtStage() (StageResult, bool) {
-	usesAssets := p.stages["compile"] || p.stages["light"] || p.stages["link"]
-	if p.o.SkipGDT || !usesAssets {
+	if !p.runsGDT() {
 		return StageResult{}, false
 	}
 	// Run gdtdb from its OWN directory, like the stock Launcher: it ties recorded asset paths to

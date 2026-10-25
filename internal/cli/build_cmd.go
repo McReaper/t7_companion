@@ -10,26 +10,37 @@ import (
 	"github.com/McReaper/t7_companion/internal/build"
 )
 
-// buildRun is build.Run; tests swap it to see what each surface asks for.
-var buildRun = build.Run
-
 func newBuildCmd() *cobra.Command {
 	o := &build.Options{}
-	var jsonOut bool
+	var jsonOut, wait, status bool
+	var resume string
 	cmd := &cobra.Command{
 		Use:   "build <name>",
 		Short: "Headlessly compile/light/link a BO3 map or mod (drives the mod tools)",
 		Long: "Runs the Black Ops 3 mod-tools build pipeline for a map (or --mod) without the\n" +
-			"GUI Launcher, and prints a compact per-stage result. It calls the same binaries\n" +
-			"the Launcher does (cod2map64, radiant_modtools, linker_modtools, gdtdb).\n\n" +
+			"GUI Launcher. It calls the same binaries the Launcher does (cod2map64,\n" +
+			"radiant_modtools, linker_modtools, gdtdb). The build runs on its own and the\n" +
+			"command returns at once: --status reads how far it got and its report once\n" +
+			"done, and --wait runs it here and prints a compact per-stage result.\n\n" +
 			"Requires a Windows BO3 mod-tools install; the path comes from --tools-path or\n" +
 			"$TA_TOOLS_PATH. Example: t7kb build zm_mymap --stages compile,light,link",
-		Args: cobra.ExactArgs(1),
+		Args: cobra.RangeArgs(0, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runBuild(cmd, o, args[0], jsonOut)
+			if resume != "" {
+				_, err := buildResume(resume, io.Discard)
+				return err
+			}
+			if len(args) != 1 {
+				return fmt.Errorf("build needs the map's or mod's name")
+			}
+			return runBuild(cmd, o, args[0], wait, status, jsonOut)
 		},
 	}
 	f := cmd.Flags()
+	f.BoolVar(&wait, "wait", false, "run the build here and print its report, instead of starting it on its own")
+	f.BoolVar(&status, "status", false, "read the state of the target's last build t7kb ran: the stage it is at, its report once done")
+	f.StringVar(&resume, "resume", "", "run the build a state file holds (how a started build runs on its own)")
+	_ = f.MarkHidden("resume")
 	f.StringVar(&o.ToolsPath, "tools-path", "", "BO3 mod-tools root (default: $TA_TOOLS_PATH)")
 	f.StringVar(&o.GamePath, "game-path", "", "BO3 game root (default: $TA_GAME_PATH, then --tools-path)")
 	f.BoolVar(&o.Mod, "mod", false, "target is a mod (mods/<name>), not a usermap")
@@ -47,13 +58,16 @@ func newBuildCmd() *cobra.Command {
 	return cmd
 }
 
-func runBuild(cmd *cobra.Command, o *build.Options, name string, jsonOut bool) error {
+func runBuild(cmd *cobra.Command, o *build.Options, name string, wait, status, jsonOut bool) error {
 	stdout := cmd.OutOrStdout()
-	rep, err := buildRun(o, name, stdout)
+	v, err := buildOp(o, name, wait, status, stdout)
 	if err != nil {
 		return err
 	}
-	return finishBuild(stdout, jsonOut, rep)
+	if rep, ok := v.(build.Report); ok {
+		return finishBuild(stdout, jsonOut, rep)
+	}
+	return printIndented(stdout)(v, nil)
 }
 
 func finishBuild(out io.Writer, asJSON bool, rep build.Report) error {

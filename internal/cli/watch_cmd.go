@@ -22,9 +22,12 @@ var watchEvery = time.Second
 // reads them; a variable so tests can wait less.
 var watchSettle = 3 * time.Second
 
-// toolRuns says whether a mod tool's process runs; a variable so tests can
-// stand in.
-var toolRuns = build.Runs
+// toolRuns says whether a mod tool's process runs, and buildStates are the
+// builds t7kb ran on an install; variables so tests can stand in.
+var (
+	toolRuns    = build.Runs
+	buildStates = build.States
+)
 
 // source is one thing the watch follows: each tick reads what it gained and
 // says what is worth saying.
@@ -53,7 +56,8 @@ func watch(ctx context.Context, toolsPath string, out io.Writer, g gamelog.Game,
 	say := func(s string) { fmt.Fprintln(out, s) }
 	sources := []source{&gamelog.Watcher{Root: root, Game: g, Out: say}}
 	if tools := toolsRoot(toolsPath); tools != "" {
-		sources = append(sources, &build.RecordWatcher{Root: tools, Runs: runs, Out: say, Settle: watchSettle})
+		sources = append(sources, &build.RecordWatcher{Root: tools, Runs: runs, Out: say, Settle: watchSettle,
+			Builds: func() []build.State { return buildStates(tools) }})
 	}
 	t := time.NewTicker(watchEvery)
 	defer t.Stop()

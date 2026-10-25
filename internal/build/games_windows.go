@@ -1,7 +1,9 @@
 package build
 
 import (
+	"os/exec"
 	"strings"
+	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -77,4 +79,26 @@ func (g *Games) Exit(pid int) (uint32, bool) {
 	}
 	delete(g.procs, pid)
 	return code, true
+}
+
+// alive reports whether the process pid still runs.
+func alive(pid int) bool {
+	if pid <= 0 {
+		return false
+	}
+	h, err := windows.OpenProcess(windows.SYNCHRONIZE, false, uint32(pid))
+	if err != nil {
+		return false
+	}
+	defer func() { _ = windows.CloseHandle(h) }()
+	ev, err := windows.WaitForSingleObject(h, 0)
+	return err == nil && ev == uint32(windows.WAIT_TIMEOUT)
+}
+
+// Detach makes a command run on its own, out of the starting process's group
+// so it outlives it, with a console no window shows: the console tools it runs
+// share it, where a process with no console at all (DETACHED_PROCESS) would
+// make Windows open a window for each of them.
+func Detach(c *exec.Cmd) {
+	c.SysProcAttr = &syscall.SysProcAttr{CreationFlags: windows.CREATE_NEW_PROCESS_GROUP | windows.CREATE_NO_WINDOW, HideWindow: true}
 }

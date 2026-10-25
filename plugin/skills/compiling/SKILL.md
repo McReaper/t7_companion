@@ -87,7 +87,7 @@ Every stage is a **console binary**; the Launcher GUI only chains them. An agent
 
 ### `t7kb:build` — the MCP tool, use this first
 
-If this skill fired over MCP, the `t7kb` server is very likely registered — the one that exposes `t7kb:search` — so call `build` directly; its schema lists the options. A script-only change is `stages` `link` alone. **It runs synchronously, minutes for a link and up to half an hour for a full compile and light**: set a long client-side timeout, a long wait is not a hang. A server with `search` but no `build` is an older binary: offer `/t7kb:setup-or-update`, and use the shell tier meanwhile.
+If this skill fired over MCP, the `t7kb` server is very likely registered — the one that exposes `t7kb:search` — so call `build` directly; its schema lists the options. A script-only change is `stages` `link` alone. **The build runs on its own, minutes for a link and up to half an hour for a full compile and light, and `build` answers at once**: carry on, and act on the plugin's monitor line when the build ends, or ask `build` with `status` (outside Claude Code, without the monitor, ask it at intervals). A target builds once at a time: a second `build` of it is refused until the first ends. A server with `search` but no `build` is an older binary: offer `/t7kb:setup-or-update`, and use the shell tier meanwhile.
 
 ### `t7kb build` — the shell fallback, when no MCP server is registered
 

@@ -19,7 +19,7 @@ t7kb create zm_leviathan --write
 
 ## `t7kb build <name>`
 
-Runs the build pipeline on a map, or a mod with `--mod`, and prints a short result per stage: `gdtdb` first (so your GDT edits reach the link), then the stages you ask for.
+Runs the build pipeline on a map, or a mod with `--mod`: `gdtdb` first (so your GDT edits reach the link), then the stages you ask for. The build runs on its own and the command returns at once; `--status` then says how far it got, and gives its report once done, a short result per stage. One build of a map or mod runs at a time.
 
 | Stage | What runs |
 | --- | --- |
@@ -30,7 +30,8 @@ Runs the build pipeline on a map, or a mod with `--mod`, and prints a short resu
 
 ```
 t7kb build zm_leviathan
-t7kb build zm_leviathan --stages link,run
+t7kb build zm_leviathan --status
+t7kb build zm_leviathan --stages link,run --wait
 t7kb build my_mod --mod --stages link
 ```
 
@@ -38,6 +39,8 @@ After a script-only change, `--stages link` is enough. A full compile and light 
 
 | Option | What it does |
 | --- | --- |
+| `--wait` | run the build in the terminal and print its report as it ends |
+| `--status` | the state of the map's last build: the stage running, its report once done |
 | `--stages` | which stages, comma-separated (default `compile,light,link`) |
 | `--mod` | the name is a mod (`mods/<name>`), not a usermap |
 | `--light` | light quality: `low`, `medium` (default) or `high` |
@@ -49,7 +52,7 @@ After a script-only change, `--stages link` is enough. A full compile and light 
 | `--game-path` | the game's root, if not the mod tools' (default `$TA_GAME_PATH`) |
 | `--skip-gdt` | skip the `gdtdb` pass |
 | `--gdt-rebuild` | rebuild the GDT database instead of updating it: only when an update reports 0 GDTs and the link then misses an edited asset |
-| `--verbose` | stream each tool's whole output as it runs |
+| `--verbose` | with `--wait`: stream each tool's whole output as it runs |
 | `--json` | the report as JSON, as the agent gets it |
 
 ## `t7kb game log [map-or-mod]`
