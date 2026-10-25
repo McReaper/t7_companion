@@ -30,8 +30,9 @@ func boxText(t *testing.T, guid string, min, max mapfile.Vec3, material string) 
 	return s.String() + "}\n"
 }
 
-// walled is a map with a 16-thick wall at x 0..16, a trigger and a clip
-// brush beyond it, and a light behind the wall.
+// walled is a map with a 16-thick wall at x 0..16; in front of it a clip
+// brush, a trigger and a caulked trigger_use; behind it a door (a
+// script_brushmodel) and a light.
 func walled(t *testing.T) *Snapshot {
 	t.Helper()
 	text := "{\nguid \"{10000000-0000-0000-0000-000000000000}\"\n\"classname\" \"worldspawn\"\n" +
@@ -39,6 +40,10 @@ func walled(t *testing.T) *Snapshot {
 		boxText(t, "30000000-0000-0000-0000-000000000000", mapfile.Vec3{-60, -100, 0}, mapfile.Vec3{-44, 100, 100}, "clip_player") +
 		"}\n{\nguid \"{40000000-0000-0000-0000-000000000000}\"\n\"classname\" \"trigger_multiple\"\n" +
 		boxText(t, "50000000-0000-0000-0000-000000000000", mapfile.Vec3{-40, -100, 0}, mapfile.Vec3{-24, 100, 100}, "trigger") +
+		"}\n{\nguid \"{70000000-0000-0000-0000-000000000000}\"\n\"classname\" \"trigger_use\"\n" +
+		boxText(t, "80000000-0000-0000-0000-000000000000", mapfile.Vec3{-20, -100, 0}, mapfile.Vec3{-10, 100, 100}, "caulk") +
+		"}\n{\nguid \"{90000000-0000-0000-0000-000000000000}\"\n\"classname\" \"script_brushmodel\"\n" +
+		boxText(t, "a0000000-0000-0000-0000-000000000000", mapfile.Vec3{40, -20, 0}, mapfile.Vec3{56, 20, 100}, "caulk") +
 		"}\n{\nguid \"{60000000-0000-0000-0000-000000000000}\"\n\"classname\" \"light\"\n\"origin\" \"100 0 50\"\n}\n"
 	m, err := mapfile.Parse([]byte(text))
 	if err != nil {
@@ -51,8 +56,9 @@ func walled(t *testing.T) *Snapshot {
 // see-through, and the sky too once a shot hides it.
 func TestOccludersAreTheBrushesRadiantDrawsSolid(t *testing.T) {
 	occ := occluders(walled(t), "")
-	if len(occ) != 1 || !slices.Equal(occ[0].owners, []string{"20000000", "10000000"}) || occ[0].box.Max[0] != 16 {
-		t.Fatalf("occluders = %+v", occ)
+	if len(occ) != 2 || !slices.Equal(occ[0].owners, []string{"20000000", "10000000"}) || occ[0].box.Max[0] != 16 ||
+		!slices.Equal(occ[1].owners, []string{"a0000000", "90000000"}) {
+		t.Fatalf("occluders = %+v: the wall and the door, no trigger whatever its material", occ)
 	}
 	for m, want := range map[string]bool{"caulk": false, "sky": false, "clip_player": true, "weaponClip": true, "trigger": true, "portal_nodraw": true, "t7_plaster_smooth_dirty_01": false} {
 		if seeThrough(m, false) != want {
@@ -94,6 +100,10 @@ func TestAWallHidesWhatIsBehindIt(t *testing.T) {
 	keep, at := inSight(occluders(snap, ""), cam, pts, [][2]float64{{1, 1}, {2, 2}, {3, 3}})
 	if len(keep) != 2 || keep[0].id != "20000000" || keep[1].id != "aaaaaaaa" || !slices.Equal(at, [][2]float64{{2, 2}, {3, 3}}) {
 		t.Errorf("in sight: %+v %v: the light is behind the wall; the wall's own id is in it, and kept", keep, at)
+	}
+	door := []labelPoint{{"90000000", mapfile.Vec3{48, 0, 50}}} // a brush entity's id, at its centre inside its brush
+	if keep, _ := inSight(occluders(snap, ""), mapfile.Vec3{48, -300, 50}, door, [][2]float64{{4, 4}}); len(keep) != 1 {
+		t.Error("the door's own brush hides its id")
 	}
 }
 
