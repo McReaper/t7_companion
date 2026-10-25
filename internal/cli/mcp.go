@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/McReaper/t7_companion/internal/embed"
+	"github.com/McReaper/t7_companion/internal/journal"
 	"github.com/McReaper/t7_companion/internal/store"
 )
 
@@ -82,8 +83,13 @@ func newMCPServer(st *store.Store, emb *embed.Embedder, warm bool) *server.MCPSe
 	s := server.NewMCPServer("t7kb", Version(), server.WithToolCapabilities(false),
 		server.WithInstructions(mcpInstructions),
 		server.WithRecovery()) // a panicking handler must not take the whole stdio server down
+	dir := journal.Dir()
 	for _, ts := range toolsets(st, emb) {
-		s.AddTools(ts.tools...)
+		tools := ts.tools
+		if dir != "" { // T7KB_DEBUG: each call recorded
+			tools = journaledTools(dir, tools)
+		}
+		s.AddTools(tools...)
 		if warm && ts.warm != nil {
 			ts.warm()
 		}
