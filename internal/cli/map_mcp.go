@@ -150,12 +150,14 @@ func mapFindTool() server.ServerTool {
 			"(min x y z, max x y z) and brush count; keys are the naming ones (targetname, target, script_noteworthy, "+
 			"script_string, script_int, name, model) unless keys asks for others. brushes lists each one's brushes and "+
 			"patches (id, rev, material, bounds, contents, curve/mesh); naming a brush's id lists just it, a patch with its "+
-			"control points as rows, as map_edit's patch op takes them. near sorts by distance. "+
+			"control points as rows, as map_edit's patch op takes them. near goes by brushes: an entity that owns brushes "+
+			"(the worldspawn too) comes with just those within radius, nearest first, and is sorted by the nearest; a point "+
+			"entity by its bounds. "+
 			"No face is shown: Radiant holds the geometry."),
 		mcp.WithString("ids", mcp.Description("Entity or brush ids (or GUIDs, or any start of one), comma- or space-separated.")),
 		mcp.WithString("class", mcp.Description("Classname; * matches any run of characters (light*, script_*).")),
 		mcp.WithString("key", mcp.Description("An entity key the entity has, or key=value (* in the value), e.g. targetname=door_1.")),
-		mcp.WithString("near", mcp.Description("A point, x y z: entities whose bounds come within radius of it, nearest first.")),
+		mcp.WithString("near", mcp.Description("A point, x y z: what comes within radius of it, nearest first: point entities by their bounds, brush entities and the worldspawn by the brushes they list.")),
 		mcp.WithNumber("radius", mcp.Description("With near: the distance in units (default 256).")),
 		mcp.WithBoolean("selected", mcp.Description("Only entities with a brush selected in Radiant (the user's selection).")),
 		mcp.WithBoolean("brushes", mcp.Description("List each entity's brushes and patches (default false).")),

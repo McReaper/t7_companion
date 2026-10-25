@@ -44,7 +44,7 @@ func newMapCmd() *cobra.Command {
 	fl := find.Flags()
 	fl.StringVar(&a.Class, "class", "", "classname, * matching any run of characters")
 	fl.StringVar(&a.Key, "key", "", "a key the entity has, or key=value")
-	fl.StringVar(&a.Near, "near", "", "a point x,y,z: entities within --radius, nearest first")
+	fl.StringVar(&a.Near, "near", "", "a point x,y,z: what comes within --radius, nearest first; an entity that owns brushes, the worldspawn too, lists those near")
 	fl.Float64Var(&a.Radius, "radius", 0, "with --near: the distance in units (default 256)")
 	fl.BoolVar(&a.Selected, "selected", false, "only entities with a brush selected in Radiant")
 	fl.BoolVar(&a.Brushes, "brushes", false, "list each entity's brushes and patches")

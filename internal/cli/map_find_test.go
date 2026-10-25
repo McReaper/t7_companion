@@ -116,6 +116,32 @@ func TestMapFindListsBrushes(t *testing.T) {
 	}
 }
 
+// near lists the world brushes near the point, nearest first, without
+// brushes asked, and sorts the worldspawn by its nearest brush. 150,-20,300
+// is 114 from the arch, 124 above the volume_sun and 316 above the floor;
+// 150,200,300 is 124 above the volume_sun and 177 from the arch, though 100
+// from the worldspawn's bounds.
+func TestMapFindNearListsTheBrushesNearThePoint(t *testing.T) {
+	testRadiant(t)
+	out := find(t, mapFindArgs{Near: "150,-20,300", Radius: 120})
+	if len(out.Found) != 1 || out.Found[0].ID != "8d452111" || len(out.Found[0].List) != 1 || out.Found[0].List[0].ID != "af3c9c64" {
+		t.Fatalf("radius 120 = %+v", out.Found)
+	}
+	if got := ids(find(t, mapFindArgs{Near: "150,200,300", Radius: 200})); !slices.Equal(got, []string{"6e73936d", "8d452111"}) {
+		t.Errorf("sorted by the nearest brush: %q", got)
+	}
+	if out.Found[0].List[0].Rows != nil {
+		t.Error("near, not named, the arch gives no points")
+	}
+	out = find(t, mapFindArgs{Near: "150,-20,300", Radius: 400, Class: "worldspawn"})
+	if l := out.Found[0].List; len(l) != 2 || l[0].ID != "af3c9c64" || l[1].ID != "5ec8de49" {
+		t.Errorf("radius 400 = %+v", out.Found[0].List)
+	}
+	if out := find(t, mapFindArgs{Near: "150,120,30", Radius: 1}); slices.Contains(ids(out), "8d452111") {
+		t.Errorf("a point in no world brush finds the worldspawn: %q", ids(out))
+	}
+}
+
 func TestMapFindSeesTheUsersSelection(t *testing.T) {
 	f := testRadiant(t)
 	f.Selection = []string{"{6E73936C-C58E-11F1-B542-00155DD185EA}"} // the volume_sun's brush

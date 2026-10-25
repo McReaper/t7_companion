@@ -9,16 +9,16 @@ Measured on the stock ZM Mod Level template's map (33 entities, 20 world brushes
 | `radiant_open` | the map already open | 53 | 183 |
 | `map_find` | every entity (33) | 1859 | 5895 |
 | `map_find` | class `script_struct` (15) | 884 | 3097 |
-| `map_find` | near the player start, 256 units | 802 | 2557 |
+| `map_find` | near the player start, 256 units, with the world brushes near it | 1081 | 3233 |
 | `map_find` | worldspawn's 20 brushes | 831 | 2073 |
 | `map_find` | one entity, all keys | 94 | 282 |
-| `map_view` | top, framed on the start zone: JSON + 457×768 image | 48 + 467 | 117 + 3477 |
-| `map_view` | 3D, framed, `render fake`: JSON + 768×405 image | 52 + 414 | 129 + 2610 |
-| `map_view` | 3D as it is, `size 1568`: JSON + 1568×827 image | 84 + 1728 | 190 + 8402 |
+| `map_view` | top, framed on the start zone: JSON + 457×768 image | 48 + 467 | 117 + 3558 |
+| `map_view` | 3D, framed, `render fake`: JSON + 768×405 image | 52 + 414 | 129 + 2717 |
+| `map_view` | 3D as it is, `size 1568`: JSON + 1568×827 image | 84 + 1728 | 190 + 8832 |
 | `map_edit` | the ops an agent writes for a room (floor, 4 walls, ceiling as brushes of 8 corners, a light) | 602 | 1333 |
 | `map_edit` | the answer to them, with each material's tile | 430 | 1068 |
 | `map_edit` | the ops for a floor, two walls caulked top and bottom, a pillar copied three times | 472 | 994 |
-| `map_edit` | the answer to them (7 made, 5 materials' tiles) | 326 | 818 |
+| `map_edit` | the answer to them (7 made, 5 materials' tiles) | 329 | 821 |
 | `map_edit` | a ramp (6 corners) and a hexagonal column (12) | 236 | 481 |
 | `map_edit` | the answer to them (two brushes) | 132 | 350 |
 | `map_edit` | a curve patch of 3 by 3 | 126 | 240 |

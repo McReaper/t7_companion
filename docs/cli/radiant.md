@@ -30,7 +30,7 @@ t7kb map find 5ec8de46 --brushes
 | --- | --- |
 | `--class` | classname; `*` matches any run of characters |
 | `--key` | a key the entity has, or `key=value` |
-| `--near`, `--radius` | entities within the radius of a point `x,y,z` (default 256), nearest first |
+| `--near`, `--radius` | what comes within the radius of a point `x,y,z` (default 256), nearest first: an entity that owns brushes, the worldspawn too, comes with the brushes near the point |
 | `--selected` | only the entities with a brush selected in Radiant |
 | `--brushes` | each entity's brushes and patches; a patch named by its id comes with its control points |
 | `--keys` | which keys to show: `all`, or a comma list |

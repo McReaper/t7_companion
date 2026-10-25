@@ -2,6 +2,7 @@ package level
 
 import (
 	"context"
+	"math"
 	"os"
 	"slices"
 	"strings"
@@ -37,7 +38,7 @@ func TestFindFilters(t *testing.T) {
 		"key=value":       {Query{Key: " name = probe "}, []string{"reflection_probe 5EC8DE46"}},
 		"key=glob":        {Query{Key: "name=*t7kb"}, []string{"reflection_probe F2D51A52"}},
 		"near":            {Query{Near: &near, Radius: 120}, []string{"worldspawn 8D452111", "reflection_probe 5EC8DE46", "volume_sun 6E73936D", "reflection_probe F2D51A52"}},
-		"near, exactly":   {Query{Near: &near, Radius: 0}, []string{"worldspawn 8D452111", "volume_sun 6E73936D", "reflection_probe F2D51A52"}},
+		"near, exactly":   {Query{Near: &near, Radius: 0}, []string{"volume_sun 6E73936D", "reflection_probe F2D51A52"}}, // the point is in no world brush
 		"selected":        {Query{Selected: true}, []string{"volume_sun 6E73936D"}},
 		"an entity by id": {Query{IDs: []string{"76780cea"}}, []string{"reflection_probe 76780CEA"}},
 		"a brush by id":   {Query{IDs: []string{"af3c9c64"}}, []string{"worldspawn 8D452111"}},
@@ -60,6 +61,46 @@ func TestFindFilters(t *testing.T) {
 	}
 	if !sel.Brush("{6e73936c-c58e-11f1-b542-00155dd185ea}") || sel.Brush("{5EC8DE49-C58E-11F1-B542-00155DD185EA}") || len(sel.Brushes) != 1 {
 		t.Errorf("selection = %+v", sel)
+	}
+}
+
+// The worldspawn's bounds span the map: near finds an entity that owns brushes
+// by its brushes, 46 and 78 units from the point here, and gives them nearest
+// first; a point entity by its bounds.
+func TestFindNearGoesByBrushes(t *testing.T) {
+	m := testMap(t)
+	ids := NewIDs(GUIDs(m))
+	p := mapfile.Vec3{150, 120, 30}
+	guids := func(bs []*mapfile.Brush) []string {
+		var out []string
+		for _, b := range bs {
+			out = append(out, b.Guid()[1:9])
+		}
+		return out
+	}
+	hits, _ := Find(m, ids, Query{Near: &p, Radius: 120}, Selection{})
+	world, probe := hits[0], hits[1]
+	if !slices.Equal(guids(world.Near), []string{"5EC8DE49", "AF3C9C64"}) || world.Distance != 46 {
+		t.Errorf("worldspawn near: %q at %v", guids(world.Near), world.Distance)
+	}
+	if probe.Near != nil || math.Abs(probe.Distance-109.8) > 0.01 {
+		t.Errorf("a point entity: %q at %v", guids(probe.Near), probe.Distance)
+	}
+	hits, _ = Find(m, ids, Query{Near: &p, Radius: 50}, Selection{})
+	if !slices.Equal(guids(hits[0].Near), []string{"5EC8DE49"}) {
+		t.Errorf("radius 50: %q", guids(hits[0].Near))
+	}
+	far := mapfile.Vec3{150, -20, 300} // 114 from af3c9c64's top corner, 316 above the floor
+	hits, _ = Find(m, ids, Query{Near: &far, Radius: 400}, Selection{})
+	if !slices.Equal(guids(hits[0].Near), []string{"AF3C9C64", "5EC8DE49"}) || math.Abs(hits[0].Distance-113.6) > 0.1 {
+		t.Errorf("nearest first: %q at %v", guids(hits[0].Near), hits[0].Distance)
+	}
+	// named brushes: only they count, though another brush of the entity is near
+	if hits, _ := Find(m, ids, Query{IDs: []string{"af3c9c64"}, Near: &p, Radius: 50}, Selection{}); len(hits) != 0 {
+		t.Errorf("a named brush 78 away, radius 50: %q", classes(hits))
+	}
+	if hits, _ := Find(m, ids, Query{IDs: []string{"af3c9c64"}, Near: &p, Radius: 80}, Selection{}); len(hits) != 1 || !slices.Equal(guids(hits[0].Near), []string{"AF3C9C64"}) {
+		t.Errorf("a named brush 78 away, radius 80: %q", classes(hits))
 	}
 }
 

@@ -103,7 +103,7 @@ func mapFind(ctx context.Context, a mapFindArgs) (*mapFindOut, error) {
 		return nil, err
 	}
 	if q.Near != nil {
-		sort.SliceStable(hits, func(i, j int) bool { return hits[i].Box.Distance(*q.Near) < hits[j].Box.Distance(*q.Near) })
+		sort.SliceStable(hits, func(i, j int) bool { return hits[i].Distance < hits[j].Distance })
 	}
 	ents, brushes := level.Counts(snap.Map)
 	out := &mapFindOut{Map: baseName(snap.State.Map), Entities: ents, Brushes: brushes, Selected: len(snap.Sel.Brushes), Matched: len(hits), Found: []foundEnt{}}
@@ -139,6 +139,9 @@ func foundOf(h level.Hit, snap *level.Snapshot, a mapFindArgs) foundEnt {
 		f.Bounds = append(vec(h.Box.Min), vec(h.Box.Max)...)
 	}
 	list, named := h.Named, len(h.Named) > 0
+	if len(h.Near) > 0 { // near: the brushes that brought it, so a world brush is found by where it is
+		list = h.Near
+	}
 	if a.Brushes && len(list) == 0 {
 		list = e.Brushes()
 	}
