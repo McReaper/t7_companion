@@ -63,7 +63,9 @@ jobs:
       # t7kb.db.zip is built upstream and too large for GoReleaser, so each release
       # would otherwise ship without it. Carry the newest one forward from the most
       # recent earlier release that has it. Idempotent: a release that already has
-      # the asset (e.g. a freshly rebuilt DB uploaded by hand) is left alone.
+      # the asset (e.g. a freshly rebuilt DB uploaded by hand) is left alone. Its
+      # download counts on the earlier release's asset, so badges.yml takes one
+      # off per asset this step uploads.
       - name: Carry the knowledge base forward from the previous release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
