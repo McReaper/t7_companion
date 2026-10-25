@@ -71,8 +71,20 @@ func TestMapCommandListsAMenu(t *testing.T) {
 	if out, err := mapCommand(context.Background(), "", nil, &bar, 0); err != nil || !slices.Equal(out.Entries, []string{"File >", "Selection >"}) {
 		t.Errorf("the menu bar = %+v, %v", out, err)
 	}
-	if _, err := mapCommand(context.Background(), "", nil, &nope, 0); err == nil {
-		t.Error("an unknown menu")
+	if _, err := mapCommand(context.Background(), "", nil, &nope, 0); err == nil || !strings.Contains(err.Error(), `no menu "Nope": a menu is named by its labels`) {
+		t.Errorf("an unknown menu: %v", err)
+	}
+	hollow := "Selection/CSG/CSG Hollow" // an entry of Selection/CSG, which runs
+	if _, err := mapCommand(context.Background(), "", nil, &hollow, 0); err == nil || err.Error() != `"Selection/CSG/CSG Hollow" is an entry, not a menu: map command "Selection/CSG/CSG Hollow" runs it` {
+		t.Errorf("an entry listed as a menu: %v", err)
+	}
+	more := "Selection/CSG/More/Nope" // under a submenu the fake has no entries for
+	if _, err := mapCommand(context.Background(), "", nil, &more, 0); err == nil || !strings.Contains(err.Error(), `no menu "Selection/CSG/More/Nope"`) {
+		t.Errorf("under an empty submenu: %v", err)
+	}
+	moreMenu := "Selection/CSG/More" // a submenu that lists nothing is no entry to run
+	if _, err := mapCommand(context.Background(), "", nil, &moreMenu, 0); err == nil || !strings.Contains(err.Error(), `no menu "Selection/CSG/More"`) {
+		t.Errorf("an empty submenu: %v", err)
 	}
 	onMachine(t)
 	if _, err := mapCommand(context.Background(), "", nil, &csg, 0); err == nil {
