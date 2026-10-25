@@ -50,7 +50,7 @@ func TestABatchIsOneEditAndItsResultsAreReadBack(t *testing.T) {
 	if got := sent(f, "edit"); len(got) != 1 || got[0] != "edit t7kb: 2 brush, 2 entity, 1 delete, 1 set, 1 move, 1 material" {
 		t.Errorf("edits = %q", got)
 	}
-	if d.Label != "t7kb: 2 brush, 2 entity, 1 delete, 1 set, 1 move, 1 material" || d.Deleted != 4 || len(d.Made) != 7 {
+	if d.Label != "t7kb: 2 brush, 2 entity, 1 delete, 1 set, 1 move, 1 material" || d.Deleted != 1 || len(d.Made) != 7 {
 		t.Errorf("done = %+v", d)
 	}
 	for i, m := range d.Made {
@@ -255,5 +255,31 @@ func TestTranslateAndRetextureKeepEachLinesShape(t *testing.T) {
 	nan, _ := mapfile.Parse([]byte("{\n{\n ( x 0 0 ) ( 1 0 0 ) ( 0 1 0 ) caulk 64 64 0 0 0 0 lightmap_gray 16384 16384 0 0 0 0\n}\n}\n"))
 	if err := translate(nan.Entities[0].Brushes()[0], mapfile.Vec3{}); err == nil || !strings.Contains(err.Error(), `"x" is no number`) {
 		t.Errorf("not a number: %v", err)
+	}
+}
+
+// Deleted counts what the delete ops took away, not what a batch rebuilt: a
+// set on a point entity, a moved world brush and a retextured curve delete
+// nothing; a brush entity deleted by its id is one, whatever its brushes.
+// (The batch refuses naming an element twice, so each named id counts once.)
+func TestDeletedCountsWhatTheDeleteOpsTookAway(t *testing.T) {
+	_, c, snap := viewing(t, 202)
+	d, err := Edit(context.Background(), c, snap, ops(t, `[
+		{"set": {"id": "5ec8de46", "keys": {"name": "probe_renamed"}}},
+		{"move": {"ids": ["5ec8de49"], "by": [0, 0, 8]}},
+		{"material": {"ids": ["af3c9c64"], "material": "caulk"}}
+	]`), "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Deleted != 0 {
+		t.Errorf("rebuilt only: %d deleted", d.Deleted)
+	}
+	d, err = Edit(context.Background(), c, d.After, ops(t, `[{"delete": ["6e73936d"]}, {"delete": ["f2d51a52"]}]`), "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Deleted != 2 {
+		t.Errorf("the volume_sun and a probe: %d deleted", d.Deleted)
 	}
 }

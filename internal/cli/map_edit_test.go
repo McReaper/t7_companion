@@ -44,7 +44,7 @@ func TestMapEditAnswersEachOpsID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.Map != "test_claude.map" || out.Undo != "t7kb: light and floor" || out.Deleted != 2 || len(out.Made) != 2 {
+	if out.Map != "test_claude.map" || out.Undo != "t7kb: light and floor" || out.Deleted != 1 || len(out.Made) != 2 {
 		t.Fatalf("answer = %+v", out)
 	}
 	light, floor := out.Made[0], out.Made[1]
