@@ -2,7 +2,9 @@
 # Downloads the latest release (binary + embedding model) and the database into
 # one directory; any MCP-capable agent (Claude Code, Codex, OpenCode, Copilot,
 # Cursor) then points at "<dir>\t7kb.exe mcp". Re-runnable, and skips the
-# ~0.9 GB download if already installed — pass -Force to reinstall/update.
+# ~0.9 GB download if already installed — pass -Force to reinstall/update,
+# which downloads the database again only when the release's differs.
+# install.tests.ps1 beside it tests it offline.
 #
 #   irm https://raw.githubusercontent.com/McReaper/t7_companion/main/install/install.ps1 | iex
 #   .\install.ps1 [-Target <dir>] [-Force]    # default target: %LOCALAPPDATA%\t7kb
@@ -27,6 +29,15 @@ function Get-Release([string]$name, [string]$out) {
     Write-Host "  downloading $name ..."
     curl.exe -L --fail --progress-bar -o $out "$base/$name"
     if ($LASTEXITCODE -ne 0) { throw "downloading $name failed (curl exit $LASTEXITCODE)" }
+}
+
+# The SHA-256 GitHub lists for a release asset ("sha256:<hex>"), or $null when
+# the API can't say (offline, rate-limited): the caller then downloads it.
+function Get-ReleaseDigest([string]$name) {
+    try {
+        $release = Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest"
+        return ($release.assets | Where-Object { $_.name -eq $name }).digest
+    } catch { return $null }
 }
 
 $updating = Test-Path $db
@@ -61,18 +72,30 @@ Get-ChildItem (Join-Path $Target "bridge") -Filter "T7RadiantBridge-*.dll" -Erro
     ForEach-Object { try { Remove-Item $_.FullName -Force -ErrorAction Stop } catch {} }
 Remove-Item $stage -Recurse -Force
 
-Get-Release "t7kb.db.zip" $dbZip
-# Left zipped on purpose: the binary unpacks it on its next start. On an
-# update that means deleting the old database, which would otherwise stay.
-if ($updating) { Remove-Item $db -Force }
+# The database changes far less often than the binary: the zip already here
+# stays when it is the release's.
+$digest = Get-ReleaseDigest "t7kb.db.zip"
+if ((Test-Path $dbZip) -and "sha256:$((Get-FileHash $dbZip -Algorithm SHA256).Hash)" -eq $digest) {
+    Write-Host "  t7kb.db.zip is the release's: kept"
+} else {
+    Get-Release "t7kb.db.zip" $dbZip
+}
+# Left zipped on purpose: the binary unpacks it on its next start, when
+# t7kb.db is missing. A t7kb.db older than the zip wasn't unpacked from it
+# (a new zip, or an update that failed before this line): it goes.
+if ((Test-Path $db) -and (Get-Item $db).LastWriteTime -lt (Get-Item $dbZip).LastWriteTime) {
+    Remove-Item $db -Force
+}
 
 # No exit here: piped into iex, it would close the user's PowerShell.
 if ($updating) {
+    $dbNote = "The first one to start unpacks the new database (~3.8 GB, about 20 s, once)."
+    if (Test-Path $db) { $dbNote = "Its database didn't change: kept." }
     Write-Host @"
 
 t7kb updated.  Binary: $exe
-Its MCP server was stopped: restart your agent sessions. The first one to
-start unpacks the new database (~3.8 GB, about 20 s, once).
+Its MCP server was stopped: restart your agent sessions.
+$dbNote
 "@
 } else {
     Write-Host @"
