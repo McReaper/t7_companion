@@ -12,7 +12,7 @@ import (
 
 // BundledBridge is the bridge release t7kb ships beside its binary: the
 // release packaging fetches it.
-const BundledBridge = "1.2.0"
+const BundledBridge = "1.2.1"
 
 const pluginName = "T7RadiantBridge"
 
