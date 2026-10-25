@@ -118,6 +118,10 @@ func TestMapCommandListsTheMenuBarOnBothSurfaces(t *testing.T) {
 	if got := tool(map[string]any{}); !strings.Contains(got, "no command") {
 		t.Errorf("no menu and no command: %s", got)
 	}
+	f.Handle("command", splitFloor) // an agent that sends every option, empty or not
+	if got := tool(map[string]any{"command": "Selection/CSG/CSG Subtract", "ids": "5ec8de49", "menu": ""}); !strings.Contains(got, `"undo":"subtract"`) {
+		t.Errorf("a command with an empty menu: %s", got)
+	}
 	if out, err := run(); err == nil || !strings.Contains(err.Error(), "--menu= the menu bar") {
 		t.Errorf("no path names the menu bar's spelling: %v\n%s", err, out)
 	}
