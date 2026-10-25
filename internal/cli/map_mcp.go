@@ -117,7 +117,8 @@ func mapViewTool() server.ServerTool {
 			"Top shows the layout best (outlines, entity names). Pick the render by the question: fullbright for "+
 			"textures, fake for shapes, bake for light (sun leaks, dark rooms): it bakes Radiant's lighting (its toolbar's "+
 			"bolt, its view only; the game's is build's light stage) and shoots under real lighting, black on an unbaked "+
-			"map; warned lists what the bake's console warned of (a probe out of range, a shadow dropped). A 2D answer gives its centre and scale (image pixels per unit). "+
+			"map; warned lists what the bake's console warned of (a probe out of range, a shadow dropped); once a bake ran, "+
+			"closing Radiant asks whether to export the lighting, a dialog for the user to answer. A 2D answer gives its centre and scale (image pixels per unit). "+
 			"The user's camera, render method, 2D axis, zoom and centre are put back (notes says what could not be); "+
 			"Radiant must not be minimised. size is the image's longer side (default 768: about 400 tokens)."),
 		mcp.WithString("view", mcp.Description("3d (default), top, front or side.")),
