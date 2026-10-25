@@ -55,7 +55,8 @@ jobs:
 
   # The skills' format, the markdown word budgets and the JSON manifests: the
   # same checks the pre-commit hook runs. Then the highlights the release of
-  # plugin.json's version needs, so a release PR can't merge without them.
+  # plugin.json's version needs, so a release PR can't merge without them, and
+  # the tests of the scripts under .github/scripts/.
   docs:
     runs-on: ubuntu-latest
     steps:
@@ -78,6 +79,8 @@ jobs:
             echo "::error file=plugin/.claude-plugin/plugin.json::$notes is missing or empty: a version bump comes with its release's highlights (CLAUDE.md, Releasing)." >&2
             exit 1
           fi
+      - name: Test the CI scripts
+        run: python -m unittest discover -s .github/scripts -p 'test_*.py'
 
   # The installer on Windows PowerShell, what users run, its downloads faked.
   install:
