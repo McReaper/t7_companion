@@ -2,10 +2,12 @@ package level
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
 	"github.com/McReaper/t7_companion/internal/level/camera"
@@ -35,7 +37,7 @@ func shoot(ctx context.Context, c *radiant.Client, view string, pose *camera.Pos
 	for _, p := range pts {
 		body.WriteString(num(p[0]) + " " + num(p[1]) + " " + num(p[2]) + "\n")
 	}
-	r, err := c.Call(ctx, line, []byte(body.String()))
+	r, err := callMouseFree(ctx, c, line, []byte(body.String()))
 	if err != nil {
 		return nil, err
 	}
@@ -60,6 +62,36 @@ func shoot(ctx context.Context, c *radiant.Client, view string, pose *camera.Pos
 		return nil, fmt.Errorf("the capture projected %d of %d points", len(f.At), len(pts))
 	}
 	return f, nil
+}
+
+// mouseWait is how long a shot waits for a mouse button held anywhere on the
+// desktop to come up: the bridge moves no camera under a drag, so a 3D shot
+// from a pose is refused busy while one is held, often for an instant.
+var mouseWait, mousePoll = 5 * time.Second, 200 * time.Millisecond
+
+// callMouseFree sends a capture, again while the bridge answers that a mouse
+// button is held, until mouseWait has passed.
+func callMouseFree(ctx context.Context, c *radiant.Client, line string, body []byte) (radiant.Reply, error) {
+	deadline := time.Now().Add(mouseWait)
+	for {
+		r, err := c.Call(ctx, line, body)
+		if !mouseHeld(err) {
+			return r, err
+		}
+		if time.Now().After(deadline) {
+			return r, fmt.Errorf("%w for %s: a 3D shot from a camera waits for every mouse button to be up; let go and take it again", err, mouseWait)
+		}
+		select {
+		case <-ctx.Done():
+			return r, err
+		case <-time.After(mousePoll):
+		}
+	}
+}
+
+func mouseHeld(err error) bool {
+	var e *radiant.Error
+	return errors.As(err, &e) && e.Code == "busy" && strings.Contains(e.Message, "mouse button")
 }
 
 // parseSummary reads "w=… h=… origin=x,y,z angles=p,y,r …" (3D) or "w=…

@@ -348,3 +348,29 @@ func TestHidingTheSkyNamesItsBrushes(t *testing.T) {
 		t.Errorf("volumes hides %q, want the info_volume alone", got)
 	}
 }
+
+// A 3D shot from a pose waits out a mouse button held for an instant, the
+// bridge refusing it busy meanwhile, and says what to do when one stays held.
+func TestA3DShotFromAPoseWaitsForTheMouseButtons(t *testing.T) {
+	f, c, snap := viewing(t, 120)
+	oldWait, oldPoll := mouseWait, mousePoll
+	mouseWait, mousePoll = 300*time.Millisecond, 10*time.Millisecond
+	t.Cleanup(func() { mouseWait, mousePoll = oldWait, oldPoll })
+	pose := camera.Pose{Origin: mapfile.Vec3{0, -600, 200}, Pitch: -15, Yaw: 90}
+	f.Update(func(f *radianttest.Fake) { f.MouseHeld = 2 })
+	if _, err := View(context.Background(), c, snap, ViewOptions{Camera: &pose}); err != nil {
+		t.Fatalf("a button held for two tries: %v", err)
+	}
+	if n := len(sent(f, "capture 3d 0 -600 200")); n != 3 {
+		t.Errorf("%d captures: two refused, the third taken", n)
+	}
+	f.Update(func(f *radianttest.Fake) { f.MouseHeld = 1 << 20 })
+	start := time.Now()
+	_, err := View(context.Background(), c, snap, ViewOptions{Camera: &pose})
+	if err == nil || !radiant.IsCode(err, "busy") || !strings.Contains(err.Error(), "a mouse button is held for 300ms: a 3D shot from a camera waits for every mouse button to be up") {
+		t.Errorf("a button that stays held: %v", err)
+	}
+	if d := time.Since(start); d < 300*time.Millisecond || d > 3*time.Second {
+		t.Errorf("waited %v, not about mouseWait", d)
+	}
+}

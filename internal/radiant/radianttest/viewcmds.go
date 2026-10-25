@@ -48,6 +48,10 @@ func capture(f *Fake, args string, body []byte) Reply {
 	if f.Minimised {
 		return Err("minimised", "Radiant is minimised: it draws nothing")
 	}
+	if w[0] == "3d" && len(w) > 1 && f.MouseHeld > 0 { // the plugin moves no camera under a drag
+		f.MouseHeld--
+		return Err("busy", "a mouse button is held")
+	}
 	var pts [][3]float64
 	for _, line := range strings.Split(strings.TrimSpace(string(body)), "\n") {
 		if p, ok := floats(strings.Fields(line), 3); ok {
