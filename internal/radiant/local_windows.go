@@ -97,3 +97,11 @@ func (local) Running(pid int) bool {
 	ev, err := windows.WaitForSingleObject(h, 0)
 	return err == nil && ev == uint32(windows.WAIT_TIMEOUT)
 }
+
+var pSetThreadExecutionState = kernel32.NewProc("SetThreadExecutionState")
+
+// esDisplayRequired resets the display's idle timer once, which turns a
+// screen that slept back on.
+const esDisplayRequired = 0x00000002
+
+func (local) WakeDisplay() { _, _, _ = pSetThreadExecutionState.Call(esDisplayRequired) }
