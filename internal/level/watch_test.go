@@ -56,7 +56,7 @@ func (rw *radiantWatch) said(t *testing.T, n int) []string {
 }
 
 func TestWatcherSaysABurstOfRadiantsErrorsInOneLine(t *testing.T) {
-	rw := newRadiantWatch(t, 0)
+	rw := newRadiantWatch(t, 200*time.Millisecond) // the burst may reach the watch over several ticks
 	for _, l := range []string{"ERROR: Can't find xmodel 'x' in gdtDB", "Loading prefab _prefabs/a.map...", "ERROR: Can't find xmodel 'x' in gdtDB",
 		"ERROR: Can't find material 'm' in gdtDB", "ERROR: a", "ERROR: b"} {
 		rw.f.Event("console", l)
@@ -146,9 +146,18 @@ func TestWatcherLeavesABridgeThatRefusedItAlone(t *testing.T) {
 }
 
 func TestMapName(t *testing.T) {
-	for in, want := range map[string]string{"": "no map", `D:\BO3\Map_Source\zm\x.map`: "zm/x.map", `C:\tmp\y.map`: "y.map"} {
+	for in, want := range map[string]string{"": "no map", `D:\BO3\Map_Source\zm\x.map`: "zm/x.map", `C:\tmp\y.map`: "y.map", "/map_source/zm/z.map": "zm/z.map"} {
 		if got := mapName(in); got != want {
 			t.Errorf("mapName(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestJoinCappedCountsWhatItLeavesOut(t *testing.T) {
+	if got := joinCapped([]string{"a", "b", "c"}, 3); got != "a | b | c" {
+		t.Errorf("three, all said: %q", got)
+	}
+	if got := joinCapped([]string{"a", "b", "c", "d"}, 4); got != "a | b | c | and 1 more" {
+		t.Errorf("four: %q", got)
 	}
 }
