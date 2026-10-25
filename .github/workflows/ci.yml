@@ -54,7 +54,8 @@ jobs:
         run: python3 .github/scripts/patch_coverage.py cover.out "origin/${{ github.base_ref }}" 80 "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.sha }}" | tee -a "$GITHUB_STEP_SUMMARY"
 
   # The skills' format, the markdown word budgets and the JSON manifests: the
-  # same checks the pre-commit hook runs.
+  # same checks the pre-commit hook runs. Then the highlights the release of
+  # plugin.json's version needs, so a release PR can't merge without them.
   docs:
     runs-on: ubuntu-latest
     steps:
@@ -70,6 +71,13 @@ jobs:
         run: |
           python -m json.tool .claude-plugin/marketplace.json > /dev/null
           python -m json.tool plugin/.claude-plugin/plugin.json > /dev/null
+      - name: Release highlights for plugin.json's version
+        run: |
+          notes=".github/release-notes/v$(jq -r .version plugin/.claude-plugin/plugin.json).md"
+          if ! grep -q '[^[:space:]]' "$notes" 2>/dev/null; then
+            echo "::error file=plugin/.claude-plugin/plugin.json::$notes is missing or empty: a version bump comes with its release's highlights (CLAUDE.md, Releasing)." >&2
+            exit 1
+          fi
 
   # The installer on Windows PowerShell, what users run, its downloads faked.
   install:
