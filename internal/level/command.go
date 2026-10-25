@@ -149,18 +149,27 @@ func parseMenu(body []byte) []MenuEntry {
 }
 
 // noMenu says why a path lists nothing: its last label is an entry of the
-// menu above it, one that runs, or no menu is named so.
+// menu above it, one that runs, or no menu is named so. A label may hold a /
+// (Select by Key/Value), so the menu above is the first, cutting from the
+// right, that lists anything.
 func noMenu(ctx context.Context, c *radiant.Client, path string) error {
-	parent, last := "", path
-	if i := strings.LastIndex(path, "/"); i >= 0 {
-		parent, last = path[:i], path[i+1:]
-	}
-	if r, err := c.Call(ctx, "menus "+parent, nil); err == nil {
-		for _, e := range parseMenu(r.Body) {
-			if e.Label == last && !e.Submenu {
-				return fmt.Errorf("%q is an entry, not a menu: map command %q runs it", path, path)
+	for cut := len(path); cut >= 0; {
+		i := strings.LastIndex(path[:cut], "/")
+		parent, last := "", path
+		if i >= 0 {
+			parent, last = path[:i], path[i+1:]
+		}
+		if r, err := c.Call(ctx, "menus "+parent, nil); err == nil {
+			if entries := parseMenu(r.Body); len(entries) > 0 {
+				for _, e := range entries {
+					if e.Label == last && !e.Submenu {
+						return fmt.Errorf("%q is an entry, not a menu: map command %q runs it", path, path)
+					}
+				}
+				break
 			}
 		}
+		cut = i
 	}
 	return fmt.Errorf("no menu %q: a menu is named by its labels from the menu bar down, joined by / (Selection/CSG)", path)
 }

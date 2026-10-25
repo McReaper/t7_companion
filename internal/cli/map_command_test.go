@@ -86,6 +86,19 @@ func TestMapCommandListsAMenu(t *testing.T) {
 	if _, err := mapCommand(context.Background(), "", nil, &moreMenu, 0); err == nil || !strings.Contains(err.Error(), `no menu "Selection/CSG/More"`) {
 		t.Errorf("an empty submenu: %v", err)
 	}
+	// a label may hold a /: the menu above an entry is the nearest, cutting from the right, that lists anything
+	f.Update(func(f *radianttest.Fake) {
+		f.Menus["Selection/Select By"] = "Select by Samplesize\t1\t0\nSelect by Key/Value\t1\t0\n"
+		f.Menus["Selection"] = "CSG\t1\t1\nCSG/Clone\t1\t0\n"
+	})
+	keyValue := "Selection/Select By/Select by Key/Value"
+	if _, err := mapCommand(context.Background(), "", nil, &keyValue, 0); err == nil || !strings.Contains(err.Error(), `"Selection/Select By/Select by Key/Value" is an entry, not a menu`) {
+		t.Errorf("an entry whose label holds a /: %v", err)
+	}
+	clone := "Selection/CSG/Clone" // Selection/CSG lists entries, none Clone: Selection's CSG/Clone is not what the path names
+	if _, err := mapCommand(context.Background(), "", nil, &clone, 0); err == nil || !strings.Contains(err.Error(), `no menu "Selection/CSG/Clone"`) {
+		t.Errorf("the nearest menu decides: %v", err)
+	}
 	onMachine(t)
 	if _, err := mapCommand(context.Background(), "", nil, &csg, 0); err == nil {
 		t.Error("a menu with no Radiant")

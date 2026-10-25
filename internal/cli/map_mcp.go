@@ -26,7 +26,8 @@ func mapCommandTool() server.ServerTool {
 			"(Selection/CSG/CSG Hollow, CSG Subtract, CSG Merge), patches, textures, prefabs. The answer reads the map "+
 			"back: the undo entry the command made (one Ctrl+Z), what it created (id, class or material, bounds), what it "+
 			"deleted, what it left selected. A command that opens a dialog waits on the user. menu instead of command "+
-			"lists a menu's entries (\"Selection/CSG\"; \"\" the menu bar), \" >\" marking a submenu."),
+			"lists a menu's entries (\"Selection/CSG\"; \"\" the menu bar), \" >\" marking a submenu. A label that holds a / "+
+			"is written as it reads (Selection/Select By/Select by Key/Value), except in a Radiant MTPlugins hosts the bridge in."),
 		mcp.WithString("command", mcp.Description("The menu path, labels from the menu bar down joined by /: Selection/CSG/CSG Hollow.")),
 		mcp.WithString("ids", mcp.Description("What to select for it, comma- or space-separated (default nothing selected).")),
 		mcp.WithString("menu", mcp.Description("List this menu's entries instead of running a command: its labels from the menu bar down joined by / (Selection/CSG); \"\" the menu bar.")),
