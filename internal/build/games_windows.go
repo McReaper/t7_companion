@@ -21,6 +21,21 @@ func NewGames() *Games { return &Games{procs: map[int]windows.Handle{}} }
 
 // Running are the pids of the game's processes.
 func (g *Games) Running() []int {
+	pids := pidsOf(gameExe)
+	for _, pid := range pids {
+		if _, ok := g.procs[pid]; !ok {
+			h, _ := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
+			g.procs[pid] = h
+		}
+	}
+	return pids
+}
+
+// Runs reports whether a process of the executable exe runs.
+func Runs(exe string) bool { return len(pidsOf(exe)) > 0 }
+
+// pidsOf are the pids of the processes of the executable exe.
+func pidsOf(exe string) []int {
 	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
 	if err != nil {
 		return nil
@@ -30,14 +45,8 @@ func (g *Games) Running() []int {
 	var pe windows.ProcessEntry32
 	pe.Size = uint32(unsafe.Sizeof(pe))
 	for err = windows.Process32First(snap, &pe); err == nil; err = windows.Process32Next(snap, &pe) {
-		if !strings.EqualFold(windows.UTF16ToString(pe.ExeFile[:]), gameExe) {
-			continue
-		}
-		pid := int(pe.ProcessID)
-		pids = append(pids, pid)
-		if _, ok := g.procs[pid]; !ok {
-			h, _ := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pe.ProcessID)
-			g.procs[pid] = h
+		if strings.EqualFold(windows.UTF16ToString(pe.ExeFile[:]), exe) {
+			pids = append(pids, int(pe.ProcessID))
 		}
 	}
 	return pids

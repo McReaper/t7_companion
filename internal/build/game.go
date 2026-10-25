@@ -19,7 +19,7 @@ const bo3AppID = "311210"
 // looks every gamePoll for a dialog of the game's: the game shows a fatal
 // error in one and asks its questions in one (safe mode after a crash), and
 // waits on it either way. What the game does next is the watcher's
-// (gamelog.Watcher, t7kb game watch).
+// (gamelog.Watcher, t7kb watch).
 var (
 	gameStartup = 8 * time.Second
 	gamePoll    = time.Second

@@ -39,7 +39,7 @@
 //
 // # Watching
 //
-// A Watcher (t7kb game watch, which the t7kb plugin's monitor runs for the
+// A Watcher (t7kb watch, which the t7kb plugin's monitor runs for the
 // whole of a Claude Code session) says each problem once, as one line, as it
 // happens: whatever the game's run, a reload from its console (devmap,
 // map_restart) included. It follows every console_mp.log from its end, and a

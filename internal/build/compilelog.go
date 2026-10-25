@@ -28,7 +28,7 @@ var (
 // compileVerdict fails or annotates a compile that exited 0 from what
 // cod2map logged, and the .errlog it wrote since start.
 func compileVerdict(sr *StageResult, out, errlog string, start time.Time) {
-	placed, messages := readErrlog(errlog, start)
+	placed, messages, _ := readErrlog(errlog, start)
 	for _, raw := range strings.Split(strings.ReplaceAll(out, "\r", ""), "\n") {
 		l := stripColor(strings.TrimSpace(raw))
 		switch {
@@ -47,15 +47,15 @@ func compileVerdict(sr *StageResult, out, errlog string, start time.Time) {
 }
 
 // readErrlog reads the problems a .errlog written since start places, as
-// warnings, maxPlaced at most, and the messages they carry.
-func readErrlog(path string, start time.Time) ([]string, map[string]bool) {
+// warnings, maxPlaced at most, the messages they carry, and how many it places.
+func readErrlog(path string, start time.Time) ([]string, map[string]bool, int) {
 	messages := map[string]bool{}
 	if !fileMTime(path).After(start.Add(-2 * time.Second)) {
-		return nil, messages
+		return nil, messages, 0
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return nil, messages
+		return nil, messages, 0
 	}
 	var out []string
 	n := 0
@@ -72,5 +72,5 @@ func readErrlog(path string, start time.Time) ([]string, map[string]bool) {
 	if n > maxPlaced {
 		out = append(out, fmt.Sprintf("and %d more in %s", n-maxPlaced, path))
 	}
-	return out, messages
+	return out, messages, n
 }

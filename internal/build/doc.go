@@ -64,4 +64,19 @@
 // names the log it wrote in its note. Reading it is internal/gamelog's, which
 // the game_log tool serves: what a run's log holds comes as the game plays,
 // long after the watch, so it is read when someone asks.
+//
+// # Watching builds
+//
+// A RecordWatcher (t7kb watch, which the t7kb plugin's monitor runs) says each
+// build the mod tools run, from the Launcher, t7kb or a hand, from the records
+// their tools write: no build reports to it. A link writes, per pass, its
+// zone's .deps under <usermaps|mods>/<name>/zone_source/*/assetinfo, and an
+// errorlog beside it when it has errors or warnings; a compile writes the
+// .errlog beside the map when it places problems, and a .lin when the map
+// leaks. A build is said once its tool's process has quit and its records
+// have stayed as they are for Settle (a mod links its zones one linker after
+// the other), from the verdicts the stages use: a link's errors, else its
+// warnings or that it went fine, with the assets it named that are in no GDT;
+// a compile's leak and placed problems, and nothing for a compile with
+// neither. Records older than the watch are not news.
 package build

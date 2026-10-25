@@ -16,3 +16,7 @@ func (g *Games) Dialogs(int) []string { return nil }
 
 // Exit is the exit code of an ended process.
 func (g *Games) Exit(int) (uint32, bool) { return 0, true }
+
+// Runs reports whether a process of the executable runs: the mod tools run on
+// Windows only.
+func Runs(string) bool { return false }
