@@ -1,0 +1,22 @@
+name: pr-body
+
+# A PR's body fills .github/pull_request_template.md: every section written,
+# every checklist item ticked or marked n/a (.github/scripts/check_pr_body.py).
+# A workflow of its own, so editing the body reruns this check alone; it reruns
+# on a push too, since a required check reports on the PR's latest commit.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  pr-body:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: The body follows the PR template
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }} # through the environment, never pasted into the script
+        run: python3 .github/scripts/check_pr_body.py
