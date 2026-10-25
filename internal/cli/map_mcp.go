@@ -72,7 +72,8 @@ const mapEditHelp = "Edit the map open in Radiant: a batch of ops, applied in or
 	"Ids are map_find's, or @n: what op " +
 	"n of this batch made (every copy of a copy op), so a brush placed, textured and copied is one undo step. A point " +
 	"entity keeps its id; a world brush or an entity that owns brushes is rebuilt and gets a new one (was gives " +
-	"the old). Every entity or brush of the map an op names needs the rev map_find gave it, in revs: the user works in the " +
+	"the old). Every entity or brush of the map an op names needs its own rev from map_find, in revs: a brush's is the " +
+	"one its brush_list row gives, not its entity's, so a world brush needs no rev of the worldspawn. The user works in the " +
 	"same Radiant, and a batch naming something they changed or deleted since it was read is refused whole, nothing sent. " +
 	"The answer reads the map back: each op's id and rev, class, origin or bounds, the tile each material got " +
 	"and where it came from, the faces each texture op textured. Edits go through Radiant, never the .map file, " +
@@ -83,9 +84,9 @@ func mapEditTool() server.ServerTool {
 		mcp.WithDescription(mapEditHelp),
 		mcp.WithArray("ops", mcp.Required(), mcp.Description("The ops, in order."), mcp.Items(map[string]any{"type": "object"})),
 		mcp.WithObject("revs", mcp.Description("The rev map_find (or a previous map_edit) gave each entity and brush of the map "+
-			"the ops name, by id: {id: rev}. Required for every such id (@n, what this batch makes, needs none): the user "+
+			"the ops name, by id: {id: rev}, a brush's own, not its entity's. Required for every such id (@n, what this batch makes, needs none): the user "+
 			"edits the same map, and a batch naming something they changed since it was read, or deleted, is refused whole.")),
-		mcp.WithString("label", mcp.Description("What the batch does, for Radiant's undo menu (default: the ops counted).")),
+		mcp.WithString("label", mcp.Description("What the batch does: Radiant's undo menu shows \"t7kb: <label>\" (default: the ops counted).")),
 		mcp.WithNumber("pid", mcp.Description("The Radiant to edit when several run."))),
 		Handler: jsonHandler(func(ctx context.Context, r mcp.CallToolRequest) (any, error) {
 			raw, err := json.Marshal(r.GetArguments()["ops"])
