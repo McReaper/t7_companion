@@ -3,6 +3,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -19,12 +20,27 @@ var version = "dev"
 // Version returns the build version, used as the MCP server version too.
 func Version() string { return version }
 
-// Execute runs the root command, exiting non-zero on error.
+// Execute runs the command line, exiting non-zero on error.
 func Execute() {
-	if err := newRootCmd().Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err)
-		os.Exit(1)
+	if code := run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr); code != 0 {
+		os.Exit(code)
 	}
+}
+
+// execute runs one command line on its streams and gives the command run and
+// its exit code.
+func execute(args []string, in io.Reader, out, errs io.Writer) (*cobra.Command, int) {
+	root := newRootCmd()
+	root.SetArgs(args)
+	root.SetIn(in)
+	root.SetOut(out)
+	root.SetErr(errs)
+	cmd, err := root.ExecuteC()
+	if err != nil {
+		fmt.Fprintln(errs, "error:", err)
+		return cmd, 1
+	}
+	return cmd, 0
 }
 
 func newRootCmd() *cobra.Command {

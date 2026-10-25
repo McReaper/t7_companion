@@ -19,6 +19,10 @@ Every tool your agent calls is also a terminal command that does the same thing:
 | `--db` | the knowledge base file; default `$T7KB_DB`, then `t7kb.db` beside the binary, then in the current folder |
 | `--write` | `create` and `gdt edit` only show what they would change until you pass it |
 
+## `T7KB_DEBUG`: a journal of every call
+
+Set `T7KB_DEBUG` to a folder, or to `1` for `debug/` beside t7kb, and t7kb records each command and each MCP tool call it serves in that folder's `journal.jsonl`, one JSON line each: when, the command or tool, what it was given (its arguments, the ops it read from stdin), what it answered, whether it failed, how long it took. The images `map view` answered are saved beside it. Read it to see what an agent did in your Radiant, call by call. For the MCP server, set it in your client's config, as `claude mcp add t7kb -e T7KB_DEBUG=1 -- <path to t7kb> mcp`. Unset, t7kb records nothing.
+
 ## `t7kb mcp`
 
 Runs the MCP server, the surface your agent uses. Your client starts it; [clients.md](clients.md) has the setup per client.
