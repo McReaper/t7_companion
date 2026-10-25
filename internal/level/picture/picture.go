@@ -65,17 +65,31 @@ type Label struct {
 	X, Y int
 }
 
-// glyphs are 3×5 hex digits, a row a byte, its three low bits the pixels
-// left to right: ids are hex.
-var glyphs = map[rune][5]uint8{
-	'0': {7, 5, 5, 5, 7}, '1': {2, 6, 2, 2, 7}, '2': {7, 1, 7, 4, 7}, '3': {7, 1, 3, 1, 7},
-	'4': {5, 5, 7, 1, 1}, '5': {7, 4, 7, 1, 7}, '6': {7, 4, 7, 5, 7}, '7': {7, 1, 1, 2, 2},
-	'8': {7, 5, 7, 5, 7}, '9': {7, 5, 7, 1, 7}, 'a': {2, 5, 7, 5, 5}, 'b': {6, 5, 6, 5, 6},
-	'c': {3, 4, 4, 4, 3}, 'd': {6, 5, 5, 5, 6}, 'e': {7, 4, 6, 4, 7}, 'f': {7, 4, 6, 4, 4},
+// glyphs are 5×7 hex digits, a row a byte, its five low bits the pixels
+// left to right: ids are hex. They are the HD44780 LCD's, lower case: b and
+// d have ascenders and 0 a slash, so none reads as 8, 0 or 6.
+var glyphs = map[rune][glyphH]uint8{
+	'0': {0x0E, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0E}, '1': {0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E},
+	'2': {0x0E, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1F}, '3': {0x1F, 0x02, 0x04, 0x02, 0x01, 0x11, 0x0E},
+	'4': {0x02, 0x06, 0x0A, 0x12, 0x1F, 0x02, 0x02}, '5': {0x1F, 0x10, 0x1E, 0x01, 0x01, 0x11, 0x0E},
+	'6': {0x06, 0x08, 0x10, 0x1E, 0x11, 0x11, 0x0E}, '7': {0x1F, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08},
+	'8': {0x0E, 0x11, 0x11, 0x0E, 0x11, 0x11, 0x0E}, '9': {0x0E, 0x11, 0x11, 0x0F, 0x01, 0x02, 0x0C},
+	'a': {0x00, 0x00, 0x0E, 0x01, 0x0F, 0x11, 0x0F}, 'b': {0x10, 0x10, 0x16, 0x19, 0x11, 0x11, 0x1E},
+	'c': {0x00, 0x00, 0x0E, 0x10, 0x10, 0x11, 0x0E}, 'd': {0x01, 0x01, 0x0D, 0x13, 0x11, 0x11, 0x0F},
+	'e': {0x00, 0x00, 0x0E, 0x11, 0x1F, 0x10, 0x0E}, 'f': {0x06, 0x09, 0x08, 0x1C, 0x08, 0x08, 0x08},
 }
 
-// px is the scale the glyphs are drawn at: a 3×5 glyph is 6×10 pixels.
-const px = 2
+const (
+	glyphW, glyphH = 5, 7
+	// px is the scale the glyphs are drawn at: a glyph is 10×14 pixels, 12
+	// apart, a size an agent reads every id at on a 768-pixel image.
+	px = 2
+)
+
+// textSize is the pixels text takes, its plate's margin left out.
+func textSize(text string) (int, int) {
+	return len(text)*(glyphW+1)*px - px, glyphH * px
+}
 
 var (
 	ink    = color.RGBA{255, 255, 255, 255}
@@ -102,7 +116,7 @@ func DrawLabels(img *image.RGBA, labels []Label) {
 // writeText writes hex digits white on a black plate, the text's upper left
 // at x, y, and returns the plate.
 func writeText(img *image.RGBA, x, y int, text string) image.Rectangle {
-	tw, th := len(text)*4*px-px, 5*px
+	tw, th := textSize(text)
 	r := image.Rect(x-2, y-2, x+tw+2, y+th+2)
 	fill(img, r, plate)
 	for i, c := range text {
@@ -111,9 +125,9 @@ func writeText(img *image.RGBA, x, y int, text string) image.Rectangle {
 			continue
 		}
 		for row, bits := range g {
-			for col := range 3 {
-				if bits&(4>>col) != 0 {
-					gx, gy := x+i*4*px+col*px, y+row*px
+			for col := range glyphW {
+				if bits&(1<<(glyphW-1-col)) != 0 {
+					gx, gy := x+i*(glyphW+1)*px+col*px, y+row*px
 					fill(img, image.Rect(gx, gy, gx+px, gy+px), ink)
 				}
 			}
@@ -125,7 +139,7 @@ func writeText(img *image.RGBA, x, y int, text string) image.Rectangle {
 // placeLabel is where a label's text goes: the first of its four places that
 // overlaps none of the plates.
 func placeLabel(b image.Rectangle, l Label, plates []image.Rectangle) (int, int, bool) {
-	tw, th := len(l.ID)*4*px-px, 5*px
+	tw, th := textSize(l.ID)
 	for _, at := range [4][2]int{{l.X + 5, l.Y - th - 4}, {l.X + 5, l.Y + 5}, {l.X - tw - 5, l.Y - th - 4}, {l.X - tw - 5, l.Y + 5}} {
 		x := min(max(at[0], b.Min.X+2), b.Max.X-tw-2)
 		y := min(max(at[1], b.Min.Y+2), b.Max.Y-th-2)
