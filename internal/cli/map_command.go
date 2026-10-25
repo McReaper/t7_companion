@@ -32,8 +32,8 @@ type madeThing struct {
 }
 
 // mapCommand runs a Radiant menu entry on what the ids name, or lists a menu
-// when menu is given instead.
-func mapCommand(ctx context.Context, command string, ids []string, menu string, pid int) (*mapCommandOut, error) {
+// when menu is given instead, "" the menu bar.
+func mapCommand(ctx context.Context, command string, ids []string, menu *string, pid int) (*mapCommandOut, error) {
 	c, err := radiant.Connect(ctx, radiantMachine, pid)
 	if err != nil {
 		return nil, err
@@ -44,12 +44,12 @@ func mapCommand(ctx context.Context, command string, ids []string, menu string, 
 		return nil, err
 	}
 	out := &mapCommandOut{Map: baseName(snap.State.Map)}
-	if command == "" && menu != "" {
-		entries, err := level.Menu(ctx, c, menu)
+	if command == "" && menu != nil {
+		entries, err := level.Menu(ctx, c, *menu)
 		if err != nil {
 			return nil, err
 		}
-		out.Menu = menu
+		out.Menu = *menu
 		for _, e := range entries {
 			s := e.Label
 			if e.Submenu {
