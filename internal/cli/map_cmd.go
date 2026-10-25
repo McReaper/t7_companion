@@ -79,7 +79,10 @@ func newMapEditCmd() *cobra.Command {
 	var pid int
 	edit := &cobra.Command{Use: "edit --ops <file|->",
 		Short: "Apply a batch of ops (a JSON array, as map_edit takes) as one undo step",
-		Args:  cobra.NoArgs,
+		Long: "Apply a batch of ops, a JSON array, as one undo step. It is the MCP tool map_edit: --ops, --revs and\n" +
+			"--label are its ops, revs and label, and the tools it names are t7kb's commands (map_find is\n" +
+			"t7kb map find). map_edit's description:\n\n" + mapEditHelp,
+		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			var raw []byte
 			var err error

@@ -70,7 +70,7 @@ Applies a batch of ops, a JSON array, in order: it lands as one entry of Radiant
 | `set`, `move`, `copy`, `delete` | keys (`null` removes one), a move by an offset, copies each further on, deletions |
 | `material`, `texture` | a material swapped, each face keeping its tile; a material laid on some faces with its tile, origin, rotation |
 
-`@n` names what op `n` of the batch made, counting from 0, so a brush placed, textured and copied is one undo step.
+`@n` names what op `n` of the batch made, counting from 0, so a brush placed, textured and copied is one undo step. `t7kb map edit --help` gives each op's fields.
 
 ```json
 [

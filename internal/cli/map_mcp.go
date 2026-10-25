@@ -40,41 +40,47 @@ func mapCommandTool() server.ServerTool {
 		})}
 }
 
+// mapEditHelp is map_edit's description, the ops' one statement: t7kb map
+// edit's help is it too.
+const mapEditHelp = "Edit the map open in Radiant: a batch of ops, applied in order, lands as ONE undo step " +
+	"(the answer's undo names it; one Ctrl+Z in Radiant takes it all back) or not at all. The agent places each " +
+	"element as it means it; nothing is laid out for it. Ops, each an object with one key:\n" +
+	"- {\"brush\": {\"points\": [[x,y,z]…], \"material\": m, \"contents\"?: flags as Treyarch's brushes carry, " +
+	"\"weaponClip detail\" (only bullets hit it: trims, frames) or \"nonColliding\", \"class\"?: c, \"keys\"?: {…}}} " +
+	"a convex brush through its corners (its faces are their hull: a box is its 8 corners, a wedge its 6, a column of " +
+	"n sides its 2n; 4 to 64 points that enclose a volume), each face in the material at its own tile, in worldspawn " +
+	"or as a new brush entity of class (info_volume, trigger_multiple, script_brushmodel)\n" +
+	"- {\"patch\": {\"rows\": [[[x,y,z]…]…], \"material\": m, \"mesh\"?: false, \"contents\"?, \"class\"?, " +
+	"\"keys\"?}} a patch through its control points, rows of as many each: a curve (Radiant's Bézier: 3, 5, 7… " +
+	"each way) or a mesh (terrain: 2 or more), drawn on the side (next row's point - point) × (next point of the row - point) " +
+	"points to (Radiant's own cylinder faces out so), its texture laid along the rows and columns by their length " +
+	"(map_command runs Radiant's patch tools on it after)\n" +
+	"- {\"raw\": text} map text as Radiant writes it, " +
+	"entities with their brushes and patches (a worldspawn's brushes go to the world), its guid lines dropped " +
+	"(the import gives new ones), every brush 4 faces or more or one patch\n" +
+	"- {\"entity\": {\"class\": c, \"origin\": [x,y,z], \"angles\"?: [p,y,r], \"keys\"?: {…}}} a point entity\n" +
+	"- {\"delete\": [ids]}\n" +
+	"- {\"set\": {\"id\": id, \"keys\": {k: v, k2: null}}} (null removes)\n" +
+	"- {\"move\": {\"ids\": [ids], \"by\": [dx,dy,dz]}}\n" +
+	"- {\"copy\": {\"ids\": [ids], \"by\": [dx,dy,dz], \"count\"?: n}} n copies, each by further than the last\n" +
+	"- {\"material\": {\"ids\": [ids], \"material\": m}} swaps the material, each face keeping its tile\n" +
+	"- {\"texture\": {\"ids\": [ids], \"faces\"?: \"top\"|\"bottom\"|\"sides\"|\"+x,-y\"…, \"material\"?: m, " +
+	"\"tile\"?: [u,v], \"scale\"?: s, \"origin\"?: [x,y,z], \"rotate\"?: deg, \"flip\"?: \"u\"|\"v\"|\"uv\"}} " +
+	"lays a material on faces (all by default): tile is the world units one repeat spans (default the material's own, " +
+	"as the install's maps use it), tiles start on origin (default 0 0 0, so faces given the same tile line up across " +
+	"brushes)\n" +
+	"Ids are map_find's, or @n: what op " +
+	"n of this batch made (every copy of a copy op), so a brush placed, textured and copied is one undo step. A point " +
+	"entity keeps its id; a world brush or an entity that owns brushes is rebuilt and gets a new one (was gives " +
+	"the old). Every entity or brush of the map an op names needs the rev map_find gave it, in revs: the user works in the " +
+	"same Radiant, and a batch naming something they changed or deleted since it was read is refused whole, nothing sent. " +
+	"The answer reads the map back: each op's id and rev, class, origin or bounds, the tile each material got " +
+	"and where it came from, the faces each texture op textured. Edits go through Radiant, never the .map file, " +
+	"and the user's selection is kept."
+
 func mapEditTool() server.ServerTool {
 	return server.ServerTool{Tool: mcp.NewTool("map_edit",
-		mcp.WithDescription("Edit the map open in Radiant: a batch of ops, applied in order, lands as ONE undo step "+
-			"(the answer's undo names it; one Ctrl+Z in Radiant takes it all back) or not at all. The agent places each "+
-			"element as it means it; nothing is laid out for it. Ops, each an object with one key: "+
-			"{\"brush\": {\"points\": [[x,y,z]…], \"material\": m, \"contents\"?: flags as Treyarch's brushes carry, "+
-			"\"weaponClip detail\" (only bullets hit it: trims, frames) or \"nonColliding\", \"class\"?: c, \"keys\"?: {…}}} "+
-			"a convex brush through its corners (its faces are their hull: a box is its 8 corners, a wedge its 6, a column of "+
-			"n sides its 2n; 4 to 64 points that enclose a volume), each face in the material at its own tile, in worldspawn "+
-			"or as a new brush entity of class (info_volume, trigger_multiple, script_brushmodel); "+
-			"{\"patch\": {\"rows\": [[[x,y,z]…]…], \"material\": m, \"mesh\"?: false, \"contents\"?, \"class\"?, "+
-			"\"keys\"?}} a patch through its control points, rows of as many each: a curve (Radiant's Bézier: 3, 5, 7… "+
-			"each way) or a mesh (terrain: 2 or more), drawn on the side (next row's point - point) × (next point of the row - point) "+
-			"points to (Radiant's own cylinder faces out so), its texture laid along the rows and columns by their length "+
-			"(map_command runs Radiant's patch tools on it after); {\"raw\": text} map text as Radiant writes it, "+
-			"entities with their brushes and patches (a worldspawn's brushes go to the world), its guid lines dropped "+
-			"(the import gives new ones), every brush 4 faces or more or one patch; "+
-			"{\"entity\": {\"class\": c, \"origin\": [x,y,z], \"angles\"?: [p,y,r], \"keys\"?: {…}}} a "+
-			"point entity; {\"delete\": [ids]}; {\"set\": {\"id\": id, \"keys\": {k: v, k2: null}}} (null removes); "+
-			"{\"move\": {\"ids\": [ids], \"by\": [dx,dy,dz]}}; {\"copy\": {\"ids\": [ids], \"by\": [dx,dy,dz], "+
-			"\"count\"?: n}} n copies, each by further than the last; "+
-			"{\"material\": {\"ids\": [ids], \"material\": m}} swaps the material, each face keeping its tile; "+
-			"{\"texture\": {\"ids\": [ids], \"faces\"?: \"top\"|\"bottom\"|\"sides\"|\"+x,-y\"…, \"material\"?: m, "+
-			"\"tile\"?: [u,v], \"scale\"?: s, \"origin\"?: [x,y,z], \"rotate\"?: deg, \"flip\"?: \"u\"|\"v\"|\"uv\"}} "+
-			"lays a material on faces (all by default): tile is the world units one repeat spans (default the material's own, "+
-			"as the install's maps use it), tiles start on origin (default 0 0 0, so faces given the same tile line up across "+
-			"brushes). "+
-			"Ids are map_find's, or @n: what op "+
-			"n of this batch made (every copy of a copy op), so a brush placed, textured and copied is one undo step. A point "+
-			"entity keeps its id; a world brush or an entity that owns brushes is rebuilt and gets a new one (was gives "+
-			"the old). Every entity or brush of the map an op names needs the rev map_find gave it, in revs: the user works in the "+
-			"same Radiant, and a batch naming something they changed or deleted since it was read is refused whole, nothing sent. "+
-			"The answer reads the map back: each op's id and rev, class, origin or bounds, the tile each material got "+
-			"and where it came from, the faces each texture op textured. Edits go through Radiant, never the .map file, "+
-			"and the user's selection is kept."),
+		mcp.WithDescription(mapEditHelp),
 		mcp.WithArray("ops", mcp.Required(), mcp.Description("The ops, in order."), mcp.Items(map[string]any{"type": "object"})),
 		mcp.WithObject("revs", mcp.Description("The rev map_find (or a previous map_edit) gave each entity and brush of the map "+
 			"the ops name, by id: {id: rev}. Required for every such id (@n, what this batch makes, needs none): the user "+
