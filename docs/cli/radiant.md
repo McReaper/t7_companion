@@ -101,4 +101,4 @@ t7kb map command "Selection/CSG/CSG Hollow" 5ec8de46
 
 | Option | What it does |
 | --- | --- |
-| `--menu` | list a menu's entries instead, a submenu marked by `>`: a menu is its labels from the menu bar down, joined by `/` (`Selection/CSG`); `--menu=`, empty, lists the menu bar |
+| `--menu` | list a menu's entries instead, a submenu marked by `>`: a menu is its labels from the menu bar down, joined by `/` (`Selection/CSG`), a label holding a `/` written as it reads; `--menu=`, empty, lists the menu bar |
