@@ -36,26 +36,26 @@ func art(img *image.RGBA) string {
 // corner is pushed inside the image. testdata/labels.golden was read glyph
 // by glyph when written.
 func TestLabelsAreDrawnWhereTheyShould(t *testing.T) {
-	img := image.NewRGBA(image.Rect(0, 0, 64, 44))
-	DrawLabels(img, []Label{{"a1", 30, 21}, {"b2", 30, 21}, {"c3", 30, 21}, {"d4", 30, 21}, {"e5", 30, 21}, {"f", 63, 0}})
+	img := image.NewRGBA(image.Rect(0, 0, 96, 44))
+	DrawLabels(img, []Label{{"a1", 30, 21}, {"b2", 30, 21}, {"c3", 30, 21}, {"d4", 30, 21}, {"e5", 30, 21}, {"f0", 95, 0}})
 	golden(t, "testdata/labels.golden", art(img))
 }
 
-// A one-digit label's plate is 10 wide and 14 high: a second label 9 to the
-// right, or 13 below, of the first moves to its next place; 10 and 14 leave
+// A one-digit label's plate is 14 wide and 18 high: a second label 13 to the
+// right, or 17 below, of the first moves to its next place; 14 and 18 leave
 // room, and the same above. Points left of and below the image get their
 // text pulled inside it.
 // testdata/labels_room.golden was read pair by pair when written.
 func TestLabelsMakeRoomAtTheirThreshold(t *testing.T) {
-	img := image.NewRGBA(image.Rect(0, 0, 100, 120))
+	img := image.NewRGBA(image.Rect(0, 0, 140, 170))
 	DrawLabels(img, []Label{
-		{"1", 5, 20}, {"2", 14, 20}, // 9 apart: the second goes below right
-		{"3", 50, 20}, {"4", 60, 20}, // 10 apart: both above right
-		{"5", 5, 60}, {"6", 5, 73}, // 13 apart: the second goes below right
-		{"7", 50, 60}, {"8", 50, 74}, // 14 apart: both above right
-		{"9", -10, 100}, {"a", 70, 300}, // off the image, left and below
-		{"b", 80, 60}, {"c", 80, 47}, // 13 above: the second moves on, to above left (below right overlaps too)
-		{"d", 80, 100}, {"e", 80, 86}, // 14 above: both above right
+		{"1", 5, 20}, {"2", 18, 20}, // 13 apart: the second goes below right
+		{"3", 60, 20}, {"4", 74, 20}, // 14 apart: both above right
+		{"5", 5, 70}, {"6", 5, 87}, // 17 apart: the second goes below right
+		{"7", 60, 70}, {"8", 60, 88}, // 18 apart: both above right
+		{"9", -10, 130}, {"a", 90, 400}, // off the image, left and below
+		{"b", 110, 70}, {"c", 110, 53}, // 17 above: the second moves on, to above left (below right overlaps too)
+		{"d", 110, 130}, {"e", 110, 112}, // 18 above: both above right
 	})
 	golden(t, "testdata/labels_room.golden", art(img))
 }

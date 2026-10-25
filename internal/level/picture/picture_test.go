@@ -72,13 +72,13 @@ func TestShrinkAveragesThePixelsUnderEach(t *testing.T) {
 }
 
 func TestLabelsAreDrawnInsideTheImage(t *testing.T) {
-	img := image.NewRGBA(image.Rect(0, 0, 120, 60))
-	DrawLabels(img, []Label{{ID: "5ec8de49", X: 30, Y: 30}, {ID: "ffz0", X: 119, Y: 0}})
-	if c := img.RGBAAt(30, 30); c != marker {
+	img := image.NewRGBA(image.Rect(0, 0, 120, 80))
+	DrawLabels(img, []Label{{ID: "5ec8de49", X: 30, Y: 50}, {ID: "ffz0", X: 119, Y: 0}})
+	if c := img.RGBAAt(30, 50); c != marker {
 		t.Errorf("the point's marker = %v", c)
 	}
 	var white, black int
-	for y := range 60 {
+	for y := range 80 {
 		for x := range 120 {
 			switch img.RGBAAt(x, y) {
 			case ink:
