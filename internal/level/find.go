@@ -107,7 +107,7 @@ func (q Query) near(e *mapfile.Entity, h *Hit) bool {
 	owns := false
 	for _, b := range brushes {
 		box := geom.BrushBox(b)
-		if b.Kind() == mapfile.KindEmpty || !box.Ok {
+		if !box.Ok { // a point entity's empty brush has no box
 			continue
 		}
 		owns = true
