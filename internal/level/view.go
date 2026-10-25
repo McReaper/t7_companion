@@ -104,6 +104,9 @@ func View(ctx context.Context, c *radiant.Client, snap *Snapshot, o ViewOptions)
 		}
 		return nil, err
 	}
+	if view == "3d" && len(o.Marks) == 0 { // an id behind a wall would read as in the room
+		pts, f.At = inSight(occluders(snap, o.Hide), f.Pose.Origin, pts, f.At)
+	}
 	shot, err := compose(f, view, pts, o.Size)
 	if err != nil {
 		return nil, err
