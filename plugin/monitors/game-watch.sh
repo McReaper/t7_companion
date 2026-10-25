@@ -8,7 +8,7 @@
 # T7KB_BIN, else where the installers put it
 bin="${T7KB_BIN:-}"
 if [ -z "$bin" ]; then
-  for c in "${LOCALAPPDATA:-}/t7kb/t7kb.exe" "$HOME/.t7kb/t7kb"; do
+  for c in "${LOCALAPPDATA:-}/t7kb/t7kb.exe"; do
     if [ -f "$c" ]; then bin="$c"; break; fi
   done
 fi
