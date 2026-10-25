@@ -44,6 +44,23 @@ func TestMapCommandAnswersWhatTheCommandDid(t *testing.T) {
 	}
 }
 
+// Radiant selects a point entity through a brush the map's text doesn't hold:
+// what a command leaves selected names the entity by its own id.
+func TestMapCommandNamesASelectedPointEntityByItsID(t *testing.T) {
+	f := testRadiant(t)
+	f.Handle("command", func(f *radianttest.Fake, _ string, _ []byte) radianttest.Reply { return radianttest.OK("", nil) })
+	out, err := mapCommand(context.Background(), "Light/Convert Probe to/from Box", []string{"5ec8de46", "f2d51a52"}, nil, 0)
+	if err != nil || !slices.Equal(out.Selected, []string{"5ec8de46", "f2d51a52"}) {
+		t.Errorf("selected = %+v, %v", out, err)
+	}
+	if out, err := mapCommand(context.Background(), "Light/Convert Probe to/from Box", []string{"5ec8de46", "af3c9c64"}, nil, 0); err != nil || !slices.Equal(out.Selected, []string{"5ec8de46", "af3c9c64"}) {
+		t.Errorf("a point entity and a brush = %+v, %v", out, err)
+	}
+	if f.Selection != nil {
+		t.Errorf("the user's selection (none) is not back: %q", f.Selection)
+	}
+}
+
 func TestMapCommandSaysTheSelectionOnceWhenItIsWhatWasMade(t *testing.T) {
 	f := testRadiant(t)
 	f.Handle("command", func(f *radianttest.Fake, _ string, _ []byte) radianttest.Reply {

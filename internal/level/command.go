@@ -13,7 +13,7 @@ type Ran struct {
 	Undo     string   // the undo menu's entry it made, "" when it made none
 	Created  []string // GUIDs of the entities and brushes it made
 	Deleted  []string // and of those it took away
-	Selected []string // the brushes it left selected (its result, for most), before the user's selection came back
+	Selected []string // what it left selected (its result, for most), before the user's selection came back, as Selection.In names it
 	After    *Snapshot
 }
 
@@ -37,29 +37,31 @@ func Command(ctx context.Context, c *radiant.Client, snap *Snapshot, ids []strin
 	if err := call(ctx, c, "deselect"); err != nil {
 		return nil, err
 	}
-	run := func() (*Ran, error) {
+	run := func() (Selection, error) {
 		if len(guids) > 0 {
 			if err := call(ctx, c, "select "+strings.Join(guids, " ")); err != nil {
-				return nil, err
+				return Selection{}, err
 			}
 		}
 		if err := call(ctx, c, "command "+path); err != nil {
-			return nil, err
+			return Selection{}, err
 		}
 		r, err := c.Call(ctx, "selection", nil)
 		if err != nil {
-			return nil, err
+			return Selection{}, err
 		}
-		return &Ran{Selected: ParseSelection(string(r.Body)).GUIDs}, nil
+		return ParseSelection(string(r.Body)), nil
 	}
-	ran, err := run()
+	sel, err := run()
 	restoreSelection(ctx, c, snap.Sel.GUIDs) // whatever happened
 	if err != nil {
 		return nil, err
 	}
+	ran := &Ran{}
 	if ran.After, err = Read(ctx, c); err != nil {
 		return nil, fmt.Errorf("%s ran, but the map could not be read back: %w", path, err)
 	}
+	ran.Selected = sel.In(ran.After)
 	ran.Created, ran.Deleted = diff(GUIDs(snap.Map), GUIDs(ran.After.Map))
 	// two commands alike in a row leave the same label: the map's change tells it too (a
 	// save clears the modified flag and makes no undo step)
