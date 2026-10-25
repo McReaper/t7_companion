@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -206,6 +207,7 @@ func TestRecordWatcherSaysEachBuildT7kbRanOnceItEnds(t *testing.T) {
 			{Name: "compile", Warnings: []string{"w1"}}, {Name: "link", Warnings: []string{"w2", "w3"}, Missing: []string{"image img_a (named by material m)"}}}}},
 		{Target: "zm_bad", Kind: "mod", Done: true, Started: end.Add(-time.Minute), Ended: end, Report: failed},
 		{Target: "zm_mute", Kind: "usermap", Done: true, Started: end, Ended: end, Report: Report{FailedStage: "start"}},
+		{Target: "zm_dumb", Kind: "usermap", Done: true, Started: end, Ended: end, Report: Report{FailedStage: "light", Stages: []StageResult{{Name: "light"}}}},
 	}
 	w.Tick()
 	w.Tick()
@@ -217,6 +219,7 @@ func TestRecordWatcherSaysEachBuildT7kbRanOnceItEnds(t *testing.T) {
 			"its link went on without what no GDT defines: image img_a (named by material m)",
 		"build of zm_bad failed at link after 1m0s: e1 | e2 | e3 | and 1 more; build's status has the report",
 		"build of zm_mute failed at start after 0s: no error said; build's status has the report",
+		"build of zm_dumb failed at light after 0s: no error said; build's status has the report",
 	}
 	if !reflect.DeepEqual(*said, want) {
 		t.Errorf("each build once, as it ended:\n got %q\nwant %q", *said, want)
@@ -233,10 +236,19 @@ func TestRecordWatcherLeavesALinkT7kbRanToItsBuildsLine(t *testing.T) {
 	if want := []string{"link of mods/zm_x ok"}; !reflect.DeepEqual(*said, want) {
 		t.Errorf("the running build's link is its own line's: %q", *said)
 	}
-	build.Done, build.Ended = true, w.start.Add(2*time.Second)
+	// Records up to 2 s around the build are its own, as file times are coarse.
+	build.Started = w.start.Add(2 * time.Second)
+	writeRecord(t, w, "usermaps/zm_x/zone_source/french/assetinfo/zm_x.deps", "version,1,1\n") // 1 s before its start
+	w.Tick()
+	build.Done, build.Ended, build.Report = true, w.start.Add(3*time.Second), Report{OK: true}
+	writeRecordAt(t, w, "usermaps/zm_x/zone_source/german/assetinfo/zm_x.deps", "version,1,1\n", 4*time.Second) // 1 s after its end
+	w.Tick()
+	if len(*said) != 2 || !strings.HasPrefix((*said)[1], "build of zm_x finished ok") {
+		t.Errorf("records within 2 s of the build are its own: %q", *said)
+	}
 	writeRecordAt(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps", "version,1,1\n", time.Minute) // a later link, from the Launcher
 	w.Tick()
-	if len(*said) != 3 || (*said)[1] != "link of usermaps/zm_x ok" {
+	if len(*said) != 3 || (*said)[2] != "link of usermaps/zm_x ok" {
 		t.Errorf("a link after the build ended is the Launcher's: %q", *said)
 	}
 }
