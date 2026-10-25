@@ -100,16 +100,20 @@ var (
 // DrawLabels marks each label's point and writes its id beside it, white on
 // a black plate kept inside the image: above right of the point, else below
 // right, above left or below left, wherever it overlaps no plate drawn
-// before; a label with no room left gets its marker only.
+// before and no marker, so a marker never hides a digit nor a plate a point;
+// a label with no room left gets its marker only.
 func DrawLabels(img *image.RGBA, labels []Label) {
-	var plates []image.Rectangle
+	taken := make([]image.Rectangle, len(labels))
+	for i, l := range labels {
+		taken[i] = image.Rect(l.X-2, l.Y-2, l.X+3, l.Y+3)
+		fill(img, taken[i], marker)
+	}
 	for _, l := range labels {
-		fill(img, image.Rect(l.X-2, l.Y-2, l.X+3, l.Y+3), marker)
-		x, y, ok := placeLabel(img.Rect, l, plates)
+		x, y, ok := placeLabel(img.Rect, l, taken)
 		if !ok {
 			continue
 		}
-		plates = append(plates, writeText(img, x, y, l.ID))
+		taken = append(taken, writeText(img, x, y, l.ID))
 	}
 }
 
@@ -137,15 +141,15 @@ func writeText(img *image.RGBA, x, y int, text string) image.Rectangle {
 }
 
 // placeLabel is where a label's text goes: the first of its four places that
-// overlaps none of the plates.
-func placeLabel(b image.Rectangle, l Label, plates []image.Rectangle) (int, int, bool) {
+// overlaps none of the rectangles taken.
+func placeLabel(b image.Rectangle, l Label, taken []image.Rectangle) (int, int, bool) {
 	tw, th := textSize(l.ID)
 	for _, at := range [4][2]int{{l.X + 5, l.Y - th - 4}, {l.X + 5, l.Y + 5}, {l.X - tw - 5, l.Y - th - 4}, {l.X - tw - 5, l.Y + 5}} {
 		x := min(max(at[0], b.Min.X+2), b.Max.X-tw-2)
 		y := min(max(at[1], b.Min.Y+2), b.Max.Y-th-2)
 		r := image.Rect(x-2, y-2, x+tw+2, y+th+2)
 		free := true
-		for _, p := range plates {
+		for _, p := range taken {
 			if r.Overlaps(p) {
 				free = false
 				break
