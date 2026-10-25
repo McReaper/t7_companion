@@ -25,7 +25,7 @@ Runs the MCP server, the surface your agent uses. Your client starts it; [client
 
 ## `t7kb watch`
 
-Says, one line each, as it happens, until you stop it: each problem the game has (a script error, a fatal error, a crash, the assets the map's zone lists that the game didn't find once it has loaded), and each build the mod tools run, from the Launcher or from t7kb: a link's errors, warnings, and the assets it named that are in no GDT, or that it went fine; a compile's leak and the problems its `.errlog` places. It reads what the game and the tools write, once the tool has quit, and says each thing once. In Claude Code, the t7kb plugin runs it for the whole session, so your agent hears of each without you telling it; `game log` and the `zone` commands then investigate.
+Says, one line each, as it happens, until you stop it: each problem the game has (a script error, a fatal error, a crash, the assets the map's zone lists that the game didn't find once it has loaded), each build the mod tools run, from the Launcher or from t7kb: a link's errors, warnings, and the assets it named that are in no GDT, or that it went fine; a compile's leak and the problems its `.errlog` places; and what a Radiant whose bridge runs reports: its errors (a model or material no GDT defines), another map opened, a prefab entered or left, a bake ended, Radiant closing. It reads what the game and the tools write, once the tool has quit, and says each thing once. In Claude Code, the t7kb plugin runs it for the whole session, so your agent hears of each without you telling it; `game log` and the `zone` commands then investigate.
 
 ```
 t7kb watch

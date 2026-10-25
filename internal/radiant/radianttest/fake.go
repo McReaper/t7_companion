@@ -132,6 +132,16 @@ func (f *Fake) Event(name, args string) {
 	}
 }
 
+// quit closes every connection, as a Radiant that exits does.
+func (f *Fake) quit() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for c := range f.conns {
+		_ = c.Close()
+	}
+	f.conns = map[*conn]bool{}
+}
+
 func (f *Fake) serve(c *conn) {
 	defer func() {
 		f.mu.Lock()

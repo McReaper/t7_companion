@@ -2,6 +2,6 @@
   {
     "name": "bo3",
     "command": "sh \"${CLAUDE_PLUGIN_ROOT}/monitors/watch.sh\"",
-    "description": "Black Ops III: the game's problems (script errors, fatal errors, crashes, the map's missing assets) and each build's verdict (a link's errors, a compile's leak)"
+    "description": "Black Ops III: the game's problems (script errors, fatal errors, crashes, the map's missing assets), each build's verdict (a link's errors, a compile's leak) and what Radiant reports (its errors, a prefab entered, a bake ended)"
   }
 ]

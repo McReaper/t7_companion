@@ -64,6 +64,18 @@ func (m *Machine) Run(s *Started) {
 	m.fakes[s.Fake.PID] = s
 }
 
+// Exit ends the Radiant of that pid: its bridge's connections close, and it
+// runs no more.
+func (m *Machine) Exit(pid int) {
+	m.mu.Lock()
+	s := m.fakes[pid]
+	delete(m.fakes, pid)
+	m.mu.Unlock()
+	if s != nil {
+		s.Fake.quit()
+	}
+}
+
 // Starts are the Start calls made: the program, then its arguments.
 func (m *Machine) Starts() [][]string {
 	m.mu.Lock()

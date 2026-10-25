@@ -106,4 +106,21 @@
 // happened. What it did is read from the map before and after (GUIDs
 // created and deleted), and from the undo menu, reported whenever the map
 // changed, as two commands alike leave the same label.
+//
+// # Watching Radiant
+//
+// A Watcher (t7kb watch, which the t7kb plugin's monitor runs) follows each
+// Radiant whose bridge already listens, with a connection of its own
+// subscribed to the console and map events; it never loads the bridge, and
+// leaves for 30 s a bridge that refused it. What a Radiant has open when the
+// watch connects is no news. It says a map Radiant opened, a prefab it
+// entered or left, a bake once "All Probes Done" ends it (with what the bake
+// warned of), and the Radiant closing; a save says nothing. Radiant writes its
+// errors as console lines beginning "ERROR: " (an xmodel or material not in
+// the gdtDB, a misc_prefab whose model won't load; a clean map's load writes
+// none: verified in a test Radiant): they are said as one line per burst, once
+// the console has been quiet for Quiet, each error once. The bridge's events
+// are read as they come, as its client drops what arrives on a full channel.
+// The map tools' own work comes through too: a map radiant_open opened, the
+// errors of an edit naming an asset no GDT defines.
 package level

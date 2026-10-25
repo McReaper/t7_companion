@@ -7,13 +7,17 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/McReaper/t7_companion/internal/radiant/radianttest"
 )
 
-func TestWatchSaysTheGamesProblemsAndEachBuildUntilStopped(t *testing.T) {
+func TestWatchSaysTheGameTheBuildsAndRadiantUntilStopped(t *testing.T) {
 	game := gameFixture(t)
-	oldEvery, oldSettle := watchEvery, watchSettle
-	t.Cleanup(func() { watchEvery, watchSettle = oldEvery, oldSettle })
-	watchEvery, watchSettle = 10*time.Millisecond, 0
+	radiant := radianttest.New(7, `C:\bo3\map_source\zm\zm_test.map`)
+	onMachine(t, radiant)
+	oldEvery, oldSettle, oldQuiet := watchEvery, watchSettle, watchQuiet
+	t.Cleanup(func() { watchEvery, watchSettle, watchQuiet = oldEvery, oldSettle, oldQuiet })
+	watchEvery, watchSettle, watchQuiet = 10*time.Millisecond, 0, 0
 	ctx, cancel := context.WithCancel(context.Background())
 	var b safeBuffer
 	done := make(chan error, 1)
@@ -29,20 +33,29 @@ func TestWatchSaysTheGamesProblemsAndEachBuildUntilStopped(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(deps), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(deps, []byte("version,1,1\n"), 0o644); err != nil {
+	// Written and dated aside, then renamed: the watch sees one record, dated past
+	// its start whatever the file system's clock.
+	if err := os.WriteFile(deps+".tmp", []byte("version,1,1\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	at := time.Now().Add(time.Second) // past the watch's start whatever the file system's clock
-	if err := os.Chtimes(deps, at, at); err != nil {
+	at := time.Now().Add(time.Second)
+	if err := os.Chtimes(deps+".tmp", at, at); err != nil {
 		t.Fatal(err)
 	}
-	want := "script error: a new one, console_mp.log line 50\nlink of usermaps/zm_test ok\n"
+	if err := os.Rename(deps+".tmp", deps); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 200 && !strings.Contains(b.String(), "link of"); i++ { // the watch follows the Radiant by then
+		time.Sleep(10 * time.Millisecond)
+	}
+	radiant.Event("console", "ERROR: Can't find xmodel 'x' in gdtDB")
+	want := "script error: a new one, console_mp.log line 50\nlink of usermaps/zm_test ok\nRadiant (pid 7) printed 1 error(s): Can't find xmodel 'x' in gdtDB\n"
 	for i := 0; i < 200 && b.String() != want; i++ {
 		time.Sleep(10 * time.Millisecond)
 	}
 	cancel()
 	if err := <-done; err != nil || b.String() != want {
-		t.Errorf("a line for the new error and one for the link, none for what was there: %v\n got %q\nwant %q", err, b.String(), want)
+		t.Errorf("a line for the game's error, the link and Radiant's error, none for what was there: %v\n got %q\nwant %q", err, b.String(), want)
 	}
 	t.Setenv("TA_GAME_PATH", "")
 	if err := watch(context.Background(), "", &b, fakeProcs{}, nil); err == nil || !strings.Contains(err.Error(), "no game path") {
