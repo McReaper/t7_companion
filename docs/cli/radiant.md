@@ -1,8 +1,8 @@
 # Radiant: the map open in your Radiant
 
-These commands work on the map Radiant has open, as it is now, unsaved edits included, through [T7RadiantBridge](https://github.com/McReaper/t7_radiant_bridge), the bridge t7kb loads into it. [Radiant integration](../radiant.md) has what to install and what stays in your hands. Each command takes `--pid` to pick a Radiant when several run. [All commands](../cli.md).
+These commands work on the map Radiant has open, as it is now, unsaved edits included, through [T7RadiantBridge](https://github.com/McReaper/t7_radiant_bridge), the bridge t7kb loads into it. [Radiant integration](../radiant.md) has what to install and what stays in your hands. Each command takes `--pid` to pick a Radiant when several run, and its `--help` gives the whole description of the MCP tool it is, with each argument's. [All commands](../cli.md).
 
-Entities and brushes go by short ids, the first 8 hex digits of their Radiant GUID, as `map find` lists them.
+Entities and brushes go by short ids, the first 8 hex digits of their Radiant GUID, as `map find` lists them. `map find`, `map view` and `map command` take them after the command or as `--ids`, comma- or space-separated.
 
 ## `t7kb radiant open <map>`
 
@@ -38,7 +38,7 @@ t7kb map find 5ec8de46 --brushes
 
 ## `t7kb map view [id…]`
 
-Saves an image of the 3D view or a 2D view as Radiant draws it, with the ids written where each thing is, and prints how the image maps to the world. Your camera, render mode and 2D views are put back after. Radiant mustn't be minimised.
+Saves an image of the 3D view or a 2D view as Radiant draws it, with the ids written where each thing is (in 3D, only what no wall hides from the camera), and prints how the image maps to the world. Your camera, render mode and 2D views are put back after. Radiant mustn't be minimised, and a screen that went to sleep is turned back on for the shot: Windows draws nothing under a sleeping screen. A 3D shot from a camera waits, up to 5 s, while you hold a mouse button.
 
 ```
 t7kb map view --view top --out top.png
@@ -52,7 +52,7 @@ t7kb map view --camera 0,-512,128,-10,90,0 --bake
 | `--at`, `--radius` | frame a point `x,y,z` and what's around it |
 | `--camera` | 3D: shoot from `x,y,z,pitch,yaw,roll` (positive pitch looks up, yaw 90 faces +y) |
 | `--render` | 3D: `fullbright` for textures, `fake` for shapes, or `wireframe`, `real`, `view`, `density` |
-| `--bake` | 3D: bake Radiant's lighting first and shoot under it, to see sun leaks and dark rooms |
+| `--bake` | 3D: bake Radiant's lighting first and shoot under it, to see sun leaks and dark rooms; Radiant then asks, when you close it, whether to export the lighting |
 | `--hide` | `volumes`, `sky` or both: hide them for this shot |
 | `--size`, `--out` | the image's longer side (default 768 pixels) and where to write it |
 | `--no-labels` | leave the ids off |
