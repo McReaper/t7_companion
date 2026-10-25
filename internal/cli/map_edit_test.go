@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/McReaper/t7_companion/internal/level"
 	"github.com/McReaper/t7_companion/internal/radiant/radianttest"
 )
 
@@ -138,4 +140,20 @@ func revsOf(t *testing.T, ids ...string) map[string]string {
 		}
 	}
 	return revs
+}
+
+// t7kb map edit --help gives map_edit's description, every op of the batch
+// in it with its fields: a CLI user never sees the tool's description.
+func TestMapEditHelpGivesEveryOp(t *testing.T) {
+	long := newMapEditCmd().Long
+	if !strings.Contains(long, mapEditHelp) {
+		t.Error("the help leaves out map_edit's description")
+	}
+	ops := reflect.TypeFor[level.Op]()
+	for i := range ops.NumField() {
+		kind, _, _ := strings.Cut(ops.Field(i).Tag.Get("json"), ",")
+		if !strings.Contains(long, `- {"`+kind+`": `) {
+			t.Errorf("the help gives no %s op", kind)
+		}
+	}
 }
