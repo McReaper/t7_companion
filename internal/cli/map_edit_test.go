@@ -142,15 +142,28 @@ func revsOf(t *testing.T, ids ...string) map[string]string {
 	return revs
 }
 
-// Each map command's --help gives its MCP tool's description, which a CLI
-// user never sees: map edit's has every op of the batch with its fields.
+// Each map command's --help gives its MCP tool's description and each
+// argument's, which a CLI user never sees, and names the skill that holds the
+// craft: map edit's has every op of the batch with its fields.
 func TestMapCommandsHelpGivesTheirToolsDescription(t *testing.T) {
 	root := newRootCmd()
 	for _, tool := range mapToolset().tools {
 		cmd, _, err := root.Find(strings.SplitN(tool.Tool.Name, "_", 2))
-		if err != nil || !strings.Contains(cmd.Long, tool.Tool.Description) || !strings.HasPrefix(cmd.Long, cmd.Short+".") {
-			t.Errorf("%s: the help of `t7kb %s` leaves out its description: %v", tool.Tool.Name, cmd.CommandPath(), err)
+		if err != nil || !strings.Contains(cmd.Long, tool.Tool.Description) || !strings.HasPrefix(cmd.Long, cmd.Short+".") || !strings.Contains(cmd.Long, "t7kb:mapping") {
+			t.Errorf("%s: the help of `t7kb %s` leaves out its description or the skill: %v", tool.Tool.Name, cmd.CommandPath(), err)
+			continue
 		}
+		for name, p := range tool.Tool.InputSchema.Properties {
+			if desc := p.(map[string]any)["description"].(string); !strings.Contains(cmd.Long, "\n  "+name+": "+desc) {
+				t.Errorf("%s: the help leaves out the argument %s", tool.Tool.Name, name)
+			}
+		}
+	}
+	if view, _, _ := root.Find([]string{"map", "view"}); !strings.Contains(view.Long, "yaw 90 faces +y") || strings.Index(view.Long, "\n  at: ") > strings.Index(view.Long, "\n  view: ") {
+		t.Error("map view's help: no yaw rule, or the arguments out of order")
+	}
+	if group, _, _ := root.Find([]string{"map"}); !strings.Contains(group.Long, mapCraft) {
+		t.Error("t7kb map --help names no skill")
 	}
 	edit, _, _ := root.Find([]string{"map", "edit"})
 	long := edit.Long
