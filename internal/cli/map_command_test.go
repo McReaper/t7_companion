@@ -25,7 +25,7 @@ func splitFloor(f *radianttest.Fake, args string, _ []byte) radianttest.Reply {
 func TestMapCommandAnswersWhatTheCommandDid(t *testing.T) {
 	f := testRadiant(t)
 	f.Handle("command", splitFloor)
-	out, err := mapCommand(context.Background(), "Selection/CSG/CSG Subtract", []string{"5ec8de49"}, "", 0)
+	out, err := mapCommand(context.Background(), "Selection/CSG/CSG Subtract", []string{"5ec8de49"}, nil, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +51,7 @@ func TestMapCommandSaysTheSelectionOnceWhenItIsWhatWasMade(t *testing.T) {
 		f.Selection = []string{"{0d000001-0000-0000-0000-000000000000}"}
 		return radianttest.OK("", nil)
 	})
-	out, err := mapCommand(context.Background(), "Brush/Anything", []string{"5ec8de49"}, "", 0)
+	out, err := mapCommand(context.Background(), "Brush/Anything", []string{"5ec8de49"}, nil, 0)
 	if err != nil || len(out.Created) != 1 || out.Selected != nil {
 		t.Errorf("answer = %+v, %v", out, err)
 	}
@@ -62,17 +62,64 @@ func TestMapCommandSaysTheSelectionOnceWhenItIsWhatWasMade(t *testing.T) {
 
 func TestMapCommandListsAMenu(t *testing.T) {
 	f := testRadiant(t)
-	f.Menus = map[string]string{"Selection/CSG": "CSG Hollow\t1\t0\nCSG Merge\t0\t0\nMore\t1\t1\n"}
-	out, err := mapCommand(context.Background(), "", nil, "Selection/CSG", 0)
+	f.Menus = map[string]string{"Selection/CSG": "CSG Hollow\t1\t0\nCSG Merge\t0\t0\nMore\t1\t1\n", "": "File\t1\t1\nSelection\t1\t1\n"}
+	csg, bar, nope := "Selection/CSG", "", "Nope"
+	out, err := mapCommand(context.Background(), "", nil, &csg, 0)
 	if err != nil || out.Menu != "Selection/CSG" || !slices.Equal(out.Entries, []string{"CSG Hollow", "CSG Merge (disabled)", "More >"}) || out.Command != "" {
 		t.Errorf("menu = %+v, %v", out, err)
 	}
-	if _, err := mapCommand(context.Background(), "", nil, "Nope", 0); err == nil {
+	if out, err := mapCommand(context.Background(), "", nil, &bar, 0); err != nil || !slices.Equal(out.Entries, []string{"File >", "Selection >"}) {
+		t.Errorf("the menu bar = %+v, %v", out, err)
+	}
+	if _, err := mapCommand(context.Background(), "", nil, &nope, 0); err == nil {
 		t.Error("an unknown menu")
 	}
 	onMachine(t)
-	if _, err := mapCommand(context.Background(), "", nil, "Selection/CSG", 0); err == nil {
+	if _, err := mapCommand(context.Background(), "", nil, &csg, 0); err == nil {
 		t.Error("a menu with no Radiant")
+	}
+}
+
+// The menu bar is an empty menu: --menu= (or --menu "") on the command line,
+// where Git Bash turns a lone / into a Windows path, and "" in the tool,
+// whose missing menu still runs the command.
+func TestMapCommandListsTheMenuBarOnBothSurfaces(t *testing.T) {
+	f := testRadiant(t)
+	f.Menus = map[string]string{"": "File\t1\t1\n", "Brush": "Rotate\t1\t0\n"}
+	run := func(args ...string) (string, error) {
+		cmd := newMapCmd()
+		var out strings.Builder
+		cmd.SetOut(&out)
+		cmd.SetErr(&out)
+		cmd.SetArgs(append([]string{"command"}, args...))
+		err := cmd.Execute()
+		return out.String(), err
+	}
+	for _, args := range [][]string{{"--menu="}, {"--menu", ""}, {"--menu", "/"}} {
+		out, err := run(args...)
+		var answer mapCommandOut
+		if err != nil || json.Unmarshal([]byte(out), &answer) != nil || !slices.Equal(answer.Entries, []string{"File >"}) {
+			t.Errorf("%q: %v\n%s", args, err, out)
+		}
+	}
+	tool := func(args map[string]any) string {
+		res, err := mapCommandTool().Handler(context.Background(), mcpRequest("map_command", args))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resultText(res)
+	}
+	if got := tool(map[string]any{"menu": ""}); !strings.Contains(got, `"entries":["File >"]`) {
+		t.Errorf(`menu "": %s`, got)
+	}
+	if got := tool(map[string]any{"menu": "Brush"}); !strings.Contains(got, `"entries":["Rotate"]`) {
+		t.Errorf("menu Brush: %s", got)
+	}
+	if got := tool(map[string]any{}); !strings.Contains(got, "no command") {
+		t.Errorf("no menu and no command: %s", got)
+	}
+	if out, err := run(); err == nil || !strings.Contains(err.Error(), "--menu= the menu bar") {
+		t.Errorf("no path names the menu bar's spelling: %v\n%s", err, out)
 	}
 }
 

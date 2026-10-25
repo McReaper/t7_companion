@@ -101,4 +101,4 @@ t7kb map command "Selection/CSG/CSG Hollow" 5ec8de46
 
 | Option | What it does |
 | --- | --- |
-| `--menu` | list a menu's entries instead, a submenu marked by `>`; `--menu /` lists the menu bar (in Git Bash, prefix `MSYS_NO_PATHCONV=1`) |
+| `--menu` | list a menu's entries instead, a submenu marked by `>`; `--menu=`, empty, lists the menu bar |

@@ -29,10 +29,14 @@ func mapCommandTool() server.ServerTool {
 			"lists a menu's entries (\"Selection/CSG\"; \"\" the menu bar), \" >\" marking a submenu."),
 		mcp.WithString("command", mcp.Description("The menu path, labels from the menu bar: Selection/CSG/CSG Hollow.")),
 		mcp.WithString("ids", mcp.Description("What to select for it, comma- or space-separated (default nothing selected).")),
-		mcp.WithString("menu", mcp.Description("List this menu's entries instead of running a command.")),
+		mcp.WithString("menu", mcp.Description("List this menu's entries instead of running a command (\"\" the menu bar).")),
 		mcp.WithNumber("pid", mcp.Description("The Radiant to use when several run."))),
 		Handler: jsonHandler(func(ctx context.Context, r mcp.CallToolRequest) (any, error) {
-			return mapCommand(ctx, r.GetString("command", ""), splitIDs(r.GetString("ids", "")), r.GetString("menu", ""), r.GetInt("pid", 0))
+			var menu *string
+			if m, ok := r.GetArguments()["menu"].(string); ok {
+				menu = &m
+			}
+			return mapCommand(ctx, r.GetString("command", ""), splitIDs(r.GetString("ids", "")), menu, r.GetInt("pid", 0))
 		})}
 }
 

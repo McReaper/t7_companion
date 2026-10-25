@@ -141,12 +141,13 @@ func mapSamples(t *testing.T, root string, add func(key, s string), addImage fun
 	v, err = mapEdit(ctx, curve, nil, "a curve", 0)
 	run("map_edit|its answer (one patch)", v, err)
 
-	v, err = mapCommand(ctx, "", nil, "Selection/CSG", 0)
+	csg := "Selection/CSG"
+	v, err = mapCommand(ctx, "", nil, &csg, 0)
 	run("map_command|list Selection/CSG", v, err)
 	box, _ := decodeOps([]byte(`[{"brush": {"points": [[900, 900, 0], [1400, 900, 0], [900, 1400, 0], [1400, 1400, 0], [900, 900, 128], [1400, 900, 128], [900, 1400, 128], [1400, 1400, 128]], "material": "script_wall"}}]`))
 	f.Handle("command", hollow) // the views above needed the fake's own commands
 	if made, err := mapEdit(ctx, box, nil, "a box", 0); err == nil && len(made.Made) == 1 {
-		v, err = mapCommand(ctx, "Selection/CSG/CSG Hollow", []string{made.Made[0].ID}, "", 0)
+		v, err = mapCommand(ctx, "Selection/CSG/CSG Hollow", []string{made.Made[0].ID}, nil, 0)
 		run("map_command|CSG Hollow on a box (six walls)", v, err)
 	}
 }

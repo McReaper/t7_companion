@@ -61,16 +61,15 @@ func newMapCommandCmd() *cobra.Command {
 	command := &cobra.Command{Use: "command <menu path> [id…]",
 		Short: "Run a Radiant menu entry on the entities and brushes named, or list a menu (--menu)",
 		RunE: func(c *cobra.Command, a []string) error {
-			path, ids := "", a
-			if menu == "" {
-				if len(a) == 0 {
-					return fmt.Errorf("give a menu path (Selection/CSG/CSG Hollow), or --menu to list one")
-				}
-				path, ids = a[0], a[1:]
+			if c.Flags().Changed("menu") {
+				return printIndented(c.OutOrStdout())(mapCommand(c.Context(), "", a, &menu, pid))
 			}
-			return printIndented(c.OutOrStdout())(mapCommand(c.Context(), path, ids, menu, pid))
+			if len(a) == 0 {
+				return fmt.Errorf("give a menu path (Selection/CSG/CSG Hollow), or --menu to list a menu's entries (--menu= the menu bar)")
+			}
+			return printIndented(c.OutOrStdout())(mapCommand(c.Context(), a[0], a[1:], nil, pid))
 		}}
-	command.Flags().StringVar(&menu, "menu", "", "list this menu's entries instead (\"\" for the menu bar is --menu /)")
+	command.Flags().StringVar(&menu, "menu", "", "list this menu's entries instead (Selection/CSG); --menu= (empty) lists the menu bar")
 	command.Flags().IntVar(&pid, "pid", 0, "the Radiant to use when several run")
 	return command
 }
