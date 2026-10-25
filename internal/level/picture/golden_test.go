@@ -33,12 +33,33 @@ func art(img *image.RGBA) string {
 
 // Five labels on one point take its four places, above right, below right,
 // above left, below left, and the fifth its marker only; a sixth at the
-// corner is pushed inside the image. testdata/labels.golden was read glyph
-// by glyph when written.
+// corner, whose plate pushed inside the image above right would cover its
+// point, goes below left. testdata/labels.golden was read glyph by glyph
+// when written.
 func TestLabelsAreDrawnWhereTheyShould(t *testing.T) {
 	img := image.NewRGBA(image.Rect(0, 0, 96, 44))
 	DrawLabels(img, []Label{{"a1", 30, 21}, {"b2", 30, 21}, {"c3", 30, 21}, {"d4", 30, 21}, {"e5", 30, 21}, {"f0", 95, 0}})
 	golden(t, "testdata/labels.golden", art(img))
+}
+
+// A plate takes no place over another label's marker, even one drawn after
+// it: a1's plate above right would cover b's point, so it goes below right,
+// and every marker pixel stays.
+func TestLabelsLeaveEveryMarkerShowing(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 80, 70))
+	DrawLabels(img, []Label{{"a1", 20, 40}, {"b", 30, 28}})
+	for _, p := range [][2]int{{20, 40}, {30, 28}} {
+		for y := p[1] - 2; y < p[1]+3; y++ {
+			for x := p[0] - 2; x < p[0]+3; x++ {
+				if img.RGBAAt(x, y) != marker {
+					t.Errorf("marker pixel %d,%d covered", x, y)
+				}
+			}
+		}
+	}
+	if img.RGBAAt(24, 21) == plate || img.RGBAAt(24, 44) != plate {
+		t.Error("a1's plate is not below right of its point")
+	}
 }
 
 // A one-digit label's plate is 14 wide and 18 high: a second label 13 to the
