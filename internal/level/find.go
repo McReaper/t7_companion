@@ -13,7 +13,7 @@ type Query struct {
 	IDs      []string      // entities or brushes, by id: an entity matches when it or one of its brushes is named
 	Class    string        // classname, * matching any run of characters, any case
 	Key      string        // "key" (has it) or "key=value", * in the value
-	Near     *mapfile.Vec3 // with Radius: entities whose bounds come that close to the point
+	Near     *mapfile.Vec3 // with Radius: entities that come that close to the point, by their brushes when they own some
 	Radius   float64
 	Selected bool // only entities with a brush selected in Radiant
 }
@@ -46,6 +46,8 @@ type Hit struct {
 	Box      geom.Box
 	Selected bool
 	Named    []*mapfile.Brush // the brushes of it the query named by id
+	Near     []*mapfile.Brush // with Near, the brushes of it (of Named, when some are) within the radius, nearest first
+	Distance float64          // with Near, how far its nearest such brush is, or a point entity's bounds
 }
 
 // Find returns the map's entities that match the query, in map order.
@@ -85,7 +87,46 @@ func (q Query) matches(e *mapfile.Entity, named map[string]bool, h *Hit) bool {
 		return false
 	}
 	h.Box = geom.EntityBox(e)
-	return q.Near == nil || (h.Box.Ok && h.Box.Distance(*q.Near) <= q.Radius)
+	return q.Near == nil || q.near(e, h)
+}
+
+// near tells whether the entity comes within the radius of the point. One
+// that owns brushes does by its brushes, which go in the hit's Near: the
+// worldspawn's bounds span the map and would match any point. A point entity
+// does by its bounds.
+func (q Query) near(e *mapfile.Entity, h *Hit) bool {
+	brushes := h.Named
+	if len(brushes) == 0 {
+		brushes = e.Brushes()
+	}
+	type found struct {
+		b *mapfile.Brush
+		d float64
+	}
+	var in []found
+	owns := false
+	for _, b := range brushes {
+		box := geom.BrushBox(b)
+		if b.Kind() == mapfile.KindEmpty || !box.Ok {
+			continue
+		}
+		owns = true
+		if d := box.Distance(*q.Near); d <= q.Radius {
+			in = append(in, found{b, d})
+		}
+	}
+	if !owns {
+		h.Distance = h.Box.Distance(*q.Near)
+		return h.Box.Ok && h.Distance <= q.Radius
+	}
+	sort.SliceStable(in, func(i, j int) bool { return in[i].d < in[j].d })
+	for _, f := range in {
+		h.Near = append(h.Near, f.b)
+	}
+	if len(in) > 0 {
+		h.Distance = in[0].d
+	}
+	return len(in) > 0
 }
 
 func (q Query) keyMatches(e *mapfile.Entity) bool {
