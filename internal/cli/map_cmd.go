@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -30,24 +31,47 @@ func newRadiantCmd() *cobra.Command {
 	return root
 }
 
+// mapCraft points an agent on the command line, who gets no MCP server
+// instructions, to the skill that holds the mapping craft.
+const mapCraft = "Building or changing the map: the craft is in the t7kb:mapping skill, load it first. It has where\n" +
+	"Treyarch's sizes are, which faces take caulk, which render shows a shape and which a material, and the\n" +
+	"stock example to measure before building."
+
 // withToolHelp puts the description of the MCP tool a map command is in its
-// help, where the map tools' rules are written once: a CLI user never sees
-// the tool's.
+// help, its arguments' too, where the map tools' rules are written once: a
+// CLI user never sees the tool's.
 func withToolHelp(c *cobra.Command, tool string) *cobra.Command {
 	for _, t := range mapToolset().tools {
 		if t.Tool.Name == tool {
-			c.Long = c.Short + ".\n\nIt is the MCP tool " + tool + ": its flags are the tool's arguments, - for _,\n" +
+			c.Long = c.Short + ".\n\n" + mapCraft + "\n\nIt is the MCP tool " + tool + ": its flags are the tool's arguments, - for _,\n" +
 				"and the tools the description names are t7kb's commands (map_find is t7kb map find).\n" +
-				tool + "'s description:\n\n" + t.Tool.Description
+				tool + "'s description:\n\n" + t.Tool.Description + argumentsHelp(t.Tool.InputSchema.Properties)
 		}
 	}
 	return c
+}
+
+// argumentsHelp lists a tool's arguments with their descriptions, by name.
+func argumentsHelp(props map[string]any) string {
+	names := make([]string, 0, len(props))
+	for n := range props {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	var b strings.Builder
+	b.WriteString("\n\nIts arguments:")
+	for _, n := range names {
+		desc, _ := props[n].(map[string]any)["description"].(string)
+		fmt.Fprintf(&b, "\n  %s: %s", n, desc)
+	}
+	return b.String()
 }
 
 func newMapCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:   "map",
 		Short: "Find, see and edit the map open in Radiant",
+		Long:  "Find, see and edit the map open in Radiant.\n\n" + mapCraft,
 	}
 	var a mapFindArgs
 	find := &cobra.Command{Use: "find [id…]",
