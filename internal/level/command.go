@@ -163,7 +163,7 @@ func noMenu(ctx context.Context, c *radiant.Client, path string) error {
 			if entries := parseMenu(r.Body); len(entries) > 0 {
 				for _, e := range entries {
 					if e.Label == last && !e.Submenu {
-						return fmt.Errorf("%q is an entry, not a menu: map command %q runs it", path, path)
+						return fmt.Errorf("%q is an entry, not a menu: it has nothing to list, and nothing ran (to run it: map command %q)", path, path)
 					}
 				}
 				break

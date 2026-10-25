@@ -75,7 +75,7 @@ func TestMapCommandListsAMenu(t *testing.T) {
 		t.Errorf("an unknown menu: %v", err)
 	}
 	hollow := "Selection/CSG/CSG Hollow" // an entry of Selection/CSG, which runs
-	if _, err := mapCommand(context.Background(), "", nil, &hollow, 0); err == nil || err.Error() != `"Selection/CSG/CSG Hollow" is an entry, not a menu: map command "Selection/CSG/CSG Hollow" runs it` {
+	if _, err := mapCommand(context.Background(), "", nil, &hollow, 0); err == nil || err.Error() != `"Selection/CSG/CSG Hollow" is an entry, not a menu: it has nothing to list, and nothing ran (to run it: map command "Selection/CSG/CSG Hollow")` {
 		t.Errorf("an entry listed as a menu: %v", err)
 	}
 	more := "Selection/CSG/More/Nope" // under a submenu the fake has no entries for
