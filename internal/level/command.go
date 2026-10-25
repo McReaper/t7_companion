@@ -125,22 +125,44 @@ func diff(before, after []string) (created, deleted []string) {
 // Menu lists a menu's entries, as the bridge's menus gives them: one
 // "label<TAB>enabled<TAB>has_submenu" line each, "---" a separator.
 func Menu(ctx context.Context, c *radiant.Client, path string) ([]MenuEntry, error) {
-	r, err := c.Call(ctx, "menus "+strings.Trim(strings.TrimSpace(path), "/"), nil)
+	path = strings.Trim(strings.TrimSpace(path), "/")
+	r, err := c.Call(ctx, "menus "+path, nil)
 	if err != nil {
 		return nil, err
 	}
+	if out := parseMenu(r.Body); len(out) > 0 {
+		return out, nil
+	}
+	return nil, noMenu(ctx, c, path)
+}
+
+func parseMenu(body []byte) []MenuEntry {
 	var out []MenuEntry
-	for _, line := range strings.Split(string(r.Body), "\n") {
+	for _, line := range strings.Split(string(body), "\n") {
 		f := strings.Split(strings.TrimRight(line, "\r"), "\t")
 		if len(f) != 3 || f[0] == "---" {
 			continue
 		}
 		out = append(out, MenuEntry{Label: strings.ReplaceAll(f[0], "&", ""), Enabled: f[1] == "1", Submenu: f[2] == "1"})
 	}
-	if len(out) == 0 {
-		return nil, fmt.Errorf("no menu %q: a menu is named by its labels from the menu bar down, joined by / (Selection/CSG)", path)
+	return out
+}
+
+// noMenu says why a path lists nothing: its last label is an entry of the
+// menu above it, one that runs, or no menu is named so.
+func noMenu(ctx context.Context, c *radiant.Client, path string) error {
+	parent, last := "", path
+	if i := strings.LastIndex(path, "/"); i >= 0 {
+		parent, last = path[:i], path[i+1:]
 	}
-	return out, nil
+	if r, err := c.Call(ctx, "menus "+parent, nil); err == nil {
+		for _, e := range parseMenu(r.Body) {
+			if e.Label == last && !e.Submenu {
+				return fmt.Errorf("%q is an entry, not a menu: map command %q runs it", path, path)
+			}
+		}
+	}
+	return fmt.Errorf("no menu %q: a menu is named by its labels from the menu bar down, joined by / (Selection/CSG)", path)
 }
 
 // MenuEntry is one entry of a Radiant menu.
