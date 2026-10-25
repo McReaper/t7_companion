@@ -17,7 +17,7 @@ Materials are the mapper's: the agent lays the ones it is asked for, face by fac
 
 ## Look from the top first, then pick the render by the question
 
-The top view is the layout: outlines, entity names and the ids, to measure against the plan. In 3D, pick the render by the question: `fullbright` for materials, `fake` for shapes, a bake for light, where an unbaked map is black and a sun leak or a dark room shows. The template's volumes (the start zone, sun, umbra and fpstool volumes) cover the start room and draw their tool textures over a shot from inside them as well as from outside (verified in a test Radiant): hide them for the shot, and the sky box for a shot from outside the map. Every view moves the mapper's camera before putting it back, and they see it move: take the views the work needs.
+The top view is the layout: outlines, entity names and the ids, to measure against the plan. In 3D, pick the render by the question: `fullbright` for materials, `fake` for shapes (a door or window seen face-on vanishes in `fullbright`, the far wall showing through it in the same material, unshaded; verified in a test Radiant), a bake for light, where an unbaked map is black and a sun leak or a dark room shows. The template's volumes (the start zone, sun, umbra and fpstool volumes) cover the start room and draw their tool textures over a shot from inside them as well as from outside (verified in a test Radiant): hide them for the shot, and the sky box for a shot from outside the map. Every view moves the mapper's camera before putting it back, and they see it move: take the views the work needs.
 
 ## Light through a wall is the lighting's to fix
 
