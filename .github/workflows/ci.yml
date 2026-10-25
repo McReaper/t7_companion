@@ -71,6 +71,15 @@ jobs:
           python -m json.tool .claude-plugin/marketplace.json > /dev/null
           python -m json.tool plugin/.claude-plugin/plugin.json > /dev/null
 
+  # The installer on Windows PowerShell, what users run, its downloads faked.
+  install:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Installer tests
+        shell: powershell
+        run: .\install\install.tests.ps1
+
   # Go's fuzzer, 45 s per Fuzz target of each package the PR changes (go test
   # only replays the seeds). A failing input fails the job and is kept as an
   # artifact: fold it into the target's seed list with the bug it guards.
