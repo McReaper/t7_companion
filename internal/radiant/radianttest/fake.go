@@ -45,6 +45,7 @@ type Fake struct {
 	PrefabDepth int
 	Entities    int
 	Minimised   bool
+	MouseHeld   int    // 3D captures from a pose refused busy, a mouse button held, before one goes through
 	Dialog      string // a modal dialog's title: every command but hello, state and menus is busy
 	Render      string
 	View2D      string
