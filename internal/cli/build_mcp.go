@@ -23,17 +23,23 @@ func buildToolset() toolset {
 func buildToolDef() mcp.Tool {
 	return mcp.NewTool("build",
 		mcp.WithDescription("Headlessly compile/light/link a Black Ops 3 map or mod by driving the "+
-			"mod-tools pipeline (gdtdb, cod2map64, radiant light, linker), returning a compact "+
-			"per-stage JSON report: a failing stage's errors and, for the link, every error and warning the "+
+			"mod-tools pipeline (gdtdb, cod2map64, radiant light, linker). The build runs on its own, minutes "+
+			"(link) up to 20-30 min (full compile+light), and this answers at once with its stages: in Claude Code "+
+			"the t7kb plugin's monitor tells you each link and compile verdict and when the build ends; status "+
+			"reads how far it got, and its report once done. One build of a target runs at a time. The report "+
+			"is per stage: a failing stage's errors and, for the link, every error and warning the "+
 			"linker logged (it exits non-zero on warnings too) and `missing`: what it looked up and found in "+
 			"no GDT (it links on without it). Look each message up with search. Requires a "+
 			"Windows BO3 mod-tools install (path from $TA_TOOLS_PATH or the tools_path arg). "+
-			"NOTE: runs synchronously and can take minutes (link) up to 20-30 min (full compile+light) "+
-			"— set a long client timeout. For a script-only change, pass stages=\"link\"."),
+			"For a script-only change, pass stages=\"link\"."),
 		mcp.WithString("name", mcp.Required(),
 			mcp.Description("Map or mod name, e.g. \"zm_mymap\".")),
+		mcp.WithBoolean("status",
+			mcp.Description("Read the state of the target's last build instead of starting one: the stages planned, the one running, done, lost (its process ended before the build did), and the report of the stages ended (default false).")),
+		mcp.WithBoolean("wait",
+			mcp.Description("Run the build within this call and answer its report; set a long client timeout (default false).")),
 		mcp.WithString("stages",
-			mcp.Description("Comma list of stages to run: compile,light,link,run (default \"compile,light,link\"). Use \"link\" alone for a script-only change. run starts the game with logfile 2 and watches its start (8 s): a dialog it opens there, or the game quitting at once (Steam not attached), fails the stage. What the game does next, its load included, the t7kb plugin's game monitor tells you as it happens, and game_log investigates.")),
+			mcp.Description("Comma list of stages to run: compile,light,link,run (default \"compile,light,link\"). Use \"link\" alone for a script-only change. run starts the game with logfile 2 and watches its start (8 s): a dialog it opens there, or the game quitting at once (Steam not attached), fails the stage. What the game does next, its load included, the t7kb plugin's monitor tells you as it happens, and game_log investigates.")),
 		mcp.WithBoolean("mod",
 			mcp.Description("Target is a mod (mods/<name>) instead of a usermap; skips compile+light (default false).")),
 		mcp.WithString("light",
@@ -82,11 +88,11 @@ func buildToolHandler() server.ToolHandlerFunc {
 		if o.Dvars, err = dvarPairs(req.GetArguments()["dvars"]); err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
-		rep, err := buildRun(o, name, io.Discard)
+		v, err := buildOp(o, name, req.GetBool("wait", false), req.GetBool("status", false), io.Discard)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
-		out, err := json.MarshalIndent(rep, "", "  ")
+		out, err := json.MarshalIndent(v, "", "  ")
 		if err != nil {
 			return mcp.NewToolResultErrorFromErr("marshal build report", err), nil
 		}
