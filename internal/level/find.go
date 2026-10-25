@@ -41,19 +41,14 @@ func ParseSelection(body string) Selection {
 // Brush reports whether the brush with that GUID is selected.
 func (s Selection) Brush(guid string) bool { return s.Brushes[hexOf(guid)] }
 
-// In is what the selection names in a snapshot of the map, once each: a
-// brush by its GUID, a point entity by its own, as Radiant selects one
-// through a brush the map's text doesn't hold.
+// In is what the selection names in a snapshot of the map: a brush by its
+// GUID, a point entity by its own, as Radiant selects one through a brush the
+// map's text doesn't hold.
 func (s Selection) In(snap *Snapshot) []string {
-	var out []string
-	seen := map[string]bool{}
+	out := make([]string, len(s.GUIDs))
 	for i, g := range s.GUIDs {
-		if snap.RevOf(g) == "" {
-			g = s.Owners[i]
-		}
-		if h := hexOf(g); !seen[h] {
-			seen[h] = true
-			out = append(out, g)
+		if out[i] = g; snap.RevOf(g) == "" {
+			out[i] = s.Owners[i]
 		}
 	}
 	return out
