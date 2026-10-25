@@ -24,3 +24,4 @@ func (local) Modules(int) ([]string, error)                         { return nil
 func (local) Ready(context.Context, int) error                      { return errNotWindows }
 func (local) Inject(int, string) error                              { return errNotWindows }
 func (local) Control(int, string) (string, error)                   { return "", errNotWindows }
+func (local) WakeDisplay()                                          {}

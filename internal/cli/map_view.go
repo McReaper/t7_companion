@@ -77,6 +77,7 @@ func mapView(ctx context.Context, a mapViewArgs) (*mapViewOut, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	radiantMachine.WakeDisplay() // a screen that slept leaves the capture blank
 	shot, err := level.View(ctx, c, snap, o)
 	if err != nil {
 		return nil, nil, err

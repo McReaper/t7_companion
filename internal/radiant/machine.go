@@ -30,6 +30,10 @@ type Machine interface {
 	Inject(pid int, dll string) error
 	// Control sends a command to MTPlugins' host in the process and returns its reply.
 	Control(pid int, cmd string) (string, error)
+	// WakeDisplay turns the screen on if it slept, for the display's idle
+	// time: Windows composes no window while the screen is off, and a capture
+	// then comes back blank.
+	WakeDisplay()
 }
 
 // ErrNoRadiant is Connect's error when no Radiant runs the bridge.

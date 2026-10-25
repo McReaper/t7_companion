@@ -24,6 +24,7 @@ type Machine struct {
 	started  [][]string
 	injected [][]string // pid, dll
 	controls [][]string // pid, command
+	wakes    int
 	nextPID  int
 }
 
@@ -222,4 +223,18 @@ func (m *Machine) Controls() [][]string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return append([][]string(nil), m.controls...)
+}
+
+// WakeDisplay counts the calls: the fake has no screen to turn on.
+func (m *Machine) WakeDisplay() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.wakes++
+}
+
+// Wakes is how many times WakeDisplay was called.
+func (m *Machine) Wakes() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.wakes
 }

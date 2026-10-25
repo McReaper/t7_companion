@@ -12,6 +12,8 @@ import (
 	"testing"
 
 	"github.com/mark3labs/mcp-go/mcp"
+
+	"github.com/McReaper/t7_companion/internal/radiant/radianttest"
 )
 
 func TestMapViewAnswersTheProjectionBesideThePNG(t *testing.T) {
@@ -34,6 +36,24 @@ func TestMapViewAnswersTheProjectionBesideThePNG(t *testing.T) {
 	at, _, err := mapView(context.Background(), mapViewArgs{View: "front", At: "0 0 0", Radius: 100})
 	if err != nil || at.View != "xz" {
 		t.Errorf("at a point: %+v, %v", at, err)
+	}
+}
+
+// A view turns the screen on before it shoots: Windows composes no window
+// under a screen that slept, and the capture comes back blank. A bad
+// argument wakes nothing.
+func TestMapViewWakesTheScreenFirst(t *testing.T) {
+	f := testRadiant(t)
+	m := radiantMachine.(*radianttest.Machine)
+	if _, _, err := mapView(context.Background(), mapViewArgs{View: "top"}); err != nil || m.Wakes() != 1 {
+		t.Errorf("a view: %v, %d wakes", err, m.Wakes())
+	}
+	if _, _, err := mapView(context.Background(), mapViewArgs{Size: -1}); err == nil || m.Wakes() != 1 {
+		t.Errorf("a refused view: %v, %d wakes", err, m.Wakes())
+	}
+	f.Update(func(f *radianttest.Fake) { f.Blank = true })
+	if _, _, err := mapView(context.Background(), mapViewArgs{View: "top"}); err == nil || !strings.Contains(err.Error(), "all one colour") || m.Wakes() != 2 {
+		t.Errorf("a blank capture after the wake: %v, %d wakes", err, m.Wakes())
 	}
 }
 
