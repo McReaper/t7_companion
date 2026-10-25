@@ -22,6 +22,7 @@ type Query struct {
 type Selection struct {
 	Brushes, Entities map[string]bool
 	GUIDs             []string // the selected brushes' GUIDs, in Radiant's order
+	Owners            []string // the entity of each of GUIDs
 }
 
 // ParseSelection reads the bridge's selection lines, "<brush guid> <entity
@@ -31,7 +32,7 @@ func ParseSelection(body string) Selection {
 	for _, line := range strings.Split(body, "\n") {
 		if f := strings.Fields(line); len(f) >= 2 {
 			s.Brushes[hexOf(f[0])], s.Entities[hexOf(f[1])] = true, true
-			s.GUIDs = append(s.GUIDs, f[0])
+			s.GUIDs, s.Owners = append(s.GUIDs, f[0]), append(s.Owners, f[1])
 		}
 	}
 	return s
@@ -39,6 +40,24 @@ func ParseSelection(body string) Selection {
 
 // Brush reports whether the brush with that GUID is selected.
 func (s Selection) Brush(guid string) bool { return s.Brushes[hexOf(guid)] }
+
+// In is what the selection names in a snapshot of the map, once each: a
+// brush by its GUID, a point entity by its own, as Radiant selects one
+// through a brush the map's text doesn't hold.
+func (s Selection) In(snap *Snapshot) []string {
+	var out []string
+	seen := map[string]bool{}
+	for i, g := range s.GUIDs {
+		if snap.RevOf(g) == "" {
+			g = s.Owners[i]
+		}
+		if h := hexOf(g); !seen[h] {
+			seen[h] = true
+			out = append(out, g)
+		}
+	}
+	return out
+}
 
 // Hit is one entity Find matched.
 type Hit struct {

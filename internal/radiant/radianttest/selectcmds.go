@@ -2,6 +2,8 @@ package radianttest
 
 import (
 	"strings"
+
+	"github.com/McReaper/t7_companion/internal/format/mapfile"
 )
 
 // selectCmd adds the brushes the GUIDs name to the selection (an entity's
@@ -17,15 +19,13 @@ func selectCmd(f *Fake, args string, _ []byte) Reply {
 	for _, g := range want {
 		found := false
 		for _, e := range m.Entities {
+			brushes := brushesOf(e)
 			if strings.EqualFold(e.Guid(), g) {
-				for _, b := range e.Brushes() {
-					f.Selection = append(f.Selection, b.Guid())
-				}
-				found = true
+				f.Selection, found = append(f.Selection, brushes...), true
 			}
-			for _, b := range e.Brushes() {
-				if strings.EqualFold(b.Guid(), g) {
-					f.Selection, found = append(f.Selection, b.Guid()), true
+			for _, b := range brushes {
+				if strings.EqualFold(b, g) {
+					f.Selection, found = append(f.Selection, b), true
 				}
 			}
 		}
@@ -38,6 +38,26 @@ func selectCmd(f *Fake, args string, _ []byte) Reply {
 		r.Summary = "missing=" + strings.Join(missing, ",")
 	}
 	return r
+}
+
+// PointBrush is the GUID of the brush through which Radiant selects a point
+// entity: one the map's text doesn't hold.
+func PointBrush(entity string) string {
+	h := strings.Trim(entity, "{}")
+	return "{" + h[:min(8, len(h))] + "-FFFF-FFFF-FFFF-FFFFFFFFFFFF}"
+}
+
+// brushesOf are the GUIDs Radiant selects an entity through: its brushes',
+// or a point entity's PointBrush.
+func brushesOf(e *mapfile.Entity) []string {
+	var out []string
+	for _, b := range e.Brushes() {
+		out = append(out, b.Guid())
+	}
+	if len(out) == 0 {
+		out = []string{PointBrush(e.Guid())}
+	}
+	return out
 }
 
 func deselect(f *Fake, _ string, _ []byte) Reply {

@@ -41,13 +41,14 @@ func entities(f *Fake, args string, _ []byte) Reply {
 	return OK(summary, out)
 }
 
-// selection gives one line per selected brush, with its entity; the bounds
-// are left at zero (the plugin gives Radiant's).
+// selection gives one line per selected brush, with its entity, a point
+// entity's PointBrush among them; the bounds are left at zero (the plugin
+// gives Radiant's).
 func selection(f *Fake, _ string, _ []byte) Reply {
 	owner := map[string]string{}
 	for _, e := range f.parsed().Entities {
-		for _, b := range e.Brushes() {
-			owner[strings.ToUpper(b.Guid())] = e.Guid()
+		for _, b := range brushesOf(e) {
+			owner[strings.ToUpper(b)] = e.Guid()
 		}
 	}
 	var out strings.Builder
