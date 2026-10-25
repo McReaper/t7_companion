@@ -27,9 +27,9 @@ func mapCommandTool() server.ServerTool {
 			"back: the undo entry the command made (one Ctrl+Z), what it created (id, class or material, bounds), what it "+
 			"deleted, what it left selected. A command that opens a dialog waits on the user. menu instead of command "+
 			"lists a menu's entries (\"Selection/CSG\"; \"\" the menu bar), \" >\" marking a submenu."),
-		mcp.WithString("command", mcp.Description("The menu path, labels from the menu bar: Selection/CSG/CSG Hollow.")),
+		mcp.WithString("command", mcp.Description("The menu path, labels from the menu bar down joined by /: Selection/CSG/CSG Hollow.")),
 		mcp.WithString("ids", mcp.Description("What to select for it, comma- or space-separated (default nothing selected).")),
-		mcp.WithString("menu", mcp.Description("List this menu's entries instead of running a command (\"\" the menu bar).")),
+		mcp.WithString("menu", mcp.Description("List this menu's entries instead of running a command: its labels from the menu bar down joined by / (Selection/CSG); \"\" the menu bar.")),
 		mcp.WithNumber("pid", mcp.Description("The Radiant to use when several run."))),
 		Handler: jsonHandler(func(ctx context.Context, r mcp.CallToolRequest) (any, error) {
 			var menu *string
@@ -151,14 +151,14 @@ func mapFindTool() server.ServerTool {
 			"(min x y z, max x y z) and brush count; keys are the naming ones (targetname, target, script_noteworthy, "+
 			"script_string, script_int, name, model) unless keys asks for others. brushes lists each one's brushes and "+
 			"patches (id, rev, material, bounds, contents, curve/mesh); naming a brush's id lists just it, a patch with its "+
-			"control points as rows, as map_edit's patch op takes them. near goes by brushes: an entity that owns brushes "+
-			"(the worldspawn too) comes with just those within radius, nearest first, and is sorted by the nearest; a point "+
-			"entity by its bounds. "+
+			"control points as rows, as map_edit's patch op takes them. near goes by bounds: a point entity by its own, an "+
+			"entity that owns brushes (the worldspawn too) by its brushes', coming with just those within radius, nearest "+
+			"first, and sorted by the nearest; its bounds and brush count stay the whole entity's. "+
 			"No face is shown: Radiant holds the geometry."),
 		mcp.WithString("ids", mcp.Description("Entity or brush ids (or GUIDs, or any start of one), comma- or space-separated.")),
 		mcp.WithString("class", mcp.Description("Classname; * matches any run of characters (light*, script_*).")),
 		mcp.WithString("key", mcp.Description("An entity key the entity has, or key=value (* in the value), e.g. targetname=door_1.")),
-		mcp.WithString("near", mcp.Description("A point, x y z: what comes within radius of it, nearest first: point entities by their bounds, brush entities and the worldspawn by the brushes they list.")),
+		mcp.WithString("near", mcp.Description("A point, x y z: what comes within radius of it by bounds, nearest first: point entities by theirs, brush entities and the worldspawn by their brushes', which they list.")),
 		mcp.WithNumber("radius", mcp.Description("With near: the distance in units (default 256).")),
 		mcp.WithBoolean("selected", mcp.Description("Only entities with a brush selected in Radiant (the user's selection).")),
 		mcp.WithBoolean("brushes", mcp.Description("List each entity's brushes and patches (default false).")),

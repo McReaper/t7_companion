@@ -30,7 +30,7 @@ t7kb map find 5ec8de46 --brushes
 | --- | --- |
 | `--class` | classname; `*` matches any run of characters |
 | `--key` | a key the entity has, or `key=value` |
-| `--near`, `--radius` | what comes within the radius of a point `x,y,z` (default 256), nearest first: an entity that owns brushes, the worldspawn too, comes with the brushes near the point |
+| `--near`, `--radius` | what comes within the radius of a point `x,y,z` (default 256) by bounds, nearest first: an entity that owns brushes, the worldspawn too, by its brushes', listing those near the point (its bounds and count stay the whole entity's) |
 | `--selected` | only the entities with a brush selected in Radiant |
 | `--brushes` | each entity's brushes and patches; a patch named by its id comes with its control points |
 | `--keys` | which keys to show: `all`, or a comma list |
@@ -101,4 +101,4 @@ t7kb map command "Selection/CSG/CSG Hollow" 5ec8de46
 
 | Option | What it does |
 | --- | --- |
-| `--menu` | list a menu's entries instead, a submenu marked by `>`; `--menu=`, empty, lists the menu bar |
+| `--menu` | list a menu's entries instead, a submenu marked by `>`: a menu is its labels from the menu bar down, joined by `/` (`Selection/CSG`); `--menu=`, empty, lists the menu bar |

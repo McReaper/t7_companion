@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -44,7 +45,7 @@ func newMapCmd() *cobra.Command {
 	fl := find.Flags()
 	fl.StringVar(&a.Class, "class", "", "classname, * matching any run of characters")
 	fl.StringVar(&a.Key, "key", "", "a key the entity has, or key=value")
-	fl.StringVar(&a.Near, "near", "", "a point x,y,z: what comes within --radius, nearest first; an entity that owns brushes, the worldspawn too, lists those near")
+	fl.StringVar(&a.Near, "near", "", "a point x,y,z: what comes within --radius of it by bounds, nearest first; an entity that owns brushes, the worldspawn too, goes by its brushes' and lists those near (its bounds and count stay the whole entity's)")
 	fl.Float64Var(&a.Radius, "radius", 0, "with --near: the distance in units (default 256)")
 	fl.BoolVar(&a.Selected, "selected", false, "only entities with a brush selected in Radiant")
 	fl.BoolVar(&a.Brushes, "brushes", false, "list each entity's brushes and patches")
@@ -62,14 +63,17 @@ func newMapCommandCmd() *cobra.Command {
 		Short: "Run a Radiant menu entry on the entities and brushes named, or list a menu (--menu)",
 		RunE: func(c *cobra.Command, a []string) error {
 			if c.Flags().Changed("menu") {
-				return printIndented(c.OutOrStdout())(mapCommand(c.Context(), "", a, &menu, pid))
+				if len(a) > 0 {
+					return fmt.Errorf("--menu takes the menu as its value and nothing after it (got %q): a submenu is --menu=\"Selection/CSG\"", strings.Join(a, " "))
+				}
+				return printIndented(c.OutOrStdout())(mapCommand(c.Context(), "", nil, &menu, pid))
 			}
 			if len(a) == 0 {
 				return fmt.Errorf("give a menu path (Selection/CSG/CSG Hollow), or --menu to list a menu's entries (--menu= the menu bar)")
 			}
 			return printIndented(c.OutOrStdout())(mapCommand(c.Context(), a[0], a[1:], nil, pid))
 		}}
-	command.Flags().StringVar(&menu, "menu", "", "list this menu's entries instead (Selection/CSG); --menu= (empty) lists the menu bar")
+	command.Flags().StringVar(&menu, "menu", "", "list a menu's entries instead, the menu named by its labels from the menu bar down joined by / (Selection/CSG); --menu= (empty) lists the menu bar")
 	command.Flags().IntVar(&pid, "pid", 0, "the Radiant to use when several run")
 	return command
 }

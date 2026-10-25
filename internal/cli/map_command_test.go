@@ -125,6 +125,9 @@ func TestMapCommandListsTheMenuBarOnBothSurfaces(t *testing.T) {
 	if got := tool(map[string]any{"command": "Selection/CSG/CSG Subtract", "ids": "5ec8de49", "menu": ""}); !strings.Contains(got, `"undo":"subtract"`) {
 		t.Errorf("a command with an empty menu: %s", got)
 	}
+	if out, err := run("--menu=Selection", "Selection/CSG"); err == nil || !strings.Contains(err.Error(), `nothing after it (got "Selection/CSG")`) {
+		t.Errorf("a path after --menu: %v\n%s", err, out)
+	}
 	if out, err := run(); err == nil || !strings.Contains(err.Error(), "--menu= the menu bar") {
 		t.Errorf("no path names the menu bar's spelling: %v\n%s", err, out)
 	}
@@ -139,7 +142,8 @@ func TestPlainMenuPathTakesOffTheListingsMarks(t *testing.T) {
 		"CSG Merge (disabled)":            "CSG Merge",
 		" Selection / CSG ":               "Selection/CSG",
 		"Make Geo... >":                   "Make Geo...",
-		"/":                               "/",
+		"Selection > Select By >":         "Selection/Select By",
+		"/":                               "",
 		"":                                "",
 	} {
 		if got := plainMenuPath(in); got != want {

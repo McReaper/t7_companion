@@ -83,14 +83,16 @@ func mapCommand(ctx context.Context, command string, ids []string, menu *string,
 	return out, nil
 }
 
-// plainMenuPath is a menu path with the marks a menu's listing adds to its
-// entries, " >" and " (disabled)", taken off each label, so an entry pasted
-// back from the listing names it.
+// plainMenuPath is a menu path as Radiant names it, its labels from the menu
+// bar down joined by /. It reads a path written as a menu's listing prints
+// its entries too, " >" after or between labels and " (disabled)" after one,
+// so an entry pasted back from the listing names it.
 func plainMenuPath(path string) string {
-	labels := strings.Split(path, "/")
-	for i, l := range labels {
-		l = strings.TrimSuffix(strings.TrimSpace(l), "(disabled)")
-		labels[i] = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(l), ">"))
+	var labels []string
+	for _, l := range strings.FieldsFunc(path, func(r rune) bool { return r == '/' || r == '>' }) {
+		if l = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(l), "(disabled)")); l != "" {
+			labels = append(labels, l)
+		}
 	}
 	return strings.Join(labels, "/")
 }
