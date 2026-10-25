@@ -107,8 +107,8 @@ func newMapEditCmd() *cobra.Command {
 			return printIndented(c.OutOrStdout())(mapEdit(c.Context(), ops, revs, label, pid))
 		}}
 	edit.Flags().StringVar(&file, "ops", "-", "the ops' JSON file, - for stdin")
-	edit.Flags().StringVar(&label, "label", "", "what the batch does, for Radiant's undo menu")
-	edit.Flags().StringVar(&revsJSON, "revs", "", `the rev map_find gave each entity and brush the ops name, as JSON {"id": "rev"}; required for each`)
+	edit.Flags().StringVar(&label, "label", "", `what the batch does: Radiant's undo menu shows "t7kb: <label>" (default: the ops counted)`)
+	edit.Flags().StringVar(&revsJSON, "revs", "", `the rev map find gave each entity and brush the ops name, as JSON {"id": "rev"}, a brush's own, not its entity's; required for each`)
 	edit.Flags().IntVar(&pid, "pid", 0, "the Radiant to edit when several run")
 	return edit
 }

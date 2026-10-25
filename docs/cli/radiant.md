@@ -87,7 +87,7 @@ t7kb map edit --ops move.json --revs '{"5ec8de46":"9f3a0c1b"}'
 | Option | What it does |
 | --- | --- |
 | `--ops` | the ops' JSON file, `-` for stdin (default) |
-| `--revs` | each named element's rev, as JSON `{"id": "rev"}` |
+| `--revs` | each named element's rev, as JSON `{"id": "rev"}`: a brush's own, not its entity's |
 | `--label` | the undo entry's name (default: the ops counted) |
 
 ## `t7kb map command <menu path> [id…]`
