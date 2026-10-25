@@ -1,5 +1,6 @@
 #!/bin/sh
-# Guards against pushing a v* tag whose plugin.json version doesn't match.
+# Guards against pushing a v* tag whose plugin.json version doesn't match, or
+# without its release highlights (.github/release-notes/<tag>.md).
 # Enable with: git config core.hooksPath .github/hooks
 # This is a local convenience check; .github/workflows/release.yml is the real gate.
 
@@ -17,6 +18,13 @@ while read -r local_ref local_sha remote_ref remote_sha; do
       if [ "$tag" != "$manifest" ]; then
         echo "pre-push: plugin.json version ($manifest) does not match tag ($tag) at $local_ref." >&2
         echo "pre-push: bump plugin/.claude-plugin/plugin.json's version to $tag before pushing this tag." >&2
+        exit 1
+      fi
+
+      notes=".github/release-notes/v$tag.md"
+      if ! git show "$local_sha:$notes" 2>/dev/null | grep -q '[^[:space:]]'; then
+        echo "pre-push: $notes is missing or empty at $local_ref." >&2
+        echo "pre-push: write the release's highlights there and commit them before pushing this tag." >&2
         exit 1
       fi
       ;;

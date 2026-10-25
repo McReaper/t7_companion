@@ -27,6 +27,14 @@ jobs:
             exit 1
           fi
 
+      - name: Verify the release has its highlights
+        run: |
+          notes=".github/release-notes/$GITHUB_REF_NAME.md"
+          if ! grep -q '[^[:space:]]' "$notes" 2>/dev/null; then
+            echo "::error::$notes is missing or empty. Write the release's highlights there (CLAUDE.md, Releasing) and commit them before tagging." >&2
+            exit 1
+          fi
+
       - uses: actions/setup-go@v5
         with:
           go-version: stable
@@ -38,18 +46,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Optional hand-written highlights: if .github/release-notes/<tag>.md exists
-      # at the tag, it goes on top of the generated changelog. Without one the
-      # release keeps GoReleaser's notes as they are. Re-runs don't add it twice.
-      - name: Add the hand-written highlights, if any
+      # The hand-written highlights, .github/release-notes/<tag>.md (checked
+      # above), go on top of the generated changelog. Re-runs don't add them twice.
+      - name: Add the hand-written highlights
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           notes=".github/release-notes/$GITHUB_REF_NAME.md"
-          if [ ! -f "$notes" ]; then
-            echo "no $notes — keeping the generated notes"
-            exit 0
-          fi
           body="$(gh release view "$GITHUB_REF_NAME" --json body --jq .body)"
           if grep -qxF "$(head -n1 "$notes")" <<<"$body"; then
             echo "highlights already in the release notes"

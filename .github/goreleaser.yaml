@@ -49,8 +49,8 @@ archives:
 # knowledge (docs(skills) ships to plugin users). ci/chore/test/refactor and
 # repo docs match no group, so GoReleaser drops them. Each line shows the
 # subject without its "type(scope):" prefix, the scope kept as a bold label.
-# A hand-written .github/release-notes/<tag>.md, if present, is added on top
-# by the release workflow.
+# The hand-written .github/release-notes/<tag>.md every release needs is added
+# on top by the release workflow.
 changelog:
   disable: false
   use: git
