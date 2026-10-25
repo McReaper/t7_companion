@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/McReaper/t7_companion/internal/format/mapfile"
@@ -110,7 +109,7 @@ type Made struct {
 // Done is a batch's outcome.
 type Done struct {
 	Label   string
-	Deleted int // brushes, a point entity's own one included
+	Deleted int // the entities and brushes the delete ops named, gone afterwards
 	Made    []Made
 	Tiles   map[string]Tile // the tile each material sized by the batch was given
 	Faces   map[int]int     // texture op -> how many faces it textured
@@ -151,10 +150,30 @@ func Edit(ctx context.Context, c *radiant.Client, snap *Snapshot, ops []Op, labe
 		return nil, fmt.Errorf("the edit is done (one Ctrl+Z undoes it), but the map could not be read back: %w", err)
 	}
 	d := &Done{Label: "t7kb: " + strings.TrimPrefix(label, "t7kb: "), After: after, Tiles: b.used, Faces: b.faces} // a label already marked once
-	d.Deleted, _ = strconv.Atoi(strings.TrimPrefix(r.Summary, "deleted="))
+	d.Deleted = deletedBy(ops, snap, after)
 	d.Made = p.match(fresh(string(r.Body)), after)
 	sort.SliceStable(d.Made, func(i, j int) bool { return d.Made[i].Op < d.Made[j].Op })
 	return d, nil
+}
+
+// deletedBy is how many of the entities and brushes the batch's delete ops
+// named are gone from the map afterwards. The bridge's count is of every brush
+// the edit took out, and a set, move or material rebuilds what it changes: a
+// set on a light was answered "deleted 1".
+func deletedBy(ops []Op, before, after *Snapshot) int {
+	present := map[string]bool{}
+	for _, g := range GUIDs(after.Map) {
+		present[hexOf(g)] = true
+	}
+	n := 0
+	for _, op := range ops {
+		for _, id := range op.Delete { // the batch refuses one named twice
+			if g, err := before.IDs.Resolve(id); err == nil && !present[hexOf(g)] {
+				n++
+			}
+		}
+	}
+	return n
 }
 
 // summary names a batch for Radiant's undo menu: its ops, counted.
