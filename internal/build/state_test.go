@@ -186,3 +186,24 @@ func TestAliveTellsARunningProcessFromAnEndedOne(t *testing.T) {
 		t.Errorf("this process runs, pid 0 is none, an ended one runs no more")
 	}
 }
+
+// A reader holding the state on Windows makes the rename fail for a moment:
+// writeState tries again, and gives up on a path that stays taken.
+func TestWriteStateTriesAgainWhileThePathIsTaken(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "s.json")
+	if err := os.Mkdir(path, 0o755); err != nil { // a rename onto a folder fails on every OS
+		t.Fatal(err)
+	}
+	go func() { time.Sleep(100 * time.Millisecond); _ = os.Remove(path) }()
+	if err := writeState(path, State{Target: "zm_x"}); err != nil {
+		t.Fatalf("written once the path was free: %v", err)
+	}
+	if s, ok, err := readState(path); !ok || err != nil || s.Target != "zm_x" {
+		t.Errorf("%+v %v %v", s, ok, err)
+	}
+	taken := filepath.Join(t.TempDir(), "taken.json")
+	writeFile(t, filepath.Join(taken, "inside"), "a folder that stays")
+	if err := writeState(taken, State{}); err == nil {
+		t.Error("a path that stays taken is an error, after a few tries")
+	}
+}
