@@ -373,4 +373,13 @@ func TestA3DShotFromAPoseWaitsForTheMouseButtons(t *testing.T) {
 	if d := time.Since(start); d < 300*time.Millisecond || d > 3*time.Second {
 		t.Errorf("waited %v, not about mouseWait", d)
 	}
+	before := len(sent(f, "capture"))
+	if _, err := View(context.Background(), c, snap, ViewOptions{View: "3d"}); err != nil || len(sent(f, "capture"))-before != 1 {
+		t.Errorf("the view as it is moves no camera and is not refused: %v, %d captures", err, len(sent(f, "capture"))-before)
+	}
+	f.Handle("capture", func(*radianttest.Fake, string, []byte) radianttest.Reply { return radianttest.Err("busy", "Save As") })
+	start = time.Now()
+	if _, err := View(context.Background(), c, snap, ViewOptions{Camera: &pose}); err == nil || strings.Contains(err.Error(), "mouse") || time.Since(start) > 200*time.Millisecond {
+		t.Errorf("a dialog's busy is waited out: %v after %v", err, time.Since(start))
+	}
 }
