@@ -85,8 +85,8 @@ func newMCPServer(st *store.Store, emb *embed.Embedder, warm bool) *server.MCPSe
 		server.WithRecovery()) // a panicking handler must not take the whole stdio server down
 	dir := journal.Dir()
 	for _, ts := range toolsets(st, emb) {
-		tools := ts.tools
-		if dir != "" { // T7KB_DEBUG: each call recorded
+		tools := strictTools(ts.tools)
+		if dir != "" { // T7KB_DEBUG: each call recorded, the refused ones too
 			tools = journaledTools(dir, tools)
 		}
 		s.AddTools(tools...)
