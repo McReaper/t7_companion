@@ -6,9 +6,11 @@ require (
 	github.com/McReaper/t7_dxbc v1.0.0
 	github.com/edgetools/go-sentex v0.1.0
 	github.com/mark3labs/mcp-go v0.55.1
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/spf13/cobra v1.10.2
 	github.com/tiktoken-go/tokenizer v0.7.0
 	golang.org/x/sys v0.44.0
+	golang.org/x/text v0.33.0
 	modernc.org/sqlite v1.53.0
 )
 
@@ -30,7 +32,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
 	github.com/schollz/progressbar/v2 v2.15.0 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
@@ -39,7 +40,6 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa // indirect
-	golang.org/x/text v0.33.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 	modernc.org/libc v1.73.4 // indirect
