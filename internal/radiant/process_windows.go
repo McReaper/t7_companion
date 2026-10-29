@@ -16,10 +16,6 @@ import (
 var (
 	kernel32            = windows.NewLazySystemDLL("kernel32.dll")
 	user32              = windows.NewLazySystemDLL("user32.dll")
-	pVirtualAllocEx     = kernel32.NewProc("VirtualAllocEx")
-	pVirtualFreeEx      = kernel32.NewProc("VirtualFreeEx")
-	pCreateRemoteThread = kernel32.NewProc("CreateRemoteThread")
-	pGetExitCodeThread  = kernel32.NewProc("GetExitCodeThread")
 	pWaitForInputIdle   = user32.NewProc("WaitForInputIdle")
 	pFindWindowExW      = user32.NewProc("FindWindowExW")
 	pGetWindowThreadPID = user32.NewProc("GetWindowThreadProcessId")
@@ -91,56 +87,6 @@ func (local) Ready(ctx context.Context, pid int) error {
 			return err
 		}
 	}
-}
-
-// Inject runs LoadLibraryW(dll) in the process, from a thread it starts there.
-func (local) Inject(pid int, dll string) error {
-	const access = windows.PROCESS_CREATE_THREAD | windows.PROCESS_QUERY_INFORMATION |
-		windows.PROCESS_VM_OPERATION | windows.PROCESS_VM_WRITE | windows.PROCESS_VM_READ | windows.SYNCHRONIZE
-	h, err := windows.OpenProcess(access, false, uint32(pid))
-	if err != nil {
-		return fmt.Errorf("open pid %d: %w", pid, err)
-	}
-	defer func() { _ = windows.CloseHandle(h) }()
-	path, err := windows.UTF16FromString(dll)
-	if err != nil {
-		return err
-	}
-	size := uintptr(len(path) * 2)
-	remote, _, e := pVirtualAllocEx.Call(uintptr(h), 0, size, windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_READWRITE)
-	if remote == 0 {
-		return fmt.Errorf("VirtualAllocEx: %w", e)
-	}
-	free := func() { _, _, _ = pVirtualFreeEx.Call(uintptr(h), remote, 0, windows.MEM_RELEASE) }
-	var written uintptr
-	if err := windows.WriteProcessMemory(h, remote, (*byte)(unsafe.Pointer(&path[0])), size, &written); err != nil {
-		free()
-		return fmt.Errorf("WriteProcessMemory: %w", err)
-	}
-	// kernel32 sits at the same address in every process of a boot
-	loadLibrary, err := windows.GetProcAddress(windows.Handle(kernel32.Handle()), "LoadLibraryW")
-	if err != nil {
-		free()
-		return err
-	}
-	th, _, e := pCreateRemoteThread.Call(uintptr(h), 0, 0, loadLibrary, remote, 0, 0)
-	if th == 0 {
-		free()
-		return fmt.Errorf("CreateRemoteThread: %w", e)
-	}
-	defer func() { _ = windows.CloseHandle(windows.Handle(th)) }()
-	if ev, err := windows.WaitForSingleObject(windows.Handle(th), 15000); err != nil || ev != windows.WAIT_OBJECT_0 {
-		return fmt.Errorf("the remote LoadLibraryW of %s did not return within 15 s", dll) // its path stays allocated: the thread may still read it
-	}
-	free()
-	var code uint32
-	if ok, _, e := pGetExitCodeThread.Call(th, uintptr(unsafe.Pointer(&code))); ok == 0 {
-		return fmt.Errorf("GetExitCodeThread: %w", e)
-	}
-	if code == 0 {
-		return fmt.Errorf("the remote LoadLibraryW of %s failed", dll)
-	}
-	return nil
 }
 
 // Control sends one command to MTPlugins' control window in the process (a

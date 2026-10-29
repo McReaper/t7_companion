@@ -125,18 +125,20 @@ func TestTheBridgeIsBesideTheBinaryUnlessTheEnvironmentNamesABuild(t *testing.T)
 func TestRadiantOpenToolOverMCP(t *testing.T) {
 	root := radiantRoot(t)
 	bridge := t.TempDir()
-	for _, p := range []string{radiant.StandaloneDLL(bridge), radiant.PluginDLL(bridge)} {
+	write := func(p, body string) {
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(p, []byte("dll"), 0o644); err != nil {
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
+	write(radiant.PluginDLL(bridge), "dll")
 	t.Setenv("T7KB_BRIDGE_DIR", bridge)
 	m := onMachine(t)
-	m.OnStart = func(pid int, _, _ string, args []string) *radianttest.Started {
-		return &radianttest.Started{Fake: radianttest.New(pid, args[0]), Unloaded: true}
+	m.OnStart = func(pid int, exe, _ string, args []string) *radianttest.Started {
+		return &radianttest.Started{Fake: radianttest.New(pid, args[0]), Unloaded: true,
+			Modules: []string{exe, filepath.Join(root, "bin", "plugins", "RadiantPlugins.dll")}}
 	}
 	c, err := client.NewInProcessClient(newMCPServer(nil, nil, false))
 	if err != nil {
@@ -153,6 +155,12 @@ func TestRadiantOpenToolOverMCP(t *testing.T) {
 		t.Fatal(err)
 	}
 	text, isErr := call(t, c, "radiant_open", map[string]any{"map": "test.map", "tools_path": root})
+	if !isErr || !strings.Contains(text, "the map tools need MTPlugins") {
+		t.Errorf("without MTPlugins: %s", text)
+	}
+	write(filepath.Join(root, "bin", "d3d9.dll"), "proxy")
+	write(filepath.Join(root, "bin", "RadiantLoader.ini"), "enabled=1\r\n")
+	text, isErr = call(t, c, "radiant_open", map[string]any{"map": "test.map", "tools_path": root})
 	if isErr || !strings.Contains(text, `"opened":"launched"`) || !strings.Contains(text, `"pid":9001`) {
 		t.Errorf("launch: %s", text)
 	}

@@ -1,6 +1,6 @@
 ---
 name: setup-or-update
-description: How to install, update, or repair the t7kb Black Ops 3 knowledge-base tool — downloads the binary and database, registers the `t7kb` MCP server via `claude mcp add`, records the BO3 mod-tools root in a short `CLAUDE.md` there (replacing the old `AGENTS.md` primer), and offers to turn on the plugin's auto-update. Run once right after installing the plugin, invoked explicitly as `/t7kb:setup-or-update` — but also use whenever the user asks to install, set up, reinstall, update or upgrade t7kb, when the SessionStart hook reports the t7kb binary and plugin versions differ, when the user wants its MCP server (re)registered, or reports the `search`/`get` tools are missing, unavailable, or won't connect.
+description: How to install, update, or repair the t7kb Black Ops 3 knowledge-base tool — downloads the binary and database, registers the `t7kb` MCP server via `claude mcp add`, records the BO3 mod-tools root in a short `CLAUDE.md` there (replacing the old `AGENTS.md` primer), offers MTPlugins (Radiant's plugin host, which loads the bridge the map tools drive Radiant through), and offers to turn on the plugin's auto-update. Run once right after installing the plugin, invoked explicitly as `/t7kb:setup-or-update` — but also use whenever the user asks to install, set up, reinstall, update or upgrade t7kb, when the SessionStart hook reports the t7kb binary and plugin versions differ, when the user wants its MCP server (re)registered, or reports the `search`/`get` tools are missing, unavailable, or won't connect, and when `radiant_open` or a `map_*` tool answers that the map tools need MTPlugins.
 ---
 
 # Install or update t7kb
@@ -41,7 +41,7 @@ claude mcp add t7kb -- "C:\Users\<you>\AppData\Local\t7kb\t7kb.exe" mcp
 
 This command runs through a POSIX-style shell (the Bash tool is git-bash), which treats an unquoted backslash as an escape character and silently drops it before a non-special letter — `C:\Users\<you>\AppData\Local\t7kb\t7kb.exe` becomes `C:Users<you>AppDataLocalt7kbt7kb.exe`, a path that can't spawn. Double-quoting the argument (as above) prevents this.
 
-**Memory:** the server keeps the knowledge base's vectors in memory, about 570 MB, so a search answers in ~0.1 s instead of ~2 s. On a machine short of memory (8 GB, with the game and the mod tools open), or if the user asks for it, register it with that turned off — searches then read the vectors from the database:
+**Memory:** the server keeps the knowledge base's vectors in memory, about 650 MB, so a search answers in ~0.1 s instead of ~2 s. On a machine short of memory (8 GB, with the game and the mod tools open), or if the user asks for it, register it with that turned off — searches then read the vectors from the database:
 
 ```bash
 claude mcp add t7kb -e T7KB_VECTOR_INDEX=0 -- "C:\Users\<you>\AppData\Local\t7kb\t7kb.exe" mcp
@@ -80,6 +80,20 @@ Modding edits **shared, install-wide files** — an assetlist line commented out
   The ignore file keeps out what the tools regenerate and large stock art; the user adds their own art with `git add -f`, which the attributes send to Git LFS (`git lfs install` once).
 - **It is a repository with no `.gitignore`**: offer the same two files.
 - **It already has one**: leave it alone.
+
+### Offer MTPlugins — the map tools load their bridge only through it
+
+t7kb's map tools (`t7kb:radiant_open`, `t7kb:map_find`, `t7kb:map_view`, `t7kb:map_edit`, `t7kb:map_command`) drive the user's Radiant through T7RadiantBridge, which [MTPlugins](https://github.com/Aidan601/MTPlugins), Radiant's plugin host, loads; t7kb loads nothing into Radiant itself. MTPlugins is installed when `<root>\bin\d3d9.dll` (its loader) has `RadiantLoader.ini` beside it, and on unless that ini says `enabled=0`.
+
+- **Installed and on:** nothing to do; t7kb copies its bridge into `bin\plugins\` when a map is opened.
+- **Not installed:** explain the above in two sentences and offer to fetch its installer. **Download and start it only on the user's yes**; the installer is a window the user goes through (it finds the BO3 folder and lets them pick MTPlugins' own plugins), so say so before it opens:
+  ```powershell
+  $a = (irm https://api.github.com/repos/Aidan601/MTPlugins/releases/latest).assets | ? name -like 'MTPlugins-Setup-*.exe'
+  irm $a.browser_download_url -OutFile "$env:TEMP\$($a.name)"; Start-Process "$env:TEMP\$($a.name)"
+  ```
+  A Radiant open during the install doesn't get it: MTPlugins loads as Radiant starts, so the user closes Radiant once (the map tools say so otherwise).
+- **`d3d9.dll` with no `RadiantLoader.ini` beside it:** another program's loader holds the name MTPlugins needs. Tell the user which file it is and let them decide; don't overwrite it.
+- **Turned off (`enabled=0`):** tell the user the map tools need it on; set `enabled=1` only on their yes.
 
 ## 4. Keep the plugin current — its source, then auto-update
 

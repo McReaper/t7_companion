@@ -34,13 +34,28 @@ func writeFile(t *testing.T, p, body string) {
 	}
 }
 
-// bridge is the folder of the bridge DLLs t7kb ships beside its binary.
+// bridge is the folder of the bridge t7kb ships beside its binary.
 func bridge(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	writeFile(t, radiant.StandaloneDLL(dir), "standalone")
 	writeFile(t, radiant.PluginDLL(dir), "plugin")
 	return dir
+}
+
+// host are the modules of a Radiant MTPlugins' host runs in, its exe first.
+func host(root string) []string {
+	return []string{filepath.Join(root, "bin", "radiant_modtools.exe"), filepath.Join(root, "bin", "plugins", "RadiantPlugins.dll")}
+}
+
+// enabled are the pids MTPlugins' host was told to enable the bridge in.
+func enabled(m *radianttest.Machine) []string {
+	var pids []string
+	for _, c := range m.Controls() {
+		if c[1] == "plugins enable T7RadiantBridge" {
+			pids = append(pids, c[0])
+		}
+	}
+	return pids
 }
 
 // withMTPlugins installs MTPlugins' loader in the root's bin/, its ini saying enabled.
@@ -163,12 +178,30 @@ func starting(listen, load time.Duration, mods ...string) func(int, string, stri
 	}
 }
 
-func TestOpenStartsRadiantOnTheMapAndInjectsTheBridge(t *testing.T) {
+// Without MTPlugins no Radiant is started: it would never get the bridge.
+// Nothing is written into the install.
+func TestOpenWithoutMTPluginsStartsNoRadiant(t *testing.T) {
 	root, a, _ := install(t)
-	dir := bridge(t)
 	m := radianttest.NewMachine()
-	m.OnStart = starting(20*time.Millisecond, 40*time.Millisecond)
-	got, err := open(t, m, radiant.OpenOptions{Root: root, Map: a, Bridge: dir})
+	m.OnStart = starting(0, 0)
+	_, err := open(t, m, radiant.OpenOptions{Root: root, Map: a, Bridge: bridge(t)})
+	if err == nil || !strings.Contains(err.Error(), "the map tools need MTPlugins") || !strings.Contains(err.Error(), radiant.MTPluginsURL) {
+		t.Errorf("err = %v, want it to say to install MTPlugins, and where from", err)
+	}
+	if s := m.Starts(); len(s) != 0 {
+		t.Errorf("starts = %q, want none", s)
+	}
+	if _, err := os.Stat(filepath.Join(root, "bin", "plugins")); err == nil {
+		t.Error("nothing is written into the install")
+	}
+}
+
+func TestOpenStartsRadiantOnTheMapThroughMTPlugins(t *testing.T) {
+	root, a, _ := install(t)
+	withMTPlugins(t, root, "1")
+	m := radianttest.NewMachine()
+	m.OnStart = starting(20*time.Millisecond, 40*time.Millisecond, host(root)[1])
+	got, err := open(t, m, radiant.OpenOptions{Root: root, Map: a, Bridge: bridge(t)})
 	if err != nil || got.How != radiant.Launched || got.Map != a || got.PID == 0 {
 		t.Errorf("open = %+v, %v", got, err)
 	}
@@ -176,11 +209,8 @@ func TestOpenStartsRadiantOnTheMapAndInjectsTheBridge(t *testing.T) {
 	if s := m.Starts(); len(s) != 1 || !slices.Equal(s[0], []string{filepath.Join(bin, "radiant_modtools.exe"), bin, a}) {
 		t.Errorf("starts = %q, want Radiant from bin/ on the map", s)
 	}
-	if in := m.Injected(); len(in) != 1 || in[0][1] != radiant.StandaloneDLL(dir) || m.Controls() != nil {
-		t.Errorf("without MTPlugins the standalone bridge is injected: %q, controls %q", in, m.Controls())
-	}
-	if _, err := os.Stat(filepath.Join(bin, "plugins")); err == nil {
-		t.Error("nothing is written into the install")
+	if e := enabled(m); len(e) != 1 {
+		t.Errorf("MTPlugins' host enables the bridge once: %q", e)
 	}
 }
 
@@ -224,8 +254,8 @@ func TestOpenLoadsThePluginThroughMTPlugins(t *testing.T) {
 			for _, c := range m.Controls() {
 				cmds = append(cmds, c[1])
 			}
-			if !slices.Equal(cmds, tc.want) || m.Injected() != nil {
-				t.Errorf("MTPlugins hosts the plugin, never alongside an injected one: %q, injected %q", cmds, m.Injected())
+			if !slices.Equal(cmds, tc.want) {
+				t.Errorf("MTPlugins' host loads the plugin: %q", cmds)
 			}
 			if b, _ := os.ReadFile(dst); string(b) != "plugin" {
 				t.Errorf("the install's plugin is t7kb's: %q", b)
@@ -236,27 +266,28 @@ func TestOpenLoadsThePluginThroughMTPlugins(t *testing.T) {
 
 func TestOpenLoadsTheBridgeIntoARadiantRunningWithoutIt(t *testing.T) {
 	root, a, b := install(t)
+	withMTPlugins(t, root, "1")
 	dir := bridge(t)
 	f := radianttest.New(21, b)
 	m := radianttest.NewMachine()
-	m.Run(&radianttest.Started{Fake: f, Unloaded: true, Modules: []string{"radiant_modtools.exe"}})
+	m.Run(&radianttest.Started{Fake: f, Unloaded: true, Modules: host(root)})
 	got, err := open(t, m, radiant.OpenOptions{Root: root, Map: a, Bridge: dir})
 	if err != nil || got.How != radiant.Reloaded || got.PID != 21 || len(reloads(f)) != 1 {
 		t.Errorf("open = %+v, %v; reloads %q", got, err, reloads(f))
 	}
-	if in := m.Injected(); len(in) != 1 || in[0][0] != "21" {
-		t.Errorf("injected %q", in)
+	if e := enabled(m); !slices.Equal(e, []string{"21"}) {
+		t.Errorf("enabled in %q", e)
 	}
 
 	m = radianttest.NewMachine()
-	m.Run(&radianttest.Started{Fake: radianttest.New(31, a), Unloaded: true})
+	m.Run(&radianttest.Started{Fake: radianttest.New(31, a), Unloaded: true, Modules: host(root)})
 	if got, err := open(t, m, radiant.OpenOptions{Root: root, Map: a, Bridge: dir}); err != nil || got.How != radiant.AlreadyOpen {
 		t.Errorf("one with the map open already: %+v, %v", got, err)
 	}
 
 	m = radianttest.NewMachine()
-	m.Run(&radianttest.Started{Fake: radianttest.New(41, b), Unloaded: true})
-	m.Run(&radianttest.Started{Fake: radianttest.New(42, b), Unloaded: true})
+	m.Run(&radianttest.Started{Fake: radianttest.New(41, b), Unloaded: true, Modules: host(root)})
+	m.Run(&radianttest.Started{Fake: radianttest.New(42, b), Unloaded: true, Modules: host(root)})
 	if _, err := open(t, m, radiant.OpenOptions{Root: root, Map: a, Bridge: dir}); err == nil || !strings.Contains(err.Error(), "2 Radiants run without the bridge (pids [41 42])") {
 		t.Errorf("several: %v", err)
 	}
@@ -269,42 +300,61 @@ func TestOpenLoadsTheBridgeIntoARadiantRunningWithoutIt(t *testing.T) {
 
 	// beside one running the bridge, the pid names the one without it
 	m = radianttest.NewMachine(radianttest.New(51, b))
-	m.Run(&radianttest.Started{Fake: radianttest.New(52, b), Unloaded: true})
+	m.Run(&radianttest.Started{Fake: radianttest.New(52, b), Unloaded: true, Modules: host(root)})
 	if got, err := open(t, m, radiant.OpenOptions{Root: root, Map: a, Bridge: dir, PID: 52}); err != nil || got.PID != 52 {
 		t.Errorf("the pid of the one without the bridge: %+v, %v", got, err)
 	}
-	if in := m.Injected(); len(in) != 1 || in[0][0] != "52" {
-		t.Errorf("injected %q, want only 52", in)
+	if e := enabled(m); !slices.Equal(e, []string{"52"}) {
+		t.Errorf("enabled in %q, want only 52", e)
+	}
+}
+
+// A Radiant that runs without MTPlugins' host can't get the bridge: MTPlugins
+// loads as Radiant starts, so it has to be closed once MTPlugins is installed.
+func TestOpenSaysToRestartARadiantRunningWithoutMTPlugins(t *testing.T) {
+	root, a, b := install(t)
+	m := radianttest.NewMachine()
+	m.Run(&radianttest.Started{Fake: radianttest.New(61, b), Unloaded: true, Modules: []string{"radiant_modtools.exe"}})
+	_, err := open(t, m, radiant.OpenOptions{Root: root, Map: a, Bridge: bridge(t)})
+	if err == nil || !strings.Contains(err.Error(), "the map tools need MTPlugins") || !strings.Contains(err.Error(), "close the Radiant of pid 61") {
+		t.Errorf("err = %v", err)
+	}
+	if c := m.Controls(); c != nil {
+		t.Errorf("controls %q, want none", c)
 	}
 }
 
 func TestOpenSaysWhyRadiantCouldNotStart(t *testing.T) {
 	for name, tc := range map[string]struct {
 		noBridge, noExe bool
-		mtplugins       string // MTPlugins installed, enabled=…
+		mtplugins       string // MTPlugins' loader: enabled=… ("" for 1), "none" or "proxy" (another program's d3d9.dll)
 		onStart         func(int, string, string, []string) *radianttest.Started
 		want            string
 	}{
-		"no bridge beside t7kb": {noBridge: true, onStart: starting(0, 0), want: "Radiant bridge isn't beside it"},
-		"no plugin beside t7kb": {noBridge: true, mtplugins: "1", onStart: starting(0, 0, "RadiantPlugins.dll"), want: "Radiant bridge isn't beside it"},
+		"no MTPlugins":          {mtplugins: "none", onStart: starting(0, 0), want: "the map tools need MTPlugins, which loads"},
+		"another d3d9.dll":      {mtplugins: "proxy", onStart: starting(0, 0), want: "is another program's (no RadiantLoader.ini beside it)"},
+		"MTPlugins turned off":  {mtplugins: "0", onStart: starting(0, 0), want: "which is turned off (enabled=0"},
+		"no plugin beside t7kb": {noBridge: true, onStart: starting(0, 0, "RadiantPlugins.dll"), want: "Radiant bridge isn't beside it"},
 		"no Radiant":            {noExe: true, want: "no Radiant at"},
 		"exits":                 {want: "exited before its bridge answered"},
-		"never loads": {onStart: func(int, string, string, []string) *radianttest.Started {
-			return &radianttest.Started{Fake: radianttest.New(0, ""), Silent: true}
+		"MTPlugins' host late":  {onStart: starting(0, 0), want: "its host never answered in Radiant"},
+		"map never opens":       {onStart: starting(0, time.Hour, "RadiantPlugins.dll"), want: `the map Radiant has open is still ""`},
+		"the bridge never loads": {onStart: func(_ int, exe, _ string, _ []string) *radianttest.Started {
+			return &radianttest.Started{Fake: radianttest.New(0, ""), Silent: true, Modules: []string{exe, "RadiantPlugins.dll"}}
 		}, want: "its bridge never answered"},
-		"map never opens":      {onStart: starting(0, time.Hour), want: `the map Radiant has open is still ""`},
-		"MTPlugins' host late": {mtplugins: "1", onStart: starting(0, 0), want: "its host never answered in Radiant"},
-		"MTPlugins turned off": {mtplugins: "0", onStart: starting(0, time.Hour), want: `the map Radiant has open is still ""`},
-		"an old bridge in it": {onStart: func(pid int, exe, _ string, _ []string) *radianttest.Started {
-			return &radianttest.Started{Fake: radianttest.New(0, ""), Unloaded: true, Modules: []string{exe, filepath.Join("t7kb", "T7RadiantBridge-1.0.0.dll")}}
-		}, want: "runs the bridge T7RadiantBridge-1.0.0.dll, which doesn't answer: close Radiant"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			root, a, _ := install(t)
 			if tc.noExe {
 				os.Remove(filepath.Join(root, "bin", "radiant_modtools.exe"))
 			}
-			if tc.mtplugins != "" {
+			switch tc.mtplugins {
+			case "none":
+			case "proxy":
+				writeFile(t, filepath.Join(root, "bin", "d3d9.dll"), "another")
+			case "":
+				withMTPlugins(t, root, "1")
+			default:
 				withMTPlugins(t, root, tc.mtplugins)
 			}
 			dir := bridge(t)
@@ -320,6 +370,26 @@ func TestOpenSaysWhyRadiantCouldNotStart(t *testing.T) {
 				t.Errorf("err = %v, want %q", err, tc.want)
 			}
 		})
+	}
+}
+
+// A Radiant still running the bridge an earlier t7kb injected is closed and
+// opened again: its own host would clash with MTPlugins'. One that runs
+// MTPlugins' host too had it step aside, and gets the plugin.
+func TestOpenSaysToRestartARadiantRunningAnOldBridge(t *testing.T) {
+	root, a, b := install(t)
+	withMTPlugins(t, root, "1")
+	old := filepath.Join("t7kb", "T7RadiantBridge-1.2.2.dll")
+	m := radianttest.NewMachine()
+	m.Run(&radianttest.Started{Fake: radianttest.New(71, b), Unloaded: true, Modules: []string{"radiant_modtools.exe", old}})
+	if _, err := open(t, m, radiant.OpenOptions{Root: root, Map: a, Bridge: bridge(t)}); err == nil ||
+		!strings.Contains(err.Error(), "runs the bridge T7RadiantBridge-1.2.2.dll, which doesn't answer: close Radiant") {
+		t.Errorf("err = %v", err)
+	}
+	m = radianttest.NewMachine()
+	m.Run(&radianttest.Started{Fake: radianttest.New(72, b), Unloaded: true, Modules: append(host(root), old)})
+	if got, err := open(t, m, radiant.OpenOptions{Root: root, Map: a, Bridge: bridge(t)}); err != nil || got.PID != 72 {
+		t.Errorf("beside MTPlugins' host: %+v, %v", got, err)
 	}
 }
 

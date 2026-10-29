@@ -16,7 +16,7 @@ type OpenOptions struct {
 	Map     string // the .map file
 	PID     int    // the Radiant to use when several run, 0 for the only one
 	Discard bool   // reload over unsaved changes
-	Bridge  string // the folder of the bridge DLLs t7kb ships (StandaloneDLL, PluginDLL)
+	Bridge  string // the folder of the bridge t7kb ships (PluginDLL)
 }
 
 // How a map came to be open.
@@ -161,6 +161,9 @@ func launch(ctx context.Context, m Machine, o OpenOptions) (Opened, error) {
 	exe := filepath.Join(bin, "radiant_modtools.exe")
 	if _, err := os.Stat(exe); err != nil {
 		return Opened{}, fmt.Errorf("no Radiant at %s: is %s a BO3 mod-tools root?", exe, o.Root)
+	}
+	if err := mtpluginsMissing(bin); err != nil {
+		return Opened{}, err // without MTPlugins, a Radiant started would never get the bridge
 	}
 	pid, err := m.Start(exe, bin, o.Map)
 	if err != nil {

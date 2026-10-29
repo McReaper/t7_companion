@@ -16,35 +16,36 @@ const BundledBridge = "1.2.2"
 
 const pluginName = "T7RadiantBridge"
 
-// StandaloneDLL is the bridge with its own host, which t7kb injects into a
-// Radiant MTPlugins doesn't load into. Its name carries its version: a running
-// Radiant locks the one it loaded, and an update installs the next beside it.
-func StandaloneDLL(dir string) string {
-	return filepath.Join(dir, pluginName+"-"+BundledBridge+".dll")
-}
-
 // PluginDLL is the bridge as an MTPlugins plugin, which t7kb copies into the
-// install's bin/plugins/ for a Radiant MTPlugins loads into.
+// install's bin/plugins/ for MTPlugins' host to load.
 func PluginDLL(dir string) string {
 	return filepath.Join(dir, "mtplugins", pluginName, pluginName+".dll")
 }
 
-// mtplugins reports whether MTPlugins loads its host into this install's
-// Radiants: its d3d9.dll proxy in bin/ with its RadiantLoader.ini, not turned off.
-func mtplugins(bin string) bool {
+// MTPluginsURL is where MTPlugins' installer is.
+const MTPluginsURL = "https://github.com/Aidan601/MTPlugins/releases/latest"
+
+// mtpluginsMissing says why MTPlugins doesn't load its host into this
+// install's Radiants, nil when it does: its d3d9.dll proxy in bin/ with its
+// RadiantLoader.ini, not turned off. The map tools need it: only its host
+// loads the bridge, t7kb loads nothing into Radiant itself.
+func mtpluginsMissing(bin string) error {
 	if _, err := os.Stat(filepath.Join(bin, "d3d9.dll")); err != nil {
-		return false
+		return fmt.Errorf("the map tools need MTPlugins, which loads t7kb's Radiant bridge into Radiant, and it isn't installed: "+
+			"install it from %s (the t7kb:setup-or-update skill offers it)", MTPluginsURL)
 	}
 	b, err := os.ReadFile(filepath.Join(bin, "RadiantLoader.ini"))
 	if err != nil {
-		return false // another program's d3d9.dll
+		return fmt.Errorf("the map tools need MTPlugins, and %s is another program's (no RadiantLoader.ini beside it): install MTPlugins from %s",
+			filepath.Join(bin, "d3d9.dll"), MTPluginsURL)
 	}
 	for _, l := range strings.Split(string(b), "\n") {
-		if k, v, ok := strings.Cut(strings.TrimSpace(l), "="); ok && strings.EqualFold(strings.TrimSpace(k), "enabled") {
-			return strings.TrimSpace(v) != "0"
+		if k, v, ok := strings.Cut(strings.TrimSpace(l), "="); ok && strings.EqualFold(strings.TrimSpace(k), "enabled") && strings.TrimSpace(v) == "0" {
+			return fmt.Errorf("the map tools need MTPlugins, which is turned off (enabled=0 in %s): turn it back on",
+				filepath.Join(bin, "RadiantLoader.ini"))
 		}
 	}
-	return true
+	return nil
 }
 
 // module is the loaded module of that base name, case-insensitively, or "".
@@ -61,14 +62,14 @@ func named(name string) func(string) bool {
 	return func(base string) bool { return base == strings.ToLower(name) }
 }
 
-// standaloneLoaded matches the standalone bridge of any version.
+// standaloneLoaded matches the standalone bridge earlier t7kb injected, of any
+// version: its own host would clash with MTPlugins'.
 func standaloneLoaded(base string) bool {
 	return strings.HasPrefix(base, strings.ToLower(pluginName)+"-") && strings.HasSuffix(base, ".dll")
 }
 
 // loadBridge makes the bridge run in the Radiant of that pid and connects to
-// it: through MTPlugins when it loads into the install's Radiants, else by
-// injecting the standalone bridge. One host only ever runs in a Radiant.
+// it, through MTPlugins' host. One host only ever runs in a Radiant.
 func loadBridge(ctx context.Context, m Machine, pid int, o OpenOptions) (*Client, error) {
 	bin := filepath.Join(o.Root, "bin")
 	if err := m.Ready(ctx, pid); err != nil {
@@ -81,20 +82,16 @@ func loadBridge(ctx context.Context, m Machine, pid int, o OpenOptions) (*Client
 	if err != nil {
 		return nil, err
 	}
-	if module(mods, named("RadiantPlugins.dll")) != "" || mtplugins(bin) {
+	if module(mods, named("RadiantPlugins.dll")) != "" { // MTPlugins' host runs: an old bridge steps aside for it
 		return loadPlugin(ctx, m, pid, bin, o.Bridge)
 	}
 	if p := module(mods, standaloneLoaded); p != "" {
 		return nil, fmt.Errorf("the Radiant of pid %d runs the bridge %s, which doesn't answer: close Radiant and open the map again", pid, filepath.Base(p))
 	}
-	dll := StandaloneDLL(o.Bridge)
-	if _, err := os.Stat(dll); err != nil {
-		return nil, fmt.Errorf("t7kb's Radiant bridge isn't beside it (%s): reinstall t7kb", dll)
+	if err := mtpluginsMissing(bin); err != nil {
+		return nil, fmt.Errorf("%w; then close the Radiant of pid %d and open the map again: MTPlugins loads as Radiant starts", err, pid)
 	}
-	if err := m.Inject(pid, dll); err != nil {
-		return nil, fmt.Errorf("could not load the bridge into Radiant (pid %d): %w", pid, err)
-	}
-	return waitBridge(ctx, m, pid, "T7RadiantBridge.log beside "+dll)
+	return loadPlugin(ctx, m, pid, bin, o.Bridge) // its host loads as Radiant starts, seconds before it answers
 }
 
 // loadPlugin has MTPlugins' host load t7kb's plugin build: copied into

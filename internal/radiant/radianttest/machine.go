@@ -22,7 +22,6 @@ type Machine struct {
 	mu       sync.Mutex
 	fakes    map[int]*Started
 	started  [][]string
-	injected [][]string // pid, dll
 	controls [][]string // pid, command
 	wakes    int
 	nextPID  int
@@ -37,8 +36,8 @@ type Started struct {
 	ListenAfter time.Duration
 	Silent      bool
 	// Modules are the modules it reports, its exe first. Unloaded is a
-	// Radiant whose bridge listens only once something loads it: an Inject, or
-	// MTPlugins' host told to enable the plugin (Control).
+	// Radiant whose bridge listens only once MTPlugins' host is told to enable
+	// the plugin (Control).
 	Modules  []string
 	Unloaded bool
 	// ControlAfter is how long after Start MTPlugins' host opens its control
@@ -168,26 +167,6 @@ func (m *Machine) Ready(_ context.Context, pid int) error {
 		return fmt.Errorf("no process %d", pid)
 	}
 	return nil
-}
-
-// Inject records the call; the Radiant's bridge then listens, and it lists the DLL.
-func (m *Machine) Inject(pid int, dll string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.injected = append(m.injected, []string{strconv.Itoa(pid), dll})
-	s := m.fakes[pid]
-	if s == nil {
-		return fmt.Errorf("no process %d", pid)
-	}
-	s.loaded, s.Modules = true, append(s.Modules, dll)
-	return nil
-}
-
-// Injected are the Inject calls made: the pid, then the DLL.
-func (m *Machine) Injected() [][]string {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return append([][]string(nil), m.injected...)
 }
 
 // Control answers as MTPlugins' host does, in a Radiant that lists
