@@ -32,27 +32,31 @@
 // over unsaved changes unless asked, a dialog, or an open prefab. A Radiant
 // running without the bridge gets it first. With no Radiant running it starts
 // bin/radiant_modtools.exe on the map from bin/, as the Launcher does, out of
-// the caller's job so it outlives the MCP server, loads the bridge into it,
-// and waits for the bridge and then for the map.
+// the caller's job so it outlives the MCP server, has the bridge loaded into
+// it, and waits for the bridge and then for the map.
 //
 // # Loading the bridge
 //
-// t7kb ships the bridge beside its binary, in bridge/ (load.go): the user
-// installs nothing else, and t7kb writes nothing into the install unless
-// MTPlugins is there. One host only ever runs in a Radiant, or both would hook
-// the same functions of it:
+// t7kb ships the bridge's MTPlugins plugin beside its binary, in bridge/
+// (load.go), and only MTPlugins' host loads it: t7kb loads nothing into
+// Radiant itself, since a process writing into another's memory is what
+// malware does, and antivirus treats it so.
 //
 //   - MTPlugins installed (its d3d9.dll proxy in bin/ with RadiantLoader.ini,
-//     not turned off) loads its host into every Radiant: t7kb copies its
-//     plugin build into bin/plugins/T7RadiantBridge/ when the install's
+//     not turned off) loads its host into every Radiant as it starts: t7kb
+//     copies the plugin into bin/plugins/T7RadiantBridge/ when the install's
 //     differs, and has the host load it through its control window
 //     (WM_COPYDATA, replies in RadiantPlugins.ctl), as MTPlugins' own tools do.
-//   - Otherwise t7kb injects the standalone bridge, which carries its own
-//     host: LoadLibraryW run in Radiant by a remote thread, once Radiant takes
-//     input (its main window exists). Its file name carries its version, as a
-//     running Radiant keeps the one it loaded locked; one already loaded is
-//     never loaded twice, so a Radiant still running an older one is closed
-//     and opened again.
+//   - Without it, Open starts no Radiant, and a running one can't get the
+//     bridge until it is closed and started again: the error says where
+//     MTPlugins is, and the t7kb:setup-or-update skill offers it.
+//   - A Radiant still running the standalone bridge an earlier t7kb injected
+//     is closed and opened again, unless MTPlugins' host runs in it too (the
+//     standalone one then stepped aside): one host only ever runs in a
+//     Radiant, or both would hook the same functions of it.
+//
+// MTPlugins' host resolves menu paths itself, splitting at every /, so an
+// entry whose label holds one can't be run or listed.
 //
 // The light stage's headless Radiant (-ledSilent) gets no bridge.
 package radiant

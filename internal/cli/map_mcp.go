@@ -24,8 +24,8 @@ func mapCommandTool() server.ServerTool {
 			"(Selection/CSG/CSG Hollow, CSG Subtract, CSG Merge), patches, textures, prefabs. The answer reads the map "+
 			"back: the undo entry the command made (one Ctrl+Z), what it created (id, class or material, bounds), what it "+
 			"deleted, what it left selected. A command that opens a dialog waits on the user. menu instead of command "+
-			"lists a menu's entries (\"Selection/CSG\"; \"\" the menu bar), \" >\" marking a submenu. A label that holds a / "+
-			"is written as it reads (Selection/Select By/Select by Key/Value), except in a Radiant MTPlugins hosts the bridge in."),
+			"lists a menu's entries (\"Selection/CSG\"; \"\" the menu bar), \" >\" marking a submenu. An entry whose label holds "+
+			"a / (Select by Key/Value) can't be reached: MTPlugins, which hosts the bridge, splits the path at every /."),
 		mcp.WithString("command", mcp.Description("The menu path, labels from the menu bar down joined by /: Selection/CSG/CSG Hollow.")),
 		mcp.WithString("ids", mcp.Description("What to select for it, comma- or space-separated (default nothing selected).")),
 		mcp.WithString("menu", mcp.Description("List this menu's entries instead of running a command: its labels from the menu bar down joined by / (Selection/CSG); \"\" the menu bar.")),
@@ -183,8 +183,9 @@ func radiantOpenTool() server.ServerTool {
 		mcp.WithDescription("Open a map in Radiant, where every map edit happens: never edit a .map file while Radiant may "+
 			"hold it, Radiant's next save overwrites it. Uses the Radiant that has the map open already; else the one running "+
 			"(pid picks one of several), which loads it in place of its map, refused over unsaved changes unless discard, "+
-			"under a dialog or inside a prefab; else starts Radiant on the map and waits for it (up to 3 minutes). It loads "+
-			"its bridge into a Radiant that runs without it, through MTPlugins when that is installed. Answers the "+
+			"under a dialog or inside a prefab; else starts Radiant on the map and waits for it (up to 3 minutes). MTPlugins, "+
+			"Radiant's plugin host, loads its bridge: without it nothing is started, and the error says where to get it "+
+			"(the t7kb:setup-or-update skill installs it). Answers the "+
 			"Radiant's pid, the map's path and how it came to be open (already open, reloaded, launched)."),
 		mcp.WithString("map", mcp.Required(), mcp.Description("A map's name (zm_castle: map_source/zm/zm_castle.map) or a .map path, relative to map_source/ unless absolute.")),
 		mcp.WithNumber("pid", mcp.Description("The Radiant to use when several run (the error lists them).")),

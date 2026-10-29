@@ -26,8 +26,6 @@ type Machine interface {
 	Modules(pid int) ([]string, error)
 	// Ready waits until the process takes input.
 	Ready(ctx context.Context, pid int) error
-	// Inject loads the DLL into the process.
-	Inject(pid int, dll string) error
 	// Control sends a command to MTPlugins' host in the process and returns its reply.
 	Control(pid int, cmd string) (string, error)
 	// WakeDisplay turns the screen on if it slept, for the display's idle

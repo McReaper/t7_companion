@@ -1,6 +1,6 @@
 # Radiant: the map open in your Radiant
 
-These commands work on the map Radiant has open, as it is now, unsaved edits included, through [T7RadiantBridge](https://github.com/McReaper/t7_radiant_bridge), the bridge t7kb loads into it. [Radiant integration](../radiant.md) has what to install and what stays in your hands. Each command takes `--pid` to pick a Radiant when several run, and its `--help` gives the whole description of the MCP tool it is, with each argument's. [All commands](../cli.md).
+These commands work on the map Radiant has open, as it is now, unsaved edits included, through [T7RadiantBridge](https://github.com/McReaper/t7_radiant_bridge), the bridge t7kb has MTPlugins load into it. [Radiant integration](../radiant.md) has what to install and what stays in your hands. Each command takes `--pid` to pick a Radiant when several run, and its `--help` gives the whole description of the MCP tool it is, with each argument's. [All commands](../cli.md).
 
 Entities and brushes go by short ids, the first 8 hex digits of their Radiant GUID, as `map find` lists them. `map find`, `map view` and `map command` take them after the command or as `--ids`, comma- or space-separated.
 
@@ -101,4 +101,4 @@ t7kb map command "Selection/CSG/CSG Hollow" 5ec8de46
 
 | Option | What it does |
 | --- | --- |
-| `--menu` | list a menu's entries instead, a submenu marked by `>`: a menu is its labels from the menu bar down, joined by `/` (`Selection/CSG`), a label holding a `/` written as it reads; `--menu=`, empty, lists the menu bar |
+| `--menu` | list a menu's entries instead, a submenu marked by `>`: a menu is its labels from the menu bar down, joined by `/` (`Selection/CSG`): MTPlugins splits the path at every `/`, so an entry whose label holds one (Select by Key/Value) is out of reach; `--menu=`, empty, lists the menu bar |
