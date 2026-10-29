@@ -12,11 +12,9 @@ import (
 )
 
 // mapToolset edits the map open in the user's Radiant, through the
-// T7RadiantBridge plugin: internal/radiant has the connection's rules. Its
-// tools refuse an argument they don't take, so another tool's option or a
-// misspelt one is an error, not ignored.
+// T7RadiantBridge plugin: internal/radiant has the connection's rules.
 func mapToolset() toolset {
-	return toolset{name: "map", tools: strictArgs([]server.ServerTool{radiantOpenTool(), mapFindTool(), mapViewTool(), mapEditTool(), mapCommandTool()})}
+	return toolset{name: "map", tools: []server.ServerTool{radiantOpenTool(), mapFindTool(), mapViewTool(), mapEditTool(), mapCommandTool()}}
 }
 
 func mapCommandTool() server.ServerTool {
