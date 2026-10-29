@@ -1,6 +1,6 @@
 # Benchmarks
 
-What a call to `t7kb` costs: time and memory for the retrieval path, and **tokens** for every MCP tool's answer, since that is what an agent actually pays for. Baseline: v2.2.2, Windows, 16 threads, NVMe, real `t7kb.db` (66,023 documents, ~350k chunks) and a full BO3 mod-tools install.
+What a call to `t7kb` costs: time and memory for the retrieval path, and **tokens** for every MCP tool's answer, since that is what an agent actually pays for. Baseline: v3.3.0, Windows, 16 threads, NVMe, real `t7kb.db` (68,457 documents, 445k chunks) and a full BO3 mod-tools install.
 
 ## How to run
 
@@ -22,17 +22,23 @@ It builds each answer with the same functions the MCP handlers use and counts to
 
 ## Tokens per tool answer
 
-16 queries phrased the way a modder asks (`benchQueries` in `internal/cli/tokens_report_test.go`); the `gdt_*` rows use one real material, its image and its GDT; the `zone_*` rows the first linked map of the install (12k packed assets).
+16 queries phrased the way a modder asks (`benchQueries` in `internal/cli/tokens_report_test.go`); the `gdt_*` rows use one real material, its image and its GDT; the `zone_*` rows the first linked map of the install (12k packed assets). The tools that act on the install are measured by answers that change nothing: `gdt_edit` as a dry run, `build` by its answer on a start (the build itself reports through the plugin's monitor), `game_log` on the game's current `console_mp.log`, `shader_decompile` on the `emissive_add` material type.
 
 | Tool | Call | Samples | Tokens p50 | p90 | max | Bytes p50 |
 |---|---|---:|---:|---:|---:|---:|
-| `search` | 10 results (default) | 16 | 725 | 791 | 842 | 2726 |
-| `search` | 5 results | 16 | 345 | 381 | 439 | 1331 |
-| `get` | top result | 16 | 664 | 3447 | 5256 | 2194 |
-| `get` | each of the top 3 | 48 | 493 | 3944 | 5256 | 1893 |
+| `search` | 10 results (default) | 16 | 730 | 791 | 842 | 2764 |
+| `search` | 5 results | 16 | 345 | 381 | 439 | 1310 |
+| `get` | top result | 16 | 664 | 3463 | 5272 | 2194 |
+| `get` | each of the top 3 | 48 | 493 | 3944 | 5272 | 1893 |
+| `build` | its answer on a start | 1 | 73 | 73 | 73 | 288 |
+| `create` | dry run, ZM Advanced Level | 1 | 1267 | 1267 | 1267 | 4138 |
+| `create` | dry run, ZM Mod Level | 1 | 228 | 228 | 228 | 907 |
+| `game_log` | grep "error" | 1 | 7492 | 7492 | 7492 | 25232 |
+| `game_log` | the current log's last launch | 1 | 359 | 359 | 359 | 1121 |
 | `gdt_find` | a material | 1 | 52 | 52 | 52 | 159 |
 | `gdt_get` | a material (defaults hidden) | 1 | 219 | 219 | 219 | 660 |
 | `gdt_get` | a material, all=true | 1 | 240 | 240 | 240 | 742 |
+| `gdt_edit` | dry run, one field of a material | 1 | 54 | 54 | 54 | 174 |
 | `gdt_refs` | its color image | 1 | 102 | 102 | 102 | 338 |
 | `gdt_refs` | the material (GDT fields and LOD files) | 1 | 245 | 245 | 245 | 786 |
 | `gdt_check` | one asset | 1 | 38 | 38 | 38 | 124 |
@@ -40,14 +46,14 @@ It builds each answer with the same functions the MCP handlers use and counts to
 | `gdt_schema` | material (names only) | 1 | 2894 | 2894 | 2894 | 11408 |
 | `gdt_schema` | material + material_type lit | 1 | 1241 | 1241 | 1241 | 4715 |
 | `gdt_schema` | xmodel | 1 | 2446 | 2446 | 2446 | 9956 |
+| `shader_decompile` | a material type, every stage | 1 | 890 | 890 | 890 | 2601 |
+| `shader_decompile` | a material type, ps | 1 | 277 | 277 | 277 | 831 |
 | `zone_explain` | the asset with the longest chain | 1 | 337 | 337 | 337 | 1123 |
 | `zone_contents` | every line of the zone | 1 | 1317 | 1317 | 1317 | 4280 |
 | `zone_contents` | its heaviest line | 1 | 972 | 972 | 972 | 3071 |
 | `zone_contents` | images: the map | 1 | 1320 | 1320 | 1320 | 3839 |
 | `zone_contents` | images: its heaviest line | 1 | 1185 | 1185 | 1185 | 3497 |
 | `zone_check` | the map | 1 | 1899 | 1899 | 1899 | 6509 |
-| `create` | dry run, ZM Advanced Level | 1 | 873 | 873 | 873 | 3017 |
-| `create` | dry run, ZM Mod Level | 1 | 228 | 228 | 228 | 907 |
 
 `get` serves long bodies a page at a time (16,000 characters by default, `max_chars` up to 64,000, `offset` for the next part). Corpus bodies: median 1.2k characters, p99 275k, maximum 98 MB (`source-workspace` indexes whole GDTs and scripts). Over 90% of documents fit in one page. A full page of a GDT is ~5.3k tokens rather than ~4k: paths and numbers tokenize denser than prose.
 
@@ -65,7 +71,7 @@ How well search ranks, and every ranking change tried and rejected: [retrieval-q
 
 | Benchmark | Result |
 |---|---|
-| Search, real corpus (embed + search), p50 / max over 16 queries | 2.01 s / 2.17 s |
+| Search, real corpus (embed + search), p50 / max over 16 queries | 2.05 s / 2.24 s |
 | Search in the MCP server, vectors in memory (embed excluded), p50 / p90 over 200 searches | 68 ms / 71 ms |
 | `search` through the MCP server over stdio (embed included), p50 / p90 over 100 calls | 143 ms / 326 ms |
 | Vector index load, MCP start (445k chunks) | 2.2 s, ~650 MB |
