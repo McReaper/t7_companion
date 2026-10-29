@@ -75,6 +75,29 @@ func TestModelUses(t *testing.T) {
 	}
 }
 
+// Warm and WarmModels fill their caches before they return, so the server can
+// hand back what they leave behind after them.
+func TestWarmFillsTheCachesBeforeReturning(t *testing.T) {
+	w := fixture(t) // stock_model: filename a\b
+	p := filepath.Join(w.Root, "model_export", "a", "b.xmodel_bin")
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte("MODEL\nVERSION 6\nMATERIAL 0 \"mtl_x\" \"Phong\" \"Phong\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	w.Warm()
+	if w.stock == nil {
+		t.Error("Warm returned before the asset index was built")
+	}
+	w.WarmModels()
+	w.models.mu.Lock()
+	defer w.models.mu.Unlock()
+	if len(w.models.Files) == 0 {
+		t.Error("WarmModels returned before the LOD files were read")
+	}
+}
+
 func TestListHas(t *testing.T) {
 	v := `mtl_skybox_default mtl_skybox_default_day\r\n` // as a GDT stores it: the escape text, not a line break
 	for name, want := range map[string]bool{"mtl_skybox_default": true, "mtl_skybox_default_day": true, "mtl_skybox": false} {

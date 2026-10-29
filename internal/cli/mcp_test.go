@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"runtime/debug"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -167,5 +168,22 @@ func TestWarmUpReleasesAfterEveryWarmUp(t *testing.T) {
 		}
 	case <-deadline:
 		t.Fatal("never released")
+	}
+}
+
+// The server collects at serverGCPercent, unless GOGC is set: then Go's own
+// reading of it stands.
+func TestUseServerGC(t *testing.T) {
+	old := debug.SetGCPercent(100)
+	defer debug.SetGCPercent(old)
+	t.Setenv("GOGC", "")
+	useServerGC()
+	if got := debug.SetGCPercent(100); got != serverGCPercent {
+		t.Errorf("GOGC unset: collecting at %d%%, want %d%%", got, serverGCPercent)
+	}
+	t.Setenv("GOGC", "50")
+	useServerGC()
+	if got := debug.SetGCPercent(100); got != 100 {
+		t.Errorf("GOGC set: useServerGC changed it to %d%%", got)
 	}
 }
