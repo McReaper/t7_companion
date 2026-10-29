@@ -3,7 +3,9 @@ package cli
 import (
 	"context"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -130,5 +132,40 @@ func TestMCPServerInstructions(t *testing.T) {
 	}
 	if n := len(strings.Fields(res.Instructions)); n > 120 {
 		t.Errorf("instructions are %d words: they load in every session, keep them near 100", n)
+	}
+}
+
+// The server hands memory back once, after every warm-up is done: before, the
+// vectors' load still makes garbage; the warm-ups themselves run together.
+func TestWarmUpReleasesAfterEveryWarmUp(t *testing.T) {
+	var done atomic.Int32
+	gate := make(chan struct{})
+	slow := func() { <-gate; done.Add(1) }
+	fast := func() { done.Add(1) }
+	released := make(chan int32, 1)
+	warmUp([]func(){slow, fast}, func() { released <- done.Load() })
+
+	deadline := time.After(5 * time.Second)
+	for done.Load() < 1 { // fast finishes while slow waits: they run together
+		select {
+		case <-deadline:
+			t.Fatal("fast warm-up waited for slow one")
+		default:
+			time.Sleep(time.Millisecond)
+		}
+	}
+	select {
+	case n := <-released:
+		t.Fatalf("released after %d of 2 warm-ups", n)
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(gate)
+	select {
+	case n := <-released:
+		if n != 2 {
+			t.Errorf("released after %d of 2 warm-ups", n)
+		}
+	case <-deadline:
+		t.Fatal("never released")
 	}
 }

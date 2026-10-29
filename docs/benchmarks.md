@@ -66,8 +66,10 @@ How well search ranks, and every ranking change tried and rejected: [retrieval-q
 | Benchmark | Result |
 |---|---|
 | Search, real corpus (embed + search), p50 / max over 16 queries | 2.01 s / 2.17 s |
-| Search in the MCP server, vectors in memory (embed excluded), p50 / max | 41 ms / 258 ms |
-| Vector index load, MCP start | 4.6 s, ~566 MB |
+| Search in the MCP server, vectors in memory (embed excluded), p50 / p90 over 200 searches | 68 ms / 71 ms |
+| `search` through the MCP server over stdio (embed included), p50 / p90 over 100 calls | 143 ms / 326 ms |
+| Vector index load, MCP start (445k chunks) | 2.2 s, ~650 MB |
+| MCP server memory (private bytes): after start / peak over 100 `search` calls | 1.14 GB / 1.43 GB |
 | `vectorRank`, synthetic | ~5.3 µs and ~1.8 KB allocated per chunk (4k and 40k chunks) |
 | `bm25Rank`, 10k docs | 41 ms |
 | `rrfFuse`, 2 × 50 candidates | 11 µs |
@@ -75,4 +77,6 @@ How well search ranks, and every ranking change tried and rejected: [retrieval-q
 | Embedding model load | 121 ms, 307 MB allocated |
 | Embed one query | ~90 ms |
 
-The vector scan dominates: ~380k chunks per query. It reads only each chunk's rowid, doc_id and vector and scores them in place, then reads the text of the winners alone for their snippets; what remains is the SQLite driver reading every row. The MCP server keeps every vector in memory instead (`vecindex.go`), scored on every CPU with the scan's results (`TestVectorIndexMatchesScan`); the CLI keeps the scan.
+The vector scan dominates: ~445k chunks per query. It reads only each chunk's rowid, doc_id and vector and scores them in place, then reads the text of the winners alone for their snippets; what remains is the SQLite driver reading every row. The MCP server keeps every vector in memory instead (`vecindex.go`), scored on every CPU with the scan's results (`TestVectorIndexMatchesScan`); the CLI keeps the scan.
+
+The MCP server's memory is the vectors (~650 MB), the GDT caches (~220 MB, with `TA_TOOLS_PATH` set) and the embedding model; at Go's default `GOGC` of 100 it held ~2.2 GB, twice what is live. It runs at `GOGC` 25 (`serverGCPercent`, `mcp.go`), which leaves search times unchanged since the vectors hold no pointers for the collector to read, and hands back to the OS what the warm-ups leave behind once they finish. A `GOGC` in the environment still wins; `T7KB_VECTOR_INDEX=0` keeps the vectors out of memory (~650 MB less, ~2 s a search).

@@ -234,11 +234,9 @@ func (w *Workspace) refreshFileMats(uses map[string][]modelUse) {
 	})
 }
 
-// WarmModels fills the xmodel material caches in the background, so the first
-// ModelUses of a session doesn't pay for reading every LOD file.
-func (w *Workspace) WarmModels() {
-	go func() { _, _ = w.ModelUses("") }()
-}
+// WarmModels fills the xmodel material caches, so the first ModelUses of a
+// session doesn't pay for reading every LOD file.
+func (w *Workspace) WarmModels() { _, _ = w.ModelUses("") }
 
 // ModelMaterials returns the materials an xmodel's LOD files use, deduplicated
 // in first-seen order, for the first GDT definition of name.

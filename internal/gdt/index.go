@@ -144,9 +144,9 @@ func (w *Workspace) refresh() {
 	}
 }
 
-// Warm builds or refreshes the asset index in the background, so the first
-// lookup doesn't pay for it (the MCP server calls this at startup).
-func (w *Workspace) Warm() { go w.scan() }
+// Warm builds or refreshes the asset index, so the first lookup doesn't pay
+// for it (the MCP server runs this in the background at startup).
+func (w *Workspace) Warm() { w.scan() }
 
 // Rel returns a path relative to the root, with forward slashes.
 func (w *Workspace) Rel(p string) string {

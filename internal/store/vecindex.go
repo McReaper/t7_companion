@@ -14,7 +14,7 @@ import (
 // times (the MCP server): a search then scores memory instead of reading ~380k
 // SQLite rows. It holds the same float32 vectors, scored with the same
 // arithmetic, chunk by chunk in the order the scan reads them, so a search
-// returns what the scan returns. A full corpus takes ~580 MB.
+// returns what the scan returns. A full corpus takes ~650 MB.
 type vecIndex struct {
 	dim    int
 	vecs   []float32 // chunk i is vecs[i*dim : (i+1)*dim]
@@ -125,10 +125,10 @@ func (ix *vecIndex) scores(qvec []float32) []float64 {
 // a one-shot search is faster with the plain scan than with loading the index.
 func (s *Store) EnableVectorIndex() { s.vecOn = true }
 
-// WarmVectors loads the vector index in the background.
+// WarmVectors loads the vector index, returning once it is loaded.
 func (s *Store) WarmVectors() {
 	if s.vecOn {
-		go s.vectorIndex()
+		s.vectorIndex()
 	}
 }
 
