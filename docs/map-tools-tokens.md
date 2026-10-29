@@ -28,3 +28,13 @@ Measured on the stock ZM Mod Level template's map (33 entities, 20 world brushes
 | `map_command` | `CSG Hollow` on a box | 206 | 579 |
 
 A room costs about fifteen hundred tokens: its ops (602, a brush being its corners, eight for a box), the answer (430), a top view to check it (515); a ramp and a hexagonal column are 236, their answer 132; a curve patch of 3 by 3 is 126, its answer 56. The whole map's `map_find` is the dearest call, about 56 tokens an entity, so `class`, `near` or `ids` narrow it; the default image, 768 pixels on the long side, stays near 450 tokens, and `size 1568` quadruples it.
+
+## What the views look like
+
+Each image is what `map_view` hands the agent, taken in a real Radiant on the stock ZM Mod Level template, ids written where each entity's origin or centre is.
+
+| Call | Image |
+| --- | --- |
+| `view top`, framed on the start zone (475×768) | ![Top view of the template map, the start zone's id over its centre](media/map-view-top.png) |
+| 3D, framed on the player start, `render fake`, `hide volumes` (768×448) | ![3D view looking down at the player start from the south-west](media/map-view-3d-framed.png) |
+| 3D as it is, `size 1568` (1331×777: Radiant's 3D view is smaller than the size asked) | ![3D view from the player start, the sky and the template's rooms ahead](media/map-view-3d-as-is.png) |

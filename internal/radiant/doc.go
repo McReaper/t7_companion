@@ -56,7 +56,7 @@
 //     Radiant, or both would hook the same functions of it.
 //
 // MTPlugins' host resolves menu paths itself, splitting at every /, so an
-// entry whose label holds one can't be run or listed.
+// entry whose label holds one is listed with its menu but can't be run.
 //
 // The light stage's headless Radiant (-ledSilent) gets no bridge.
 package radiant

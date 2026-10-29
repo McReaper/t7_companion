@@ -101,4 +101,4 @@ t7kb map command "Selection/CSG/CSG Hollow" 5ec8de46
 
 | Option | What it does |
 | --- | --- |
-| `--menu` | list a menu's entries instead, a submenu marked by `>`: a menu is its labels from the menu bar down, joined by `/` (`Selection/CSG`): MTPlugins splits the path at every `/`, so an entry whose label holds one (Select by Key/Value) is out of reach; `--menu=`, empty, lists the menu bar |
+| `--menu` | list a menu's entries instead, a submenu marked by `>`: a menu is its labels from the menu bar down, joined by `/` (`Selection/CSG`): MTPlugins splits the path at every `/`, so an entry whose label holds one (Select by Key/Value) is listed but can't be run; `--menu=`, empty, lists the menu bar |
