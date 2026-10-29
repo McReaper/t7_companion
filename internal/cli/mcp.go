@@ -2,7 +2,9 @@ package cli
 
 import (
 	"os"
+	"runtime/debug"
 	"strings"
+	"sync"
 
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
@@ -30,7 +32,7 @@ func newMCPCmd() *cobra.Command {
 type toolset struct {
 	name  string
 	tools []server.ServerTool
-	warm  func() // optional: background warm-up when the server starts
+	warm  func() // optional: warm-up the server runs in the background at start, returning once done
 }
 
 func toolsets(st *store.Store, emb *embed.Embedder) []toolset {
@@ -55,7 +57,7 @@ func runMCP() error {
 	}
 	defer st.Close()
 	if vectorIndexWanted() {
-		st.EnableVectorIndex() // a long-lived server: search memory, not ~380k rows per query
+		st.EnableVectorIndex() // a long-lived server: search memory, not ~445k rows per query
 	}
 
 	emb, err := embed.New()
@@ -63,7 +65,31 @@ func runMCP() error {
 		return err
 	}
 
+	if os.Getenv("GOGC") == "" {
+		debug.SetGCPercent(serverGCPercent)
+	}
 	return server.ServeStdio(newMCPServer(st, emb, true))
+}
+
+// serverGCPercent is the server's GOGC. Go's default, 100, lets the heap grow to
+// twice what is live before collecting, and the vectors alone are ~650 MB: the
+// server held ~2.2 GB. The vectors hold no pointers, so the collector barely
+// reads them, and collecting at 25% leaves search times unchanged. GOGC set in
+// the environment still wins.
+const serverGCPercent = 25
+
+// warmUp runs every toolset's warm-up at once in the background, then hands
+// back to the OS what they left behind: loading the vectors alone reads ~650 MB
+// of rows that are garbage once copied, and Go keeps freed memory otherwise.
+func warmUp(warms []func(), release func()) {
+	go func() {
+		var wg sync.WaitGroup
+		for _, w := range warms {
+			wg.Go(w)
+		}
+		wg.Wait()
+		release()
+	}()
 }
 
 // mcpInstructions reach the agent in every session where the server is
@@ -84,20 +110,24 @@ func newMCPServer(st *store.Store, emb *embed.Embedder, warm bool) *server.MCPSe
 		server.WithInstructions(mcpInstructions),
 		server.WithRecovery()) // a panicking handler must not take the whole stdio server down
 	dir := journal.Dir()
+	var warms []func()
 	for _, ts := range toolsets(st, emb) {
 		tools := strictTools(ts.tools)
 		if dir != "" { // T7KB_DEBUG: each call recorded, the refused ones too
 			tools = journaledTools(dir, tools)
 		}
 		s.AddTools(tools...)
-		if warm && ts.warm != nil {
-			ts.warm()
+		if ts.warm != nil {
+			warms = append(warms, ts.warm)
 		}
+	}
+	if warm {
+		warmUp(warms, debug.FreeOSMemory)
 	}
 	return s
 }
 
-// vectorIndexWanted: the MCP server keeps the vectors in memory (~570 MB) unless
+// vectorIndexWanted: the MCP server keeps the vectors in memory (~650 MB) unless
 // T7KB_VECTOR_INDEX is 0, false or off — for a machine short of memory, where
 // each search then reads them from the database (~2 s).
 func vectorIndexWanted() bool {
