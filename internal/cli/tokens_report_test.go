@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/tiktoken-go/tokenizer"
 
+	"github.com/McReaper/t7_companion/internal/build"
 	"github.com/McReaper/t7_companion/internal/embed"
 	"github.com/McReaper/t7_companion/internal/gdt"
 	"github.com/McReaper/t7_companion/internal/store"
@@ -112,6 +114,7 @@ func TestTokenReport(t *testing.T) {
 	if root := os.Getenv("TA_TOOLS_PATH"); root != "" {
 		gdtSamples(t, root, add)
 		zoneSamples(t, root, add)
+		runSamples(t, root, add)
 		mapSamples(t, root, add, addImage)
 		for _, tpl := range []string{"ZM Mod Level", "ZM Advanced Level"} { // dry runs: nothing is written
 			if v, err := createOp(root, "zm_token_report_sample", tpl, nil, false); err == nil {
@@ -206,6 +209,51 @@ func gdtSamples(t *testing.T, root string, add func(key, s string)) {
 			v, err = gdtRefs(w, img)
 			run("gdt_refs|its color image", v, err)
 		}
+	}
+}
+
+// runSamples measures the tools that act on the install, by their answers that
+// change nothing: a dry-run gdt_edit, build's answer on a start and its status
+// of the first map t7kb built, game_log on the current log, and
+// shader_decompile on a material type.
+func runSamples(t *testing.T, root string, add func(key, s string)) {
+	t.Helper()
+	run := func(key string, v any, err error) {
+		if err != nil {
+			t.Logf("%s: %v", key, err)
+			return
+		}
+		add(key, mcpJSON(t, v))
+	}
+	if w, err := gdt.Open(root); err == nil {
+		const mat = "mtl_p7_cru_gun_range_booth_01"
+		if locs, _ := w.Find(mat); len(locs) > 0 {
+			v, err := gdtEdit(w, gdt.EditRequest{File: locs[0].File, Asset: mat, Set: map[string]string{"surfaceType": "metal"}, DryRun: true})
+			run("gdt_edit|dry run, one field of a material", v, err)
+		}
+	}
+	// what build answers at once on a start, built here rather than started
+	run("build|its answer on a start", buildStarted{Started: "zm_token_report_sample (usermap)", PID: 12345,
+		Stages: []string{"gdt", "compile", "light", "link"}, Next: buildStartedNext}, nil)
+	maps, _ := filepath.Glob(filepath.Join(root, "usermaps", "*", "zone", "*.ff"))
+	sort.Strings(maps)
+	for _, ff := range maps {
+		name := filepath.Base(filepath.Dir(filepath.Dir(ff)))
+		if v, err := buildOp(&build.Options{ToolsPath: root}, name, false, true, io.Discard); err == nil {
+			run("build|status of a linked map", v, nil)
+			break
+		}
+	}
+	v, err := gameLog(gameLogArgs{ToolsPath: root})
+	run("game_log|the current log's last launch", v, err)
+	v, err = gameLog(gameLogArgs{ToolsPath: root, Grep: "error"})
+	run("game_log|grep \"error\"", v, err)
+	for _, q := range []struct{ key, name, stage string }{
+		{"shader_decompile|a material type, every stage", "emissive_add", ""},
+		{"shader_decompile|a material type, ps", "emissive_add", "ps"},
+	} {
+		v, err := shaderDecompile(root, q.name, q.stage, 0, 0, false)
+		run(q.key, v, err)
 	}
 }
 
