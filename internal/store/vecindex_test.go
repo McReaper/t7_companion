@@ -65,3 +65,23 @@ func BenchmarkVectorIndexRank(b *testing.B) {
 		})
 	}
 }
+
+// WarmVectors loads the index before it returns, so the server can hand back
+// the load's garbage after it; without EnableVectorIndex it loads nothing.
+func TestWarmVectorsLoadsBeforeReturning(t *testing.T) {
+	c := corpus(t, 100, 2)
+	s, err := Open(c.path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	s.WarmVectors()
+	if s.vecIx != nil {
+		t.Fatal("loaded without EnableVectorIndex")
+	}
+	s.EnableVectorIndex()
+	s.WarmVectors()
+	if s.vecIx == nil {
+		t.Fatal("WarmVectors returned before the index loaded")
+	}
+}

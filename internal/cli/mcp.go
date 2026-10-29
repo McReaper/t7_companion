@@ -65,9 +65,7 @@ func runMCP() error {
 		return err
 	}
 
-	if os.Getenv("GOGC") == "" {
-		debug.SetGCPercent(serverGCPercent)
-	}
+	useServerGC()
 	return server.ServeStdio(newMCPServer(st, emb, true))
 }
 
@@ -77,6 +75,12 @@ func runMCP() error {
 // reads them, and collecting at 25% leaves search times unchanged. GOGC set in
 // the environment still wins.
 const serverGCPercent = 25
+
+func useServerGC() {
+	if os.Getenv("GOGC") == "" {
+		debug.SetGCPercent(serverGCPercent)
+	}
+}
 
 // warmUp runs every toolset's warm-up at once in the background, then hands
 // back to the OS what they left behind: loading the vectors alone reads ~650 MB
