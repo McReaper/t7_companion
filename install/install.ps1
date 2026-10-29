@@ -53,24 +53,23 @@ Get-Release "t7kb_windows_amd64.zip" $tmp
 Get-Process t7kb -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe } |
     Stop-Process -Force -PassThru | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
 
-# A Radiant keeps the bridge it loaded locked. Its file name carries its
-# version, so the same one is in place already, and an older one stays until
-# that Radiant closes: the next update removes it.
 $stage = Join-Path $env:TEMP "t7kb_install"
 Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
 Expand-Archive -Path $tmp -DestinationPath $stage -Force
 Remove-Item $tmp -Force
 Get-ChildItem $stage -Recurse -File | ForEach-Object {
     $dst = Join-Path $Target $_.FullName.Substring($stage.Length + 1)
-    if ($_.Name -like "T7RadiantBridge-*.dll" -and (Test-Path $dst)) { return }
     New-Item -ItemType Directory -Force -Path (Split-Path $dst) | Out-Null
     Copy-Item $_.FullName $dst -Force
 }
-$keep = @(Get-ChildItem (Join-Path $stage "bridge") -Filter "T7RadiantBridge-*.dll" -ErrorAction SilentlyContinue | ForEach-Object Name)
-Get-ChildItem (Join-Path $Target "bridge") -Filter "T7RadiantBridge-*.dll" -ErrorAction SilentlyContinue |
-    Where-Object { $keep -notcontains $_.Name } |
-    ForEach-Object { try { Remove-Item $_.FullName -Force -ErrorAction Stop } catch {} }
 Remove-Item $stage -Recurse -Force
+
+# t7kb 3 shipped a standalone bridge it injected into Radiant, with its own
+# files. A Radiant still running one keeps that DLL locked: the next update
+# removes it.
+Get-ChildItem (Join-Path $Target "bridge") -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -like "T7RadiantBridge-*.dll" -or $_.Name -in "MinHook-LICENSE.txt", "T7RadiantBridge.log" } |
+    ForEach-Object { try { Remove-Item $_.FullName -Force -ErrorAction Stop } catch {} }
 
 # The database changes far less often than the binary: the zip already here
 # stays when it is the release's.

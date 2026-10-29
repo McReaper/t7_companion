@@ -17,6 +17,6 @@ Sources:
 
 The code in this repo is MIT — see [`LICENSE`](../LICENSE).
 
-The release archive also carries, in `bridge/`, [T7RadiantBridge](https://github.com/McReaper/t7_radiant_bridge), the Radiant bridge t7kb has [MTPlugins](https://github.com/Aidan601/MTPlugins) load into Radiant: a separate GPLv3 program, with its `LICENSE` and `NOTICE.md` beside it and its source at the release its file name gives. t7kb talks to it over a named pipe only.
+The release archive also carries, in `bridge/`, [T7RadiantBridge](https://github.com/McReaper/t7_radiant_bridge), the Radiant bridge t7kb has [MTPlugins](https://github.com/Aidan601/MTPlugins) load into Radiant: a separate GPLv3 program, with its `LICENSE` and `NOTICE.md` beside it and its source at the release whose version `t7kb radiant open` reports as `plugin`. t7kb talks to it over a named pipe only.
 
 **Removal:** if you authored something bundled here and want it taken out, message the maintainer [McReaper](https://github.com/McReaper) privately and it will be dropped from the next build.
