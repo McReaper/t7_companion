@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -136,13 +135,7 @@ func (ef *editFlags) run(c *cobra.Command, run gdtRun) error {
 
 // readBatch reads --batch: a JSON file, or stdin for "-".
 func (ef *editFlags) readBatch(stdin io.Reader) ([]gdtEditItem, error) {
-	var b []byte
-	var err error
-	if ef.batch == "-" {
-		b, err = io.ReadAll(stdin)
-	} else {
-		b, err = os.ReadFile(ef.batch)
-	}
+	b, err := readInput(ef.batch, stdin)
 	if err != nil {
 		return nil, err
 	}
