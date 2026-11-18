@@ -76,6 +76,10 @@ func TestGDTCommands(t *testing.T) {
 		if err != nil || len(m["results"].([]any)) != 2 || m["written"] != false {
 			t.Fatalf("%v %v", m, err)
 		}
+		// Windows PowerShell 5.1 pipes a UTF-8 BOM ahead of the JSON
+		if m, err := runGDT(t, root, "\xEF\xBB\xBF"+batch, "edit", "--file", "source_data/batch.gdt", "--batch", "-"); err != nil || len(m["results"].([]any)) != 2 {
+			t.Fatalf("a batch after a BOM: %v %v", m, err)
+		}
 	})
 
 	t.Run("edit --image-* creates an image", func(t *testing.T) {

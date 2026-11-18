@@ -118,6 +118,10 @@ func TestMapEditToolAndCommand(t *testing.T) {
 	if _, err := run(`not json`); err == nil {
 		t.Error("ops that are no JSON")
 	}
+	// Windows PowerShell 5.1 pipes a UTF-8 BOM ahead of the JSON: the ops behind it get decoded
+	if _, err := run("\xEF\xBB\xBF" + `[{"nope": 1}]`); err == nil || !strings.Contains(err.Error(), "op 0") {
+		t.Errorf("ops after a BOM: %v", err)
+	}
 }
 
 // revsOf reads, through map_find, the revs map_edit wants for these ids.

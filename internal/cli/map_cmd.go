@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"sort"
 	"strings"
@@ -128,13 +127,7 @@ func newMapEditCmd() *cobra.Command {
 		Short: "Apply a batch of ops (a JSON array, as map_edit takes) as one undo step",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			var raw []byte
-			var err error
-			if file == "-" {
-				raw, err = io.ReadAll(c.InOrStdin())
-			} else {
-				raw, err = os.ReadFile(file)
-			}
+			raw, err := readInput(file, c.InOrStdin())
 			if err != nil {
 				return err
 			}
