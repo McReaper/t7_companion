@@ -26,6 +26,8 @@ The right-hand Build Options are four independent checkboxes run by the **Build*
 
 A normal first build ticks all four; day-to-day you re-tick only what changed (see *Iterate fast* below). In Claude Code, the plugin's monitor also says each build the mapper runs from the Launcher once its tool quits: a link's errors, or that it went fine, and a compile's leak. Ask them to build and wait for that line rather than for a paste of the Launcher's console.
 
+**The plugin's monitor starts only in a session opened inside the BO3 root** (`TA_TOOLS_PATH`, a map's folder included). In a session opened elsewhere, start the same watch yourself before a build, a run or Radiant work: Claude Code's Monitor tool on `"$LOCALAPPDATA/t7kb/t7kb.exe" watch`, with its longest timeout, re-armed each time it expires while that work goes on. Without it no line comes, and a wait for one never ends.
+
 ## Assets must be converted before you link
 
 The linker packs **converted** assets, not raw source — so the asset pipeline has to run first:
