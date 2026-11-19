@@ -48,4 +48,14 @@ func workspace(toolsPath string) (*gdt.Workspace, error) {
 	return w, nil
 }
 
+// releaseWorkspaces drops every cached workspace, and with it its index and
+// xmodel caches (~250 MB on a full install), for the MCP server gone idle; the
+// next call opens the root again from the caches on disk. A call already
+// running keeps the workspace it holds.
+func releaseWorkspaces() {
+	wsMu.Lock()
+	defer wsMu.Unlock()
+	clear(wsCache)
+}
+
 // ---- operations shared by CLI and MCP

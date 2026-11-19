@@ -121,21 +121,30 @@ func (ix *vecIndex) scores(qvec []float32) []float64 {
 }
 
 // EnableVectorIndex makes vector search score an in-memory copy of the
-// vectors, loaded on first use (or by WarmVectors). For a long-lived process:
-// a one-shot search is faster with the plain scan than with loading the index.
+// vectors, loaded by the first search and dropped by ReleaseVectors. For a
+// long-lived process: a one-shot search is faster with the plain scan than
+// with loading the index.
 func (s *Store) EnableVectorIndex() { s.vecOn = true }
 
-// WarmVectors loads the vector index, returning once it is loaded.
-func (s *Store) WarmVectors() {
-	if s.vecOn {
-		s.vectorIndex()
-	}
+// ReleaseVectors drops the in-memory index (~650 MB on a full corpus), and
+// says whether one was loaded; the next search loads it again. A search
+// already running keeps the copy it holds.
+func (s *Store) ReleaseVectors() bool {
+	s.vecMu.Lock()
+	defer s.vecMu.Unlock()
+	had := s.vecIx != nil
+	s.vecIx, s.vecLoaded = nil, false
+	return had
 }
 
-// vectorIndex returns the in-memory index, loading it once; nil means scan.
+// vectorIndex returns the in-memory index, loading it unless it is; nil means
+// scan. Searches meanwhile wait for the one load.
 func (s *Store) vectorIndex() *vecIndex {
-	s.vecOnce.Do(func() {
+	s.vecMu.Lock()
+	defer s.vecMu.Unlock()
+	if !s.vecLoaded {
 		s.vecIx, _ = loadVecIndex(context.Background(), s.db) // on failure, the scan still answers
-	})
+		s.vecLoaded = true
+	}
 	return s.vecIx
 }

@@ -113,7 +113,7 @@ func TestTheServerRecordsEachToolCall(t *testing.T) {
 	testRadiant(t)
 	dir := t.TempDir()
 	t.Setenv(journal.Env, dir)
-	c, err := client.NewInProcessClient(newMCPServer(nil, nil, false))
+	c, err := client.NewInProcessClient(newMCPServer(nil, nil, nil))
 	if err != nil {
 		t.Fatal(err)
 	}

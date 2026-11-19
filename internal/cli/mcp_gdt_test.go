@@ -88,7 +88,7 @@ func decode(t *testing.T, text string) map[string]any {
 func TestGDTToolsOverMCP(t *testing.T) {
 	root := fakeToolsRoot(t)
 	t.Setenv("TA_TOOLS_PATH", root)
-	c, err := client.NewInProcessClient(newMCPServer(nil, nil, false))
+	c, err := client.NewInProcessClient(newMCPServer(nil, nil, nil))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -43,9 +43,10 @@ type Store struct {
 	srcList []string
 	srcErr  error
 
-	vecOn   bool      // EnableVectorIndex: score an in-memory copy of the vectors
-	vecOnce sync.Once // vectorIndex(): loaded once
-	vecIx   *vecIndex
+	vecOn     bool       // EnableVectorIndex: score an in-memory copy of the vectors
+	vecMu     sync.Mutex // guards vecIx and vecLoaded
+	vecLoaded bool       // vectorIndex() tried a load since the last ReleaseVectors
+	vecIx     *vecIndex
 }
 
 // Hit is one fused search result.
