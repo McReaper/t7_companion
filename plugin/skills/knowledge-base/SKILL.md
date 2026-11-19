@@ -7,7 +7,7 @@ description: How to search the t7kb knowledge base for Black Ops 3 / BO3 / Treya
 
 You have a local knowledge base of the Black Ops 3 modding community via the **t7kb** MCP server — tools `t7kb:search` (hybrid keyword + semantic) and `t7kb:get` (full document by `doc_id`). For any non-trivial BO3 modding question, query it before answering from memory; the corpus is the authority on what BO3 modding actually contains, your training data is not. That holds mid-task too, not only for a question or an error: before asserting how the pipeline behaves (what the linker packs, how a zone, assetlist or GDT works) or asking the user to confirm it, search, and load the skill that owns it.
 
-_If the `t7kb` tools aren't available, the knowledge base isn't installed — run `/t7kb:setup-or-update` first._
+_If `t7kb:search` isn't among your tools, the t7kb MCP server isn't registered for this session, even when the `t7kb` command runs in a shell. Tell the user once and offer `/t7kb:setup-or-update`: it installs t7kb if needed and registers the server. Until then, use the `t7kb` CLI, which has a command for every tool._
 
 _If you're working under a BO3 mod-tools root (it holds `bin/`, `share/` and `map_source/`, with `usermaps/` or `mods/`) whose `CLAUDE.md` doesn't record it yet, offer `/t7kb:setup-or-update`: its step 3 writes a short `CLAUDE.md` stub there naming the root, which covers every map/mod under it._
 
