@@ -15,16 +15,33 @@ import (
 )
 
 // T7KB_RELEASE_AFTER sets how long the server waits idle: a Go duration, or
-// 0/off/never to keep what it loaded; anything else keeps the default.
+// a zero one, off or never to keep what it loaded; anything else keeps the
+// default.
 func TestReleaseAfterReadsTheEnvironment(t *testing.T) {
 	for v, want := range map[string]time.Duration{
 		"": defaultReleaseAfter, "90s": 90 * time.Second, " 30M ": 30 * time.Minute,
-		"0": 0, "off": 0, "Never": 0, "no": 0, "false": 0,
+		"0": 0, "0s": 0, "off": 0, "Never": 0, "no": 0, "false": 0,
 		"soon": defaultReleaseAfter, "-5m": defaultReleaseAfter,
 	} {
 		t.Setenv("T7KB_RELEASE_AFTER", v)
 		if got := releaseAfter(); got != want {
 			t.Errorf("T7KB_RELEASE_AFTER=%q: %v, want %v", v, got, want)
+		}
+	}
+}
+
+// The server looks a few times per wait, at most once a minute, and never
+// spins on a tiny wait.
+func TestIdleCheckPace(t *testing.T) {
+	for after, want := range map[time.Duration]time.Duration{
+		10 * time.Minute:      time.Minute,
+		2 * time.Minute:       30 * time.Second,
+		40 * time.Second:      10 * time.Second,
+		20 * time.Millisecond: 10 * time.Millisecond,
+		time.Millisecond:      10 * time.Millisecond,
+	} {
+		if got := checkEvery(after); got != want {
+			t.Errorf("checkEvery(%v) = %v, want %v", after, got, want)
 		}
 	}
 }

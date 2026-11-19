@@ -18,19 +18,26 @@ import (
 const defaultReleaseAfter = 10 * time.Minute
 
 // releaseAfter is defaultReleaseAfter, or T7KB_RELEASE_AFTER as a Go duration
-// (90s, 30m); 0, off or never keeps everything loaded once loaded.
+// (90s, 30m); a zero one (0, 0s), off or never keeps everything loaded once
+// loaded.
 func releaseAfter() time.Duration {
 	v := strings.ToLower(strings.TrimSpace(os.Getenv("T7KB_RELEASE_AFTER")))
 	switch v {
 	case "":
 		return defaultReleaseAfter
-	case "0", "off", "never", "no", "false":
+	case "off", "never", "no", "false":
 		return 0
 	}
-	if d, err := time.ParseDuration(v); err == nil && d > 0 {
+	if d, err := time.ParseDuration(v); err == nil && d >= 0 {
 		return d
 	}
 	return defaultReleaseAfter
+}
+
+// checkEvery is how often the server looks whether it has been idle long
+// enough: a quarter of the wait, at most a minute, at least 10 ms.
+func checkEvery(after time.Duration) time.Duration {
+	return min(time.Minute, max(after/4, 10*time.Millisecond))
 }
 
 // idleRelease runs release once the server has been idle for after: no call
@@ -93,11 +100,9 @@ func (r *idleRelease) check(now time.Time) bool {
 	return true
 }
 
-// run checks, a few times per after (at most once a minute), until stop is
-// closed.
+// run checks every checkEvery(after) until stop is closed.
 func (r *idleRelease) run(stop <-chan struct{}) {
-	every := min(time.Minute, max(r.after/4, 10*time.Millisecond))
-	t := time.NewTicker(every)
+	t := time.NewTicker(checkEvery(r.after))
 	defer t.Stop()
 	for {
 		select {
