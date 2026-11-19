@@ -76,7 +76,7 @@ The measurement works for any raw asset — animtrees, animtables, behavior tree
 The stages are decoupled on purpose; the slow full build is only for the first pass or a geometry change.
 
 - **Script-only change** (GSC/CSC/Lua) → **Link** alone. No Compile, no Light — scripts aren't in the BSP. Fastest loop.
-- **Entity-only change** (moved/added spawners, script_structs, KVPs — no brush edits) → the map compiler's **`-onlyents`** fast path re-exports just entities. It's invalid the moment any *brush* geometry changed (throws a brush-count mismatch) — that forces a **Full Compile**.
+- **Entity-only change** (moved/added spawners, script_structs, KVPs — no brush edits) → the map compiler's **`-onlyents`** fast path re-exports just entities. It's invalid the moment any *brush* geometry changed (throws a brush-count mismatch) — that forces a **Full Compile**. An entity that lights (a light, an emissive model, a prefab swapping one in, a probe) also needs **Light**: the link takes the last bake's `.led`, so the game keeps that bake's lighting until the next one, which `t7kb watch` says after the link.
 - **Geometry change** (brushes/patches) → **Full Compile** (+ Light if it affects lighting) → Link.
 - **Lighting-only change** → **Light** → Link; no recompile.
 - **Asset edit** (GDT/model/material) → save + let GdtDB index → **Link**. Run `t7kb:gdt_check` on the GDT first: it reports the missing references, missing source files and duplicates the linker would otherwise hand you one per run (**t7kb:assets**).

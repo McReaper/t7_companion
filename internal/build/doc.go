@@ -102,7 +102,11 @@
 // Each line wakes the agent, so a link that built says only what its target's
 // last link didn't: the warnings and the assets it named that are in no GDT
 // that are new, and that it built again after a link that broke; one that
-// went as the last one did says nothing. The last link before the watch is
+// went as the last one did says nothing. After a usermap's link that built,
+// whoever ran it, it says once per bake when the map's .led is more than 2 s
+// older than its .d3dbsp: the game lights the map from the last bake, so what
+// a compile since brought in (a light, an emissive, a probe) shows as that
+// bake left it. The last link before the watch is
 // read from disk at its start: the errorlogs and .deps.partial written since
 // the newest .deps under all/assetinfo, as every link runs that
 // language-neutral pass first and a language pass only an earlier link ran
