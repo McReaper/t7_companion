@@ -1,0 +1,2 @@
+# Every text file is LF in the working tree too, whatever core.autocrlf says: tests compare files byte for byte (README's diagram, the picture goldens), and Git for Windows checks out CRLF by default.
+* text=auto eol=lf
