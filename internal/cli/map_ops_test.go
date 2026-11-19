@@ -140,7 +140,7 @@ func TestRadiantOpenToolOverMCP(t *testing.T) {
 		return &radianttest.Started{Fake: radianttest.New(pid, args[0]), Unloaded: true,
 			Modules: []string{exe, filepath.Join(root, "bin", "plugins", "RadiantPlugins.dll")}}
 	}
-	c, err := client.NewInProcessClient(newMCPServer(nil, nil, false))
+	c, err := client.NewInProcessClient(newMCPServer(nil, nil, nil))
 	if err != nil {
 		t.Fatal(err)
 	}

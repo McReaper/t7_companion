@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -66,22 +67,79 @@ func BenchmarkVectorIndexRank(b *testing.B) {
 	}
 }
 
-// WarmVectors loads the index before it returns, so the server can hand back
-// the load's garbage after it; without EnableVectorIndex it loads nothing.
-func TestWarmVectorsLoadsBeforeReturning(t *testing.T) {
+// The index loads on the first search, not before; ReleaseVectors drops it,
+// says it did, and the next search loads it again and ranks as before.
+func TestReleasedVectorsLoadAgainOnTheNextSearch(t *testing.T) {
 	c := corpus(t, 100, 2)
 	s, err := Open(c.path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	s.WarmVectors()
+	ctx := context.Background()
+	qvec := unitVec(rand.New(rand.NewSource(3)))
+
+	plain, err := s.vectorRank(ctx, qvec, Pool, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if s.vecIx != nil {
 		t.Fatal("loaded without EnableVectorIndex")
 	}
 	s.EnableVectorIndex()
-	s.WarmVectors()
+	if s.vecIx != nil {
+		t.Fatal("loaded before any search")
+	}
+	first, err := s.vectorRank(ctx, qvec, Pool, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if s.vecIx == nil {
-		t.Fatal("WarmVectors returned before the index loaded")
+		t.Fatal("the first search didn't load the index")
+	}
+	if !s.ReleaseVectors() || s.vecIx != nil {
+		t.Fatal("ReleaseVectors kept the index, or said there was none")
+	}
+	if s.ReleaseVectors() {
+		t.Error("a second ReleaseVectors said it dropped an index")
+	}
+	again, err := s.vectorRank(ctx, qvec, Pool, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.vecIx == nil {
+		t.Fatal("the search after a release didn't load the index again")
+	}
+	if !reflect.DeepEqual(first, plain) || !reflect.DeepEqual(again, plain) {
+		t.Error("the index ranks differently from the scan, before or after a release")
+	}
+}
+
+// A store whose vectors can't load (no embeddings table) answers with the
+// scan, and doesn't retry the load on each search until it is released.
+func TestVectorIndexWithoutEmbeddingsLoadsOnce(t *testing.T) {
+	c := corpus(t, 10, 1)
+	rw, err := sql.Open("sqlite", "file:"+c.path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rw.Exec(`DROP TABLE embeddings`); err != nil {
+		t.Fatal(err)
+	}
+	_ = rw.Close()
+	s, err := Open(c.path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	s.EnableVectorIndex()
+	if s.vectorIndex() != nil || !s.vecLoaded {
+		t.Fatal("no embeddings: want no index, and the load marked as tried")
+	}
+	if s.ReleaseVectors() {
+		t.Error("ReleaseVectors said it dropped an index that never loaded")
+	}
+	if s.vecLoaded {
+		t.Error("ReleaseVectors left the load marked as tried")
 	}
 }

@@ -11,14 +11,9 @@ import (
 )
 
 // gdtToolset is GDT authoring: find/get/schema/edit/check/refs over the mod-tools
-// root's GDTs. Its index is warmed at server start, like gdtdb does for APE.
+// root's GDTs. Its index loads on the first call, from its cache on disk.
 func gdtToolset() toolset {
-	return toolset{name: "gdt", tools: gdtToolDefs(), warm: func() {
-		if w, err := workspace(""); err == nil {
-			w.Warm()
-			w.WarmModels()
-		}
-	}}
+	return toolset{name: "gdt", tools: gdtToolDefs()}
 }
 
 func gdtToolDefs() []server.ServerTool {

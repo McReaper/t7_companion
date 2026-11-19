@@ -4,7 +4,6 @@ import (
 	"os"
 	"runtime/debug"
 	"strings"
-	"sync"
 
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
@@ -32,7 +31,6 @@ func newMCPCmd() *cobra.Command {
 type toolset struct {
 	name  string
 	tools []server.ServerTool
-	warm  func() // optional: warm-up the server runs in the background at start, returning once done
 }
 
 func toolsets(st *store.Store, emb *embed.Embedder) []toolset {
@@ -48,8 +46,11 @@ func toolsets(st *store.Store, emb *embed.Embedder) []toolset {
 	}
 }
 
-// runMCP opens the db and loads the embedder once, then serves every toolset over
-// stdio. Nothing is written to stdout except the MCP protocol stream.
+// runMCP opens the db, then serves every toolset over stdio. What the tools
+// load — the search vectors, the embedding model, the GDT caches — loads on the
+// first call that needs it, and is handed back once the server goes idle
+// (releaseAfter): a session that never touches BO3 holds none of it. Nothing
+// is written to stdout except the MCP protocol stream.
 func runMCP() error {
 	st, err := openStore()
 	if err != nil {
@@ -59,14 +60,26 @@ func runMCP() error {
 	if vectorIndexWanted() {
 		st.EnableVectorIndex() // a long-lived server: search memory, not ~445k rows per query
 	}
-
-	emb, err := embed.New()
-	if err != nil {
-		return err
-	}
+	emb := embed.Lazy()
 
 	useServerGC()
-	return server.ServeStdio(newMCPServer(st, emb, true))
+	var idle *idleRelease
+	if after := releaseAfter(); after > 0 {
+		idle = newIdleRelease(after, func() { releaseLoaded(st, emb) })
+		stop := make(chan struct{})
+		defer close(stop)
+		go idle.run(stop)
+	}
+	return server.ServeStdio(newMCPServer(st, emb, idle))
+}
+
+// releaseLoaded drops what tool calls loaded and hands the memory back to the
+// OS, which Go otherwise keeps.
+func releaseLoaded(st *store.Store, emb *embed.Embedder) {
+	st.ReleaseVectors()
+	emb.Release()
+	releaseWorkspaces()
+	debug.FreeOSMemory()
 }
 
 // serverGCPercent is the server's GOGC. Go's default, 100, lets the heap grow to
@@ -82,20 +95,6 @@ func useServerGC() {
 	}
 }
 
-// warmUp runs every toolset's warm-up at once in the background, then hands
-// back to the OS what they left behind: loading the vectors alone reads ~650 MB
-// of rows that are garbage once copied, and Go keeps freed memory otherwise.
-func warmUp(warms []func(), release func()) {
-	go func() {
-		var wg sync.WaitGroup
-		for _, w := range warms {
-			wg.Go(w)
-		}
-		wg.Wait()
-		release()
-	}()
-}
-
 // mcpInstructions reach the agent in every session where the server is
 // registered, so they hold only the rule that always applies: each tool's
 // description says what it does, and the t7kb:* skills carry the craft.
@@ -108,25 +107,21 @@ const mcpInstructions = "t7kb is a local knowledge base of the Black Ops 3 (BO3)
 	"first: it holds the method and the traps that fail silently."
 
 // newMCPServer registers every toolset on one server — the one runMCP serves,
-// and the one tests drive in-process.
-func newMCPServer(st *store.Store, emb *embed.Embedder, warm bool) *server.MCPServer {
+// and the one tests drive in-process. idle, when set, counts every call.
+func newMCPServer(st *store.Store, emb *embed.Embedder, idle *idleRelease) *server.MCPServer {
 	s := server.NewMCPServer("t7kb", Version(), server.WithToolCapabilities(false),
 		server.WithInstructions(mcpInstructions),
 		server.WithRecovery()) // a panicking handler must not take the whole stdio server down
 	dir := journal.Dir()
-	var warms []func()
 	for _, ts := range toolsets(st, emb) {
 		tools := strictTools(ts.tools)
 		if dir != "" { // T7KB_DEBUG: each call recorded, the refused ones too
 			tools = journaledTools(dir, tools)
 		}
-		s.AddTools(tools...)
-		if ts.warm != nil {
-			warms = append(warms, ts.warm)
+		if idle != nil {
+			tools = idle.wrap(tools)
 		}
-	}
-	if warm {
-		warmUp(warms, debug.FreeOSMemory)
+		s.AddTools(tools...)
 	}
 	return s
 }

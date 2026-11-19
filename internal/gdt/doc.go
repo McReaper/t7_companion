@@ -55,8 +55,9 @@
 //
 // Every GDT in the directories gdtdb scans (bin/converter_gdt_dirs_0.txt) is
 // indexed, gob-cached in the user cache dir and refreshed incrementally by
-// mtime/size; the MCP server warms it at start and refresh (index.go) keeps it
-// fresh in a long session. The techsetdef tree stays fresh too (techset.go): a
+// mtime/size; the MCP server loads it on its first call, drops it once idle,
+// and refresh (index.go) keeps it fresh in a long session. The techsetdef tree
+// stays fresh too (techset.go): a
 // material type it doesn't know rescans it, it is rescanned once it is two
 // minutes old, and a resolved techset whose techsetdef or #includes changed is
 // read again — a custom techset written mid-session is a material type at
