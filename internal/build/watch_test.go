@@ -82,6 +82,45 @@ func TestRecordWatcherSaysALinkThatBuiltWithWhatItLinkedWithout(t *testing.T) {
 	}
 }
 
+// A link that stops on a fatal error, a crash or a stop leaves its .deps as
+// .deps.partial and writes no errorlog: said once the linker has quit, with
+// where its error is. An earlier link's .deps doesn't hide it.
+func TestRecordWatcherSaysALinkThatStoppedBeforeItFinished(t *testing.T) {
+	runs := map[string]bool{linkerExe: true}
+	w, said := recordWatch(t, runs)
+	writeRecordAt(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps", "version,1,1\n", -time.Hour) // the last link that finished
+	writeRecord(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps.partial", "version,1,1\nscriptparsetree,scripts/zm/_zm_bl")
+	writeRecord(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.errorlog", "return 1\n^1ERROR: no xmodel p7_crate\n")
+	w.Tick()
+	if len(*said) != 0 {
+		t.Fatalf("nothing while the linker runs: %q", *said)
+	}
+	runs[linkerExe] = false
+	w.Tick()
+	w.Tick()
+	want := []string{"link of usermaps/zm_x stopped before it finished (a fatal error, a crash or a stop): " +
+		"usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps stayed .partial, and its error went only to the Launcher's console: " +
+		"ask for it, or link again with build, which reports it; before that it logged 1 error(s): ERROR: no xmodel p7_crate"}
+	if !reflect.DeepEqual(*said, want) {
+		t.Errorf("one line once the linker quit:\n got %q\nwant %q", *said, want)
+	}
+}
+
+// A .deps.partial its .deps followed, or one left by an earlier link, is not
+// a link that stopped.
+func TestRecordWatcherSaysALinkThatFinishedAfterItsPartialAsItWent(t *testing.T) {
+	w, said := recordWatch(t, nil)
+	writeRecordAt(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps.partial", "version,1,1\n", time.Second)
+	writeRecordAt(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps", "version,1,1\n", 3*time.Second)
+	writeRecordAt(t, w, "mods/my_mod/zone_source/all/assetinfo/zm_mod.deps.partial", "version,1,1\n", -time.Hour) // a stopped link before the watch
+	writeRecord(t, w, "mods/my_mod/zone_source/all/assetinfo/zm_mod.deps", "version,1,1\n")
+	w.Tick()
+	want := []string{"link of mods/my_mod ok", "link of usermaps/zm_x ok"}
+	if !reflect.DeepEqual(*said, want) {
+		t.Errorf("finished links:\n got %q\nwant %q", *said, want)
+	}
+}
+
 func TestRecordWatcherWaitsForRecordsToSettleAndSaysEachOnce(t *testing.T) {
 	w, said := recordWatch(t, nil)
 	w.Settle = time.Hour
@@ -250,5 +289,22 @@ func TestRecordWatcherLeavesALinkT7kbRanToItsBuildsLine(t *testing.T) {
 	w.Tick()
 	if len(*said) != 3 || (*said)[2] != "link of usermaps/zm_x ok" {
 		t.Errorf("a link after the build ended is the Launcher's: %q", *said)
+	}
+}
+
+// A link t7kb ran that stopped before it finished is its build's line alone:
+// the build read the error from the linker's own output.
+func TestRecordWatcherLeavesAStoppedLinkT7kbRanToItsBuildsLine(t *testing.T) {
+	w, said := recordWatch(t, nil)
+	build := State{Target: "zm_x", Kind: "usermap", PID: 7, Started: w.start}
+	w.Builds = func() []State { return []State{build} }
+	writeRecord(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps.partial", "version,1,1\n")
+	w.Tick()
+	build.Done, build.Ended = true, w.start.Add(2*time.Second)
+	build.Report = Report{FailedStage: "link", Stages: []StageResult{{Name: "link", Errors: []string{"script error"}}}}
+	w.Tick()
+	want := []string{"build of zm_x failed at link after 2s: script error; build's status has the report"}
+	if !reflect.DeepEqual(*said, want) {
+		t.Errorf("only the build's line:\n got %q\nwant %q", *said, want)
 	}
 }
