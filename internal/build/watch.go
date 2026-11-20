@@ -50,7 +50,7 @@ func (w *RecordWatcher) Tick() {
 		w.start, w.seen, w.links, w.compiles, w.builds = now, map[string]time.Time{}, map[string]*records{}, map[string]*records{}, map[string]bool{}
 	}
 	for _, kind := range []string{"usermaps", "mods"} {
-		for _, ext := range []string{"deps", "errorlog"} {
+		for _, ext := range []string{"deps", "errorlog", "deps.partial"} {
 			paths, _ := filepath.Glob(filepath.Join(w.Root, kind, "*", "zone_source", "*", "assetinfo", "*."+ext))
 			for _, p := range paths {
 				w.note(w.links, p, filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(p)))), now)
@@ -186,6 +186,15 @@ func (w *RecordWatcher) sayLink(target string, since time.Time) {
 	for i, f := range log.files {
 		where[i] = name + "/zone_source/" + f
 	}
+	if cut := w.unfinished(target, since); len(cut) > 0 {
+		line := fmt.Sprintf("link of %s stopped before it finished (a fatal error, a crash or a stop): %s stayed .partial, and its error went only to "+
+			"the Launcher's console: ask for it, or link again with build, which reports it", name, strings.Join(cut, ", "))
+		if len(log.errors) > 0 {
+			line += fmt.Sprintf("; before that it logged %d error(s): %s", len(log.errors), named(log.errors, len(log.errors)))
+		}
+		w.Out(line)
+		return
+	}
 	switch {
 	case len(log.errors) > 0:
 		w.Out(fmt.Sprintf("link of %s failed with %d error(s): %s; all in %s", name, len(log.errors), named(log.errors, len(log.errors)), strings.Join(where, ", ")))
@@ -195,6 +204,24 @@ func (w *RecordWatcher) sayLink(target string, since time.Time) {
 	default:
 		w.Out(fmt.Sprintf("link of %s ok%s", name, w.missing(target, since)))
 	}
+}
+
+// unfinished names the .deps a link left unfinished: the linker writes a
+// zone's .deps.partial as it goes and its .deps once that zone is done, so a
+// .deps.partial written by this link and not followed by its .deps is a link
+// that stopped there, and a fatal error writes no errorlog.
+func (w *RecordWatcher) unfinished(target string, since time.Time) []string {
+	parts, _ := filepath.Glob(filepath.Join(target, "zone_source", "*", "assetinfo", "*.deps.partial"))
+	var cut []string
+	for _, p := range parts {
+		m := fileMTime(p)
+		done := strings.TrimSuffix(p, ".partial")
+		if m.Before(since.Add(-2*time.Second)) || !fileMTime(done).Before(m) {
+			continue
+		}
+		cut = append(cut, w.rel(done))
+	}
+	return cut
 }
 
 // missing names the assets the zones the link wrote looked up and found in no
