@@ -99,10 +99,11 @@
 // the other), from the verdicts the stages use: a compile's leak and placed
 // problems, and that it stopped, and nothing for a compile with none; a
 // link's errors, or that it stopped, each time.
-// Each line wakes the agent, so a link that built says only what its target's
-// last link didn't: the warnings and the assets it named that are in no GDT
-// that are new, and that it built again after a link that broke; one that
-// went as the last one did says nothing. After a usermap's link that built,
+// A link that built is said each time, so an agent waiting on a build hears
+// it is done; as each line wakes the agent, it names only what its target's
+// last link didn't have (the warnings and the assets it named that are in no
+// GDT), counts the rest, and says it built again after a link that broke.
+// After a usermap's link that built,
 // whoever ran it, it says once per bake when the map's .led is more than 2 s
 // older than its .d3dbsp: the game lights the map from the last bake, so what
 // a compile since brought in (a light, an emissive, a probe) shows as that
