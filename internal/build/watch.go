@@ -35,6 +35,7 @@ type RecordWatcher struct {
 	builds   map[string]bool      // t7kb's builds, by target and start: true once said, false while seen running
 	states   []State              // t7kb's builds, as Builds last said
 	last     map[string]*lastLink // by target folder, what its last link left
+	lit      map[string]time.Time // by map target, the .led a link was last said to light it with stale
 }
 
 // lastLink is what a target's last link left, so that a link says only what
@@ -57,7 +58,7 @@ type records struct {
 func (w *RecordWatcher) Tick() {
 	now := time.Now()
 	if w.seen == nil {
-		w.start, w.seen, w.links, w.compiles, w.builds = now, map[string]time.Time{}, map[string]*records{}, map[string]*records{}, map[string]bool{}
+		w.start, w.seen, w.links, w.compiles, w.builds, w.lit = now, map[string]time.Time{}, map[string]*records{}, map[string]*records{}, map[string]bool{}, map[string]time.Time{}
 		w.last = w.lastOnDisk()
 	}
 	for _, kind := range []string{"usermaps", "mods"} {
@@ -189,7 +190,9 @@ func (w *RecordWatcher) flush(builds map[string]*records, exe string, now time.T
 // when it is news: a warning or a lookup in no GDT the last link didn't have,
 // or a build after a link that broke. Each line wakes the agent, so a link
 // that went as the last one did says nothing. A link t7kb ran is its build's
-// line's to say, and is the last link all the same.
+// line's to say, and is the last link all the same. After a link that built,
+// whoever ran it, staleLight says whether its map's lighting predates its
+// compile.
 func (w *RecordWatcher) sayLink(target string, since time.Time) {
 	prev := w.last[target]
 	if prev == nil {
@@ -208,17 +211,45 @@ func (w *RecordWatcher) sayLink(target string, since time.Time) {
 		where[i] = name + "/zone_source/" + f
 	}
 	var line string
-	if cut := w.unfinished(target, since); len(cut) > 0 || len(log.errors) > 0 {
-		w.last[target] = &lastLink{broke: true, warnings: prev.warnings, missing: prev.missing}
-		line = brokeLine(name, cut, log, where)
-	} else {
+	cut := w.unfinished(target, since)
+	built := len(cut) == 0 && len(log.errors) == 0
+	if built {
 		missing := w.missing(target, since)
 		w.last[target] = &lastLink{warnings: setOf(log.warnings), missing: setOf(missing)}
 		line = builtLine(name, prev, log.warnings, missing, where)
+	} else {
+		w.last[target] = &lastLink{broke: true, warnings: prev.warnings, missing: prev.missing}
+		line = brokeLine(name, cut, log, where)
 	}
 	if line != "" && !w.ranByT7kb(target, since) {
 		w.Out(line)
 	}
+	if built {
+		w.staleLight(target)
+	}
+}
+
+// ledStamp is how a stale-lighting line dates the bake and the compile.
+const ledStamp = "Jan 2 15:04"
+
+// staleLight says, once per bake, that a map links with the lighting of a bake
+// older than its last compile: the game lights a map from the .led only the
+// light stage writes, so what a compile since brought in (a light, an
+// emissive model, a probe) shows as that bake left it until the next one.
+func (w *RecordWatcher) staleLight(target string) {
+	name := filepath.Base(target)
+	pp, _, _ := strings.Cut(name, "_") // zm, mp
+	if filepath.Base(filepath.Dir(target)) != "usermaps" {
+		return
+	}
+	maps := filepath.Join(w.Root, "share", "raw", "maps", pp)
+	led, bsp := fileMTime(filepath.Join(maps, name+".led")), fileMTime(filepath.Join(maps, name+".d3dbsp"))
+	if led.IsZero() || !bsp.After(led.Add(2*time.Second)) || w.lit[target].Equal(led) {
+		return
+	}
+	w.lit[target] = led
+	w.Out(fmt.Sprintf("link of %s used lighting baked %s, before the map's compile of %s: lights, emissives and probes changed since show in game only once the map is lit again (Light in the Launcher, or build's light stage)",
+		w.rel(target), led.Format(ledStamp), bsp.Format(ledStamp)))
 }
 
 // brokeLine says a link that stopped before it finished, or that failed.
