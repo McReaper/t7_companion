@@ -417,8 +417,11 @@ func (w *RecordWatcher) missing(target string, since time.Time) []string {
 	return ids
 }
 
-// sayCompile says a compile's problems: a leak, from the leakfile it wrote,
-// and what its .errlog places. A compile with neither says nothing.
+// sayCompile says a compile's problems: that it stopped before it finished, a
+// leak, from the leakfile it wrote, and what its .errlog places. A compile
+// writes its records before its .d3dbsp, an ents-only one too, so one whose
+// .d3dbsp is older than its records stopped, unless t7kb ran it: its build
+// says it. A compile with none says nothing.
 func (w *RecordWatcher) sayCompile(base string, since time.Time) {
 	var parts []string
 	if !fileMTime(base + ".lin").Before(since.Add(-2 * time.Second)) {
@@ -427,9 +430,26 @@ func (w *RecordWatcher) sayCompile(base string, since time.Time) {
 	if placed, _, n := readErrlog(base+".errlog", since); n > 0 {
 		parts = append(parts, fmt.Sprintf("%s.errlog places %d problem(s): %s", w.rel(base), n, named(placed, n)))
 	}
-	if len(parts) > 0 {
-		w.Out(fmt.Sprintf("compile of %s.map: %s", w.rel(base), strings.Join(parts, "; ")))
+	head := "compile of " + w.rel(base) + ".map"
+	if bsp := w.bspOf(base); fileMTime(bsp).Before(since) && !w.ranByT7kb(filepath.Join(w.Root, "usermaps", filepath.Base(base)), since) {
+		head += fmt.Sprintf(" stopped before it finished (a fatal error, a crash or a stop): it didn't write %s, and its error went only to "+
+			"the Launcher's console: ask for it, or compile again with build, which reports it", w.rel(bsp))
+		if len(parts) > 0 {
+			head += "; " + strings.Join(parts, "; ")
+		}
+		w.Out(head)
+		return
 	}
+	if len(parts) > 0 {
+		w.Out(head + ": " + strings.Join(parts, "; "))
+	}
+}
+
+// bspOf is the .d3dbsp a compile of the map at base writes, as the Launcher
+// has it: map_source/<dir>/<map>.map compiles to
+// share/raw/maps/<dir>/<map>.d3dbsp.
+func (w *RecordWatcher) bspOf(base string) string {
+	return filepath.Join(w.Root, "share", "raw", "maps", filepath.Base(filepath.Dir(base)), filepath.Base(base)+".d3dbsp")
 }
 
 // rel is a path as a line names it: from the root, with slashes.
