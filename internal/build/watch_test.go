@@ -31,14 +31,19 @@ func writeRecord(t *testing.T, w *RecordWatcher, rel, body string) {
 // watch began.
 func writeRecordAt(t *testing.T, w *RecordWatcher, rel, body string, after time.Duration) {
 	t.Helper()
-	p := filepath.Join(w.Root, filepath.FromSlash(rel))
+	writeFileAt(t, w.Root, rel, body, w.start.Add(after))
+}
+
+// writeFileAt writes a file under root, dated at.
+func writeFileAt(t *testing.T, root, rel, body string, at time.Time) {
+	t.Helper()
+	p := filepath.Join(root, filepath.FromSlash(rel))
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	at := w.start.Add(after)
 	if err := os.Chtimes(p, at, at); err != nil {
 		t.Fatal(err)
 	}
@@ -72,8 +77,7 @@ func TestRecordWatcherSaysALinkThatBuiltWithWhatItLinkedWithout(t *testing.T) {
 	writeRecord(t, w, "mods/my_mod/zone_source/all/assetinfo/zm_mod.deps", "version,1,1\n")
 	writeRecordAt(t, w, "mods/my_mod/zone_source/all/assetinfo/core_mod.deps", "version,1,1\nxmodel,x\n\tgdt,image,old_missing,\n", -time.Hour) // an earlier link's
 	w.Tick()
-	want := []string{
-		"link of mods/my_mod ok",
+	want := []string{ // my_mod's link went fine, and names no earlier link's lookups
 		"link of usermaps/zm_x built, with 1 warning(s): a french warning; all in usermaps/zm_x/zone_source/french/assetinfo/fr_zm_x.errorlog, " +
 			"but 4 asset(s) it named are in no GDT and it linked on without them: image img_a | image img_b | image img_c | and 1 more",
 	}
@@ -112,10 +116,15 @@ func TestRecordWatcherSaysALinkThatFinishedAfterItsPartialAsItWent(t *testing.T)
 	w, said := recordWatch(t, nil)
 	writeRecordAt(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps.partial", "version,1,1\n", time.Second)
 	writeRecordAt(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps", "version,1,1\n", 3*time.Second)
+	writeRecordAt(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.errorlog", "return 1000\n^3w\n", 4*time.Second)
 	writeRecordAt(t, w, "mods/my_mod/zone_source/all/assetinfo/zm_mod.deps.partial", "version,1,1\n", -time.Hour) // a stopped link before the watch
 	writeRecord(t, w, "mods/my_mod/zone_source/all/assetinfo/zm_mod.deps", "version,1,1\n")
+	writeRecord(t, w, "mods/my_mod/zone_source/all/assetinfo/zm_mod.errorlog", "return 1000\n^3w\n")
 	w.Tick()
-	want := []string{"link of mods/my_mod ok", "link of usermaps/zm_x ok"}
+	want := []string{
+		"link of mods/my_mod built, with 1 warning(s): w; all in mods/my_mod/zone_source/all/assetinfo/zm_mod.errorlog",
+		"link of usermaps/zm_x built, with 1 warning(s): w; all in usermaps/zm_x/zone_source/all/assetinfo/zm_x.errorlog",
+	}
 	if !reflect.DeepEqual(*said, want) {
 		t.Errorf("finished links:\n got %q\nwant %q", *said, want)
 	}
@@ -125,6 +134,7 @@ func TestRecordWatcherWaitsForRecordsToSettleAndSaysEachOnce(t *testing.T) {
 	w, said := recordWatch(t, nil)
 	w.Settle = time.Hour
 	writeRecord(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps", "version,1,1\n")
+	writeRecord(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.errorlog", "return 1\n^1e\n")
 	w.Tick()
 	if len(*said) != 0 {
 		t.Fatalf("nothing before the records settle: %q", *said)
@@ -132,7 +142,7 @@ func TestRecordWatcherWaitsForRecordsToSettleAndSaysEachOnce(t *testing.T) {
 	w.Settle = 0
 	w.Tick()
 	w.Tick()
-	if want := []string{"link of usermaps/zm_x ok"}; !reflect.DeepEqual(*said, want) {
+	if want := []string{"link of usermaps/zm_x failed with 1 error(s): e; all in usermaps/zm_x/zone_source/all/assetinfo/zm_x.errorlog"}; !reflect.DeepEqual(*said, want) {
 		t.Errorf("said once settled: %q", *said)
 	}
 }
@@ -270,9 +280,11 @@ func TestRecordWatcherLeavesALinkT7kbRanToItsBuildsLine(t *testing.T) {
 	build := State{Target: "zm_x", Kind: "usermap", PID: 7, Started: w.start}
 	w.Builds = func() []State { return []State{build} }
 	writeRecord(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps", "version,1,1\n")
+	writeRecord(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.errorlog", "return 1000\n^3w1\n")
 	writeRecord(t, w, "mods/zm_x/zone_source/all/assetinfo/zm_mod.deps", "version,1,1\n") // another target of that name
+	writeRecord(t, w, "mods/zm_x/zone_source/all/assetinfo/zm_mod.errorlog", "return 1000\n^3w1\n")
 	w.Tick()
-	if want := []string{"link of mods/zm_x ok"}; !reflect.DeepEqual(*said, want) {
+	if want := []string{"link of mods/zm_x built, with 1 warning(s): w1; all in mods/zm_x/zone_source/all/assetinfo/zm_mod.errorlog"}; !reflect.DeepEqual(*said, want) {
 		t.Errorf("the running build's link is its own line's: %q", *said)
 	}
 	// Records up to 2 s around the build are its own, as file times are coarse.
@@ -281,13 +293,16 @@ func TestRecordWatcherLeavesALinkT7kbRanToItsBuildsLine(t *testing.T) {
 	w.Tick()
 	build.Done, build.Ended, build.Report = true, w.start.Add(3*time.Second), Report{OK: true}
 	writeRecordAt(t, w, "usermaps/zm_x/zone_source/german/assetinfo/zm_x.deps", "version,1,1\n", 4*time.Second) // 1 s after its end
+	writeRecordAt(t, w, "usermaps/zm_x/zone_source/german/assetinfo/ge_zm_x.errorlog", "return 1000\n^3w1\n", 4*time.Second)
 	w.Tick()
 	if len(*said) != 2 || !strings.HasPrefix((*said)[1], "build of zm_x finished ok") {
 		t.Errorf("records within 2 s of the build are its own: %q", *said)
 	}
-	writeRecordAt(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps", "version,1,1\n", time.Minute) // a later link, from the Launcher
+	// A later link, from the Launcher: the build's link was the last one.
+	writeRecordAt(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps", "version,1,1\n", time.Minute)
+	writeRecordAt(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.errorlog", "return 1000\n^3w1\n^3w2\n", time.Minute)
 	w.Tick()
-	if len(*said) != 3 || (*said)[2] != "link of usermaps/zm_x ok" {
+	if len(*said) != 3 || (*said)[2] != "link of usermaps/zm_x built, with 2 warning(s), 1 of them new: w2; all in usermaps/zm_x/zone_source/all/assetinfo/zm_x.errorlog" {
 		t.Errorf("a link after the build ended is the Launcher's: %q", *said)
 	}
 }
@@ -303,8 +318,152 @@ func TestRecordWatcherLeavesAStoppedLinkT7kbRanToItsBuildsLine(t *testing.T) {
 	build.Done, build.Ended = true, w.start.Add(2*time.Second)
 	build.Report = Report{FailedStage: "link", Stages: []StageResult{{Name: "link", Errors: []string{"script error"}}}}
 	w.Tick()
-	want := []string{"build of zm_x failed at link after 2s: script error; build's status has the report"}
+	writeRecordAt(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps", "version,1,1\n", time.Minute) // the fix, linked from the Launcher
+	w.Tick()
+	want := []string{"build of zm_x failed at link after 2s: script error; build's status has the report", "link of usermaps/zm_x ok again"}
 	if !reflect.DeepEqual(*said, want) {
-		t.Errorf("only the build's line:\n got %q\nwant %q", *said, want)
+		t.Errorf("only the build's line, then the Launcher's link after it:\n got %q\nwant %q", *said, want)
+	}
+}
+
+// A link that built says only what the last link didn't: each line wakes the
+// agent. The last link is the last one, not all of them.
+func TestRecordWatcherSaysOnlyWhatALinkChanged(t *testing.T) {
+	w, said := recordWatch(t, nil)
+	bullets := "Found 3 bad bulletmeshes, dumped to " + w.Root + `\/usermaps\zm_x/zone_source/all/assetinfo/zm_x_bulletreport.csv file.`
+	link := func(at time.Duration, warnings []string, missing ...string) {
+		t.Helper()
+		deps := "version,1,1\nxmodel,m\n"
+		for _, m := range missing {
+			deps += "\tgdt,image," + m + ",\n"
+		}
+		writeRecordAt(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps", deps, at)
+		if len(warnings) > 0 {
+			writeRecordAt(t, w, "usermaps/zm_x/zone_source/all/assetinfo/zm_x.errorlog", "return 1000\n^3"+strings.Join(warnings, "\n^3")+"\n", at+time.Second)
+		}
+		w.Tick()
+	}
+	link(10*time.Second, []string{bullets}, "img_a")
+	link(20*time.Second, []string{bullets}, "img_a")
+	link(30*time.Second, []string{bullets, "a new warning"}, "img_a")
+	link(40*time.Second, []string{bullets}, "img_a", "img_b")
+	link(50*time.Second, nil)
+	link(60*time.Second, nil, "img_a")
+	const log = "; all in usermaps/zm_x/zone_source/all/assetinfo/zm_x.errorlog"
+	want := []string{
+		"link of usermaps/zm_x built, with 1 warning(s): Found 3 bad bulletmeshes, dumped to usermaps/zm_x/zone_source/all/assetinfo/zm_x_bulletreport.csv file." + log +
+			", but 1 asset(s) it named are in no GDT and it linked on without them: image img_a",
+		"link of usermaps/zm_x built, with 2 warning(s), 1 of them new: a new warning" + log + ", but it linked on without the same 1 asset(s) in no GDT as before",
+		"link of usermaps/zm_x built, with the same 1 warning(s) as before, but 2 asset(s) it named are in no GDT and it linked on without them, 1 of them new: image img_b",
+		"link of usermaps/zm_x ok, but 1 asset(s) it named are in no GDT and it linked on without them: image img_a",
+	}
+	if !reflect.DeepEqual(*said, want) {
+		t.Errorf("what changed, link after link:\n got %q\nwant %q", *said, want)
+	}
+}
+
+// A link that failed or stopped is said each time, and the next one that
+// builds says it built again. One that broke leaves the last built link's
+// warnings as they were.
+func TestRecordWatcherSaysALinkThatBuiltAgainAfterOneThatBroke(t *testing.T) {
+	w, said := recordWatch(t, nil)
+	const all = "usermaps/zm_x/zone_source/all/assetinfo/"
+	link := func(at time.Duration, errorlog string) {
+		t.Helper()
+		writeRecordAt(t, w, all+"zm_x.deps", "version,1,1\n", at)
+		if errorlog != "" {
+			writeRecordAt(t, w, all+"zm_x.errorlog", errorlog, at+time.Second)
+		}
+		w.Tick()
+	}
+	link(10*time.Second, "return 1\n^1ERROR: bad script\n")
+	link(20*time.Second, "return 1\n^1ERROR: bad script\n")
+	link(30*time.Second, "")
+	writeRecordAt(t, w, all+"zm_x.deps.partial", "version,1,1\n", 40*time.Second)
+	w.Tick()
+	link(50*time.Second, "return 1000\n^3w\n")
+	link(60*time.Second, "return 1000\n^3w\n")
+	link(70*time.Second, "return 1\n^1ERROR: bad script\n^3w\n^3w2\n")
+	link(80*time.Second, "return 1000\n^3w\n")
+	failed := "link of usermaps/zm_x failed with 1 error(s): ERROR: bad script; all in usermaps/zm_x/zone_source/all/assetinfo/zm_x.errorlog"
+	want := []string{
+		failed, failed,
+		"link of usermaps/zm_x ok again",
+		"link of usermaps/zm_x stopped before it finished (a fatal error, a crash or a stop): usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps stayed .partial, " +
+			"and its error went only to the Launcher's console: ask for it, or link again with build, which reports it",
+		"link of usermaps/zm_x built again, with 1 warning(s): w; all in usermaps/zm_x/zone_source/all/assetinfo/zm_x.errorlog",
+		failed,
+		"link of usermaps/zm_x built again, with the same 1 warning(s) as before",
+	}
+	if !reflect.DeepEqual(*said, want) {
+		t.Errorf("each break, and each build after one:\n got %q\nwant %q", *said, want)
+	}
+}
+
+// The last link before the watch is read from disk: the errorlogs and the
+// .deps.partial written since the last link that got through its
+// language-neutral pass, which every link runs first. A language pass only an
+// earlier link ran keeps its records. Its lookups in no GDT aren't read, so
+// the first link names them all.
+func TestRecordWatcherTakesTheLastLinkBeforeItFromDisk(t *testing.T) {
+	root := t.TempDir()
+	before := time.Now().Add(-time.Hour)
+	bullets := "Found 3 bad bulletmeshes, dumped to " + root + `\/usermaps\zm_same/zone_source/all/assetinfo/zm_same_bulletreport.csv file.`
+	writeFileAt(t, root, "usermaps/zm_same/zone_source/all/assetinfo/zm_same.deps", "version,1,1\n", before)
+	writeFileAt(t, root, "usermaps/zm_same/zone_source/all/assetinfo/zm_same.errorlog", "return 1000\n^3"+bullets+"\n", before.Add(13*time.Second))
+	writeFileAt(t, root, "usermaps/zm_near/zone_source/all/assetinfo/zm_near.deps", "version,1,1\n", before)
+	writeFileAt(t, root, "usermaps/zm_near/zone_source/french/assetinfo/fr_zm_near.errorlog", "return 1000\n^3w\n", before.Add(-time.Second)) // file times are coarse
+	writeFileAt(t, root, "usermaps/zm_stale/zone_source/all/assetinfo/zm_stale_old.deps", "version,1,1\n", before.Add(-3*time.Hour))
+	writeFileAt(t, root, "usermaps/zm_stale/zone_source/all/assetinfo/zm_stale.deps", "version,1,1\n", before)
+	writeFileAt(t, root, "usermaps/zm_stale/zone_source/all/assetinfo/zm_stale.errorlog", "return 1000\n^3w\n", before.Add(-time.Hour)) // an earlier link's
+	writeFileAt(t, root, "usermaps/zm_stale/zone_source/japanese/assetinfo/zm_stale.deps", "version,1,1\n", before.Add(-2*time.Hour))
+	writeFileAt(t, root, "usermaps/zm_stale/zone_source/japanese/assetinfo/ja_zm_stale.errorlog", "return 1\n^1ERROR: e\n", before.Add(-2*time.Hour+time.Second))
+	writeFileAt(t, root, "usermaps/zm_stale/zone_source/japanese/assetinfo/zm_stale.deps.partial", "version,1,1\n", before.Add(-2*time.Hour+time.Second))
+	writeFileAt(t, root, "mods/m_failed/zone_source/all/assetinfo/m_failed.deps", "version,1,1\n", before)
+	writeFileAt(t, root, "mods/m_failed/zone_source/all/assetinfo/m_failed.errorlog", "return 1\n^1ERROR: e\n", before.Add(time.Second))
+	writeFileAt(t, root, "usermaps/zm_stopped/zone_source/all/assetinfo/zm_stopped.deps", "version,1,1\n", before.Add(-time.Hour))
+	writeFileAt(t, root, "usermaps/zm_stopped/zone_source/all/assetinfo/zm_stopped.errorlog", "return 1000\n^3w\n", before.Add(-time.Hour+time.Second))
+	writeFileAt(t, root, "usermaps/zm_stopped/zone_source/all/assetinfo/zm_stopped.deps.partial", "version,1,1\n", before)
+	writeFileAt(t, root, "usermaps/zm_missing/zone_source/all/assetinfo/zm_missing.deps", "version,1,1\nxmodel,m\n\tgdt,image,img_a,\n", before)
+	var said []string
+	w := &RecordWatcher{Root: root, Out: func(s string) { said = append(said, s) }}
+	w.Tick()
+	for _, name := range []string{"zm_same", "zm_near", "zm_stale", "zm_stopped"} {
+		writeRecord(t, w, "usermaps/"+name+"/zone_source/all/assetinfo/"+name+".deps", "version,1,1\n")
+	}
+	writeRecord(t, w, "usermaps/zm_same/zone_source/all/assetinfo/zm_same.errorlog", "return 1000\n^3"+bullets+"\n")
+	writeRecord(t, w, "usermaps/zm_near/zone_source/all/assetinfo/zm_near.errorlog", "return 1000\n^3w\n")
+	writeRecord(t, w, "usermaps/zm_stale/zone_source/all/assetinfo/zm_stale.errorlog", "return 1000\n^3w\n")
+	writeRecord(t, w, "usermaps/zm_stopped/zone_source/all/assetinfo/zm_stopped.errorlog", "return 1000\n^3w\n")
+	writeRecord(t, w, "mods/m_failed/zone_source/all/assetinfo/m_failed.deps", "version,1,1\n")
+	writeRecord(t, w, "usermaps/zm_missing/zone_source/all/assetinfo/zm_missing.deps", "version,1,1\nxmodel,m\n\tgdt,image,img_a,\n")
+	w.Tick()
+	want := []string{
+		"link of mods/m_failed ok again",
+		"link of usermaps/zm_missing ok, but 1 asset(s) it named are in no GDT and it linked on without them: image img_a",
+		"link of usermaps/zm_stale built, with 1 warning(s): w; all in usermaps/zm_stale/zone_source/all/assetinfo/zm_stale.errorlog",
+		"link of usermaps/zm_stopped built again, with the same 1 warning(s) as before",
+	}
+	if !reflect.DeepEqual(said, want) {
+		t.Errorf("each link against the one before the watch:\n got %q\nwant %q", said, want)
+	}
+}
+
+func TestShortWritesPathsUnderTheRootFromIt(t *testing.T) {
+	for _, c := range []struct{ root, msg, want string }{
+		{`D:\Games\BO3`, `Found 111 bad bulletmeshes, dumped to D:\Games\BO3\/usermaps\zm_x/zone_source/all/assetinfo/zm_x_bulletreport.csv file.`,
+			`Found 111 bad bulletmeshes, dumped to usermaps/zm_x/zone_source/all/assetinfo/zm_x_bulletreport.csv file.`},
+		{`D:\Games\BO3\`, `d:/games/bo3/mods\m\a.csv and D:\Games\BO3\mods\m\b.csv`, `mods/m/a.csv and mods/m/b.csv`},
+		{`D:\Games\BO3`, `D:\Games\BO3x\a\b.csv stays`, `D:\Games\BO3x\a\b.csv stays`},
+		{`D:\Games\BO3`, `in D:\Games\BO3\`, `in `},
+		{`D:\Games\BO3`, `D:\Games\BO3\ then a\b`, ` then a\b`},
+		{`D:\Games\BO3`, `no path\here`, `no path\here`},
+		{``, `a/b`, `a/b`},
+		{`/`, `/usr/x`, `/usr/x`},
+	} {
+		w := &RecordWatcher{Root: c.root}
+		if got := w.short(c.msg); got != c.want {
+			t.Errorf("root %q: short(%q) = %q, want %q", c.root, c.msg, got, c.want)
+		}
 	}
 }

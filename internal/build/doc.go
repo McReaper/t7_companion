@@ -90,12 +90,21 @@
 // it finishes (a fatal error, a crash, a stop) leaves that .deps as
 // .deps.partial and writes no errorlog, its error only in the output of what
 // ran it, the Launcher's console; a compile writes the .errlog beside the
-// map when it places problems, and a .lin when the map leaks. A build is said once its tool's process has quit and its records
-// have stayed as they are for Settle (a mod links its zones one linker after
-// the other), from the verdicts the stages use: a link's errors, else its
-// warnings or that it went fine, with the assets it named that are in no GDT;
-// a compile's leak and placed problems, and nothing for a compile with
-// neither. Records older than the watch are not news. A build t7kb ran is said
-// once more as it ends, from its State: its stages, or the stage that failed
-// and its first errors, or, when its process ended first, that it stopped.
+// map when it places problems, and a .lin when the map leaks. A build is said
+// once its tool's process has quit and its records have stayed as they are
+// for Settle (a mod links its zones one linker after the other), from the
+// verdicts the stages use: a compile's leak and placed problems, and nothing
+// for a compile with neither; a link's errors, or that it stopped, each time.
+// Each line wakes the agent, so a link that built says only what its target's
+// last link didn't: the warnings and the assets it named that are in no GDT
+// that are new, and that it built again after a link that broke; one that
+// went as the last one did says nothing. The last link before the watch is
+// read from disk at its start: the errorlogs and .deps.partial written since
+// the newest .deps under all/assetinfo, as every link runs that
+// language-neutral pass first and a language pass only an earlier link ran
+// keeps its records; its lookups in no GDT are left unknown, so the first
+// link names them. Records older than the watch are not news otherwise. A build
+// t7kb ran is said once more as it ends, from its State: its stages, or the
+// stage that failed and its first errors, or, when its process ended first,
+// that it stopped; its link is the last one all the same.
 package build

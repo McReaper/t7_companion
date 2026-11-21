@@ -34,6 +34,16 @@ type RecordWatcher struct {
 	compiles map[string]*records  // by map path without its extension, a compile not said yet
 	builds   map[string]bool      // t7kb's builds, by target and start: true once said, false while seen running
 	states   []State              // t7kb's builds, as Builds last said
+	last     map[string]*lastLink // by target folder, what its last link left
+}
+
+// lastLink is what a target's last link left, so that a link says only what
+// changed: whether it broke (it failed or stopped), and the warnings and the
+// lookups in no GDT of the last one that built.
+type lastLink struct {
+	broke    bool
+	warnings map[string]bool
+	missing  map[string]bool // nil when unknown: the watch reads no .deps written before it began
 }
 
 // records are the records one build wrote since the watch last said it.
@@ -48,6 +58,7 @@ func (w *RecordWatcher) Tick() {
 	now := time.Now()
 	if w.seen == nil {
 		w.start, w.seen, w.links, w.compiles, w.builds = now, map[string]time.Time{}, map[string]*records{}, map[string]*records{}, map[string]bool{}
+		w.last = w.lastOnDisk()
 	}
 	for _, kind := range []string{"usermaps", "mods"} {
 		for _, ext := range []string{"deps", "errorlog", "deps.partial"} {
@@ -174,36 +185,200 @@ func (w *RecordWatcher) flush(builds map[string]*records, exe string, now time.T
 	}
 }
 
-// sayLink says a link's verdict, from the errorlogs it wrote, and after a link
-// that built, the assets it looked up and found in no GDT.
+// sayLink says a link that failed or stopped, each time, and one that built
+// when it is news: a warning or a lookup in no GDT the last link didn't have,
+// or a build after a link that broke. Each line wakes the agent, so a link
+// that went as the last one did says nothing. A link t7kb ran is its build's
+// line's to say, and is the last link all the same.
 func (w *RecordWatcher) sayLink(target string, since time.Time) {
-	if w.ranByT7kb(target, since) {
-		return
+	prev := w.last[target]
+	if prev == nil {
+		prev = &lastLink{}
 	}
 	name := w.rel(target)
 	log, _ := readLinkLogs(filepath.Join(target, "zone_source"), since)
+	for i, s := range log.errors {
+		log.errors[i] = w.short(s)
+	}
+	for i, s := range log.warnings {
+		log.warnings[i] = w.short(s)
+	}
 	where := make([]string, len(log.files))
 	for i, f := range log.files {
 		where[i] = name + "/zone_source/" + f
 	}
-	if cut := w.unfinished(target, since); len(cut) > 0 {
-		line := fmt.Sprintf("link of %s stopped before it finished (a fatal error, a crash or a stop): %s stayed .partial, and its error went only to "+
-			"the Launcher's console: ask for it, or link again with build, which reports it", name, strings.Join(cut, ", "))
-		if len(log.errors) > 0 {
-			line += fmt.Sprintf("; before that it logged %d error(s): %s", len(log.errors), named(log.errors, len(log.errors)))
-		}
+	var line string
+	if cut := w.unfinished(target, since); len(cut) > 0 || len(log.errors) > 0 {
+		w.last[target] = &lastLink{broke: true, warnings: prev.warnings, missing: prev.missing}
+		line = brokeLine(name, cut, log, where)
+	} else {
+		missing := w.missing(target, since)
+		w.last[target] = &lastLink{warnings: setOf(log.warnings), missing: setOf(missing)}
+		line = builtLine(name, prev, log.warnings, missing, where)
+	}
+	if line != "" && !w.ranByT7kb(target, since) {
 		w.Out(line)
-		return
 	}
+}
+
+// brokeLine says a link that stopped before it finished, or that failed.
+func brokeLine(name string, cut []string, log linkLog, where []string) string {
+	if len(cut) == 0 {
+		return fmt.Sprintf("link of %s failed with %d error(s): %s; all in %s", name, len(log.errors), named(log.errors, len(log.errors)), strings.Join(where, ", "))
+	}
+	line := fmt.Sprintf("link of %s stopped before it finished (a fatal error, a crash or a stop): %s stayed .partial, and its error went only to "+
+		"the Launcher's console: ask for it, or link again with build, which reports it", name, strings.Join(cut, ", "))
+	if len(log.errors) > 0 {
+		line += fmt.Sprintf("; before that it logged %d error(s): %s", len(log.errors), named(log.errors, len(log.errors)))
+	}
+	return line
+}
+
+// builtLine says a link that built, when it is news, and "" when it isn't: it
+// names the warnings and lookups in no GDT the last link didn't have, counts
+// the ones it had too, and says "again" after a link that broke.
+func builtLine(name string, prev *lastLink, warnings, missing, where []string) string {
+	newWarnings, newMissing := unseen(warnings, prev.warnings), missing
+	if prev.missing != nil {
+		newMissing = unseen(missing, prev.missing)
+	}
+	if !prev.broke && len(newWarnings) == 0 && len(newMissing) == 0 {
+		return ""
+	}
+	head := "ok"
+	if len(warnings) > 0 {
+		head = "built"
+	}
+	if prev.broke {
+		head += " again"
+	}
+	return "link of " + name + " " + head + warnedOf(warnings, newWarnings, where) + linkedWithout(missing, newMissing)
+}
+
+// warnedOf says a built link's warnings: the new ones named, and where all
+// are.
+func warnedOf(warnings, fresh, where []string) string {
 	switch {
-	case len(log.errors) > 0:
-		w.Out(fmt.Sprintf("link of %s failed with %d error(s): %s; all in %s", name, len(log.errors), named(log.errors, len(log.errors)), strings.Join(where, ", ")))
-		return
-	case len(log.warnings) > 0:
-		w.Out(fmt.Sprintf("link of %s built, with %d warning(s): %s; all in %s%s", name, len(log.warnings), named(log.warnings, len(log.warnings)), strings.Join(where, ", "), w.missing(target, since)))
-	default:
-		w.Out(fmt.Sprintf("link of %s ok%s", name, w.missing(target, since)))
+	case len(warnings) == 0:
+		return ""
+	case len(fresh) == 0:
+		return fmt.Sprintf(", with the same %d warning(s) as before", len(warnings))
 	}
+	return fmt.Sprintf(", with %d warning(s)%s: %s; all in %s", len(warnings), ofThemNew(warnings, fresh), named(fresh, len(fresh)), strings.Join(where, ", "))
+}
+
+// linkedWithout says the lookups in no GDT a built link went on without: the
+// new ones named.
+func linkedWithout(missing, fresh []string) string {
+	switch {
+	case len(missing) == 0:
+		return ""
+	case len(fresh) == 0:
+		return fmt.Sprintf(", but it linked on without the same %d asset(s) in no GDT as before", len(missing))
+	}
+	return fmt.Sprintf(", but %d asset(s) it named are in no GDT and it linked on without them%s: %s", len(missing), ofThemNew(missing, fresh), named(fresh, len(fresh)))
+}
+
+// ofThemNew says how many of a list are new, when not all of them are.
+func ofThemNew(all, fresh []string) string {
+	if len(fresh) == len(all) {
+		return ""
+	}
+	return fmt.Sprintf(", %d of them new", len(fresh))
+}
+
+// lastOnDisk reads what each target's last link before the watch left: the
+// errorlogs and .deps.partial written since the last link that got through
+// its language-neutral pass. Its lookups in no GDT are left unknown, as
+// reading every target's .deps would slow the watch's start: the first link
+// it sees names them all.
+func (w *RecordWatcher) lastOnDisk() map[string]*lastLink {
+	last := map[string]*lastLink{}
+	for _, kind := range []string{"usermaps", "mods"} {
+		dirs, _ := filepath.Glob(filepath.Join(w.Root, kind, "*", "zone_source"))
+		for _, zoneSource := range dirs {
+			target := filepath.Dir(zoneSource)
+			since := lastLinked(zoneSource)
+			log, _ := readLinkLogs(zoneSource, since)
+			for i, s := range log.warnings {
+				log.warnings[i] = w.short(s)
+			}
+			last[target] = &lastLink{broke: len(log.errors) > 0 || len(w.unfinished(target, since)) > 0, warnings: setOf(log.warnings)}
+		}
+	}
+	return last
+}
+
+// lastLinked is when the last link that got through its language-neutral
+// pass wrote that pass's .deps, the newest under all/assetinfo: every link
+// runs that pass first, and the records of a language pass only an earlier
+// link ran stay beside the later ones.
+func lastLinked(zoneSource string) time.Time {
+	deps, _ := filepath.Glob(filepath.Join(zoneSource, "all", "assetinfo", "*.deps"))
+	var newest time.Time
+	for _, d := range deps {
+		if m := fileMTime(d); m.After(newest) {
+			newest = m
+		}
+	}
+	return newest
+}
+
+// short writes the paths under the root in a linker message from the root,
+// with slashes, as a line names them: the linker writes them whole, as
+// <root>\/usermaps\<name>/zone_source/….
+func (w *RecordWatcher) short(msg string) string {
+	root := strings.TrimRight(strings.ReplaceAll(w.Root, `\`, "/"), "/")
+	if root == "" {
+		return msg
+	}
+	root += "/"
+	var b strings.Builder
+	for {
+		i := indexFold(strings.ReplaceAll(msg, `\`, "/"), root)
+		if i < 0 {
+			b.WriteString(msg)
+			return b.String()
+		}
+		b.WriteString(msg[:i])
+		rest := strings.TrimLeft(msg[i+len(root):], `\/`)
+		end := strings.IndexAny(rest, " \t")
+		if end < 0 {
+			end = len(rest)
+		}
+		b.WriteString(strings.ReplaceAll(rest[:end], `\`, "/"))
+		msg = rest[end:]
+	}
+}
+
+// indexFold is the index of sub's first occurrence in s, ignoring case, or -1.
+func indexFold(s, sub string) int {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if strings.EqualFold(s[i:i+len(sub)], sub) {
+			return i
+		}
+	}
+	return -1
+}
+
+// unseen is what of a list a set doesn't hold, in order.
+func unseen(list []string, set map[string]bool) []string {
+	var out []string
+	for _, s := range list {
+		if !set[s] {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// setOf is a list's items as a set, empty but not nil for an empty list.
+func setOf(list []string) map[string]bool {
+	set := make(map[string]bool, len(list))
+	for _, s := range list {
+		set[s] = true
+	}
+	return set
 }
 
 // unfinished names the .deps a link left unfinished: the linker writes a
@@ -226,7 +401,7 @@ func (w *RecordWatcher) unfinished(target string, since time.Time) []string {
 
 // missing names the assets the zones the link wrote looked up and found in no
 // GDT: the linker links on without them and logs nothing.
-func (w *RecordWatcher) missing(target string, since time.Time) string {
+func (w *RecordWatcher) missing(target string, since time.Time) []string {
 	dir := filepath.Join(target, "zone_source", "all", "assetinfo")
 	deps, _ := filepath.Glob(filepath.Join(dir, "*.deps"))
 	var ids []string
@@ -239,10 +414,7 @@ func (w *RecordWatcher) missing(target string, since time.Time) string {
 			ids = append(ids, x.ID.String())
 		}
 	}
-	if len(ids) == 0 {
-		return ""
-	}
-	return fmt.Sprintf(", but %d asset(s) it named are in no GDT and it linked on without them: %s", len(ids), named(ids, len(ids)))
+	return ids
 }
 
 // sayCompile says a compile's problems: a leak, from the leakfile it wrote,

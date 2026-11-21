@@ -34,8 +34,9 @@ func TestWatchSaysTheGameTheBuildsAndRadiantUntilStopped(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Written and dated aside, then renamed: the watch sees one record, dated past
-	// its start whatever the file system's clock.
-	if err := os.WriteFile(deps+".tmp", []byte("version,1,1\n"), 0o644); err != nil {
+	// its start whatever the file system's clock. A link that went fine says
+	// nothing, so this one linked without an image.
+	if err := os.WriteFile(deps+".tmp", []byte("version,1,1\nxmodel,m\n\tgdt,image,img_a,\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	at := time.Now().Add(time.Second)
@@ -49,7 +50,7 @@ func TestWatchSaysTheGameTheBuildsAndRadiantUntilStopped(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	radiant.Event("console", "ERROR: Can't find xmodel 'x' in gdtDB")
-	want := "script error: a new one, console_mp.log line 50\nlink of usermaps/zm_test ok\nRadiant (pid 7) printed 1 error(s): Can't find xmodel 'x' in gdtDB\n"
+	want := "script error: a new one, console_mp.log line 50\nlink of usermaps/zm_test ok, but 1 asset(s) it named are in no GDT and it linked on without them: image img_a\nRadiant (pid 7) printed 1 error(s): Can't find xmodel 'x' in gdtDB\n"
 	for i := 0; i < 200 && b.String() != want; i++ {
 		time.Sleep(10 * time.Millisecond)
 	}
