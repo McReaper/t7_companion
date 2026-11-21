@@ -1,6 +1,7 @@
 package build
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -183,6 +184,8 @@ func TestRecordWatcherSaysACompilesLeakAndPlacedProblems(t *testing.T) {
 	if len(*said) != 0 {
 		t.Fatalf("nothing while cod2map runs: %q", *said)
 	}
+	writeRecordAt(t, w, "share/raw/maps/zm/zm_x.d3dbsp", "bsp", 3*time.Second) // each compile finished: its .d3dbsp comes last
+	writeRecordAt(t, w, "share/raw/maps/mp/mp_quiet.d3dbsp", "bsp", 3*time.Second)
 	runs[compilerExe] = false
 	w.Tick()
 	want := []string{"compile of map_source/zm/zm_x.map: the map leaks, and the leakfile map_source/zm/zm_x.lin traces the hole to the void (t7kb:mapping); " +
@@ -190,6 +193,33 @@ func TestRecordWatcherSaysACompilesLeakAndPlacedProblems(t *testing.T) {
 		"entity 0 brush 3 at 1 2 3: Brush has a bad plane | and 1 more"}
 	if !reflect.DeepEqual(*said, want) {
 		t.Errorf("a compile's problems, and nothing for one with none:\n got %q\nwant %q", *said, want)
+	}
+}
+
+// A compile whose process the watch never saw (it began before the watch, or
+// a process list missed it) is read from its records: written before its
+// .d3dbsp, they date its start. A compile t7kb ran is its build's to say.
+func TestRecordWatcherSaysACompileThatStoppedFromItsRecords(t *testing.T) {
+	w, said := recordWatch(t, nil)
+	w.Builds = func() []State { return []State{{Target: "zm_t7kb", Kind: "usermap", PID: 7, Started: w.start}} }
+	for _, name := range []string{"zm_cut", "zm_t7kb", "zm_done"} {
+		writeRecordAt(t, w, "share/raw/maps/zm/"+name+".d3dbsp", "bsp", -time.Hour)
+		writeRecordAt(t, w, "map_source/zm/"+name+".errlog", `"m" 0 1 1 2 3 0 0 1 "bad plane"`+"\n", 2*time.Second)
+	}
+	writeRecordAt(t, w, "share/raw/maps/zm/zm_done.d3dbsp", "bsp", 3*time.Second)
+	writeRecordAt(t, w, "map_source/zm/zm_quiet.errlog", "nothing it places\n", 2*time.Second) // stopped with nothing placed yet
+	w.Tick()
+	const problem = "map_source/zm/%s.errlog places 1 problem(s): entity 0 brush 1 at 1 2 3: bad plane"
+	const stopped = "compile of map_source/zm/%s.map stopped before it finished (a fatal error, a crash or a stop): it didn't write share/raw/maps/zm/%[1]s.d3dbsp, " +
+		"and its error went only to the Launcher's console: ask for it, or compile again with build, which reports it"
+	want := []string{
+		fmt.Sprintf(stopped, "zm_cut") + "; " + fmt.Sprintf(problem, "zm_cut"),
+		"compile of map_source/zm/zm_done.map: " + fmt.Sprintf(problem, "zm_done"),
+		fmt.Sprintf(stopped, "zm_quiet"),
+		"compile of map_source/zm/zm_t7kb.map: " + fmt.Sprintf(problem, "zm_t7kb"),
+	}
+	if !reflect.DeepEqual(*said, want) {
+		t.Errorf("the compile that stopped, from its records:\n got %q\nwant %q", *said, want)
 	}
 }
 
@@ -205,6 +235,8 @@ func TestRecordWatcherTakesRecordsUpTo2sOlderThanTheBuildsFirst(t *testing.T) {
 	writeRecord(t, w, "map_source/zm/zm_near.errlog", `"m" 0 1 1 2 3 0 0 1 "bad plane"`+"\n")
 	writeRecordAt(t, w, "map_source/zm/zm_far.lin", "0 0 0\n", -2*time.Second)
 	writeRecord(t, w, "map_source/zm/zm_far.errlog", `"m" 0 1 1 2 3 0 0 1 "bad plane"`+"\n")
+	writeRecordAt(t, w, "share/raw/maps/zm/zm_near.d3dbsp", "bsp", 2*time.Second) // both compiles finished
+	writeRecordAt(t, w, "share/raw/maps/zm/zm_far.d3dbsp", "bsp", 2*time.Second)
 	w.Tick()
 	want := []string{
 		"link of usermaps/zm_x ok, but 2 asset(s) it named are in no GDT and it linked on without them: image img_b | image img_a",

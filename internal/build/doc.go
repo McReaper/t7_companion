@@ -90,11 +90,15 @@
 // it finishes (a fatal error, a crash, a stop) leaves that .deps as
 // .deps.partial and writes no errorlog, its error only in the output of what
 // ran it, the Launcher's console; a compile writes the .errlog beside the
-// map when it places problems, and a .lin when the map leaks. A build is said
-// once its tool's process has quit and its records have stayed as they are
-// for Settle (a mod links its zones one linker after the other), from the
-// verdicts the stages use: a compile's leak and placed problems, and nothing
-// for a compile with neither; a link's errors, or that it stopped, each time.
+// map when it places problems, a .lin when the map leaks (and still compiles
+// on), and its .d3dbsp under share/raw/maps last, an ents-only compile too,
+// so a compile whose .d3dbsp is older than its records stopped before it
+// finished; one that stops before writing a record, as on a clean map, says
+// nothing. A build is said once its tool's process has quit and its records
+// have stayed as they are for Settle (a mod links its zones one linker after
+// the other), from the verdicts the stages use: a compile's leak and placed
+// problems, and that it stopped, and nothing for a compile with none; a
+// link's errors, or that it stopped, each time.
 // Each line wakes the agent, so a link that built says only what its target's
 // last link didn't: the warnings and the assets it named that are in no GDT
 // that are new, and that it built again after a link that broke; one that
