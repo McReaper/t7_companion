@@ -186,11 +186,11 @@ func (w *RecordWatcher) flush(builds map[string]*records, exe string, now time.T
 	}
 }
 
-// sayLink says a link that failed or stopped, each time, and one that built
-// when it is news: a warning or a lookup in no GDT the last link didn't have,
-// or a build after a link that broke. Each line wakes the agent, so a link
-// that went as the last one did says nothing. A link t7kb ran is its build's
-// line's to say, and is the last link all the same. After a link that built,
+// sayLink says each link once it has ended: one that failed or stopped, and
+// one that built, so an agent waiting on a build hears it is done. Each line
+// wakes the agent, so a built link names only what its last link didn't have
+// and counts the rest. A link t7kb ran is its build's line's to say, and is
+// the last link all the same. After a link that built,
 // whoever ran it, staleLight says whether its map's lighting predates its
 // compile.
 func (w *RecordWatcher) sayLink(target string, since time.Time) {
@@ -221,7 +221,7 @@ func (w *RecordWatcher) sayLink(target string, since time.Time) {
 		w.last[target] = &lastLink{broke: true, warnings: prev.warnings, missing: prev.missing}
 		line = brokeLine(name, cut, log, where)
 	}
-	if line != "" && !w.ranByT7kb(target, since) {
+	if !w.ranByT7kb(target, since) {
 		w.Out(line)
 	}
 	if built {
@@ -265,16 +265,13 @@ func brokeLine(name string, cut []string, log linkLog, where []string) string {
 	return line
 }
 
-// builtLine says a link that built, when it is news, and "" when it isn't: it
-// names the warnings and lookups in no GDT the last link didn't have, counts
-// the ones it had too, and says "again" after a link that broke.
+// builtLine says a link that built: it names the warnings and lookups in no
+// GDT the last link didn't have, counts the ones it had too, and says "again"
+// after a link that broke.
 func builtLine(name string, prev *lastLink, warnings, missing, where []string) string {
 	newWarnings, newMissing := unseen(warnings, prev.warnings), missing
 	if prev.missing != nil {
 		newMissing = unseen(missing, prev.missing)
-	}
-	if !prev.broke && len(newWarnings) == 0 && len(newMissing) == 0 {
-		return ""
 	}
 	head := "ok"
 	if len(warnings) > 0 {
