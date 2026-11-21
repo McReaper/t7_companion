@@ -79,6 +79,7 @@ func TestRecordWatcherSaysALinkThatBuiltWithWhatItLinkedWithout(t *testing.T) {
 	writeRecordAt(t, w, "mods/my_mod/zone_source/all/assetinfo/core_mod.deps", "version,1,1\nxmodel,x\n\tgdt,image,old_missing,\n", -time.Hour) // an earlier link's
 	w.Tick()
 	want := []string{ // my_mod's link went fine, and names no earlier link's lookups
+		"link of mods/my_mod ok",
 		"link of usermaps/zm_x built, with 1 warning(s): a french warning; all in usermaps/zm_x/zone_source/french/assetinfo/fr_zm_x.errorlog, " +
 			"but 4 asset(s) it named are in no GDT and it linked on without them: image img_a | image img_b | image img_c | and 1 more",
 	}
@@ -358,9 +359,10 @@ func TestRecordWatcherLeavesAStoppedLinkT7kbRanToItsBuildsLine(t *testing.T) {
 	}
 }
 
-// A link that built says only what the last link didn't: each line wakes the
+// A link that built is said each time, so an agent waiting on it hears it is
+// done, and names only what the last link didn't have: each line wakes the
 // agent. The last link is the last one, not all of them.
-func TestRecordWatcherSaysOnlyWhatALinkChanged(t *testing.T) {
+func TestRecordWatcherNamesOnlyWhatALinkChanged(t *testing.T) {
 	w, said := recordWatch(t, nil)
 	bullets := "Found 3 bad bulletmeshes, dumped to " + w.Root + `\/usermaps\zm_x/zone_source/all/assetinfo/zm_x_bulletreport.csv file.`
 	link := func(at time.Duration, warnings []string, missing ...string) {
@@ -385,8 +387,10 @@ func TestRecordWatcherSaysOnlyWhatALinkChanged(t *testing.T) {
 	want := []string{
 		"link of usermaps/zm_x built, with 1 warning(s): Found 3 bad bulletmeshes, dumped to usermaps/zm_x/zone_source/all/assetinfo/zm_x_bulletreport.csv file." + log +
 			", but 1 asset(s) it named are in no GDT and it linked on without them: image img_a",
+		"link of usermaps/zm_x built, with the same 1 warning(s) as before, but it linked on without the same 1 asset(s) in no GDT as before",
 		"link of usermaps/zm_x built, with 2 warning(s), 1 of them new: a new warning" + log + ", but it linked on without the same 1 asset(s) in no GDT as before",
 		"link of usermaps/zm_x built, with the same 1 warning(s) as before, but 2 asset(s) it named are in no GDT and it linked on without them, 1 of them new: image img_b",
+		"link of usermaps/zm_x ok",
 		"link of usermaps/zm_x ok, but 1 asset(s) it named are in no GDT and it linked on without them: image img_a",
 	}
 	if !reflect.DeepEqual(*said, want) {
@@ -424,6 +428,7 @@ func TestRecordWatcherSaysALinkThatBuiltAgainAfterOneThatBroke(t *testing.T) {
 		"link of usermaps/zm_x stopped before it finished (a fatal error, a crash or a stop): usermaps/zm_x/zone_source/all/assetinfo/zm_x.deps stayed .partial, " +
 			"and its error went only to the Launcher's console: ask for it, or link again with build, which reports it",
 		"link of usermaps/zm_x built again, with 1 warning(s): w; all in usermaps/zm_x/zone_source/all/assetinfo/zm_x.errorlog",
+		"link of usermaps/zm_x built, with the same 1 warning(s) as before",
 		failed,
 		"link of usermaps/zm_x built again, with the same 1 warning(s) as before",
 	}
@@ -473,6 +478,8 @@ func TestRecordWatcherTakesTheLastLinkBeforeItFromDisk(t *testing.T) {
 	want := []string{
 		"link of mods/m_failed ok again",
 		"link of usermaps/zm_missing ok, but 1 asset(s) it named are in no GDT and it linked on without them: image img_a",
+		"link of usermaps/zm_near built, with the same 1 warning(s) as before",
+		"link of usermaps/zm_same built, with the same 1 warning(s) as before",
 		"link of usermaps/zm_stale built, with 1 warning(s): w; all in usermaps/zm_stale/zone_source/all/assetinfo/zm_stale.errorlog",
 		"link of usermaps/zm_stopped built again, with the same 1 warning(s) as before",
 	}
