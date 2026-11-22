@@ -19,7 +19,8 @@ type githubRelease struct {
 }
 
 func newUpdateCheckCmd() *cobra.Command {
-	return &cobra.Command{
+	var quiet bool
+	cmd := &cobra.Command{
 		Use:   "update-check",
 		Short: "Check GitHub for a newer t7kb release",
 		Long: "Reports whether a newer t7kb release exists, and which installs of the t7kb Claude Code\n" +
@@ -28,13 +29,38 @@ func newUpdateCheckCmd() *cobra.Command {
 			"-Force for the binary (see the README or the setup-or-update skill).",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if quiet {
+				return runQuietUpdateCheck(cmd)
+			}
 			return runUpdateCheck(cmd)
 		},
 	}
+	cmd.Flags().BoolVar(&quiet, "quiet", false, "print only a newer release's tag, nothing when up to date or on a dev build, and skip the plugin check (the plugin's session-start hook runs it)")
+	return cmd
+}
+
+// quietTimeout bounds what a session's start waits on a slow network.
+const quietTimeout = 3 * time.Second
+
+// runQuietUpdateCheck prints the latest release's tag when this build is
+// behind it, else nothing. A dev build has no release to compare, so it asks
+// nothing.
+func runQuietUpdateCheck(cmd *cobra.Command) error {
+	if Version() == "dev" {
+		return nil
+	}
+	rel, err := fetchLatestRelease(quietTimeout)
+	if err != nil {
+		return fmt.Errorf("couldn't check for updates: %w", err)
+	}
+	if strings.TrimPrefix(Version(), "v") != strings.TrimPrefix(rel.TagName, "v") {
+		fmt.Fprintln(cmd.OutOrStdout(), rel.TagName)
+	}
+	return nil
 }
 
 func runUpdateCheck(cmd *cobra.Command) error {
-	rel, err := fetchLatestRelease()
+	rel, err := fetchLatestRelease(5 * time.Second)
 	if err != nil {
 		return fmt.Errorf("couldn't check for updates: %w", err)
 	}
@@ -62,7 +88,7 @@ func runUpdateCheck(cmd *cobra.Command) error {
 	return nil
 }
 
-func fetchLatestRelease() (*githubRelease, error) {
+func fetchLatestRelease(timeout time.Duration) (*githubRelease, error) {
 	req, err := http.NewRequest(http.MethodGet, releaseAPIURL, nil)
 	if err != nil {
 		return nil, err
@@ -70,7 +96,7 @@ func fetchLatestRelease() (*githubRelease, error) {
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("User-Agent", "t7kb-update-check")
 
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{Timeout: timeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err

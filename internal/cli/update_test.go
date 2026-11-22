@@ -113,3 +113,50 @@ func TestUpdateCheckPlugins(t *testing.T) {
 		t.Errorf("without Claude Code the plugin check stays quiet:\n%s", out)
 	}
 }
+
+// update-check --quiet, the plugin hook's release check: the newer tag or
+// nothing, and no request at all from a dev build.
+func TestUpdateCheckQuiet(t *testing.T) {
+	status, calls := http.StatusOK, 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(`{"tag_name":"v2.1.0","html_url":"https://example.invalid/r"}`))
+	}))
+	defer srv.Close()
+	oldURL, oldVersion, oldList := releaseAPIURL, version, listPlugins
+	defer func() { releaseAPIURL, version, listPlugins = oldURL, oldVersion, oldList }()
+	releaseAPIURL = srv.URL
+	listPlugins = func() ([]byte, error) {
+		t.Error("--quiet must not ask Claude Code for its plugins")
+		return nil, exec.ErrNotFound
+	}
+
+	run := func() (string, error) {
+		var out bytes.Buffer
+		cmd := newUpdateCheckCmd()
+		cmd.SilenceUsage, cmd.SilenceErrors = true, true // as under the root command
+		cmd.SetOut(&out)
+		cmd.SetArgs([]string{"--quiet"})
+		err := cmd.Execute()
+		return out.String(), err
+	}
+	for _, c := range []struct{ version, want string }{
+		{"2.0.0", "v2.1.0\n"},
+		{"2.1.0", ""},
+		{"v2.1.0", ""},
+	} {
+		version = c.version
+		if out, err := run(); err != nil || out != c.want {
+			t.Errorf("version %s: got %q (%v), want %q", c.version, out, err, c.want)
+		}
+	}
+	version, calls = "dev", 0
+	if out, err := run(); err != nil || out != "" || calls != 0 {
+		t.Errorf("a dev build: got %q (%v) after %d requests, want nothing and none", out, err, calls)
+	}
+	version, status = "2.0.0", http.StatusForbidden
+	if out, err := run(); err == nil || out != "" {
+		t.Errorf("an API error must fail with nothing on stdout: %q (%v)", out, err)
+	}
+}

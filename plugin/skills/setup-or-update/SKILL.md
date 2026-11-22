@@ -1,6 +1,6 @@
 ---
 name: setup-or-update
-description: How to install, update, or repair the t7kb Black Ops 3 knowledge-base tool — downloads the binary and database, registers the `t7kb` MCP server via `claude mcp add`, records the BO3 mod-tools root in a short `CLAUDE.md` there (replacing the old `AGENTS.md` primer), offers MTPlugins (Radiant's plugin host, which loads the bridge the map tools drive Radiant through), and offers to turn on the plugin's auto-update. Run once right after installing the plugin, invoked explicitly as `/t7kb:setup-or-update` — but also use whenever the user asks to install, set up, reinstall, update or upgrade t7kb, when the SessionStart hook reports the t7kb binary and plugin versions differ, when the user wants its MCP server (re)registered, or reports the `search`/`get` tools are missing, unavailable, or won't connect, and when `radiant_open` or a `map_*` tool answers that the map tools need MTPlugins.
+description: How to install, update, or repair the t7kb Black Ops 3 knowledge-base tool — downloads the binary and database, registers the `t7kb` MCP server via `claude mcp add`, records the BO3 mod-tools root in a short `CLAUDE.md` there (replacing the old `AGENTS.md` primer), offers MTPlugins (Radiant's plugin host, which loads the bridge the map tools drive Radiant through), and offers to turn on the plugin's auto-update. Run once right after installing the plugin, invoked explicitly as `/t7kb:setup-or-update` — but also use whenever the user asks to install, set up, reinstall, update or upgrade t7kb, when the SessionStart hook reports the t7kb binary and plugin versions differ or a newer release is out, when the user wants its MCP server (re)registered, or reports the `search`/`get` tools are missing, unavailable, or won't connect, and when `radiant_open` or a `map_*` tool answers that the map tools need MTPlugins.
 ---
 
 # Install or update t7kb
@@ -11,7 +11,7 @@ Download the t7kb tool + database, register it as an MCP server so it auto-start
 
 Detect the OS and run the matching command. It downloads the binary, the embedding model, and the ~0.9 GB database archive into one folder, and prints the install path. Both installers are idempotent: if a binary + database are already present at the target path, they skip the download — safe to run even after a manual or earlier install.
 
-If a binary already exists at the target path (the case the idempotency check would otherwise just skip), run `<path>/t7kb update-check` (`.exe` on Windows) first — it's a lightweight, on-demand-only network check (no automatic/background calls anywhere else in `t7kb`) — and act on what it reports:
+If a binary already exists at the target path (the case the idempotency check would otherwise just skip), run `<path>/t7kb update-check` (`.exe` on Windows) first — one call to GitHub's API — and act on what it reports:
 
 - **Up to date** — proceed to skip the install as usual.
 - **"Running a local/dev build"** — the binary at the install path was built from source, not downloaded from a release, so it may lack tools the skills name. Unless the user says they put it there on purpose, treat it like an available update and offer `-Force`.
@@ -19,7 +19,7 @@ If a binary already exists at the target path (the case the idempotency check wo
 - **"The t7kb Claude Code plugin (its skills) is behind …"** (with either verdict above) — one or more installs of this plugin, per scope, are on an older version. Relay the listed installs and offer to run the printed `claude plugin marketplace update` / `claude plugin update … --scope …` commands (a `project`/`local` one from the project path it names); after they succeed, tell the user to restart Claude Code, which is what loads the new skills. Step 4 keeps it from falling behind again.
 - **Check failed** (e.g. offline) — don't block setup on it; fall back to skipping the install as before, with a one-line note that the check itself couldn't run.
 
-When the SessionStart hook sent the user here (the binary and the plugin versions differ), the update-check above says which side is behind. Otherwise, only pass the force flag below if the user explicitly wants to reinstall/update.
+When the SessionStart hook sent the user here (the binary and the plugin versions differ, or a newer release is out), the update-check above says which side is behind. Otherwise, only pass the force flag below if the user explicitly wants to reinstall/update.
 
 Releases are Windows-only, like the mod tools. In PowerShell:
 
@@ -104,13 +104,13 @@ Installs made before 2026-09-29 added the marketplace from `t7-reapy/t7_companio
 - **Check** `claude plugin marketplace list --json`: the `t7-reapy` entry must have `"source": "github"` and `"repo": "McReaper/t7_companion"`.
 - **Any other source:** explain the above in two sentences and, on the user's yes, set `extraKnownMarketplaces["t7-reapy"].source` to `{"source": "github", "repo": "McReaper/t7_companion"}` in the settings file that declares it (`~/.claude/settings.json`, else the project's `.claude/settings.json`), keeping every other key. Then run `claude plugin marketplace add McReaper/t7_companion`, which re-clones the marketplace from there; the installed plugin stays (verified on a test install). The settings edit comes first: Claude Code refuses an `add` whose source differs from the declared one.
 
-### Offer auto-update — the only automatic path to the next release
+### Offer auto-update — the skills then update themselves
 
-Nothing else tells the user a release exists: a third-party marketplace such as `t7-reapy` doesn't auto-update by default, the SessionStart hook works offline (it compares the installed binary's version with the plugin's, so it only speaks once one of them has updated), and `t7kb update-check` runs only when asked. With auto-update on, Claude Code updates the plugin in the background and the next session loads it; the hook then sees the binary behind and sends the user back here.
+The SessionStart hook says when a newer release is out, but a third-party marketplace such as `t7-reapy` doesn't auto-update by default, so the skills stay behind until the user updates them. With auto-update on, Claude Code updates the plugin in the background and the next session loads it; the hook then sees the binary behind and sends the user back here.
 
 - **Read the setting** from the user's `~/.claude/settings.json`: `extraKnownMarketplaces["t7-reapy"].autoUpdate` (`claude plugin marketplace add` declared the marketplace there). Read only that settings file, never Claude Code's internal `known_marketplaces.json` — its format is Claude Code's own and can change.
 - **Not `true`:** explain the above in a sentence and offer to set `"autoUpdate": true` on that entry. Write it only on the user's yes, editing the JSON in place and keeping every other key. If they'd rather do it themselves: `/plugin` → Marketplaces → `t7-reapy` → Enable auto-update.
-- **When it can't take effect:** with `DISABLE_UPDATES`, `DISABLE_AUTOUPDATER` or `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` set and `FORCE_AUTOUPDATE_PLUGINS=1` not set, Claude Code skips the plugin auto-update pass whatever the setting says. Say so rather than setting it, and leave the choice of environment to the user.
+- **When it can't take effect:** with `DISABLE_UPDATES`, `DISABLE_AUTOUPDATER` or `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` set and `FORCE_AUTOUPDATE_PLUGINS=1` not set, Claude Code skips the plugin auto-update pass whatever the setting says (and the hook skips its release check under the last one). Say so rather than setting it, and leave the choice of environment to the user.
 
 ## 5. Confirm what was done, and report a failed step as failed
 
