@@ -22,6 +22,15 @@ const RRFK = 60
 // Pool is the per-retriever candidate count fused before truncating to limit.
 const Pool = 50
 
+// bm25Weight scales BM25's RRF points against the vector's when both lists
+// have hits. At equal weights a document in both lists, however low in each,
+// outranked the vector's first hit alone (2/110 > 1/61); at 0.75 that hit wins
+// (1/61 > 1.75/110). Scored against internal/cli TestRetrievalQuality
+// (docs/retrieval-experiments.md): 46 of 55 questions get a key document in
+// the top 5 instead of 42. A search with one list alone (--bm25, --vector, the
+// any-word fallback) has nothing to balance and keeps plain RRF scores.
+const bm25Weight = 0.75
+
 // titleWeight: a BM25 match in the title counts this much over one in the
 // body (the summary half as much). Reference pages are short with precise
 // titles ("PlayFXOnTag (GSC)", "Wallbuy 0 Fix") and lost to long threads and
@@ -106,7 +115,11 @@ func (s *Store) SearchHybrid(ctx context.Context, query string, qvec []float32, 
 	if err != nil {
 		return nil, err
 	}
-	return s.hits(ctx, limit, bm25, vec)
+	w := bm25Weight
+	if len(vec) == 0 {
+		w = 1 // keyword-only: nothing to balance
+	}
+	return s.hits(ctx, limit, ranking{bm25, w}, ranking{vec, 1})
 }
 
 // SearchAnyWord ranks by BM25 the documents that hold any word of the query:
@@ -116,11 +129,11 @@ func (s *Store) SearchAnyWord(ctx context.Context, query string, limit int, sour
 	if err != nil {
 		return nil, err
 	}
-	return s.hits(ctx, limit, bm25)
+	return s.hits(ctx, limit, ranking{bm25, 1})
 }
 
 // hits fuses the rankings into the top limit hits, reliability breaking ties.
-func (s *Store) hits(ctx context.Context, limit int, rankings ...[]rankItem) ([]Hit, error) {
+func (s *Store) hits(ctx context.Context, limit int, rankings ...ranking) ([]Hit, error) {
 	fused, snippet := rrfFuse(rankings...)
 	if len(fused) == 0 {
 		return nil, nil
@@ -152,14 +165,21 @@ type rankItem struct {
 	snippet string
 }
 
-// rrfFuse combines ranked lists by Reciprocal Rank Fusion and keeps the first
-// non-empty snippet seen per doc.
-func rrfFuse(rankings ...[]rankItem) (fused map[string]float64, snippet map[string]string) {
+// ranking is one retriever's candidates in rank order, and the weight of the
+// RRF points they earn.
+type ranking struct {
+	items  []rankItem
+	weight float64
+}
+
+// rrfFuse combines ranked lists by weighted Reciprocal Rank Fusion (each hit
+// earns weight / (RRFK + rank)) and keeps the first non-empty snippet seen per doc.
+func rrfFuse(rankings ...ranking) (fused map[string]float64, snippet map[string]string) {
 	fused = make(map[string]float64)
 	snippet = make(map[string]string)
-	for _, items := range rankings {
-		for rank, it := range items {
-			fused[it.docID] += 1.0 / float64(RRFK+rank+1)
+	for _, r := range rankings {
+		for rank, it := range r.items {
+			fused[it.docID] += r.weight / float64(RRFK+rank+1)
 			if snippet[it.docID] == "" && it.snippet != "" {
 				snippet[it.docID] = it.snippet
 			}

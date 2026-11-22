@@ -224,7 +224,7 @@ func BenchmarkRRFFuse(b *testing.B) {
 	a, c := mk(), mk()
 	b.ReportAllocs()
 	for b.Loop() {
-		rrfFuse(a, c)
+		rrfFuse(ranking{a, bm25Weight}, ranking{c, 1})
 	}
 }
 

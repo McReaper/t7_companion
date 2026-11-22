@@ -17,7 +17,7 @@ Three judged sets, scored by the same test:
 | key@5 / recall@10 / MRR / nDCG@10 | tuning | held-out |
 |---|---|---|
 | v2.2 ranking | 0.71 / 0.66 / 1.00 / 0.69 | 0.83 / 0.44 / 0.82 / 0.50 |
-| + title ×10 (**current**) | 0.79 / 0.67 / 1.00 / 0.70 | 0.83 / 0.43 / 0.82 / 0.50 |
+| + title ×10 (**kept**) | 0.79 / 0.67 / 1.00 / 0.70 | 0.83 / 0.43 / 0.82 / 0.50 |
 | + reliability weight 0.25 alone | 0.86 / 0.68 / 1.00 / 0.72 | 0.78 / 0.39 / 0.79 / 0.47 |
 | title ×10 + reliability 0.25 (shipped in 2.3.0) | 0.86 / 0.68 / 1.00 / 0.72 | 0.78 / 0.39 / 0.79 / 0.47 |
 
@@ -33,4 +33,4 @@ The tuning judgments are pooled: the top 10 of each ranking variant was judged t
 
 **Still failing unfiltered**: `clientfield register set lua` and `custom lua hud widget` come back all Discord, with the API page and the LUI tutorials absent from the top 10 — no ranking weight reaches them. The `source` filter does: the eval's `filtered` checks (an agent passing the kind of answer it wants) put a key document at rank 3 for both (`source: api`, `source: wiki`), and at rank 1 for `PlayFXOnTag` (`api`) and the wallbuy fix (`wiki,forums`). The test fails if one drops out of the top 5. On the 2026-11 rebuild ([retrieval-experiments.md](retrieval-experiments.md)), one LUI tutorial reaches the unfiltered top 10 (rank 10), and the `source: wiki` check finds its key document at rank 1. The rest is unchanged.
 
-**Experiments.** Database rebuilds, fusion weights, summaries and chunk sizes measured since 2026-11, with what was kept and why, are in [retrieval-experiments.md](retrieval-experiments.md). Its last table is the current baseline on the extended grades.
+**Experiments.** Database rebuilds, fusion weights, summaries and chunk sizes measured since 2026-11, with what was kept and why, are in [retrieval-experiments.md](retrieval-experiments.md). The current ranking adds BM25 × 0.75 to the hybrid fusion, and that page's last table is its baseline on the extended grades.

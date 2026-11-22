@@ -31,7 +31,7 @@ Ranking and database changes measured with `TestRetrievalQuality` since 2026-11,
 
 - **Larger pools** change nothing on the fresh set and lose on tuning.
 - **OR top-up** helps where every-word BM25 finds little ("power switch turns on perks and doors" 0.47 → 0.77) and breaks queries it already served ("sound alias plays silently" 0.82 → 0.25): the extra BM25 hits become two-list docs and push out vector-only answers.
-- **BM25 × 0.75** is the only change that raises key@5 on all three sets. Its nDCG gains on held-out and fresh (+0.05) outweigh the loss on tuning (−0.02). With it, a doc ranked first by the vector alone (0.0164) beats the weakest two-list doc (0.0159); a BM25-only doc still cannot.
+- **BM25 × 0.75 (shipped).** It is the only change that raises key@5 on all three sets. Its nDCG gains on held-out and fresh (+0.05) outweigh the loss on tuning (−0.02). With it, a doc ranked first by the vector alone (0.0164) beats the weakest two-list doc (0.0159); a BM25-only doc still cannot. `rrfFuse` applies it only when both lists have hits. A keyword-only search (`--bm25`, the any-word fallback) and a vector-only one keep plain RRF scores (`TestKeywordOnlySearchKeepsPlainRRFScores`).
 - **Question-style summaries (E2)** neither help nor hurt here. The first pilot, with long identifier-heavy summaries, lost 0.07 key@5 on tuning.
 
 **Chunk sizes, 2026-11-22 (later).** The vector reads only a chunk's first 128 tokens, and the title + summary head takes ~48 of them, so 40–70% of the prose in 700-character chunks reached no vector. Three re-chunkings of build E2 (same summaries, only the vectors changed) were tested: 300-character chunks (871k vectors; 79% still overflow 128 tokens, because code is token-dense), token-sized chunks that fit 128 whole with the head on each (1.50M vectors, every body token embedded), and a head-only vector plus title-prefixed token-sized chunks (854k). The top 10 of each was pooled into all three sets. The 251 never-judged docs among them were judged blind, which added 134 grades. Every score below and from now on uses the extended grades. Paired per-query nDCG@10 against E2, BM25 × 0.75 fusion:
@@ -49,5 +49,7 @@ Ranking and database changes measured with `TestRetrievalQuality` since 2026-11,
 
   | fusion | tuning | held-out | fresh |
   |---|---|---|---|
-  | shipped | 0.67 (0.71) | 0.47 (0.83) | 0.48 (0.74) |
-  | BM25 × 0.75 | 0.66 (0.79) | 0.51 (0.89) | 0.52 (0.78) |
+  | equal weights | 0.67 (0.71) | 0.47 (0.83) | 0.48 (0.74) |
+  | BM25 × 0.75 (**current**) | 0.66 (0.79) | 0.51 (0.89) | 0.52 (0.78) |
+
+  The full test on E3 with the shipped code, as key@5 / recall@10 / MRR / nDCG@10: tuning 0.79 / 0.54 / 1.00 / 0.67, held-out 0.89 / 0.39 / 0.81 / 0.51, fresh 0.83 / 0.42 / 0.81 / 0.52. That is 46 of 55 questions with a key document in the top 5, against 42 at equal weights.
