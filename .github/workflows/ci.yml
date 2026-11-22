@@ -76,7 +76,7 @@ jobs:
         run: |
           notes=".github/release-notes/v$(jq -r .version plugin/.claude-plugin/plugin.json).md"
           if ! grep -q '[^[:space:]]' "$notes" 2>/dev/null; then
-            echo "::error file=plugin/.claude-plugin/plugin.json::$notes is missing or empty: a version bump comes with its release's highlights (CLAUDE.md, Releasing)." >&2
+            echo "::error file=plugin/.claude-plugin/plugin.json::$notes is missing or empty: a version bump comes with its release's highlights (docs/releasing.md)." >&2
             exit 1
           fi
       - name: Test the CI scripts
