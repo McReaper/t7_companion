@@ -1,0 +1,455 @@
+{
+ "about": "Fresh blind set for TestRetrievalQuality, built 2026-11-22 for one decision: which of the ranking ideas (larger per-retriever pools, an OR top-up for BM25, weighted RRF) and the question-style summaries to keep. 23 queries on themes and phrasings neither other set covers, written before any ranking was run. Candidates: the top 10 of every ranking variant tried (shipped fusion; pools of 75-200; OR top-up; RRF weights 0.5-1 either way; BM25-only AND and OR; vector-only) on two builds (D, and E2 with regenerated pilot summaries), plus a title lookup over the non-Discord sources; judged from title, summary and excerpts, sorted by doc_id without knowing which ranking proposed them (E2's 16 extra candidates were judged in a second pass). key = the direct answer, relevant = helps. Built against the 68,457-doc corpus of build D.",
+ "queries": [
+  {
+   "query": "elevator that carries players up and down",
+   "key": [
+    "forums-ugx::ugx-forums-scripting-14244",
+    "forums-ugx::ugx-forums-scripting-15302",
+    "docs-bo3::bo3-docs-elevators-wakka",
+    "discord-bo3modtools::mapping_845730801118216202",
+    "source-workspace::workspace.rex.templates.zm.advanced.level.usermaps.template.scripts.zm.zm.elevator.gsc",
+    "video-youtube::Tutorial - Elevator - Rotating Stuff - RedSpace's Jump Pad - Instant Teleporter and more",
+    "forums-modme::650"
+   ],
+   "relevant": [
+    "forums-modme::639",
+    "forums-modme::844",
+    "forums-modme::2949",
+    "discord-bo3modtools::scripting_963609756419903500",
+    "video-youtube::Moving Platforms | Black Ops 3 Mod Tools Tutorial",
+    "forums-ugx::ugx-forums-scripting-13737",
+    "discord-bo3modtools::scripting_1309635473404330058"
+   ]
+  },
+  {
+   "query": "add a custom weapon to pack a punch",
+   "key": [
+    "discord-bo3modtools::general_602310143098617863",
+    "discord-bo3modtools::general_311614747814395915",
+    "forums-ugx::ugx-forums-modding-13356",
+    "forums-modme::2007"
+   ],
+   "relevant": [
+    "discord-bo3modtools::scripting_262961950194008064",
+    "discord-bo3modtools::scripting_280020677812289536",
+    "discord-bo3modtools::scripting_1158545273321168957",
+    "forums-modme::862",
+    "wiki-t7::guides/add-camo-table-to-custom-weapons.md",
+    "forums-modme::818"
+   ]
+  },
+  {
+   "query": "spawn a script model and make it rotate",
+   "key": [
+    "gscode-api::api.gsc.rotateyaw",
+    "gscode-api::api.gsc.rotate",
+    "gscode-api::api.gsc.spawn",
+    "forums-ugx::ugx-forums-general-13767",
+    "video-youtube::Black Ops 3 Mod Tools - Rotating Entities",
+    "forums-modme::2970",
+    "discord-bo3modtools::scripting_1033700091225182268",
+    "wiki-zeroy::spinning-models"
+   ],
+   "relevant": [
+    "discord-bo3modtools::general_345565861098291203",
+    "gscode-api::api.gsc.rotateto",
+    "gscode-api::api.gsc.setmodel",
+    "forums-modme::823",
+    "forums-modme::1428",
+    "forums-ugx::ugx-forums-scripting-13875",
+    "forums-ugx::ugx-forums-mapping-14092",
+    "discord-bo3modtools::scripting_1190363052474896404",
+    "discord-bo3modtools::scripting_1147897766811533332",
+    "discord-bo3modtools::scripting_976137286381105192",
+    "video-youtube::Tutorial - Elevator - Rotating Stuff - RedSpace's Jump Pad - Instant Teleporter and more"
+   ]
+  },
+  {
+   "query": "notify waittill endon",
+   "key": [
+    "wiki-t7::information/flags-notifies-endons.md",
+    "discord-bo3modtools::scripting_1212493747280158730",
+    "discord-bo3modtools::scripting_1238279275073896500"
+   ],
+   "relevant": [
+    "discord-bo3modtools::general_1227873502980472863",
+    "discord-bo3modtools::scripting_1293684114607833128",
+    "wiki-modme::black-ops-3-guides-scripting-guide",
+    "forums-modme::3694",
+    "discord-bo3modtools::scripting_1124410533286776842",
+    "discord-bo3modtools::general_1311876166449102970",
+    "discord-bo3modtools::general_1137913039002271744",
+    "source-scripts::t7src.gsc.scripts.shared.util_shared"
+   ]
+  },
+  {
+   "query": "teleporter to another part of the map",
+   "key": [
+    "wiki-modme::black-ops-3-basics-setting-up-teleporters",
+    "video-youtube::Black Ops 3 Mod Tools - Teleporter (Animated & Customisable)",
+    "video-youtube::Black Ops 3 Mod Tools tutorial Ep.18 Teleporters /Link Updated",
+    "video-youtube::KINO STYLE TELEPORTS MADE EASY TUTORIAL BLACK OPS 3 MOD TOOLS UPDATED SCRIPT INCLUDED",
+    "docs-bo3::bo3-docs-instant-teleport-wakka"
+   ],
+   "relevant": [
+    "forums-modme::2912",
+    "forums-modme::3727",
+    "forums-modme::649",
+    "forums-modme::621",
+    "forums-modme::1063",
+    "forums-ugx::ugx-forums-scripting-13180",
+    "discord-bo3modtools::scripting_1355596673707016312",
+    "discord-bo3modtools::mapping_484012752948690964",
+    "discord-bo3modtools::forum_1154117420173246555",
+    "discord-bo3modtools::general_1123325619309121556",
+    "discord-bo3modtools::mapping_684583500321390654",
+    "source-workspace::workspace.map.source.prefabs.midgetblaster.teleport.receiver.zone.map",
+    "discord-bo3modtools::scripting_1157038734118760560"
+   ]
+  },
+  {
+   "query": "export a model from Blender to Black Ops 3",
+   "key": [
+    "forums-modme::3545",
+    "forums-modme::3384",
+    "discord-bo3modtools::general_1046781766117101658",
+    "discord-bo3modtools::modeling-animation_634215289097027584",
+    "discord-bo3modtools::general_976306425414422628"
+   ],
+   "relevant": [
+    "forums-modme::1491",
+    "forums-modme::3286",
+    "discord-bo3modtools::general_1008120174471303278",
+    "discord-bo3modtools::general_1121597735506821191",
+    "discord-bo3modtools::general_996665653383675934",
+    "video-youtube::Black Ops 3 Mod Tools Tutorial - Setup Export2Bin",
+    "video-youtube::Black Ops 3 Mod Tools | Tutorial Part 13 - Porting Models",
+    "discord-bo3modtools::mapping_994374146567962685",
+    "discord-bo3modtools::general_247931465323511808",
+    "discord-bo3modtools::modeling-animation_1260072886354313318"
+   ]
+  },
+  {
+   "query": "weapon recoil and spread settings",
+   "key": [
+    "discord-bo3modtools::general_310232030841667584",
+    "discord-bo3modtools::general_310231244711526400",
+    "defs-bo3::asset.bulletweapon",
+    "discord-bo3modtools::general_459048462495907840"
+   ],
+   "relevant": [
+    "gscode-api::api.gsc.setspreadoverride",
+    "discord-bo3modtools::general_1235234200932712560",
+    "source-workspace::workspace.deffiles.backups.bulletweapon.awi",
+    "source-workspace::workspace.usermaps.zm.test.scripts.zm.weapon.mod.csc"
+   ]
+  },
+  {
+   "query": "zombies stand still and never attack",
+   "key": [
+    "discord-bo3modtools::general_603751372105711635",
+    "forums-modme::3023",
+    "discord-bo3modtools::mapping_438763413301362708",
+    "discord-bo3modtools::scripting_1132464177118711958",
+    "discord-bo3modtools::scripting_1238617232649752687"
+   ],
+   "relevant": [
+    "discord-bo3modtools::general_603751272654569472",
+    "discord-bo3modtools::general_232212563385909252",
+    "discord-bo3modtools::general_276387560878637056",
+    "discord-bo3modtools::mapping_685311303497285633",
+    "discord-bo3modtools::mapping_232935527651737601",
+    "forums-ugx::ugx-forums-mapping-13656",
+    "discord-bo3modtools::scripting_1220557468266926141",
+    "wiki-t7::guides/zombies-goto-poi-when-downed.md"
+   ]
+  },
+  {
+   "query": "custom AAT alternate ammo type",
+   "key": [
+    "source-scripts::t7src.gsc.scripts.shared.aat_shared",
+    "source-scripts::t7src.gsc.scripts.zm.aats._zm_aat_turned"
+   ],
+   "relevant": [
+    "wiki-t7::guides/make-ai-exempt-aat.md",
+    "discord-bo3modtools::scripting_1258970785360646194",
+    "discord-bo3modtools::general_575595555196108810",
+    "forums-ugx::ugx-forums-scripting-16001"
+   ]
+  },
+  {
+   "query": "change the starting weapon",
+   "key": [
+    "wiki-modme::black-ops-3-basics-change-starting-weapon",
+    "wiki-t7::guides/change-starting-weapons.md",
+    "forums-ugx::ugx-forums-scripting-12998",
+    "video-youtube::Black Ops 3 Mod Tools - Change Starting Weapon",
+    "video-youtube::Black Ops 3 Mod Tools tutorial Ep.19 Change Starting Weapon",
+    "forums-modme::840"
+   ],
+   "relevant": [
+    "discord-bo3modtools::scripting_970537413288017981",
+    "discord-bo3modtools::general_1081202819987689492",
+    "discord-bo3modtools::scripting_1282744390909169755",
+    "forums-modme::1445",
+    "forums-modme::1158",
+    "forums-modme::1249",
+    "forums-modme::3812",
+    "forums-ugx::ugx-forums-mapping-18119",
+    "video-youtube::Black Ops 3 Mod Tools - Change Last Stand Weapon",
+    "discord-bo3modtools::general_458256238619394049"
+   ]
+  },
+  {
+   "query": "change the skybox",
+   "key": [
+    "forums-modme::285",
+    "forums-ugx::ugx-forums-mapping-12920",
+    "video-youtube::Black Ops III Mod Tools Tutorial - Ep 08 - Changing Skyboxes (LET'S BUILD A MAP)",
+    "video-youtube::Tutorial 3 Skybox   SSI   Lightstate Quick Overview   Sun Volume"
+   ],
+   "relevant": [
+    "discord-bo3modtools::general_235402964955561985",
+    "discord-bo3modtools::general_231136967868416003",
+    "forums-modme::1818",
+    "video-youtube::Tutorial 14 - Custom Skyboxes",
+    "video-youtube::CUSTOM SKYBOX INTO YOUR MAP BLACK OPS 3 CUSTOM ZOMBIES MOD TOOLS TUTORIAL",
+    "forums-modme::1747",
+    "forums-modme::1088",
+    "forums-modme::1414",
+    "forums-modme::443",
+    "forums-ugx::ugx-forums-mapping-13447",
+    "discord-bo3modtools::mapping_1300943260671410278",
+    "discord-bo3modtools::mapping_1143310546163224586"
+   ]
+  },
+  {
+   "query": "play a camera animation cutscene with xcam",
+   "key": [
+    "discord-bo3modtools::general_450949963296276480",
+    "discord-bo3modtools::general_706476368946528326",
+    "discord-bo3modtools::general_706631566847377480",
+    "discord-bo3modtools::lui_1153181008611524708",
+    "gscode-api::api.csc.playmaincamxcam"
+   ],
+   "relevant": [
+    "defs-bo3::asset.xcam",
+    "gscode-api::api.csc.playextracamxcam",
+    "discord-bo3modtools::modeling-animation_1345541459297959946",
+    "discord-bo3modtools::general_861594334850449478",
+    "discord-bo3modtools::general_354303064469012481",
+    "defs-bo3::asset.scriptbundle",
+    "discord-bo3modtools::general_861607544086462494"
+   ]
+  },
+  {
+   "query": "disable gobblegum machines",
+   "key": [
+    "forums-modme::3137"
+   ],
+   "relevant": [
+    "discord-bo3modtools::general_1262855428753195008",
+    "discord-bo3modtools::general_1268327405336924190",
+    "discord-bo3modtools::general_1128775257864552498",
+    "discord-bo3modtools::scripting_1286370175196594259",
+    "discord-bo3modtools::forum_1454323831857610875",
+    "discord-bo3modtools::general_1262020755818807337"
+   ]
+  },
+  {
+   "query": "Exceeded 256 items for type fx",
+   "key": [
+    "wiki-t7::guides/how-to-use-csc-fx.md",
+    "discord-bo3modtools::scripting_1122524960972341328",
+    "discord-bo3modtools::scripting_968433420554354699",
+    "discord-bo3modtools::general_685309757904650241"
+   ],
+   "relevant": [
+    "discord-bo3modtools::scripting_1374683227658256455",
+    "discord-bo3modtools::scripting_968393044716060702",
+    "discord-bo3modtools::scripting_1284023367158206465"
+   ]
+  },
+  {
+   "query": "noclip and god mode console commands",
+   "key": [
+    "wiki-t7::information/bo3-console-commands-standard.md",
+    "discord-bo3modtools::general_230799972247928832",
+    "discord-bo3modtools::mapping_929088894987817002"
+   ],
+   "relevant": [
+    "discord-bo3modtools::mapping_929111392366231623",
+    "discord-bo3modtools::general_1137421843746267187",
+    "discord-bo3modtools::general_236123584727220224",
+    "discord-bo3modtools::general_680155938002698277",
+    "discord-bo3modtools::general_1097121233411248241",
+    "discord-bo3modtools::general_234249461402959872",
+    "personal-notes::notes.sphynx-commands-cheat-sheet",
+    "video-youtube::Sphynx's Console Commands (BO3 Mod Tools 2022)",
+    "video-youtube::How to use the Dev console on Black Ops 3 with mod tools - PC"
+   ]
+  },
+  {
+   "query": "custom loading screen image",
+   "key": [
+    "forums-modme::1560",
+    "discord-bo3modtools::general_755268522074177588",
+    "discord-bo3modtools::mapping_948012163749003344",
+    "discord-bo3modtools::general_839856957451665429"
+   ],
+   "relevant": [
+    "video-youtube::Black Ops 3 Mod Tools tutorial Ep.17 Making A Load Screen image",
+    "wiki-zeroy::loadscreen",
+    "discord-bo3modtools::general_705843224559747194",
+    "discord-bo3modtools::mapping_698116220892872714",
+    "discord-bo3modtools::general_550576928684376074",
+    "discord-bo3modtools::general_507023823950970901",
+    "forums-modme::3760",
+    "forums-modme::3056",
+    "video-youtube::Preview Image, Loading Screens, & Steam Workshop Page (BO3 Mod Tools 2022)",
+    "discord-bo3modtools::scripting_1072964417882431488",
+    "discord-bo3modtools::general_239057430070165504",
+    "forums-ugx::ugx-forums-scripting-13505",
+    "wiki-modme::black-ops-3-intermediate-setting-up-loadscreen-videos"
+   ]
+  },
+  {
+   "query": "ladder players can climb",
+   "key": [
+    "discord-bo3modtools::general_664558740036648961",
+    "forums-ugx::ugx-forums-mapping-13978",
+    "forums-modme::525",
+    "forums-modme::2735",
+    "forums-ugx::ugx-forums-help-desk-15255"
+   ],
+   "relevant": [
+    "discord-bo3modtools::general_1363305719931080795",
+    "discord-bo3modtools::mapping_1385821081440354496",
+    "discord-bo3modtools::mapping_874099829347876944",
+    "discord-bo3modtools::mapping_1380561887665721556",
+    "video-youtube::Black Ops III Mod Tools Tutorial - Ep 15 - Clip & Special Textures (LET'S BUILD A MAP)",
+    "discord-bo3modtools::general_458044202069262339"
+   ]
+  },
+  {
+   "query": "model is black or missing its texture in game",
+   "key": [
+    "forums-modme::1466",
+    "forums-modme::1571",
+    "discord-bo3modtools::general_1120734889860419625",
+    "discord-bo3modtools::forum_1113597147275853949"
+   ],
+   "relevant": [
+    "discord-bo3modtools::general_640611257787088932",
+    "forums-modme::3718",
+    "discord-bo3modtools::mapping_1189186606331080704",
+    "forums-modme::3303",
+    "discord-bo3modtools::mapping_700277883213447208",
+    "discord-bo3modtools::general_1116062165019930675",
+    "discord-bo3modtools::general_1498152056727539855",
+    "forums-ugx::ugx-forums-help-desk-14860",
+    "forums-modme::517",
+    "discord-bo3modtools::general_959942825875746866"
+   ]
+  },
+  {
+   "query": "difference between targetname and script_noteworthy",
+   "key": [
+    "forums-ugx::ugx-forums-scripting-13622"
+   ],
+   "relevant": [
+    "discord-bo3modtools::general_1106372056469225646",
+    "discord-bo3modtools::scripting_1220513407900323912",
+    "discord-bo3modtools::scripting_1220518448518529024",
+    "wiki-t7::information/radiant-kvps-in-scripts.md",
+    "wiki-t7::information/available-script-kvps.md",
+    "forums-ugx::ugx-forums-scripting-15197",
+    "forums-modme::1201",
+    "wiki-t7::guides/how-to-use-your-own-kvps.md"
+   ]
+  },
+  {
+   "query": "give points when a zombie is killed",
+   "key": [
+    "forums-ugx::ugx-forums-scripting-13895",
+    "forums-ugx::ugx-forums-scripting-13478"
+   ],
+   "relevant": [
+    "forums-ugx::ugx-forums-scripting-13791",
+    "discord-bo3modtools::scripting_1149008829246341171",
+    "forums-modme::3448",
+    "forums-modme::985",
+    "discord-bo3modtools::scripting_1135578743910445087"
+   ]
+  },
+  {
+   "query": "shoot an object to trigger something",
+   "key": [
+    "forums-ugx::ugx-forums-scripting-13225",
+    "forums-ugx::ugx-forums-scripting-14024",
+    "defs-bo3::entity.trigger_damage",
+    "wiki-makecent::scripts-shootable-ees",
+    "forums-modme::1245",
+    "forums-modme::1260"
+   ],
+   "relevant": [
+    "discord-bo3modtools::general_235748388551917569",
+    "forums-modme::1186",
+    "forums-modme::1389",
+    "forums-modme::829",
+    "forums-modme::976",
+    "forums-modme::751",
+    "forums-modme::2810",
+    "forums-modme::1210",
+    "forums-ugx::ugx-forums-general-13057",
+    "forums-ugx::ugx-forums-scripting-13911",
+    "forums-ugx::ugx-forums-scripting-14144",
+    "forums-ugx::ugx-forums-scripting-14182",
+    "discord-bo3modtools::scripting_1088139634082594858",
+    "discord-bo3modtools::scripting_1386044902043029555",
+    "discord-bo3modtools::scripting_1069073998383697962",
+    "discord-bo3modtools::scripting_241678459175305216",
+    "discord-bo3modtools::general_397162595645128704",
+    "wiki-modme::black-ops-3-guides-scripting-guide"
+   ]
+  },
+  {
+   "query": "boss zombie with a health bar",
+   "key": [
+    "discord-bo3modtools::lui_912777082961010718",
+    "discord-bo3modtools::general_933141074715771010",
+    "discord-bo3modtools::lui_1164181896301924393"
+   ],
+   "relevant": [
+    "discord-bo3modtools::scripting_1217425554140041237",
+    "forums-modme::3471",
+    "discord-bo3modtools::general_581499683797598218",
+    "forums-modme::1174",
+    "forums-ugx::ugx-forums-scripting-16133",
+    "forums-ugx::ugx-forums-scripting-15682",
+    "discord-bo3modtools::scripting_1395968086619717722",
+    "source-workspace::workspace.usermaps.zm.test.scripts.zm.zm.cellbreaker.gsc",
+    "source-workspace::workspace.usermaps.zm.ai.test.scripts.zm.zm.cellbreaker.gsc",
+    "forums-modme::3324"
+   ]
+  },
+  {
+   "query": "array::thread_all",
+   "key": [
+    "discord-bo3modtools::scripting_1386028615581302835",
+    "discord-bo3modtools::scripting_1258498548517965967",
+    "source-scripts::t7src.gsc.scripts.shared.array_shared",
+    "discord-bo3modtools::scripting_1135190121080176760"
+   ],
+   "relevant": [
+    "discord-bo3modtools::scripting_1151547186266513408",
+    "discord-bo3modtools::scripting_1401478343529861120",
+    "discord-bo3modtools::scripting_1372488861380509706",
+    "discord-bo3modtools::scripting_1372481673362542652",
+    "discord-bo3modtools::scripting_1178611236427018240",
+    "source-scripts::t7src.csc.scripts.shared.array_shared"
+   ]
+  }
+ ]
+}

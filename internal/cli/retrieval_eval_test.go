@@ -86,6 +86,22 @@ func TestRetrievalQuality(t *testing.T) {
 	fmt.Fprintf(&report, "\nHELD-OUT SET (other themes, judged blind)")
 	scoreSet(t, &report, emb, st, holdout.Queries)
 
+	// The fresh set: a third blind set, pooled from every ranking variant tried
+	// in 2026-11 so none of them is favoured; see its "about".
+	var fresh struct {
+		Queries []evalQuery `json:"queries"`
+	}
+	fb, err := os.ReadFile("testdata/retrieval_fresh.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(fb, &fresh); err != nil {
+		t.Fatal(err)
+	}
+	checkJudgedDocsExist(t, db, fresh.Queries)
+	fmt.Fprintf(&report, "\nFRESH SET (third blind set, pooled from every variant)")
+	scoreSet(t, &report, emb, st, fresh.Queries)
+
 	// The source filter: an agent that knows the kind of answer it wants passes
 	// source, and a key document should then be in the top 5.
 	fmt.Fprintf(&report, "\nwith the source filter an agent would pass:\n")
