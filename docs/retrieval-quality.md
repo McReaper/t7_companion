@@ -8,10 +8,11 @@ T7KB_BENCH_DB=<t7kb.db> HF_HOME=<model cache> go test ./internal/cli -run TestRe
 
 `TestRetrievalQuality` scores search against 14 judged queries (`internal/cli/testdata/retrieval_eval.json`), one or more per skill domain. Each lists its **key** documents (the API doc, the reference tutorial, the thread with the fix) and **relevant** ones, judged by reading the candidates from three independent paths: the hybrid top 30, the BM25 top 15, and a title search over the non-Discord sources. A judged doc_id the db lacks fails the test.
 
-Two judged sets, scored by the same test:
+Three judged sets, scored by the same test:
 
 - **tuning** (`retrieval_eval.json`, 14 queries) — the ranking weights were chosen on it;
-- **held-out** (`retrieval_holdout.json`, 18 queries) — other themes and phrasings, candidates pooled from both rankings and judged blind (sorted by doc_id, without knowing which ranking proposed which). It checks that a choice generalises.
+- **held-out** (`retrieval_holdout.json`, 18 queries) — other themes and phrasings, candidates pooled from both rankings and judged blind (sorted by doc_id, without knowing which ranking proposed which). It checks that a choice generalises;
+- **fresh** (`retrieval_fresh.json`, 23 queries) — a third blind set, written before any ranking ran, its candidates pooled from every variant in [retrieval-experiments.md](retrieval-experiments.md).
 
 | key@5 / recall@10 / MRR / nDCG@10 | tuning | held-out |
 |---|---|---|
@@ -30,4 +31,6 @@ Two judged sets, scored by the same test:
 
 The tuning judgments are pooled: the top 10 of each ranking variant was judged too (as relevant only), so a ranking that surfaces relevant documents the baseline missed isn't scored as noise.
 
-**Still failing unfiltered**: `clientfield register set lua` and `custom lua hud widget` come back all Discord, with the API page and the LUI tutorials absent from the top 10 — no ranking weight reaches them. The `source` filter does: the eval's `filtered` checks (an agent passing the kind of answer it wants) put a key document at rank 3 for both (`source: api`, `source: wiki`), and at rank 1 for `PlayFXOnTag` (`api`) and the wallbuy fix (`wiki,forums`). The test fails if one drops out of the top 5.
+**Still failing unfiltered**: `clientfield register set lua` and `custom lua hud widget` come back all Discord, with the API page and the LUI tutorials absent from the top 10 — no ranking weight reaches them. The `source` filter does: the eval's `filtered` checks (an agent passing the kind of answer it wants) put a key document at rank 3 for both (`source: api`, `source: wiki`), and at rank 1 for `PlayFXOnTag` (`api`) and the wallbuy fix (`wiki,forums`). The test fails if one drops out of the top 5. On the 2026-11 rebuild ([retrieval-experiments.md](retrieval-experiments.md)), one LUI tutorial reaches the unfiltered top 10 (rank 10), and the `source: wiki` check finds its key document at rank 1. The rest is unchanged.
+
+**Experiments.** Database rebuilds, fusion weights, summaries and chunk sizes measured since 2026-11, with what was kept and why, are in [retrieval-experiments.md](retrieval-experiments.md). Its last table is the current baseline on the extended grades.
