@@ -21,6 +21,8 @@ type pluginInstall struct {
 }
 
 // listPlugins runs Claude Code's public plugin listing; a var so tests can fake it.
+// Never read Claude Code's internal installed_plugins.json instead: its format
+// is Claude Code's own and can change.
 var listPlugins = func() ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
