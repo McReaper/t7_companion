@@ -1,5 +1,5 @@
 {
-  "about": "Judged queries for TestRetrievalQuality. key = the best sources for the question (the API doc, the reference tutorial, the thread that has the fix); relevant = useful but secondary. Judged by reading each candidate from three independent paths, then pooled — the top 10 of each ranking variant tried was judged too, so a variant that surfaces relevant documents the baseline missed isn't scored as if it surfaced noise: the hybrid top 30, the BM25 top 15, and a title search over the non-Discord sources. Built against the v2.2 corpus (66,023 docs); a doc_id missing from the db fails the test, so a rebuilt corpus that renames documents shows up instead of silently scoring zero. The 'filtered' entries check the source filter: an agent that knows the kind of answer it wants (the API reference, a tutorial) passes source, and a key document should then lead.",
+  "about": "Judged queries for TestRetrievalQuality. key = the best sources for the question (the API doc, the reference tutorial, the thread that has the fix); relevant = useful but secondary. Judged by reading each candidate from three independent paths, then pooled — the top 10 of each ranking variant tried was judged too, so a variant that surfaces relevant documents the baseline missed isn't scored as if it surfaced noise: the hybrid top 30, the BM25 top 15, and a title search over the non-Discord sources. Built against the v2.2 corpus (66,023 docs); a doc_id missing from the db fails the test, so a rebuilt corpus that renames documents shows up instead of silently scoring zero. The 'filtered' entries check the source filter: an agent that knows the kind of answer it wants (the API reference, a tutorial) passes source, and a key document should then lead. Added 2026-11-22: the top 10 of three chunking variants (300-char chunks; token-sized chunks with the head on each; a head-only vector plus title-prefixed chunks; each fused as shipped, with BM25 x 0.75, and vector-only) were pooled the same way, and the never-judged docs among them judged blind, sorted by doc_id.",
   "queries": [
     {
       "query": "clientfield register set lua",
@@ -23,7 +23,13 @@
         "discord-bo3modtools::lui_391966779024474114",
         "discord-bo3modtools::lui_910254042444361739",
         "discord-bo3modtools::lui_910277421813628989",
-        "discord-bo3modtools::lui_1475157741155651778"
+        "discord-bo3modtools::lui_1475157741155651778",
+        "discord-bo3modtools::general_639842819535667220",
+        "discord-bo3modtools::lui_1113446899266113586",
+        "discord-bo3modtools::lui_1123427407181918258",
+        "discord-bo3modtools::lui_1160982664715706449",
+        "discord-bo3modtools::scripting_1289285467891699743",
+        "discord-bo3modtools::general_841745743059353610"
       ]
     },
     {
@@ -42,14 +48,20 @@
         "forums-modme::675",
         "discord-bo3modtools::scripting_1248804065371095151",
         "discord-bo3modtools::scripting_1347867744544096266",
-        "discord-bo3modtools::scripting_1142440711900369030"
+        "discord-bo3modtools::scripting_1142440711900369030",
+        "discord-bo3modtools::general_262898497378844673",
+        "discord-bo3modtools::general_455225443453501464",
+        "discord-bo3modtools::scripting_1210390268239417384",
+        "discord-bo3modtools::scripting_1234901226404188190",
+        "discord-bo3modtools::general_237704278578429962"
       ]
     },
     {
       "query": "play fx on a tag of a model",
       "key": [
         "gscode-api::api.gsc.playfxontag",
-        "gscode-api::api.csc.playfxontag"
+        "gscode-api::api.csc.playfxontag",
+        "forums-modme::1206"
       ],
       "relevant": [
         "forums-modme::3413",
@@ -60,7 +72,10 @@
         "discord-bo3modtools::scripting_1264806940228456539",
         "discord-bo3modtools::scripting_1098746581957750834",
         "discord-bo3modtools::scripting_244077856253149184",
-        "discord-bo3modtools::scripting_1386156018462883960"
+        "discord-bo3modtools::scripting_1386156018462883960",
+        "discord-bo3modtools::general_272129765652037632",
+        "discord-bo3modtools::scripting_969070410631106600",
+        "forums-ugx::ugx-forums-scripting-16225"
       ]
     },
     {
@@ -84,7 +99,8 @@
         "discord-bo3modtools::scripting_272876719432531970",
         "discord-bo3modtools::general_786894643757318164",
         "forums-ugx::ugx-forums-help-desk-16466",
-        "forums-modme::3088"
+        "forums-modme::3088",
+        "discord-bo3modtools::scripting_285148357867864065"
       ],
       "relevant": [
         "discord-bo3modtools::mapping_350523155254870018",
@@ -98,7 +114,11 @@
         "discord-bo3modtools::scripting_1014785723976646706",
         "discord-bo3modtools::general_237719493894340609",
         "discord-bo3modtools::forum_1096171240785461259",
-        "discord-bo3modtools::general_344539132183314433"
+        "discord-bo3modtools::general_344539132183314433",
+        "discord-bo3modtools::general_719268135420690502",
+        "discord-bo3modtools::scripting_1146812385122852965",
+        "discord-bo3modtools::scripting_1362096921467949227",
+        "discord-bo3modtools::general_230854438078644227"
       ]
     },
     {
@@ -130,7 +150,9 @@
         "source-scripts::t7src.gsc.scripts.zm._zm_perks",
         "wiki-modme::black-ops-3-guides-creating-a-custom-perk",
         "forums-modme::788",
-        "video-youtube::BLACK OPS 3 MOD TOOLS - TUTORIAL 8 - HOW TO ADD SIMPLE GIANT STYLE RANDOM SPAWNING PERK MACHINES"
+        "video-youtube::BLACK OPS 3 MOD TOOLS - TUTORIAL 8 - HOW TO ADD SIMPLE GIANT STYLE RANDOM SPAWNING PERK MACHINES",
+        "discord-bo3modtools::general_647124296992555009",
+        "forums-ugx::ugx-forums-mapping-14686"
       ]
     },
     {
@@ -144,7 +166,8 @@
         "discord-bo3modtools::general_1135978715537494137",
         "discord-bo3modtools::general_945065090862944287",
         "discord-bo3modtools::general_1135978793488621578",
-        "discord-bo3modtools::general_1108461397119082597"
+        "discord-bo3modtools::general_1108461397119082597",
+        "discord-bo3modtools::general_708682076777349191"
       ]
     },
     {
@@ -173,7 +196,8 @@
       "query": "fog volume not working",
       "key": [
         "discord-bo3modtools::mapping_493485785589350424",
-        "discord-bo3modtools::general_719396062997118978"
+        "discord-bo3modtools::general_719396062997118978",
+        "forums-modme::1880"
       ],
       "relevant": [
         "discord-bo3modtools::general_235991469951811585",
@@ -186,7 +210,8 @@
         "discord-bo3modtools::mapping_1305638880724389950",
         "discord-bo3modtools::mapping_233389463169007616",
         "discord-bo3modtools::mapping_493459756011356181",
-        "discord-bo3modtools::general_270958322927140864"
+        "discord-bo3modtools::general_270958322927140864",
+        "forums-modme::419"
       ]
     },
     {
@@ -199,7 +224,9 @@
         "discord-bo3modtools::general_1103525428393680976",
         "forums-modme::1428",
         "discord-bo3modtools::general_992506467645132891",
-        "wiki-zeroy::zm-player-models-2"
+        "wiki-zeroy::zm-player-models-2",
+        "discord-bo3modtools::general_1144340632819740693",
+        "discord-bo3modtools::general_242124257977434112"
       ]
     },
     {
@@ -219,7 +246,12 @@
         "forums-ugx::ugx-forums-modding-13549",
         "forums-modme::1244",
         "discord-bo3modtools::general_408334771450675200",
-        "discord-bo3modtools::general_611162364515188739"
+        "discord-bo3modtools::general_611162364515188739",
+        "discord-bo3modtools::general_260884050007425024",
+        "discord-bo3modtools::general_341754823173210112",
+        "discord-bo3modtools::general_945418824713392138",
+        "forums-modme::1710",
+        "discord-bo3modtools::general_954847590304870430"
       ]
     },
     {
@@ -241,7 +273,12 @@
         "discord-bo3modtools::general_342289172821704704",
         "discord-bo3modtools::lui_1109909513169031178",
         "discord-bo3modtools::lui_825164369448796170",
-        "discord-bo3modtools::lui_1158934429322989579"
+        "discord-bo3modtools::lui_1158934429322989579",
+        "discord-bo3modtools::general_1007331065049927792",
+        "discord-bo3modtools::lui_533147914462298133",
+        "discord-bo3modtools::lui_717935376727015444",
+        "discord-bo3modtools::lui_948704494533894164",
+        "forums-modme::2979"
       ]
     },
     {
@@ -263,7 +300,10 @@
         "discord-bo3modtools::mapping_817224983980802058",
         "discord-bo3modtools::general_1496951238082822294",
         "discord-bo3modtools::mapping_386726313047621652",
-        "discord-bo3modtools::general_1120389510165975090"
+        "discord-bo3modtools::general_1120389510165975090",
+        "discord-bo3modtools::general_324700515395043328",
+        "discord-bo3modtools::mapping_1274918364317483008",
+        "forums-modme::3307"
       ]
     }
   ],

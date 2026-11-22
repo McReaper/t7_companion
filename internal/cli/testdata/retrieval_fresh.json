@@ -1,5 +1,5 @@
 {
- "about": "Fresh blind set for TestRetrievalQuality, built 2026-11-22 for one decision: which of the ranking ideas (larger per-retriever pools, an OR top-up for BM25, weighted RRF) and the question-style summaries to keep. 23 queries on themes and phrasings neither other set covers, written before any ranking was run. Candidates: the top 10 of every ranking variant tried (shipped fusion; pools of 75-200; OR top-up; RRF weights 0.5-1 either way; BM25-only AND and OR; vector-only) on two builds (D, and E2 with regenerated pilot summaries), plus a title lookup over the non-Discord sources; judged from title, summary and excerpts, sorted by doc_id without knowing which ranking proposed them (E2's 16 extra candidates were judged in a second pass). key = the direct answer, relevant = helps. Built against the 68,457-doc corpus of build D.",
+ "about": "Fresh blind set for TestRetrievalQuality, built 2026-11-22 for one decision: which of the ranking ideas (larger per-retriever pools, an OR top-up for BM25, weighted RRF) and the question-style summaries to keep. 23 queries on themes and phrasings neither other set covers, written before any ranking was run. Candidates: the top 10 of every ranking variant tried (shipped fusion; pools of 75-200; OR top-up; RRF weights 0.5-1 either way; BM25-only AND and OR; vector-only) on two builds (D, and E2 with regenerated pilot summaries), plus a title lookup over the non-Discord sources; judged from title, summary and excerpts, sorted by doc_id without knowing which ranking proposed them (E2's 16 extra candidates were judged in a second pass). key = the direct answer, relevant = helps. Built against the 68,457-doc corpus of build D. Added 2026-11-22: the top 10 of three chunking variants (300-char chunks; token-sized chunks with the head on each; a head-only vector plus title-prefixed chunks; each fused as shipped, with BM25 x 0.75, and vector-only) were pooled the same way, and the never-judged docs among them judged blind, sorted by doc_id.",
  "queries": [
   {
    "query": "elevator that carries players up and down",
@@ -36,7 +36,9 @@
     "discord-bo3modtools::scripting_1158545273321168957",
     "forums-modme::862",
     "wiki-t7::guides/add-camo-table-to-custom-weapons.md",
-    "forums-modme::818"
+    "forums-modme::818",
+    "discord-bo3modtools::general_234749282660384778",
+    "source-scripts::t7src.gsc.scripts.zm._zm_pack_a_punch"
    ]
   },
   {
@@ -62,7 +64,9 @@
     "discord-bo3modtools::scripting_1190363052474896404",
     "discord-bo3modtools::scripting_1147897766811533332",
     "discord-bo3modtools::scripting_976137286381105192",
-    "video-youtube::Tutorial - Elevator - Rotating Stuff - RedSpace's Jump Pad - Instant Teleporter and more"
+    "video-youtube::Tutorial - Elevator - Rotating Stuff - RedSpace's Jump Pad - Instant Teleporter and more",
+    "forums-modme::2644",
+    "forums-ugx::ugx-forums-mapping-13797"
    ]
   },
   {
@@ -70,7 +74,8 @@
    "key": [
     "wiki-t7::information/flags-notifies-endons.md",
     "discord-bo3modtools::scripting_1212493747280158730",
-    "discord-bo3modtools::scripting_1238279275073896500"
+    "discord-bo3modtools::scripting_1238279275073896500",
+    "discord-bo3modtools::scripting_1384534794393620491"
    ],
    "relevant": [
     "discord-bo3modtools::general_1227873502980472863",
@@ -80,7 +85,9 @@
     "discord-bo3modtools::scripting_1124410533286776842",
     "discord-bo3modtools::general_1311876166449102970",
     "discord-bo3modtools::general_1137913039002271744",
-    "source-scripts::t7src.gsc.scripts.shared.util_shared"
+    "source-scripts::t7src.gsc.scripts.shared.util_shared",
+    "forums-modme::2688",
+    "discord-bo3modtools::scripting_1239840984347578388"
    ]
   },
   {
@@ -105,7 +112,11 @@
     "discord-bo3modtools::general_1123325619309121556",
     "discord-bo3modtools::mapping_684583500321390654",
     "source-workspace::workspace.map.source.prefabs.midgetblaster.teleport.receiver.zone.map",
-    "discord-bo3modtools::scripting_1157038734118760560"
+    "discord-bo3modtools::scripting_1157038734118760560",
+    "forums-ugx::ugx-forums-scripting-14009",
+    "forums-ugx::ugx-forums-scripting-14130",
+    "discord-bo3modtools::scripting_1103993543992815636",
+    "discord-bo3modtools::scripting_1146408048999534633"
    ]
   },
   {
@@ -127,7 +138,9 @@
     "video-youtube::Black Ops 3 Mod Tools | Tutorial Part 13 - Porting Models",
     "discord-bo3modtools::mapping_994374146567962685",
     "discord-bo3modtools::general_247931465323511808",
-    "discord-bo3modtools::modeling-animation_1260072886354313318"
+    "discord-bo3modtools::modeling-animation_1260072886354313318",
+    "discord-bo3modtools::general_321753824492650497",
+    "discord-bo3modtools::modeling-animation_709807640095490058"
    ]
   },
   {
@@ -162,7 +175,11 @@
     "discord-bo3modtools::mapping_232935527651737601",
     "forums-ugx::ugx-forums-mapping-13656",
     "discord-bo3modtools::scripting_1220557468266926141",
-    "wiki-t7::guides/zombies-goto-poi-when-downed.md"
+    "wiki-t7::guides/zombies-goto-poi-when-downed.md",
+    "discord-bo3modtools::mapping_627901560634081300",
+    "forums-modme::3042",
+    "forums-ugx::ugx-forums-general-12841",
+    "forums-ugx::ugx-forums-mapping-14419"
    ]
   },
   {
@@ -198,7 +215,9 @@
     "forums-modme::3812",
     "forums-ugx::ugx-forums-mapping-18119",
     "video-youtube::Black Ops 3 Mod Tools - Change Last Stand Weapon",
-    "discord-bo3modtools::general_458256238619394049"
+    "discord-bo3modtools::general_458256238619394049",
+    "discord-bo3modtools::scripting_1192152057075990690",
+    "discord-bo3modtools::scripting_1194017905478729728"
    ]
   },
   {
@@ -221,7 +240,10 @@
     "forums-modme::443",
     "forums-ugx::ugx-forums-mapping-13447",
     "discord-bo3modtools::mapping_1300943260671410278",
-    "discord-bo3modtools::mapping_1143310546163224586"
+    "discord-bo3modtools::mapping_1143310546163224586",
+    "discord-bo3modtools::general_356915174038306828",
+    "discord-bo3modtools::mapping_264481257587474433",
+    "discord-bo3modtools::general_512447015763050530"
    ]
   },
   {
@@ -240,7 +262,9 @@
     "discord-bo3modtools::general_861594334850449478",
     "discord-bo3modtools::general_354303064469012481",
     "defs-bo3::asset.scriptbundle",
-    "discord-bo3modtools::general_861607544086462494"
+    "discord-bo3modtools::general_861607544086462494",
+    "discord-bo3modtools::general_1342877789497462856",
+    "discord-bo3modtools::general_1342911658405789868"
    ]
   },
   {
@@ -263,12 +287,14 @@
     "wiki-t7::guides/how-to-use-csc-fx.md",
     "discord-bo3modtools::scripting_1122524960972341328",
     "discord-bo3modtools::scripting_968433420554354699",
-    "discord-bo3modtools::general_685309757904650241"
+    "discord-bo3modtools::general_685309757904650241",
+    "discord-bo3modtools::scripting_1124728975940386966"
    ],
    "relevant": [
     "discord-bo3modtools::scripting_1374683227658256455",
     "discord-bo3modtools::scripting_968393044716060702",
-    "discord-bo3modtools::scripting_1284023367158206465"
+    "discord-bo3modtools::scripting_1284023367158206465",
+    "discord-bo3modtools::general_568565335226318881"
    ]
   },
   {
@@ -287,7 +313,9 @@
     "discord-bo3modtools::general_234249461402959872",
     "personal-notes::notes.sphynx-commands-cheat-sheet",
     "video-youtube::Sphynx's Console Commands (BO3 Mod Tools 2022)",
-    "video-youtube::How to use the Dev console on Black Ops 3 with mod tools - PC"
+    "video-youtube::How to use the Dev console on Black Ops 3 with mod tools - PC",
+    "discord-bo3modtools::general_273796720712744960",
+    "discord-bo3modtools::general_680170827911790634"
    ]
   },
   {
@@ -296,7 +324,8 @@
     "forums-modme::1560",
     "discord-bo3modtools::general_755268522074177588",
     "discord-bo3modtools::mapping_948012163749003344",
-    "discord-bo3modtools::general_839856957451665429"
+    "discord-bo3modtools::general_839856957451665429",
+    "discord-bo3modtools::general_761779673885442048"
    ],
    "relevant": [
     "video-youtube::Black Ops 3 Mod Tools tutorial Ep.17 Making A Load Screen image",
@@ -311,7 +340,11 @@
     "discord-bo3modtools::scripting_1072964417882431488",
     "discord-bo3modtools::general_239057430070165504",
     "forums-ugx::ugx-forums-scripting-13505",
-    "wiki-modme::black-ops-3-intermediate-setting-up-loadscreen-videos"
+    "wiki-modme::black-ops-3-intermediate-setting-up-loadscreen-videos",
+    "discord-bo3modtools::general_1012462581186830499",
+    "discord-bo3modtools::general_235928030806016000",
+    "discord-bo3modtools::general_495862248150007808",
+    "discord-bo3modtools::lui_617562455131815977"
    ]
   },
   {
@@ -329,7 +362,8 @@
     "discord-bo3modtools::mapping_874099829347876944",
     "discord-bo3modtools::mapping_1380561887665721556",
     "video-youtube::Black Ops III Mod Tools Tutorial - Ep 15 - Clip & Special Textures (LET'S BUILD A MAP)",
-    "discord-bo3modtools::general_458044202069262339"
+    "discord-bo3modtools::general_458044202069262339",
+    "discord-bo3modtools::general_231063779302047744"
    ]
   },
   {
@@ -350,7 +384,11 @@
     "discord-bo3modtools::general_1498152056727539855",
     "forums-ugx::ugx-forums-help-desk-14860",
     "forums-modme::517",
-    "discord-bo3modtools::general_959942825875746866"
+    "discord-bo3modtools::general_959942825875746866",
+    "discord-bo3modtools::general_235817628675866624",
+    "discord-bo3modtools::general_862221103509274636",
+    "discord-bo3modtools::mapping_694940755747406027",
+    "forums-modme::2103"
    ]
   },
   {
@@ -366,7 +404,8 @@
     "wiki-t7::information/available-script-kvps.md",
     "forums-ugx::ugx-forums-scripting-15197",
     "forums-modme::1201",
-    "wiki-t7::guides/how-to-use-your-own-kvps.md"
+    "wiki-t7::guides/how-to-use-your-own-kvps.md",
+    "discord-bo3modtools::scripting_1079790081788878848"
    ]
   },
   {
@@ -380,7 +419,9 @@
     "discord-bo3modtools::scripting_1149008829246341171",
     "forums-modme::3448",
     "forums-modme::985",
-    "discord-bo3modtools::scripting_1135578743910445087"
+    "discord-bo3modtools::scripting_1135578743910445087",
+    "discord-bo3modtools::forum_1369919381781483520",
+    "discord-bo3modtools::scripting_1228304680786989176"
    ]
   },
   {
@@ -391,7 +432,8 @@
     "defs-bo3::entity.trigger_damage",
     "wiki-makecent::scripts-shootable-ees",
     "forums-modme::1245",
-    "forums-modme::1260"
+    "forums-modme::1260",
+    "forums-modme::1094"
    ],
    "relevant": [
     "discord-bo3modtools::general_235748388551917569",
@@ -411,7 +453,9 @@
     "discord-bo3modtools::scripting_1069073998383697962",
     "discord-bo3modtools::scripting_241678459175305216",
     "discord-bo3modtools::general_397162595645128704",
-    "wiki-modme::black-ops-3-guides-scripting-guide"
+    "wiki-modme::black-ops-3-guides-scripting-guide",
+    "forums-modme::934",
+    "forums-ugx::ugx-forums-general-13212"
    ]
   },
   {
@@ -431,7 +475,10 @@
     "discord-bo3modtools::scripting_1395968086619717722",
     "source-workspace::workspace.usermaps.zm.test.scripts.zm.zm.cellbreaker.gsc",
     "source-workspace::workspace.usermaps.zm.ai.test.scripts.zm.zm.cellbreaker.gsc",
-    "forums-modme::3324"
+    "forums-modme::3324",
+    "discord-bo3modtools::scripting_1372505784155504760",
+    "discord-bo3modtools::scripting_1372512694128742521",
+    "source-scripts::t7src.gsc.scripts.zm.zm_castle_ee_bossfight"
    ]
   },
   {
@@ -448,7 +495,10 @@
     "discord-bo3modtools::scripting_1372488861380509706",
     "discord-bo3modtools::scripting_1372481673362542652",
     "discord-bo3modtools::scripting_1178611236427018240",
-    "source-scripts::t7src.csc.scripts.shared.array_shared"
+    "source-scripts::t7src.csc.scripts.shared.array_shared",
+    "discord-bo3modtools::scripting_1137223675012186162",
+    "discord-bo3modtools::scripting_1240342341248618526",
+    "discord-bo3modtools::scripting_232045925873221642"
    ]
   }
  ]

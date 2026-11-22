@@ -1,5 +1,5 @@
 {
-  "about": "Held-out judged queries for TestRetrievalQuality: themes and phrasings the tuning set (retrieval_eval.json) doesn't cover, used only to check that ranking choices generalise — never to make them. Candidates came from both the v2.2 ranking and the title-weighted one (hybrid top 20, BM25 top 10 each) plus a title search over non-Discord sources, merged and judged blind: sorted by doc_id, without knowing which ranking proposed which. key = the direct answer, relevant = helps; reference pages no system found (SetLightingState, the modme camo-tables guide) were added by lookup so recall counts what both miss. Used once so far, on 2026-10-02, to reject the reliability weight shipped in 2.3.0 (it lost here while winning on tuning); a further ranking decision should be checked on a fresh blind set.",
+  "about": "Held-out judged queries for TestRetrievalQuality: themes and phrasings the tuning set (retrieval_eval.json) doesn't cover, used only to check that ranking choices generalise — never to make them. Candidates came from both the v2.2 ranking and the title-weighted one (hybrid top 20, BM25 top 10 each) plus a title search over non-Discord sources, merged and judged blind: sorted by doc_id, without knowing which ranking proposed which. key = the direct answer, relevant = helps; reference pages no system found (SetLightingState, the modme camo-tables guide) were added by lookup so recall counts what both miss. Used once so far, on 2026-10-02, to reject the reliability weight shipped in 2.3.0 (it lost here while winning on tuning); a further ranking decision should be checked on a fresh blind set. Added 2026-11-22: the top 10 of three chunking variants (300-char chunks; token-sized chunks with the head on each; a head-only vector plus title-prefixed chunks; each fused as shipped, with BM25 x 0.75, and vector-only) were pooled the same way, and the never-judged docs among them judged blind, sorted by doc_id.",
   "queries": [
     {
       "query": "black screen when loading the map after linking",
@@ -23,7 +23,13 @@
         "forums-modme::2763",
         "forums-modme::2767",
         "forums-ugx::ugx-forums-mapping-13551",
-        "forums-ugx::ugx-forums-modding-12765"
+        "forums-ugx::ugx-forums-modding-12765",
+        "discord-bo3modtools::general_784891822040023082",
+        "forums-modme::1890",
+        "forums-modme::365",
+        "forums-modme::658",
+        "forums-ugx::ugx-forums-help-desk-13824",
+        "discord-bo3modtools::scripting_1135310076643655741"
       ]
     },
     {
@@ -32,7 +38,8 @@
         "wiki-t7::guides/add-camo-table-to-custom-weapons.md",
         "defs-bo3::asset.weaponcamotable",
         "discord-bo3modtools::general_479742788460871692",
-        "wiki-modme::black-ops-3-guides-setting-up-camo-tables"
+        "wiki-modme::black-ops-3-guides-setting-up-camo-tables",
+        "video-youtube::Harry Bo21 - Black Ops 3 - Setting up Camo Tables for Custom Weapons"
       ],
       "relevant": [
         "defs-bo3::asset.weaponcamo",
@@ -51,7 +58,10 @@
         "discord-bo3modtools::general_969891743480815617",
         "discord-bo3modtools::mapping_466745242301759508",
         "discord-bo3modtools::scripting_965268633511166012",
-        "discord-bo3modtools::showcase_236044327522926592"
+        "discord-bo3modtools::showcase_236044327522926592",
+        "discord-bo3modtools::general_234965394786353152",
+        "discord-bo3modtools::general_269834059356569600",
+        "discord-bo3modtools::mapping_264920610843525121"
       ]
     },
     {
@@ -75,7 +85,8 @@
         "discord-bo3modtools::scripting_267508101207425025",
         "discord-bo3modtools::scripting_971195301320851519",
         "forums-ugx::ugx-forums-mapping-13041",
-        "forums-ugx::ugx-forums-mapping-13672"
+        "forums-ugx::ugx-forums-mapping-13672",
+        "discord-bo3modtools::mapping_269043193088180224"
       ]
     },
     {
@@ -102,7 +113,9 @@
         "forums-modme::3454",
         "forums-ugx::ugx-forums-mapping-14224",
         "source-scripts::t7src.csc.scripts.shared._character_customization",
-        "source-workspace::workspace.usermaps.zm.playermodels.test.zone.source.zm.playersmodels.zpkg"
+        "source-workspace::workspace.usermaps.zm.playermodels.test.zone.source.zm.playersmodels.zpkg",
+        "discord-bo3modtools::general_1095696213233369108",
+        "forums-ugx::ugx-forums-modding-14551"
       ]
     },
     {
@@ -124,7 +137,10 @@
         "forums-modme::1042",
         "source-scripts::t7src.gsc.scripts.zm._zm_powerup_fire_sale",
         "source-scripts::t7src.gsc.scripts.zm._zm_powerup_insta_kill",
-        "source-scripts::t7src.gsc.scripts.zm._zm_powerup_nuke"
+        "source-scripts::t7src.gsc.scripts.zm._zm_powerup_nuke",
+        "discord-bo3modtools::general_706268972445597779",
+        "discord-bo3modtools::scripting_1096440304674013285",
+        "source-dump::dump.scripts.zm._zm_powerup_shield_charge.gsc"
       ]
     },
     {
@@ -137,7 +153,8 @@
       "relevant": [
         "gscode-api::api.gsc.execdevgui",
         "wiki-t7::information/list-of-dvars.md",
-        "discord-bo3modtools::general_663461670282199040"
+        "discord-bo3modtools::general_663461670282199040",
+        "discord-bo3modtools::general_322776302128070669"
       ]
     },
     {
@@ -160,7 +177,12 @@
         "forums-ugx::ugx-forums-scripting-14730",
         "video-youtube::Black Ops 3 Mod Tools tutorial Ep.11 Zones",
         "video-youtube::Black Ops 3 Mod Tools | Tutorial 9 - Doors and Debris",
-        "video-youtube::😀 Zone Like Treyarch! Best Method for All Map Designs: Call of Duty: Black Ops 3: Mod Tools"
+        "video-youtube::😀 Zone Like Treyarch! Best Method for All Map Designs: Call of Duty: Black Ops 3: Mod Tools",
+        "discord-bo3modtools::general_1012068864303042680",
+        "discord-bo3modtools::mapping_299144407175921665",
+        "discord-bo3modtools::scripting_1092027420799934515",
+        "forums-modme::495",
+        "forums-ugx::ugx-forums-mapping-13082"
       ]
     },
     {
@@ -182,7 +204,9 @@
         "forums-ugx::ugx-forums-scripting-14144",
         "source-scripts::t7src.gsc.scripts.zm.zm_island_side_ee_song",
         "source-workspace::workspace.usermaps.zm.test.scripts.zm.zm.teddy.easter.egg.csc",
-        "source-workspace::workspace.usermaps.zm.test.scripts.zm.zm.teddy.easter.egg.gsc"
+        "source-workspace::workspace.usermaps.zm.test.scripts.zm.zm.teddy.easter.egg.gsc",
+        "discord-bo3modtools::general_1397615650540748850",
+        "forums-modme::934"
       ]
     },
     {
@@ -202,7 +226,9 @@
         "discord-bo3modtools::scripting_966382137903308870",
         "gscode-api::api.csc.playradiantexploder",
         "gscode-api::api.gsc.activateclientradiantexploder",
-        "source-scripts::t7src.csc.scripts.shared.exploder_shared"
+        "source-scripts::t7src.csc.scripts.shared.exploder_shared",
+        "discord-bo3modtools::scripting_970339596393140275",
+        "docs-bo3::bo3-docs-fx-lights"
       ]
     },
     {
@@ -211,7 +237,8 @@
         "wiki-t7::guides/change-zombie-variables.md",
         "discord-bo3modtools::general_557032243483246604",
         "forums-ugx::ugx-forums-scripting-13335",
-        "discord-bo3modtools::scripting_1208835000842199140"
+        "discord-bo3modtools::scripting_1208835000842199140",
+        "discord-bo3modtools::mapping_381403300773363715"
       ],
       "relevant": [
         "discord-bo3modtools::general_1329638906127323158",
@@ -223,7 +250,9 @@
         "discord-bo3modtools::scripting_1114304750188507186",
         "forums-modme::1161",
         "forums-modme::731",
-        "forums-ugx::ugx-forums-scripting-15682"
+        "forums-ugx::ugx-forums-scripting-15682",
+        "discord-bo3modtools::general_361751704946999300",
+        "forums-ugx::ugx-forums-scripting-15887"
       ]
     },
     {
@@ -232,7 +261,8 @@
         "wiki-t7::guides/how-to-use-localization.md",
         "wiki-modme::black-ops-3-basics-adding-the-missing-localized-strings",
         "discord-bo3modtools::lui_955027711691214928",
-        "discord-bo3modtools::general_361547451817263116"
+        "discord-bo3modtools::general_361547451817263116",
+        "discord-bo3modtools::general_340589868398936075"
       ],
       "relevant": [
         "discord-bo3modtools::general_1121134509572751380",
@@ -243,7 +273,9 @@
         "discord-bo3modtools::scripting_979757618073591818",
         "gscode-api::api.csc.makelocalizedstring",
         "gscode-api::api.gsc.makelocalizedstring",
-        "wiki-ardivee::localization"
+        "wiki-ardivee::localization",
+        "discord-bo3modtools::general_964893703623819375",
+        "discord-bo3modtools::general_361547651235446804"
       ]
     },
     {
@@ -266,7 +298,10 @@
         "forums-ugx::ugx-forums-modding-13356",
         "forums-ugx::ugx-forums-scripting-12866",
         "source-scripts::t7src.gsc.scripts.zm._zm_magicbox",
-        "video-youtube::Black Ops 3 Mod Tools - Customise Box Weapons"
+        "video-youtube::Black Ops 3 Mod Tools - Customise Box Weapons",
+        "discord-bo3modtools::general_1173260716493512774",
+        "discord-bo3modtools::general_234441932149882881",
+        "discord-bo3modtools::general_422617754428899328"
       ]
     },
     {
@@ -287,7 +322,8 @@
         "discord-bo3modtools::mapping_243479777057439745",
         "discord-bo3modtools::scripting_279970555355070465",
         "forums-modme::789",
-        "video-youtube::Tutorial Perk Lights Set them ON"
+        "video-youtube::Tutorial Perk Lights Set them ON",
+        "forums-ugx::ugx-forums-mapping-13041"
       ]
     },
     {
@@ -321,7 +357,10 @@
         "forums-ugx::ugx-forums-mapping-13587",
         "forums-ugx::ugx-forums-modding-12887",
         "forums-ugx::ugx-forums-modding-13228",
-        "forums-ugx::ugx-forums-scripting-13522"
+        "forums-ugx::ugx-forums-scripting-13522",
+        "discord-bo3modtools::forum_1134821692435341362",
+        "discord-bo3modtools::general_233391277100630017",
+        "discord-bo3modtools::general_715603872722190406"
       ]
     },
     {
@@ -329,7 +368,8 @@
       "key": [
         "forums-ugx::ugx-forums-mapping-14129",
         "discord-bo3modtools::general_522213301828976650",
-        "discord-bo3modtools::general_665910556666101781"
+        "discord-bo3modtools::general_665910556666101781",
+        "wiki-modme::black-ops-3-basics-setting-up-water"
       ],
       "relevant": [
         "discord-bo3modtools::general_387479800945836042",
@@ -355,7 +395,8 @@
         "discord-bo3modtools::mapping_234822014114856960",
         "discord-bo3modtools::mapping_261217718223503370",
         "discord-bo3modtools::mapping_311630821167726592",
-        "discord-bo3modtools::scripting_1075670062733742150"
+        "discord-bo3modtools::scripting_1075670062733742150",
+        "discord-bo3modtools::general_546648270471036929"
       ]
     },
     {
@@ -390,7 +431,10 @@
       ],
       "relevant": [
         "discord-bo3modtools::general_430340484792320000",
-        "source-scripts::t7src.gsc.scripts.zm._zm_spawner"
+        "source-scripts::t7src.gsc.scripts.zm._zm_spawner",
+        "forums-modme::1832",
+        "forums-modme::2958",
+        "forums-ugx::ugx-forums-scripting-13819"
       ]
     }
   ]
