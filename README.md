@@ -164,7 +164,7 @@ Every tool is also a command: `t7kb` alone opens an interactive search, and [the
 
 ## 🔄 Updating
 
-**Turn on auto-update** for the `t7-reapy` marketplace (`/plugin` → Marketplaces; `/t7kb:setup-or-update` offers it): Claude Code then keeps the skills current, and at the next session start t7kb says when the binary is behind. `t7kb update-check` says whether either is behind, with the commands to update each. To refresh the binary, run `/t7kb:setup-or-update` in Claude Code, or re-run the installer with `--force` / `-Force`: it downloads the database again only when it changed.
+Each new session, t7kb says when a newer release is out: one call to GitHub, none with `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` set. **Turn on auto-update** for the `t7-reapy` marketplace (`/plugin` → Marketplaces; `/t7kb:setup-or-update` offers it): Claude Code then keeps the skills current, and t7kb says when the binary is behind them. `t7kb update-check` says whether either is behind, with the commands to update each. To refresh the binary, run `/t7kb:setup-or-update` in Claude Code, or re-run the installer with `--force` / `-Force`: it downloads the database again only when it changed.
 
 ## 🤝 Contributing
 

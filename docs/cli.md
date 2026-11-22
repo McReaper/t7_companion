@@ -37,4 +37,4 @@ t7kb watch
 
 ## `t7kb update-check`
 
-Says whether a newer t7kb release is out and whether your Claude Code plugin is behind it, with the commands to update each. It never downloads anything: the README's [Updating](../README.md#-updating) section says how to update.
+Says whether a newer t7kb release is out and whether your Claude Code plugin is behind it, with the commands to update each. It never downloads anything: the README's [Updating](../README.md#-updating) section says how to update. `--quiet` prints only a newer release's tag, nothing when up to date: the plugin runs it at each session start.
