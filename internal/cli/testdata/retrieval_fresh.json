@@ -1,5 +1,5 @@
 {
- "about": "Fresh blind set for TestRetrievalQuality, built 2026-11-22 for one decision: which of the ranking ideas (larger per-retriever pools, an OR top-up for BM25, weighted RRF) and the question-style summaries to keep. 23 queries on themes and phrasings neither other set covers, written before any ranking was run. Candidates: the top 10 of every ranking variant tried (shipped fusion; pools of 75-200; OR top-up; RRF weights 0.5-1 either way; BM25-only AND and OR; vector-only) on two builds (D, and E2 with regenerated pilot summaries), plus a title lookup over the non-Discord sources; judged from title, summary and excerpts, sorted by doc_id without knowing which ranking proposed them (E2's 16 extra candidates were judged in a second pass). key = the direct answer, relevant = helps. Built against the 68,457-doc corpus of build D. Added 2026-11-22: the top 10 of three chunking variants (300-char chunks; token-sized chunks with the head on each; a head-only vector plus title-prefixed chunks; each fused as shipped, with BM25 x 0.75, and vector-only) were pooled the same way, and the never-judged docs among them judged blind, sorted by doc_id.",
+ "about": "Fresh blind set for TestRetrievalQuality, built 2026-11-22 for one decision: which of the ranking ideas (larger per-retriever pools, an OR top-up for BM25, weighted RRF) and the question-style summaries to keep. 23 queries on themes and phrasings neither other set covers, written before any ranking was run. Candidates: the top 10 of every ranking variant tried (shipped fusion; pools of 75-200; OR top-up; RRF weights 0.5-1 either way; BM25-only AND and OR; vector-only) on two builds (D, and E2 with regenerated pilot summaries), plus a title lookup over the non-Discord sources; judged from title, summary and excerpts, sorted by doc_id without knowing which ranking proposed them (E2's 16 extra candidates were judged in a second pass). key = the direct answer, relevant = helps. Built against the 68,457-doc corpus of build D. Added 2026-11-22: the top 10 of three chunking variants (300-char chunks; token-sized chunks with the head on each; a head-only vector plus title-prefixed chunks; each fused as shipped, with BM25 x 0.75, and vector-only) were pooled the same way, and the never-judged docs among them judged blind, sorted by doc_id. Added 2026-11-23: the top 10 of builds whose code sources (source-scripts, source-dump, source-workspace, defs-bo3) carry generated summaries, ranked as one list and with the code ranked apart (7 pages, then 3 code files; BM25 x 0.5, 0.75 and 1), were pooled the same way, and the never-judged docs among them judged blind.",
  "queries": [
   {
    "query": "elevator that carries players up and down",
@@ -19,7 +19,8 @@
     "discord-bo3modtools::scripting_963609756419903500",
     "video-youtube::Moving Platforms | Black Ops 3 Mod Tools Tutorial",
     "forums-ugx::ugx-forums-scripting-13737",
-    "discord-bo3modtools::scripting_1309635473404330058"
+    "discord-bo3modtools::scripting_1309635473404330058",
+    "source-workspace::workspace.map.source.prefabs.midgetblaster.moving.platform.elevator.map"
    ]
   },
   {
@@ -66,7 +67,9 @@
     "discord-bo3modtools::scripting_976137286381105192",
     "video-youtube::Tutorial - Elevator - Rotating Stuff - RedSpace's Jump Pad - Instant Teleporter and more",
     "forums-modme::2644",
-    "forums-ugx::ugx-forums-mapping-13797"
+    "forums-ugx::ugx-forums-mapping-13797",
+    "source-dump::dump.scripts.cp._rotating_object.csc",
+    "source-scripts::t7src.csc.scripts.mp._rotating_object"
    ]
   },
   {
@@ -87,7 +90,10 @@
     "discord-bo3modtools::general_1137913039002271744",
     "source-scripts::t7src.gsc.scripts.shared.util_shared",
     "forums-modme::2688",
-    "discord-bo3modtools::scripting_1239840984347578388"
+    "discord-bo3modtools::scripting_1239840984347578388",
+    "discord-bo3modtools::scripting_1249863500285739008",
+    "discord-bo3modtools::scripting_1095043823165513870",
+    "discord-bo3modtools::scripting_1234202393584078950"
    ]
   },
   {
@@ -116,7 +122,8 @@
     "forums-ugx::ugx-forums-scripting-14009",
     "forums-ugx::ugx-forums-scripting-14130",
     "discord-bo3modtools::scripting_1103993543992815636",
-    "discord-bo3modtools::scripting_1146408048999534633"
+    "discord-bo3modtools::scripting_1146408048999534633",
+    "source-workspace::workspace.map.source.prefabs.midgetblaster.teleport.zod.portal.02.map"
    ]
   },
   {
@@ -179,7 +186,8 @@
     "discord-bo3modtools::mapping_627901560634081300",
     "forums-modme::3042",
     "forums-ugx::ugx-forums-general-12841",
-    "forums-ugx::ugx-forums-mapping-14419"
+    "forums-ugx::ugx-forums-mapping-14419",
+    "source-scripts::t7src.gsc.scripts.zm._zm_behavior"
    ]
   },
   {
@@ -243,7 +251,12 @@
     "discord-bo3modtools::mapping_1143310546163224586",
     "discord-bo3modtools::general_356915174038306828",
     "discord-bo3modtools::mapping_264481257587474433",
-    "discord-bo3modtools::general_512447015763050530"
+    "discord-bo3modtools::general_512447015763050530",
+    "source-workspace::workspace.source.data.piotrek.skyboxes.gdt",
+    "source-dump::dump.scripts.zm.zm_castle_ee.csc",
+    "source-workspace::workspace.source.data.bo6.skyboxes.gdt",
+    "source-workspace::workspace.source.data.midgetblaster.t7.skybox.gdt",
+    "source-workspace::workspace.source.data.custom.deadshot.extra.skyboxes.gdt"
    ]
   },
   {
@@ -315,7 +328,8 @@
     "video-youtube::Sphynx's Console Commands (BO3 Mod Tools 2022)",
     "video-youtube::How to use the Dev console on Black Ops 3 with mod tools - PC",
     "discord-bo3modtools::general_273796720712744960",
-    "discord-bo3modtools::general_680170827911790634"
+    "discord-bo3modtools::general_680170827911790634",
+    "source-dump::dump.scripts.cp._devgui.gsc"
    ]
   },
   {

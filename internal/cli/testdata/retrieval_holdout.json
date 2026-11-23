@@ -1,5 +1,5 @@
 {
-  "about": "Held-out judged queries for TestRetrievalQuality: themes and phrasings the tuning set (retrieval_eval.json) doesn't cover, used only to check that ranking choices generalise — never to make them. Candidates came from both the v2.2 ranking and the title-weighted one (hybrid top 20, BM25 top 10 each) plus a title search over non-Discord sources, merged and judged blind: sorted by doc_id, without knowing which ranking proposed which. key = the direct answer, relevant = helps; reference pages no system found (SetLightingState, the modme camo-tables guide) were added by lookup so recall counts what both miss. Used once so far, on 2026-10-02, to reject the reliability weight shipped in 2.3.0 (it lost here while winning on tuning); a further ranking decision should be checked on a fresh blind set. Added 2026-11-22: the top 10 of three chunking variants (300-char chunks; token-sized chunks with the head on each; a head-only vector plus title-prefixed chunks; each fused as shipped, with BM25 x 0.75, and vector-only) were pooled the same way, and the never-judged docs among them judged blind, sorted by doc_id.",
+  "about": "Held-out judged queries for TestRetrievalQuality: themes and phrasings the tuning set (retrieval_eval.json) doesn't cover, used only to check that ranking choices generalise — never to make them. Candidates came from both the v2.2 ranking and the title-weighted one (hybrid top 20, BM25 top 10 each) plus a title search over non-Discord sources, merged and judged blind: sorted by doc_id, without knowing which ranking proposed which. key = the direct answer, relevant = helps; reference pages no system found (SetLightingState, the modme camo-tables guide) were added by lookup so recall counts what both miss. Used once so far, on 2026-10-02, to reject the reliability weight shipped in 2.3.0 (it lost here while winning on tuning); a further ranking decision should be checked on a fresh blind set. Added 2026-11-22: the top 10 of three chunking variants (300-char chunks; token-sized chunks with the head on each; a head-only vector plus title-prefixed chunks; each fused as shipped, with BM25 x 0.75, and vector-only) were pooled the same way, and the never-judged docs among them judged blind, sorted by doc_id. Added 2026-11-23: the top 10 of builds whose code sources (source-scripts, source-dump, source-workspace, defs-bo3) carry generated summaries, ranked as one list and with the code ranked apart (7 pages, then 3 code files; BM25 x 0.5, 0.75 and 1), were pooled the same way, and the never-judged docs among them judged blind.",
   "queries": [
     {
       "query": "black screen when loading the map after linking",
@@ -61,7 +61,9 @@
         "discord-bo3modtools::showcase_236044327522926592",
         "discord-bo3modtools::general_234965394786353152",
         "discord-bo3modtools::general_269834059356569600",
-        "discord-bo3modtools::mapping_264920610843525121"
+        "discord-bo3modtools::mapping_264920610843525121",
+        "source-workspace::workspace.source.data.iw7zapper.ziszappers.gdt",
+        "source-workspace::workspace.source.data.wpn.t7.zmb.zod.idg.gdt"
       ]
     },
     {
@@ -86,7 +88,8 @@
         "discord-bo3modtools::scripting_971195301320851519",
         "forums-ugx::ugx-forums-mapping-13041",
         "forums-ugx::ugx-forums-mapping-13672",
-        "discord-bo3modtools::mapping_269043193088180224"
+        "discord-bo3modtools::mapping_269043193088180224",
+        "source-dump::dump.scripts.shared.util_shared.gsc"
       ]
     },
     {
@@ -140,7 +143,8 @@
         "source-scripts::t7src.gsc.scripts.zm._zm_powerup_nuke",
         "discord-bo3modtools::general_706268972445597779",
         "discord-bo3modtools::scripting_1096440304674013285",
-        "source-dump::dump.scripts.zm._zm_powerup_shield_charge.gsc"
+        "source-dump::dump.scripts.zm._zm_powerup_shield_charge.gsc",
+        "source-scripts::t7src.gsc.scripts.zm.bgbs._zm_bgb_im_feelin_lucky"
       ]
     },
     {
@@ -182,7 +186,9 @@
         "discord-bo3modtools::mapping_299144407175921665",
         "discord-bo3modtools::scripting_1092027420799934515",
         "forums-modme::495",
-        "forums-ugx::ugx-forums-mapping-13082"
+        "forums-ugx::ugx-forums-mapping-13082",
+        "source-dump::dump.scripts.zm._zm_zonemgr.gsc",
+        "source-workspace::workspace.map.source.prefabs.midgetblaster.buyable.doors.buyable.activate.zone.door.map"
       ]
     },
     {
@@ -206,7 +212,8 @@
         "source-workspace::workspace.usermaps.zm.test.scripts.zm.zm.teddy.easter.egg.csc",
         "source-workspace::workspace.usermaps.zm.test.scripts.zm.zm.teddy.easter.egg.gsc",
         "discord-bo3modtools::general_1397615650540748850",
-        "forums-modme::934"
+        "forums-modme::934",
+        "source-scripts::t7src.gsc.scripts.cp.bonuszm._bonuszm_zmsng"
       ]
     },
     {
@@ -323,7 +330,9 @@
         "discord-bo3modtools::scripting_279970555355070465",
         "forums-modme::789",
         "video-youtube::Tutorial Perk Lights Set them ON",
-        "forums-ugx::ugx-forums-mapping-13041"
+        "forums-ugx::ugx-forums-mapping-13041",
+        "source-dump::dump.scripts.zm.zm_temple_power.gsc",
+        "source-scripts::t7src.gsc.scripts.zm._zm_perks"
       ]
     },
     {
@@ -421,7 +430,12 @@
         "discord-bo3modtools::mapping_364604029885612034",
         "discord-bo3modtools::mapping_926933220803633182",
         "discord-bo3modtools::mapping_939584292940558346",
-        "video-youtube::Traversals and Source Files to help you guys out"
+        "video-youtube::Traversals and Source Files to help you guys out",
+        "source-workspace::workspace.map.source.prefabs.midgetblaster.traversals.ai.zombie.jump.up.244.down.36.map",
+        "source-workspace::workspace.map.source.prefabs.midgetblaster.traversals.ai.zombie.climb.up.256.down.32.map",
+        "source-workspace::workspace.map.source.prefabs.midgetblaster.traversals.ai.zombie.jump.down.96.map",
+        "source-workspace::workspace.map.source.prefabs.midgetblaster.traversals.ai.zombie.jump.across.192.down.80.map",
+        "source-workspace::workspace.map.source.prefabs.midgetblaster.traversals.ai.zombie.climb.up.200.down.40.map"
       ]
     },
     {

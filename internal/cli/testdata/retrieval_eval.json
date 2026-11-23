@@ -1,5 +1,5 @@
 {
-  "about": "Judged queries for TestRetrievalQuality. key = the best sources for the question (the API doc, the reference tutorial, the thread that has the fix); relevant = useful but secondary. Judged by reading each candidate from three independent paths, then pooled — the top 10 of each ranking variant tried was judged too, so a variant that surfaces relevant documents the baseline missed isn't scored as if it surfaced noise: the hybrid top 30, the BM25 top 15, and a title search over the non-Discord sources. Built against the v2.2 corpus (66,023 docs); a doc_id missing from the db fails the test, so a rebuilt corpus that renames documents shows up instead of silently scoring zero. The 'filtered' entries check the source filter: an agent that knows the kind of answer it wants (the API reference, a tutorial) passes source, and a key document should then lead. Added 2026-11-22: the top 10 of three chunking variants (300-char chunks; token-sized chunks with the head on each; a head-only vector plus title-prefixed chunks; each fused as shipped, with BM25 x 0.75, and vector-only) were pooled the same way, and the never-judged docs among them judged blind, sorted by doc_id.",
+  "about": "Judged queries for TestRetrievalQuality. key = the best sources for the question (the API doc, the reference tutorial, the thread that has the fix); relevant = useful but secondary. Judged by reading each candidate from three independent paths, then pooled — the top 10 of each ranking variant tried was judged too, so a variant that surfaces relevant documents the baseline missed isn't scored as if it surfaced noise: the hybrid top 30, the BM25 top 15, and a title search over the non-Discord sources. Built against the v2.2 corpus (66,023 docs); a doc_id missing from the db fails the test, so a rebuilt corpus that renames documents shows up instead of silently scoring zero. The 'filtered' entries check the source filter: an agent that knows the kind of answer it wants (the API reference, a tutorial) passes source, and a key document should then lead. Added 2026-11-22: the top 10 of three chunking variants (300-char chunks; token-sized chunks with the head on each; a head-only vector plus title-prefixed chunks; each fused as shipped, with BM25 x 0.75, and vector-only) were pooled the same way, and the never-judged docs among them judged blind, sorted by doc_id. Added 2026-11-23: the top 10 of builds whose code sources (source-scripts, source-dump, source-workspace, defs-bo3) carry generated summaries, ranked as one list and with the code ranked apart (7 pages, then 3 code files; BM25 x 0.5, 0.75 and 1), were pooled the same way, and the never-judged docs among them judged blind.",
   "queries": [
     {
       "query": "clientfield register set lua",
@@ -29,7 +29,8 @@
         "discord-bo3modtools::lui_1123427407181918258",
         "discord-bo3modtools::lui_1160982664715706449",
         "discord-bo3modtools::scripting_1289285467891699743",
-        "discord-bo3modtools::general_841745743059353610"
+        "discord-bo3modtools::general_841745743059353610",
+        "source-dump::dump.scripts.shared.clientfield_shared.csc"
       ]
     },
     {
@@ -53,7 +54,9 @@
         "discord-bo3modtools::general_455225443453501464",
         "discord-bo3modtools::scripting_1210390268239417384",
         "discord-bo3modtools::scripting_1234901226404188190",
-        "discord-bo3modtools::general_237704278578429962"
+        "discord-bo3modtools::general_237704278578429962",
+        "source-scripts::t7src.gsc.scripts.zm.zm_stalingrad_pavlov_trap",
+        "source-dump::dump.scripts.zm.zm_stalingrad_pavlov_trap.gsc"
       ]
     },
     {
@@ -152,7 +155,9 @@
         "forums-modme::788",
         "video-youtube::BLACK OPS 3 MOD TOOLS - TUTORIAL 8 - HOW TO ADD SIMPLE GIANT STYLE RANDOM SPAWNING PERK MACHINES",
         "discord-bo3modtools::general_647124296992555009",
-        "forums-ugx::ugx-forums-mapping-14686"
+        "forums-ugx::ugx-forums-mapping-14686",
+        "source-workspace::workspace.usermaps.zm.ultimate.perks.scripts.zm.zm.perk.phdflopper.gsc",
+        "source-dump::dump.scripts.zm._zm_perks.gsc"
       ]
     },
     {
@@ -211,7 +216,9 @@
         "discord-bo3modtools::mapping_233389463169007616",
         "discord-bo3modtools::mapping_493459756011356181",
         "discord-bo3modtools::general_270958322927140864",
-        "forums-modme::419"
+        "forums-modme::419",
+        "source-workspace::workspace.map.source.prefabs.zm.harrybo21.prefabs.apothicon.fury.apothicon.fury.fog.setup.map",
+        "source-workspace::workspace.map.source.prefabs.midgetblaster.ai.apothicon.fury.fog.setup.map"
       ]
     },
     {
@@ -226,7 +233,10 @@
         "discord-bo3modtools::general_992506467645132891",
         "wiki-zeroy::zm-player-models-2",
         "discord-bo3modtools::general_1144340632819740693",
-        "discord-bo3modtools::general_242124257977434112"
+        "discord-bo3modtools::general_242124257977434112",
+        "source-workspace::workspace.usermaps.zm.playermodels.test.zone.source.zm.playersmodels.zpkg",
+        "source-workspace::workspace.usermaps.zm.test.zone.source.zm.playersmodels.zpkg",
+        "source-workspace::workspace.usermaps.zm.ai.test.zone.source.zm.playersmodels.zpkg"
       ]
     },
     {
@@ -278,7 +288,10 @@
         "discord-bo3modtools::lui_533147914462298133",
         "discord-bo3modtools::lui_717935376727015444",
         "discord-bo3modtools::lui_948704494533894164",
-        "forums-modme::2979"
+        "forums-modme::2979",
+        "source-workspace::workspace.usermaps.zm.test.ui.uieditor.widgets.hud.h1ammowidget.h1ammoinfo.lua",
+        "source-workspace::workspace.usermaps.zm.test.ui.uieditor.widgets.hud.zm.perks.whoswho.whoswhorevivewidget.lua",
+        "source-workspace::workspace.usermaps.zm.test.ui.uieditor.menus.hud.h1hud.zm.factory.lua"
       ]
     },
     {
@@ -303,7 +316,8 @@
         "discord-bo3modtools::general_1120389510165975090",
         "discord-bo3modtools::general_324700515395043328",
         "discord-bo3modtools::mapping_1274918364317483008",
-        "forums-modme::3307"
+        "forums-modme::3307",
+        "defs-bo3::entity.build_light"
       ]
     }
   ],
