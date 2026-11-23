@@ -17,11 +17,11 @@ func TestHybridFusionWeighsBM25(t *testing.T) {
 	}
 	bm[Pool-1].docID, vec[Pool-1].docID = "both", "both"
 
-	equal, _ := rrfFuse(ranking{bm, 1}, ranking{vec, 1})
+	equal, _ := rrfFuse(ranking{items: bm, weight: 1}, ranking{items: vec, weight: 1})
 	if equal["both"] <= equal["v0"] {
 		t.Fatalf("equal weights: last in both lists %.5f should beat the vector's first %.5f", equal["both"], equal["v0"])
 	}
-	weighted, _ := rrfFuse(ranking{bm, bm25Weight}, ranking{vec, 1})
+	weighted, _ := rrfFuse(ranking{items: bm, weight: bm25Weight}, ranking{items: vec, weight: 1})
 	if weighted["v0"] <= weighted["both"] {
 		t.Fatalf("BM25 x %.2f: the vector's first %.5f should beat last in both lists %.5f", bm25Weight, weighted["v0"], weighted["both"])
 	}

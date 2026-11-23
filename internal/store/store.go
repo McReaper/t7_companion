@@ -108,7 +108,8 @@ func (s *Store) Close() error { return s.db.Close() }
 // of the whole corpus being filtered afterwards.
 func (s *Store) SearchHybrid(ctx context.Context, query string, qvec []float32, limit int, sources ...string) ([]Hit, error) {
 	only := sourceSet(sources)
-	bm25, err := s.bm25Rank(ctx, ftsQuery(query), Pool, only)
+	match := ftsQuery(query)
+	bm25, err := s.bm25Rank(ctx, match, Pool, only)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +117,7 @@ func (s *Store) SearchHybrid(ctx context.Context, query string, qvec []float32, 
 	if err != nil {
 		return nil, err
 	}
-	return s.fuse(ctx, limit, bm25, vec)
+	return s.fuse(ctx, limit, match, bm25, vec)
 }
 
 // codeSlots is how many of limit results Search keeps for code and data
@@ -166,11 +167,11 @@ func (s *Store) Search(ctx context.Context, query string, qvec []float32, limit 
 	if err != nil {
 		return nil, err
 	}
-	pages, err := s.fuse(ctx, limit, bmPages, vecPages)
+	pages, err := s.fuse(ctx, limit, match, bmPages, vecPages)
 	if err != nil {
 		return nil, err
 	}
-	code, err := s.fuse(ctx, limit, bmCode, vecCode)
+	code, err := s.fuse(ctx, limit, match, bmCode, vecCode)
 	if err != nil {
 		return nil, err
 	}
@@ -185,25 +186,28 @@ func (s *Store) Search(ctx context.Context, query string, qvec []float32, limit 
 // fuse is SearchHybrid's fusion of one BM25 and one vector ranking. BM25 is
 // weighted bm25Weight against the vector; a keyword-only search has nothing
 // to balance and keeps plain RRF scores.
-func (s *Store) fuse(ctx context.Context, limit int, bm25, vec []rankItem) ([]Hit, error) {
+func (s *Store) fuse(ctx context.Context, limit int, match string, bm25, vec []rankItem) ([]Hit, error) {
 	w := bm25Weight
 	if len(vec) == 0 {
 		w = 1
 	}
-	return s.hits(ctx, limit, ranking{bm25, w}, ranking{vec, 1})
+	return s.hits(ctx, limit, ranking{items: bm25, weight: w, match: match}, ranking{items: vec, weight: 1})
 }
 
 // SearchAnyWord ranks by BM25 the documents that hold any word of the query:
 // a keyword-only search of a question finds no document holding every word.
 func (s *Store) SearchAnyWord(ctx context.Context, query string, limit int, sources ...string) ([]Hit, error) {
-	bm25, err := s.bm25Rank(ctx, ftsAnyQuery(query), Pool, sourceSet(sources))
+	match := ftsAnyQuery(query)
+	bm25, err := s.bm25Rank(ctx, match, Pool, sourceSet(sources))
 	if err != nil {
 		return nil, err
 	}
-	return s.hits(ctx, limit, ranking{bm25, 1})
+	return s.hits(ctx, limit, ranking{items: bm25, weight: 1, match: match})
 }
 
 // hits fuses the rankings into the top limit hits, reliability breaking ties.
+// A hit a BM25 ranking found shows its BM25 snippet, the words it matched;
+// one only the vector found shows its best chunk.
 func (s *Store) hits(ctx context.Context, limit int, rankings ...ranking) ([]Hit, error) {
 	fused, snippet := rrfFuse(rankings...)
 	if len(fused) == 0 {
@@ -222,6 +226,9 @@ func (s *Store) hits(ctx context.Context, limit int, rankings ...ranking) ([]Hit
 	if limit > 0 && len(docIDs) > limit {
 		docIDs = docIDs[:limit]
 	}
+	if err := s.bm25Snippets(ctx, docIDs, snippet, rankings); err != nil {
+		return nil, err
+	}
 
 	hits := make([]Hit, len(docIDs))
 	for i, d := range docIDs {
@@ -234,6 +241,7 @@ func (s *Store) hits(ctx context.Context, limit int, rankings ...ranking) ([]Hit
 type rankItem struct {
 	docID   string
 	snippet string
+	rowid   int64 // a BM25 item's row, to read its snippet once it is shown
 }
 
 // ranking is one retriever's candidates in rank order, and the weight of the
@@ -241,6 +249,7 @@ type rankItem struct {
 type ranking struct {
 	items  []rankItem
 	weight float64
+	match  string // a BM25 ranking's MATCH expression, for its snippets
 }
 
 // rrfFuse combines ranked lists by weighted Reciprocal Rank Fusion (each hit
@@ -296,7 +305,9 @@ func ftsTerms(q, join string) string {
 }
 
 // bm25Rank returns up to limit doc_ids ranked by FTS5 BM25 for an FTS5 MATCH
-// expression, with a snippet.
+// expression. Their snippets are read later, for the hits shown only
+// (bm25Snippets): computed in this query, they were made for every document
+// holding the words, long scripts included, and cost most of its time.
 func (s *Store) bm25Rank(ctx context.Context, match string, limit int, only map[string]bool) ([]rankItem, error) {
 	if match == "" {
 		return nil, nil
@@ -312,7 +323,7 @@ func (s *Store) bm25Rank(ctx context.Context, match string, limit int, only map[
 		filter = "AND d.source IN (" + strings.Join(marks, ",") + ")"
 	}
 	q := `
-		SELECT d.doc_id, snippet(docs_fts, 3, '', '', ' … ', 12) AS snip
+		SELECT d.rowid, d.doc_id
 		FROM docs_fts
 		JOIN documents d ON d.rowid = docs_fts.rowid
 		WHERE docs_fts MATCH ? ` + filter + `
@@ -328,14 +339,59 @@ func (s *Store) bm25Rank(ctx context.Context, match string, limit int, only map[
 	var out []rankItem
 	for rows.Next() {
 		var it rankItem
-		var snip sql.NullString
-		if err := rows.Scan(&it.docID, &snip); err != nil {
+		if err := rows.Scan(&it.rowid, &it.docID); err != nil {
 			return nil, err
 		}
-		it.snippet = snip.String
 		out = append(out, it)
 	}
 	return out, rows.Err()
+}
+
+// bm25Snippets sets the BM25 snippet of each shown doc a BM25 ranking found,
+// over whatever snippet the vector gave it, unless the BM25 one is empty.
+func (s *Store) bm25Snippets(ctx context.Context, shown []string, snippet map[string]string, rankings []ranking) error {
+	isShown := make(map[string]bool, len(shown))
+	for _, d := range shown {
+		isShown[d] = true
+	}
+	for _, r := range rankings {
+		if r.match == "" {
+			continue
+		}
+		docOf := map[int64]string{}
+		args := []any{r.match}
+		for _, it := range r.items {
+			if isShown[it.docID] {
+				docOf[it.rowid] = it.docID
+				args = append(args, it.rowid)
+			}
+		}
+		if len(docOf) == 0 {
+			continue
+		}
+		rows, err := s.db.QueryContext(ctx, `
+			SELECT rowid, snippet(docs_fts, 3, '', '', ' … ', 12)
+			FROM docs_fts
+			WHERE docs_fts MATCH ? AND rowid IN (`+strings.TrimSuffix(strings.Repeat("?,", len(docOf)), ",")+`)`, args...)
+		if err != nil {
+			return fmt.Errorf("bm25 snippets: %w", err)
+		}
+		for rows.Next() {
+			var rowid int64
+			var snip sql.NullString
+			if err := rows.Scan(&rowid, &snip); err != nil {
+				_ = rows.Close()
+				return err
+			}
+			if snip.String != "" {
+				snippet[docOf[rowid]] = snip.String
+			}
+		}
+		if err := rows.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // scoredDoc is a doc with its best vector score and that chunk's snippet.

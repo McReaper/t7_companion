@@ -174,3 +174,30 @@ func TestVectorRankSplitMatchesFilteredRanks(t *testing.T) {
 		}
 	}
 }
+
+// A hit BM25 found shows the passage around the words it matched; a hit only
+// the vector found shows its best chunk.
+func TestHitsShowTheMatchedPassageElseTheChunk(t *testing.T) {
+	st, q := splitDB(t, 4, 4)
+	ctx := context.Background()
+	for _, c := range []struct {
+		query string
+		want  func(Hit) string
+	}{
+		{"spawner", func(h Hit) string { return "spawner" }},
+		{"zzznotaword", func(h Hit) string { return "chunk of " + h.DocID }},
+	} {
+		hits, err := st.SearchHybrid(ctx, c.query, q, 8)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(hits) != 8 {
+			t.Fatalf("%q: %d hits, want 8", c.query, len(hits))
+		}
+		for _, h := range hits {
+			if !strings.Contains(h.Snippet, c.want(h)) {
+				t.Errorf("%q: %s shows %q, want %q in it", c.query, h.DocID, h.Snippet, c.want(h))
+			}
+		}
+	}
+}
