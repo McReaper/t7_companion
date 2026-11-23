@@ -53,3 +53,5 @@ Ranking and database changes measured with `TestRetrievalQuality` since 2026-11,
   | BM25 × 0.75 (**current**) | 0.66 (0.79) | 0.51 (0.89) | 0.52 (0.78) |
 
   The full test on E3 with the shipped code, as key@5 / recall@10 / MRR / nDCG@10: tuning 0.79 / 0.54 / 1.00 / 0.67, held-out 0.89 / 0.39 / 0.81 / 0.51, fresh 0.83 / 0.42 / 0.81 / 0.52. That is 46 of 55 questions with a key document in the top 5, against 42 at equal weights.
+
+**Code summaries and the code part, 2026-11-23.** Generated summaries for the code sources lost 2 questions in one list, and ranking the code apart turned them into a gain. The measurements and the variants tried are on their own page: [retrieval-code-part.md](retrieval-code-part.md).
