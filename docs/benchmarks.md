@@ -24,9 +24,11 @@ It builds each answer with the same functions the MCP handlers use and counts to
 
 16 queries phrased the way a modder asks (`benchQueries` in `internal/cli/tokens_report_test.go`); the `gdt_*` rows use one real material, its image and its GDT; the `zone_*` rows the first linked map of the install (12k packed assets). The tools that act on the install are measured by answers that change nothing: `gdt_edit` as a dry run, `build` by its answer on a start (the build itself reports through the plugin's monitor), `game_log` on the game's current `console_mp.log`, `shader_decompile` on the `emissive_add` material type.
 
+The default `search` row was measured again on 2026-11-23, same database, after search gained its code part. The two headings and the three code files' snippets cost 63 tokens at p50 (730 → 793).
+
 | Tool | Call | Samples | Tokens p50 | p90 | max | Bytes p50 |
 |---|---|---:|---:|---:|---:|---:|
-| `search` | 10 results (default) | 16 | 730 | 791 | 842 | 2764 |
+| `search` | 10 results (default) | 16 | 793 | 868 | 951 | 2955 |
 | `search` | 5 results | 16 | 345 | 381 | 439 | 1310 |
 | `get` | top result | 16 | 664 | 3463 | 5272 | 2194 |
 | `get` | each of the top 3 | 48 | 493 | 3944 | 5272 | 1893 |
