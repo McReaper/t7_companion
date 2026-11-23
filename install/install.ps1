@@ -88,7 +88,7 @@ if ((Test-Path $db) -and (Get-Item $db).LastWriteTime -lt (Get-Item $dbZip).Last
 
 # No exit here: piped into iex, it would close the user's PowerShell.
 if ($updating) {
-    $dbNote = "The first one to start unpacks the new database (~3.8 GB, about 20 s, once)."
+    $dbNote = "The first one to start unpacks the new database (~3.3 GB, about 20 s, once)."
     if (Test-Path $db) { $dbNote = "Its database didn't change: kept." }
     Write-Host @"
 

@@ -114,6 +114,6 @@ Nothing else tells the user a release exists: a third-party marketplace such as 
 
 ## 5. Confirm what was done, and report a failed step as failed
 
-Tell the user what was done. After a first install, the `t7kb:search` and `t7kb:get` MCP tools become available in the **next session** (or after `/reload-plugins`); after an update, a restart of Claude Code loads the new binary and skills. Either way, the ~3.8 GB database unpacks itself the first time the server starts, about 20 s once.
+Tell the user what was done. After a first install, the `t7kb:search` and `t7kb:get` MCP tools become available in the **next session** (or after `/reload-plugins`); after an update, a restart of Claude Code loads the new binary and skills. Either way, the ~3.3 GB database unpacks itself the first time the server starts, about 20 s once.
 
 If the install or registration failed at any step above, report the exact error there instead of reaching this step — don't claim success.
