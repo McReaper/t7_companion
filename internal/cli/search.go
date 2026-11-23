@@ -60,7 +60,7 @@ func runSearch(cmd *cobra.Command, query string, num int, bm25, vector, scores b
 	if vector {
 		keywords = "" // an empty keyword query leaves the ranking to the vectors
 	}
-	hits, err := st.SearchHybrid(cmd.Context(), keywords, qvec, num, only...)
+	hits, err := st.Search(cmd.Context(), keywords, qvec, num, only...)
 	if err != nil {
 		return err
 	}
@@ -91,6 +91,9 @@ func embedQuery(query string) ([]float32, error) {
 
 func printHits(out io.Writer, hits []store.Hit, showScores bool) {
 	for i, h := range hits {
+		if head := partHeading(hits, i); head != "" {
+			fmt.Fprintln(out, head)
+		}
 		if showScores {
 			fmt.Fprintf(out, "%2d. [rrf %.4f · rel %.2f] %s  (%s)\n", i+1, h.Score, h.Reliability, h.DocID, h.Source)
 		} else {
@@ -101,4 +104,20 @@ func printHits(out io.Writer, hits []store.Hit, showScores bool) {
 			fmt.Fprintf(out, "    %s\n", h.Snippet)
 		}
 	}
+}
+
+// partHeading is the line printed before hit i of a search that lists pages
+// then code files (store.Search, unfiltered): one heading before the pages and
+// one before the code, when both are listed. Otherwise none.
+func partHeading(hits []store.Hit, i int) string {
+	if len(hits) == 0 || hits[0].Code || !hits[len(hits)-1].Code {
+		return ""
+	}
+	switch {
+	case i == 0:
+		return "Guides, threads and docs:"
+	case hits[i].Code && !hits[i-1].Code:
+		return "Code and data files (scripts, mod-tools files, entity and asset definitions):"
+	}
+	return ""
 }

@@ -66,6 +66,7 @@ type Hit struct {
 	Score       float64 // fused RRF score (higher = better)
 	Reliability float64
 	Snippet     string
+	Code        bool // listed in Search's code part, after the pages
 }
 
 // Doc is a full document body.
@@ -115,9 +116,79 @@ func (s *Store) SearchHybrid(ctx context.Context, query string, qvec []float32, 
 	if err != nil {
 		return nil, err
 	}
+	return s.fuse(ctx, limit, bm25, vec)
+}
+
+// codeSlots is how many of limit results Search keeps for code and data
+// files: 3 of 10.
+func codeSlots(limit int) int { return limit * 3 / 10 }
+
+// Search is the search t7kb serves. With sources, it is SearchHybrid. Without,
+// it ranks two parts of the corpus apart, with SearchHybrid's fusion in each:
+// the pages (guides, threads, docs, the API reference, videos) and the code
+// and data files (codeSources). Its hits list the best pages, then the best
+// code files, marked Code: codeSlots(limit) of them, fewer when the code part
+// has fewer hits, more when the pages can't fill the rest.
+//
+// Code files hold over half the corpus's vectors. In one list with the pages,
+// they took the slots of the guides that answer a question; apart, the right
+// page stays among 10 results as often, and the code slots add a useful file
+// for many more questions (docs/retrieval-experiments.md).
+func (s *Store) Search(ctx context.Context, query string, qvec []float32, limit int, sources ...string) ([]Hit, error) {
+	if len(sources) > 0 || limit <= 0 {
+		return s.SearchHybrid(ctx, query, qvec, limit, sources...)
+	}
+	all, err := s.sources(ctx)
+	if err != nil {
+		return nil, err
+	}
+	pageSet, codeSet := map[string]bool{}, map[string]bool{}
+	for _, src := range all {
+		if codeSources[src] {
+			codeSet[src] = true
+		} else {
+			pageSet[src] = true
+		}
+	}
+	if len(pageSet) == 0 || len(codeSet) == 0 {
+		return s.SearchHybrid(ctx, query, qvec, limit) // one part only: nothing to keep apart
+	}
+	match := ftsQuery(query)
+	bmPages, err := s.bm25Rank(ctx, match, Pool, pageSet)
+	if err != nil {
+		return nil, err
+	}
+	bmCode, err := s.bm25Rank(ctx, match, Pool, codeSet)
+	if err != nil {
+		return nil, err
+	}
+	vecPages, vecCode, err := s.vectorRankSplit(ctx, qvec, Pool, codeSet)
+	if err != nil {
+		return nil, err
+	}
+	pages, err := s.fuse(ctx, limit, bmPages, vecPages)
+	if err != nil {
+		return nil, err
+	}
+	code, err := s.fuse(ctx, limit, bmCode, vecCode)
+	if err != nil {
+		return nil, err
+	}
+	nPages := min(len(pages), limit-min(len(code), codeSlots(limit)))
+	code = code[:min(len(code), limit-nPages)]
+	for i := range code {
+		code[i].Code = true
+	}
+	return append(pages[:nPages], code...), nil
+}
+
+// fuse is SearchHybrid's fusion of one BM25 and one vector ranking. BM25 is
+// weighted bm25Weight against the vector; a keyword-only search has nothing
+// to balance and keeps plain RRF scores.
+func (s *Store) fuse(ctx context.Context, limit int, bm25, vec []rankItem) ([]Hit, error) {
 	w := bm25Weight
 	if len(vec) == 0 {
-		w = 1 // keyword-only: nothing to balance
+		w = 1
 	}
 	return s.hits(ctx, limit, ranking{bm25, w}, ranking{vec, 1})
 }
@@ -285,16 +356,54 @@ type scoredDoc struct {
 // and vector cost more than the scoring. The text of the winners alone is read
 // afterwards, for their snippets.
 func (s *Store) vectorRank(ctx context.Context, qvec []float32, limit int, only map[string]bool) ([]rankItem, error) {
+	docs, err := s.vectorBest(ctx, qvec, only)
+	if err != nil {
+		return nil, err
+	}
+	return s.topItems(ctx, docs, limit)
+}
+
+// vectorRankSplit is vectorRank for two parts of the corpus in one pass over
+// the vectors: the documents of the sources in code, and the others.
+func (s *Store) vectorRankSplit(ctx context.Context, qvec []float32, limit int, code map[string]bool) (others, inCode []rankItem, err error) {
+	docs, err := s.vectorBest(ctx, qvec, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	var a, b []scoredDoc
+	for _, d := range docs {
+		if code[sourceOf(d.docID)] {
+			b = append(b, d)
+		} else {
+			a = append(a, d)
+		}
+	}
+	if others, err = s.topItems(ctx, a, limit); err != nil {
+		return nil, nil, err
+	}
+	if inCode, err = s.topItems(ctx, b, limit); err != nil {
+		return nil, nil, err
+	}
+	return others, inCode, nil
+}
+
+// topItems keeps the limit best docs and reads their snippets.
+func (s *Store) topItems(ctx context.Context, docs []scoredDoc, limit int) ([]rankItem, error) {
+	top := topDocs(docs, limit)
+	if err := s.chunkSnippets(ctx, top); err != nil {
+		return nil, err
+	}
+	return rankItems(top), nil
+}
+
+// vectorBest scores every chunk and returns each document's best, unsorted.
+func (s *Store) vectorBest(ctx context.Context, qvec []float32, only map[string]bool) ([]scoredDoc, error) {
 	if len(qvec) == 0 {
 		return nil, nil
 	}
 	if s.vecOn {
 		if ix := s.vectorIndex(); ix != nil {
-			top := ix.rank(qvec, limit, only)
-			if err := s.chunkSnippets(ctx, top); err != nil {
-				return nil, err
-			}
-			return rankItems(top), nil
+			return ix.best(qvec, only), nil
 		}
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT rowid, doc_id, embedding FROM embeddings`)
@@ -325,11 +434,11 @@ func (s *Store) vectorRank(ctx context.Context, qvec []float32, limit int, only 
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	top := topDocs(best, limit)
-	if err := s.chunkSnippets(ctx, top); err != nil {
-		return nil, err
+	docs := make([]scoredDoc, 0, len(best))
+	for _, d := range best {
+		docs = append(docs, d)
 	}
-	return rankItems(top), nil
+	return docs, nil
 }
 
 // chunkSnippets reads the best chunk's text of each doc and makes its snippet.
@@ -360,11 +469,7 @@ func (s *Store) chunkSnippets(ctx context.Context, docs []scoredDoc) error {
 }
 
 // topDocs returns the limit best-scoring docs, best first.
-func topDocs(byDoc map[string]scoredDoc, limit int) []scoredDoc {
-	docs := make([]scoredDoc, 0, len(byDoc))
-	for _, d := range byDoc {
-		docs = append(docs, d)
-	}
+func topDocs(docs []scoredDoc, limit int) []scoredDoc {
 	sort.Slice(docs, func(i, j int) bool { return docs[i].score > docs[j].score })
 	if limit > 0 && len(docs) > limit {
 		docs = docs[:limit]

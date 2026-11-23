@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"math"
 	"runtime"
-	"sort"
 	"sync"
 )
 
@@ -69,9 +68,9 @@ func loadVecIndex(ctx context.Context, db *sql.DB) (*vecIndex, error) {
 	return ix, rows.Err()
 }
 
-// rank scores every chunk on every CPU, then keeps each document's best chunk
-// (the first of equal scores, in scan order) and the limit best documents.
-func (ix *vecIndex) rank(qvec []float32, limit int, only map[string]bool) []scoredDoc {
+// best scores every chunk on every CPU, then keeps each document's best chunk
+// (the first of equal scores, in scan order), unsorted.
+func (ix *vecIndex) best(qvec []float32, only map[string]bool) []scoredDoc {
 	if len(qvec) != ix.dim {
 		return nil // the scan skips every chunk of another dimension
 	}
@@ -91,10 +90,6 @@ func (ix *vecIndex) rank(qvec []float32, limit int, only map[string]bool) []scor
 		if b > 0 {
 			docs = append(docs, scoredDoc{docID: ix.docs[d], score: scores[b-1], chunk: ix.rowid[b-1]})
 		}
-	}
-	sort.Slice(docs, func(i, j int) bool { return docs[i].score > docs[j].score })
-	if limit > 0 && len(docs) > limit {
-		docs = docs[:limit]
 	}
 	return docs
 }

@@ -88,7 +88,7 @@ func TestTokenReport(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		hits, err := st.SearchHybrid(ctx, q, v, 10)
+		hits, err := st.Search(ctx, q, v, 10)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -21,8 +21,12 @@ import (
 //
 //	T7KB_BENCH_DB=<t7kb.db> HF_HOME=<models> go test ./internal/cli -run TestRetrievalQuality -v
 //
+// Each query runs the search t7kb serves (store.Search): unfiltered, its 10
+// results are the 7 best pages, then the 3 best code and data files.
+//
 // Metrics, averaged over the queries:
-//   - key@5: a key document is in the top 5
+//   - key@5: a key document is in the top 5 (the first 5 pages)
+//   - key@10: a key document is among the 10 results
 //   - recall@10: the share of key + relevant documents in the top 10
 //   - MRR: 1 / the rank of the first key or relevant document
 //   - nDCG@10: graded ranking quality (key 2, relevant 1), 1 = ideal order
@@ -33,7 +37,7 @@ type evalQuery struct {
 	Relevant []string `json:"relevant"`
 }
 
-type evalScore struct{ key5, recall10, mrr, ndcg10 float64 }
+type evalScore struct{ key5, key10, recall10, mrr, ndcg10 float64 }
 
 func TestRetrievalQuality(t *testing.T) {
 	db := os.Getenv("T7KB_BENCH_DB")
@@ -138,13 +142,13 @@ func TestRetrievalQuality(t *testing.T) {
 func scoreSet(t *testing.T, report *strings.Builder, emb *embed.Embedder, st *store.Store, qs []evalQuery) {
 	t.Helper()
 	var sum evalScore
-	fmt.Fprintf(report, "\n%-46s key@5 rec@10  MRR  nDCG@10  top-10 sources\n", "query")
+	fmt.Fprintf(report, "\n%-46s key@5 key@10 rec@10  MRR  nDCG@10  top-10 sources\n", "query")
 	for _, q := range qs {
 		v, err := emb.Embed(q.Query)
 		if err != nil {
 			t.Fatal(err)
 		}
-		hits, err := st.SearchHybrid(context.Background(), q.Query, v, 10)
+		hits, err := st.Search(context.Background(), q.Query, v, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -154,13 +158,14 @@ func scoreSet(t *testing.T, report *strings.Builder, emb *embed.Embedder, st *st
 		}
 		s := scoreRanking(ids, q)
 		sum.key5 += s.key5
+		sum.key10 += s.key10
 		sum.recall10 += s.recall10
 		sum.mrr += s.mrr
 		sum.ndcg10 += s.ndcg10
-		fmt.Fprintf(report, "%-46.46s %5.0f %6.2f %4.2f %8.2f  %s\n", q.Query, s.key5, s.recall10, s.mrr, s.ndcg10, sourceMix(ids))
+		fmt.Fprintf(report, "%-46.46s %5.0f %6.0f %6.2f %4.2f %8.2f  %s\n", q.Query, s.key5, s.key10, s.recall10, s.mrr, s.ndcg10, sourceMix(ids))
 	}
 	n := float64(len(qs))
-	fmt.Fprintf(report, "%-46s %5.2f %6.2f %4.2f %8.2f\n", fmt.Sprintf("MEAN over %d queries", len(qs)), sum.key5/n, sum.recall10/n, sum.mrr/n, sum.ndcg10/n)
+	fmt.Fprintf(report, "%-46s %5.2f %6.2f %6.2f %4.2f %8.2f\n", fmt.Sprintf("MEAN over %d queries", len(qs)), sum.key5/n, sum.key10/n, sum.recall10/n, sum.mrr/n, sum.ndcg10/n)
 }
 
 // scoreRanking scores one ranked list of doc_ids against a judged query.
@@ -188,6 +193,9 @@ func scoreRanking(ids []string, q evalQuery) evalScore {
 		}
 		if g == 2 && i < 5 {
 			s.key5 = 1
+		}
+		if g == 2 && i < 10 {
+			s.key10 = 1
 		}
 	}
 	s.recall10 = float64(found) / float64(len(grade))
@@ -255,11 +263,11 @@ func checkJudgedDocsExist(t *testing.T, db string, qs []evalQuery) {
 
 func TestScoreRanking(t *testing.T) {
 	q := evalQuery{Key: []string{"k"}, Relevant: []string{"r1", "r2"}}
-	if s := scoreRanking([]string{"k", "r1", "r2"}, q); s.key5 != 1 || s.recall10 != 1 || s.mrr != 1 || math.Abs(s.ndcg10-1) > 1e-9 {
+	if s := scoreRanking([]string{"k", "r1", "r2"}, q); s.key5 != 1 || s.key10 != 1 || s.recall10 != 1 || s.mrr != 1 || math.Abs(s.ndcg10-1) > 1e-9 {
 		t.Fatalf("the ideal ranking scores 1 everywhere: %+v", s)
 	}
-	if s := scoreRanking([]string{"x", "x", "x", "x", "x", "k"}, q); s.key5 != 0 || s.mrr != 1.0/6 || s.recall10 != 1.0/3 {
-		t.Fatalf("a key at rank 6 misses key@5: %+v", s)
+	if s := scoreRanking([]string{"x", "x", "x", "x", "x", "k"}, q); s.key5 != 0 || s.key10 != 1 || s.mrr != 1.0/6 || s.recall10 != 1.0/3 {
+		t.Fatalf("a key at rank 6 misses key@5, not key@10: %+v", s)
 	}
 	if s := scoreRanking([]string{"x"}, q); s != (evalScore{}) {
 		t.Fatalf("nothing found scores 0: %+v", s)

@@ -22,6 +22,12 @@ var sourceGroups = map[string][]string{
 	"workspace": {"source-workspace"}, // files of a mod-tools install
 }
 
+// codeSources are the code and data files Search ranks apart from the pages:
+// Treyarch's scripts and game data (both decompilations), the files of a
+// mod-tools install, and the entity and asset definitions read from its
+// deffiles.
+var codeSources = map[string]bool{"source-scripts": true, "source-dump": true, "source-workspace": true, "defs-bo3": true}
+
 // SourceGroups lists the group names, for help texts.
 func SourceGroups() []string {
 	out := make([]string, 0, len(sourceGroups))

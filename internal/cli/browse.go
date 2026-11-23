@@ -56,7 +56,7 @@ func runBrowse(cmd *cobra.Command, _ []string) error {
 			if err != nil {
 				return err
 			}
-			if hits, err = st.SearchHybrid(cmd.Context(), line, qvec, 10); err != nil {
+			if hits, err = st.Search(cmd.Context(), line, qvec, 10); err != nil {
 				return err
 			}
 			if len(hits) == 0 {

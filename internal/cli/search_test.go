@@ -77,3 +77,42 @@ func TestSearchBM25AnswersAQuestionWithTheDocumentsHoldingSomeOfItsWords(t *test
 		t.Errorf("no word found:\n%s\nstderr: %s", out, errs)
 	}
 }
+
+// Unfiltered, search lists the pages under one heading and the code files
+// under another, after them; a source filter lists one kind without headings.
+func TestSearchHeadsThePagesAndTheCodeFiles(t *testing.T) {
+	kbDB(t, map[string]string{
+		"wiki-modme::spawners":            "Place a zombie spawner and give it a targetname.",
+		"discord-bo3modtools::spawner":    "My spawner never spawns anything.",
+		"source-scripts::zm_spawner":      "spawner spawner spawner",
+		"defs-bo3::entity.actor_spawner":  "spawner spawner",
+		"source-workspace::prefab.spawns": "spawner",
+	})
+	run := func(args ...string) string {
+		cmd := newRootCmd()
+		var out strings.Builder
+		cmd.SetOut(&out)
+		cmd.SetErr(&out)
+		cmd.SetArgs(append([]string{"search", "--bm25", "spawner"}, args...))
+		if err := cmd.Execute(); err != nil {
+			t.Fatal(err)
+		}
+		return out.String()
+	}
+	out := run()
+	pages, code := strings.Index(out, "Guides, threads and docs:"), strings.Index(out, "Code and data files")
+	if pages != 0 || code < 0 {
+		t.Fatalf("want the pages' heading first, then the code's:\n%s", out)
+	}
+	for _, id := range []string{"wiki-modme::spawners", "discord-bo3modtools::spawner"} {
+		if i := strings.Index(out, id); i < pages || i > code {
+			t.Errorf("%s should be listed between the two headings:\n%s", id, out)
+		}
+	}
+	if i := strings.Index(out, "source-scripts::zm_spawner"); i < code {
+		t.Errorf("the code file should be listed after its heading:\n%s", out)
+	}
+	if out := run("--source", "wiki,scripts"); strings.Contains(out, "Guides, threads") || strings.Contains(out, "Code and data") {
+		t.Errorf("a filtered search is one list, without headings:\n%s", out)
+	}
+}

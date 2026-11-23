@@ -24,7 +24,9 @@ func searchToolDef() mcp.Tool {
 	return mcp.NewTool("search",
 		mcp.WithDescription("Search the Black Ops 3 modding knowledge base with hybrid "+
 			"(keyword + semantic) retrieval. Returns ranked results — doc_id, title, "+
-			"source, reliability, and a snippet. Use `get` to fetch a full body."),
+			"source, reliability, and a snippet. Unfiltered, the last 3 of 10 are code and data files "+
+			"(Treyarch's scripts, mod-tools files, entity and asset definitions), ranked apart from the "+
+			"guides, threads and docs listed above them. Use `get` to fetch a full body."),
 		mcp.WithString("query", mcp.Required(),
 			mcp.Description("Natural-language question or keywords.")),
 		mcp.WithNumber("limit", mcp.Description("Maximum number of results (default 10).")),
@@ -58,7 +60,7 @@ func searchToolHandler(st *store.Store, emb *embed.Embedder) server.ToolHandlerF
 		if err != nil {
 			return mcp.NewToolResultErrorFromErr("embed query", err), nil
 		}
-		hits, err := st.SearchHybrid(ctx, query, qvec, limit, only...)
+		hits, err := st.Search(ctx, query, qvec, limit, only...)
 		if err != nil {
 			return mcp.NewToolResultErrorFromErr("search", err), nil
 		}
@@ -72,6 +74,9 @@ func formatHits(hits []store.Hit) string {
 	}
 	var b strings.Builder
 	for i, h := range hits {
+		if head := partHeading(hits, i); head != "" {
+			fmt.Fprintln(&b, head)
+		}
 		fmt.Fprintf(&b, "%d. %s  (source: %s, reliability: %.2f)\n", i+1, h.DocID, h.Source, h.Reliability)
 		fmt.Fprintf(&b, "   %s\n", h.Title)
 		if h.Snippet != "" {
